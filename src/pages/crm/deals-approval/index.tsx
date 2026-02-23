@@ -1107,7 +1107,7 @@ const CrmDeals = () => {
     }
   };
 
-  // Handle view deal
+  // Handle view deal - open GenericSidebar only (no modal)
   const handleViewDeal = useCallback(async (dealId: number) => {
     try {
       setLoadingDeal(true);
@@ -1115,6 +1115,8 @@ const CrmDeals = () => {
       setRelatedLead(null);
       const dealData: any = await getDeal(dealId);
       setViewingDeal(dealData);
+      setSelectedDeal(dealData);
+      setShowDealSidebar(true);
 
       // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
       if (dealData.ticket_id) {
@@ -1140,8 +1142,6 @@ const CrmDeals = () => {
           // Don't show error toast as lead is optional
         }
       }
-
-      setShowDealViewModal(true);
     } catch (error) {
       console.error("Failed to fetch deal:", error);
       toast.error("Failed to load deal details");

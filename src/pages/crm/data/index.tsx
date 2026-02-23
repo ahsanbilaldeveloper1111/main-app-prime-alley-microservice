@@ -83,7 +83,7 @@ import {
   Target,
   Layers,
 } from "lucide-react";
-import ConvertToLeadModal from "@components/ConvertToLeadModal";
+import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
@@ -143,7 +143,7 @@ import {
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
-import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
+import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
@@ -1199,7 +1199,7 @@ const CrmProspectsManagement = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-
+        
         // Also populate the campaignsById map
         const campaignsMap: Record<number, string> = {};
         campaignsResponse.data.forEach((campaign: any) => {
@@ -1658,90 +1658,12 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  // Handle view data item
+  // Handle view data item - open GenericSidebar only (no modal)
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
-    setShowViewModal(true);
+    setSelectedProspect(item);
+    setShowProspectSidebar(true);
   }, []);
-
-  // Fetch call recordings (not call logs) for the selected prospect
-  // Filters by current user's extension and prospect's phone number
-  const fetchCallRecordings = useCallback(
-    async (phoneNumber: string) => {
-      const normalizedPhone = (phoneNumber || '').replace(/\s/g, '');
-      if (!normalizedPhone) {
-        setCallRecordings([]);
-        return;
-      }
-
-      setCallRecordingsLoading(true);
-      try {
-        const filters = {
-          remote_party_number: [normalizedPhone]
-        };
-
-        // Use ListCallLogs with reportType 'recordings' to fetch call recordings
-        const response = await ListCallLogs(
-          {
-            page: 1,
-            perPage: 5,
-            search: "",
-            filters,
-            reportType: "recordings", // This ensures we get recordings, not logs
-            moduleSlug: ModuleSlug.CALL_RECORDINGS,
-          },
-          "call-logs/recordings", // Endpoint for call recordings
-        );
-
-        if (response?.dataList) {
-          setCallRecordings(response.dataList);
-        } else {
-          setCallRecordings([]);
-        }
-
-        // Store total count from pagination
-        if (response?.total !== undefined) {
-          setCallRecordingsTotal(response.total);
-        } else {
-          setCallRecordingsTotal(0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch call recordings:", error);
-        setCallRecordings([]);
-        setCallRecordingsTotal(0);
-      } finally {
-        setCallRecordingsLoading(false);
-      }
-    },
-    [session],
-  );
-
-  // Load call recordings when view modal opens
-  useEffect(() => {
-    if (showViewModal && selectedDataItem?.phone) {
-      fetchCallRecordings(selectedDataItem.phone);
-    } else {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [showViewModal, selectedDataItem, fetchCallRecordings]);
-
-  // Load call recordings when prospect sidebar (preview modal) opens
-  useEffect(() => {
-    if (showProspectSidebar && selectedProspect?.phone) {
-      fetchCallRecordings(
-        selectedProspect.phone
-      );
-    } else if (!showProspectSidebar && !showViewModal) {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [
-    showProspectSidebar,
-    selectedProspect,
-    showViewModal,
-    fetchCallRecordings,
-  ]);
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -3125,7 +3047,7 @@ const CrmProspectsManagement = () => {
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
-              console.log("Import contacts");
+              setShowUploadModal(true);
             }}
             style={{
               width: "100%",
@@ -3177,9 +3099,7 @@ const CrmProspectsManagement = () => {
           data: {
             email: contactForm.email.trim(),
             assigned_to: assignedTo,
-            user_extension: userExtension,
             uploaded_by: uploadedBy,
-            campaign_id: contactForm.campaign_id ?? undefined,
             company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
             next_call: contactForm.next_call || undefined,
@@ -3245,9 +3165,9 @@ const CrmProspectsManagement = () => {
       await updateCrmData(editingContactId, {
         name,
         phone: contactForm.phoneNumber.trim(),
+        campaign_id: contactForm.campaign_id ?? null,
         data: {
           email: contactForm.email.trim(),
-          campaign_id: contactForm.campaign_id ?? undefined,
           company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
           next_call: contactForm.next_call || undefined,
@@ -3618,42 +3538,47 @@ const CrmProspectsManagement = () => {
                       >
                         Campaign
                       </label>
-                      <Select
-                        value={
-                          contactForm.campaign_id != null
-                            ? (() => {
-                                const c = availableCampaigns.find(
-                                  (x) => x.id === contactForm.campaign_id,
-                                );
-                                return c
-                                  ? { value: String(c.id), label: c.label }
-                                  : null;
-                              })()
-                            : null
-                        }
-                        onChange={(opt: any) =>
-                          setContactForm({
-                            ...contactForm,
-                            campaign_id: opt?.value ? Number(opt.value) : null,
-                          })
-                        }
-                        options={availableCampaigns.map((c) => ({
-                          value: String(c.id),
-                          label: c.label,
-                        }))}
-                        placeholder="Select campaign"
-                        isClearable
-                        isSearchable
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            minHeight: 40,
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                          }),
-                        }}
-                      />
+                      {(() => {
+                        const campaignSelectOptions =
+                          availableCampaigns.map((c) => ({
+                            value: String(c.id),
+                            label: c.label,
+                          }));
+                        return (
+                          <Select
+                            value={
+                              contactForm.campaign_id != null
+                                ? campaignSelectOptions.find(
+                                    (o) =>
+                                      o.value ===
+                                      String(contactForm.campaign_id),
+                                  ) ?? null
+                                : null
+                            }
+                            onChange={(opt: any) =>
+                              setContactForm({
+                                ...contactForm,
+                                campaign_id: opt?.value
+                                  ? Number(opt.value)
+                                  : null,
+                              })
+                            }
+                            options={campaignSelectOptions}
+                            placeholder="Select campaign"
+                            isClearable
+                            isSearchable
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: 40,
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                              }),
+                            }}
+                          />
+                        );
+                      })()}
                     </div>
                     <div
                       className="contact-form-field"
@@ -8334,109 +8259,16 @@ const CrmProspectsManagement = () => {
                 icon: PhoneIcon,
                 collapsible: true,
                 defaultExpanded: true,
-                count: callRecordingsTotal ?? callRecordings.length,
-                isLoading: callRecordingsLoading,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () =>
+                      selectedProspect?.phone &&
+                      handleCallClick(selectedProspect),
                   },
-                ],
-                ...(callRecordings.length > 0
-                  ? {
-                      customContent: (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
-                          }}
-                        >
-                          {callRecordings.map(
-                            (recording: any, index: number) => {
-                              const duration =
-                                parseInt(
-                                  recording.Duration?.toString() || "0",
-                                ) / 10000000 || 0;
-                              const isOutgoing =
-                                recording.Direction === "CALL_OUTGOING";
-                              return (
-                                <div
-                                  key={recording.Id || index}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "10px 12px",
-                                    background: "#f9fafb",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#1f2937",
-                                      }}
-                                    >
-                                      {formatDateTimeToLocal(
-                                        recording.DateTime,
-                                        GlobalDateFormat,
-                                      )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                        marginTop: "2px",
-                                      }}
-                                    >
-                                      {formatDuration(duration)} ·{" "}
-                                      {isOutgoing ? "Outgoing" : "Incoming"}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    style={{
-                                      background: "transparent",
-                                      border: "none",
-                                      color: "#2563eb",
-                                      cursor: "pointer",
-                                      padding: "6px",
-                                      borderRadius: "6px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                    title="Play Recording"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePlayCallRecording(recording);
-                                    }}
-                                  >
-                                    <FiPlay size={18} />
-                                  </button>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      ),
-                    }
-                  : {
-                      emptyState: {
-                        icon: PhoneIcon,
-                        message: "No call recordings available yet.",
-                        action: {
-                          label: "Make a call",
-                          onClick: () =>
-                            selectedProspect?.phone &&
-                            handleCallClick(selectedProspect),
-                        },
-                      },
-                    }),
+                },
               },
               {
                 id: "notes",
@@ -8740,21 +8572,22 @@ const CrmProspectsManagement = () => {
         />
       </div>{" "}
       {/* End flex container */}
-      {/* Convert to Lead Modal */}
-      {convertingProspectId && (
-        <ConvertToLeadModal
-          show={showConvertToLeadModal}
-          onHide={() => {
-            setShowConvertToLeadModal(false);
-            setConvertingProspectId(null);
-          }}
-          prospectId={convertingProspectId}
-          onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
-            toast.success("Prospect converted to lead successfully!");
-          }}
-        />
-      )}
+      {/* Convert to Lead – same sidebar as Create Lead on leads page, with prospect pre-filled */}
+      <CreateLeadModal
+        show={showConvertToLeadModal}
+        onHide={() => {
+          setShowConvertToLeadModal(false);
+          setConvertingProspectId(null);
+        }}
+        onSuccess={() => {
+          setShowConvertToLeadModal(false);
+          setConvertingProspectId(null);
+          setRefreshKey((prev) => prev + 1);
+          toast.success("Prospect converted to lead successfully!");
+        }}
+        type="lead"
+        crmDataId={convertingProspectId ?? undefined}
+      />
       {/* Column Editor Modal */}
       <Modal
         show={showColumnEditor}

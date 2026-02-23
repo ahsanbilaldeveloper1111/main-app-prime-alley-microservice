@@ -992,6 +992,7 @@ export const updateCrmData = async (
   payload: {
     name: string;
     phone: string;
+    campaign_id: number | null;
     data: Record<string, any>;
   },
 ): Promise<any> => {
