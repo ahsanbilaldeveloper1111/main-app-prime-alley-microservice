@@ -4,17 +4,17 @@ import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
 import { Button, Dropdown } from 'react-bootstrap';
 import { Eye, Key } from 'lucide-react';
-import { updateUserStatus } from '@utils/users';
 
-const STATUS_OPTIONS = ['Active', 'Disabled', 'Pending', 'Deleted'] as const;
+const STATUS_OPTIONS = ['processing', 'completed', 'deleted'] as const;
 
 interface UseUserColumnsOptions {
     onResetPassword?: (username: string) => void;
     onChangeStatus?: (encId: string, status: string) => void;
+    onStatusOptionSelect?: (row: any, status: string) => void;
 }
 
 export const useUserColumns = (session: any, customFieldColumns: Column[], options?: UseUserColumnsOptions) => {
-    const { onResetPassword, onChangeStatus } = options || {};
+    const { onResetPassword, onChangeStatus, onStatusOptionSelect } = options || {};
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
@@ -98,11 +98,10 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
                 )}
 
 {session?.user?.permissions?.includes('change-status-users') && (
-                    <Dropdown align="end" onSelect={async (status) => {
+                    <Dropdown align="end" onSelect={(status) => {
                         if (!status) return;
-                        const response = await updateUserStatus(props.encId, status);
-                        if (response) {
-                            onChangeStatus?.(props.encId, status);
+                        if (onStatusOptionSelect) {
+                            onStatusOptionSelect(props, status);
                         }
                     }}>
                         <Dropdown.Toggle variant="outline-primary" size="sm" className="" title="Status" id={`status-dropdown-${props.encId}`}>
@@ -119,7 +118,7 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
                 )}
             </div>
         ),
-    }), [session?.user?.permissions, onResetPassword, onChangeStatus]);
+    }), [session?.user?.permissions, onResetPassword, onChangeStatus, onStatusOptionSelect]);
 
     // Memoize the columns array to prevent unnecessary re-renders
     const columns: Column[] = useMemo(() => {

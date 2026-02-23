@@ -301,7 +301,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
             {
-                path: '/hosts/groups',
+                path: '/host-groups',
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
             {

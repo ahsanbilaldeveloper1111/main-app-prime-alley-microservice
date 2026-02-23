@@ -1053,7 +1053,7 @@ const processUserRequest = async (applicantDetails: any) => {
                   userId: applicantDetails.userId?.toString() || "",
                   company_id: applicantDetails.company_id,
                   update_user: true,
-                  self_app: true,
+                //   self_app: true,
               });
           } catch (error) {
               applicantDetails.verify = false;
@@ -1642,7 +1642,7 @@ const processUserRequest = async (applicantDetails: any) => {
               allow_fac_info: applicantDetails.allow_fac_info,
               display: applicantDetails.displayName || null,
               allow_error: false,     
-              self_app: true,
+            //   self_app: true,
           });
           if (applicantDetails.verify) {
               try {

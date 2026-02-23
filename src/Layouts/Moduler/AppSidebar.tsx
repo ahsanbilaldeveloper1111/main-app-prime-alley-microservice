@@ -393,7 +393,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
               id: 'billing-invoices', 
               title: 'Invoices', 
               icon: <DollarSign size={16} />, 
-              url: '/accounting/customer/invoices', 
+              url: '/finance/invoices', 
               permission: PERMISSIONS.VIEW_INVOICES_BILLING 
             },
             { 
