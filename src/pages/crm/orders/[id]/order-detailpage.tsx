@@ -74,6 +74,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const [loading, setLoading] = useState(true);
   const { hasPermission } = usePermissions();
   const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
+  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -267,6 +268,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
     recordName: orderRecordName,
     recordEmail: orderRecordEmail,
     recordPhone: orderRecordPhone,
+    onTaskCreated: () => tasksRefetch?.(),
   });
 
   // Key Information Fields - Order specific
@@ -1581,6 +1583,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
               recordName={orderRecordName}
               canSendWhatsApp={canSendWhatsApp}
               extensions={extensions}
+              onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
               {...activityModals.crmActivitiesPanelProps}
             />
           )}

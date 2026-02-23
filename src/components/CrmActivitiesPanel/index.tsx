@@ -7,7 +7,7 @@ import {
   X, ChevronDown, ChevronRight, Mail, Calendar, MessageSquare, ClipboardList,
   FileText, Pencil, Trash2, MessageCircle, AlertCircle, Phone,
 } from 'lucide-react';
-import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, getCampaigns, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry } from '@utils/crm';
+import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, getCampaigns, getTasks, createTask, updateTask, deleteTask, createTaskNote, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry, type TaskData } from '@utils/crm';
 import { getSmsList, getChats, getWhatsAppChatMessages, sendWhatsApp, getEmails, type SmsListItem, type SmsListMeta } from '@utils/communication';
 import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { ListCallLogs } from '@utils/calls';
@@ -20,6 +20,7 @@ import TaskModal from '@components/TaskModal';
 import MeetingModal from '@components/MeetingModal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
+import { useSession } from 'next-auth/react';
 import moment from 'moment-timezone';
 
 // -----------------------------------------------------------------------------
@@ -176,6 +177,8 @@ export interface CrmActivitiesPanelProps {
   onOpenEmail?: () => void;
   onOpenTask?: () => void;
   onOpenMeeting?: () => void;
+  /** Called with refetch function so parent can trigger tasks refetch (e.g. after creating task from sidebar modal). */
+  onTasksRefetchReady?: (fetchTasks: () => void) => void;
 }
 
 export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
@@ -191,6 +194,7 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   onOpenEmail,
   onOpenTask,
   onOpenMeeting,
+  onTasksRefetchReady,
 }) => {
   const useExternalModals = Boolean(onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting);
   const [activityFilter, setActivityFilter] = useState('activity');
@@ -212,6 +216,13 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [tasksList, setTasksList] = useState<TaskData[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<TaskData | null>(null);
+  const [taskDeleteLoading, setTaskDeleteLoading] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingTaskForm, setEditingTaskForm] = useState({ name: '', due_date: '', time: '', status: 'pending' as 'pending' | 'completed' | 'failed', urgency: 'med' as 'low' | 'med' | 'high' });
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [smsList, setSmsList] = useState<SmsListItem[]>([]);
   const [smsLoading, setSmsLoading] = useState(false);
@@ -314,6 +325,31 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     if (activityFilter !== 'meetings' || recordId == null) return;
     fetchMeetings();
   }, [activityFilter, recordId, fetchMeetings]);
+
+  const fetchTasks = useCallback(() => {
+    if (recordId == null || Number.isNaN(recordId)) return;
+    setTasksLoading(true);
+    setTasksError(null);
+    getTasks({ record_type: recordType, record_id: recordId, per_page: 100 })
+      .then((res: { data?: TaskData[] }) => {
+        setTasksList(Array.isArray(res?.data) ? res.data : []);
+        setTasksError(null);
+      })
+      .catch(() => {
+        setTasksList([]);
+        setTasksError('Failed to load tasks');
+      })
+      .finally(() => setTasksLoading(false));
+  }, [recordType, recordId]);
+
+  useEffect(() => {
+    if (activityFilter !== 'tasks' || recordId == null) return;
+    fetchTasks();
+  }, [activityFilter, recordId, fetchTasks]);
+
+  useEffect(() => {
+    onTasksRefetchReady?.(fetchTasks);
+  }, [onTasksRefetchReady, fetchTasks]);
 
   const fetchSms = useCallback(() => {
     if (recordId == null || Number.isNaN(recordId)) return;
@@ -529,6 +565,74 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     await fetchMeetings();
     setShowMeetingModal(false);
   }, [fetchMeetings]);
+
+  const { data: session } = useSession();
+  const userExtension =
+    (session?.user as { extension?: string; phone?: string } | undefined)?.extension ??
+    (session?.user as { extension?: string; phone?: string } | undefined)?.phone ??
+    '';
+
+  /** Parse TaskModal activityDate preset to YYYY-MM-DD for due_date. */
+  const parseTaskDueDate = useCallback((activityDate: string, activityTime: string): string => {
+    const m = moment();
+    if (activityDate === 'Today') return m.format('YYYY-MM-DD');
+    if (activityDate === 'Tomorrow') return m.add(1, 'day').format('YYYY-MM-DD');
+    if (activityDate?.includes('3 business') || activityDate?.includes('Friday')) return m.add(3, 'day').format('YYYY-MM-DD');
+    if (activityDate === 'In 1 week') return m.add(1, 'week').format('YYYY-MM-DD');
+    if (activityDate === 'In 2 weeks') return m.add(2, 'week').format('YYYY-MM-DD');
+    if (activityDate === 'In 1 month') return m.add(1, 'month').format('YYYY-MM-DD');
+    return moment().add(3, 'day').format('YYYY-MM-DD');
+  }, []);
+
+  const handleTaskSave = useCallback(
+    async (taskForm: {
+      title: string;
+      activityDate: string;
+      activityTime: string;
+      priority: string;
+      notes: string;
+    }) => {
+      const due_date = parseTaskDueDate(taskForm.activityDate, taskForm.activityTime);
+      const urgency = taskForm.priority === 'High' ? 'high' : taskForm.priority === 'Medium' ? 'med' : 'low';
+      const ext = userExtension || 'unknown';
+      try {
+        await createTask({
+          name: taskForm.title.trim(),
+          user_extension: ext,
+          created_by: ext,
+          urgency,
+          due_date,
+          time: taskForm.activityTime?.slice(0, 5) || undefined,
+          status: 'pending',
+          notes: taskForm.notes?.trim() ? [{ note: taskForm.notes.trim() }] : undefined,
+          record_type: recordType,
+          record_id: recordId,
+          email: record?.data?.data?.email ?? undefined,
+          phone: record?.data?.phone ?? undefined,
+          company_name: record?.data?.name ?? undefined,
+        });
+        setShowTaskModal(false);
+        fetchTasks();
+      } catch {
+        // createTask shows toast
+      }
+    },
+    [recordType, recordId, record, userExtension, parseTaskDueDate, fetchTasks],
+  );
+
+  const handleTaskDeleteConfirm = useCallback(async () => {
+    if (taskToDelete?.id == null) return;
+    setTaskDeleteLoading(true);
+    try {
+      await deleteTask(taskToDelete.id);
+      setTaskToDelete(null);
+      fetchTasks();
+    } catch {
+      // deleteTask shows toast
+    } finally {
+      setTaskDeleteLoading(false);
+    }
+  }, [taskToDelete, fetchTasks]);
 
   const handleWhatsAppReplySend = useCallback(async () => {
     if (selectedWhatsAppChatId == null || !whatsappReplyMessage.trim() || !canSendWhatsApp) return;
@@ -989,12 +1093,136 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
       )}
 
       {activityFilter === 'tasks' && (
-        <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
-          <ClipboardList size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-          <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
-            Create and manage tasks related to this contact.
-          </p>
-        </div>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', marginBottom: '20px' }}>
+            <button
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #414141',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: '300',
+                color: '#141414',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+              onClick={onOpenTask ?? (() => setShowTaskModal(true))}
+            >
+              <ClipboardList size={16} />
+              Create task
+            </button>
+          </div>
+          {tasksLoading ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Loading tasks…</p>
+            </div>
+          ) : tasksError ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <AlertCircle size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', margin: 0 }}>{tasksError}</p>
+            </div>
+          ) : tasksList.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <ClipboardList size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
+                Create and manage tasks related to this contact.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {tasksList.map((task) => {
+                const taskId = task.id!;
+                const isEditing = editingTaskId === taskId;
+                const dueDate = task.due_date?.slice(0, 10) ?? '';
+                const description = task.notes?.length && task.notes[0]?.note ? task.notes[0].note : '—';
+                const iconBtnStyle: React.CSSProperties = { background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', color: '#718096', display: 'flex', alignItems: 'center' };
+                return (
+                  <div key={taskId} style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '5px', padding: '16px 20px', marginBottom: '0' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {isEditing ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingTaskForm.name}
+                              onChange={(e) => setEditingTaskForm((p) => ({ ...p, name: e.target.value }))}
+                              placeholder="Task name"
+                              style={{ width: '100%', padding: '8px 12px', border: '1px solid #cbd5e0', borderRadius: '5px', fontSize: '14px', marginBottom: '8px' }}
+                            />
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                              <input type="date" value={editingTaskForm.due_date} onChange={(e) => setEditingTaskForm((p) => ({ ...p, due_date: e.target.value }))} style={{ padding: '8px 12px', border: '1px solid #cbd5e0', borderRadius: '5px', fontSize: '14px' }} />
+                              <input type="time" value={editingTaskForm.time} onChange={(e) => setEditingTaskForm((p) => ({ ...p, time: e.target.value }))} style={{ padding: '8px 12px', border: '1px solid #cbd5e0', borderRadius: '5px', fontSize: '14px' }} />
+                              <select value={editingTaskForm.status} onChange={(e) => setEditingTaskForm((p) => ({ ...p, status: e.target.value as 'pending' | 'completed' | 'failed' }))} style={{ padding: '8px 12px', border: '1px solid #cbd5e0', borderRadius: '5px', fontSize: '14px' }}>
+                                <option value="pending">Pending</option>
+                                <option value="completed">Completed</option>
+                                <option value="failed">Failed</option>
+                              </select>
+                              <select value={editingTaskForm.urgency} onChange={(e) => setEditingTaskForm((p) => ({ ...p, urgency: e.target.value as 'low' | 'med' | 'high' }))} style={{ padding: '8px 12px', border: '1px solid #cbd5e0', borderRadius: '5px', fontSize: '14px' }}>
+                                <option value="low">Low</option>
+                                <option value="med">Medium</option>
+                                <option value="high">High</option>
+                              </select>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (editingTaskId == null) return;
+                                  try {
+                                    await updateTask(editingTaskId, {
+                                      name: editingTaskForm.name,
+                                      due_date: editingTaskForm.due_date || undefined,
+                                      time: editingTaskForm.time || undefined,
+                                      status: editingTaskForm.status,
+                                      urgency: editingTaskForm.urgency,
+                                    });
+                                    setEditingTaskId(null);
+                                    fetchTasks();
+                                  } catch {}
+                                }}
+                                style={{ padding: '6px 14px', backgroundColor: '#141414', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', color: '#fff', cursor: 'pointer' }}
+                              >
+                                Save
+                              </button>
+                              <button type="button" onClick={() => setEditingTaskId(null)} style={{ padding: '6px 14px', backgroundColor: '#fff', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', fontWeight: '500', color: '#141414', cursor: 'pointer' }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p style={{ fontSize: '14px', fontWeight: '600', color: '#141414', margin: '0 0 4px 0', lineHeight: '1.4' }}>{task.name}</p>
+                            <p style={{ fontSize: '14px', color: '#141414', margin: '4px 0', lineHeight: '1.6' }}>
+                              {dueDate ? new Date(task.due_date!).toLocaleDateString('en-US') : '—'}
+                              {task.time ? ` ${task.time.slice(0, 5)}` : ''}
+                              {task.status ? ` · ${task.status}` : ''}
+                              {task.urgency ? ` · ${task.urgency}` : ''}
+                            </p>
+                            {description !== '—' && (
+                              <p style={{ fontSize: '13px', color: '#718096', margin: '8px 0 0 0', lineHeight: '1.5' }}>{description}</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {!isEditing && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '13px', color: '#718096', whiteSpace: 'nowrap', marginRight: '4px' }}>
+                            {task.updated_at ? new Date(task.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                          </span>
+                          <button type="button" onClick={() => { setEditingTaskId(taskId); setEditingTaskForm({ name: task.name, due_date: dueDate, time: task.time?.slice(0, 5) ?? '', status: (task.status as 'pending' | 'completed' | 'failed') || 'pending', urgency: (task.urgency as 'low' | 'med' | 'high') || 'med' }); }} style={iconBtnStyle} title="Edit task"><Pencil size={14} /></button>
+                          <button type="button" onClick={() => setTaskToDelete(task)} style={{ ...iconBtnStyle, color: '#e53e3e' }} title="Delete task"><Trash2 size={14} /></button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {activityFilter === 'meetings' && (
@@ -1248,9 +1476,20 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
         <>
           <NotesModal isOpen={showNotesModal} onClose={() => setShowNotesModal(false)} recordName={recordName} onSave={handleNoteCreate} />
           <EmailModal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)} recipientEmail={recordEmail} recipientName={recordName} senderEmail="user@example.com" senderName="Your Name" onSend={async () => { await fetchEmails(); setShowEmailModal(false); }} />
-          <TaskModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} assignedToName="Unassigned" onSave={() => setShowTaskModal(false)} />
+          <TaskModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} assignedToName="Unassigned" onSave={handleTaskSave} />
           <MeetingModal isOpen={showMeetingModal} onClose={() => setShowMeetingModal(false)} hostEmail="user@example.com" hostName="Your Name" attendeeEmail={recordEmail} attendeeName={recordName} onSchedule={handleMeetingSchedule} />
         </>
+      )}
+
+      {taskToDelete != null && (
+        <DeleteConfirmationModal
+          isOpen={true}
+          onClose={() => setTaskToDelete(null)}
+          onConfirm={handleTaskDeleteConfirm}
+          title="Delete task"
+          message={`Are you sure you want to delete "${taskToDelete.name}"?`}
+          isLoading={taskDeleteLoading}
+        />
       )}
 
       {showRecordingModal && (

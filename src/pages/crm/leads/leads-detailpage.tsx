@@ -98,6 +98,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -187,6 +188,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordName: leadRecordName,
     recordEmail: leadRecordEmail,
     recordPhone: leadRecordPhone,
+    onTaskCreated: () => tasksRefetch?.(),
   });
 
   const toggleSection = (sectionId: string) => {
@@ -1976,6 +1978,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             recordLoading={leadLoading}
             recordName={leadRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
             {...activityModals.crmActivitiesPanelProps}
           />
         )}

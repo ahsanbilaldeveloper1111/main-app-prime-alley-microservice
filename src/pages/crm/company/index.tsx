@@ -83,6 +83,9 @@ import {
   FileText,
   Target,
   Layers,
+  Link as LinkIcon,
+  Linkedin,
+  ExternalLink,
 } from "lucide-react";
 import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
@@ -96,9 +99,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 
 import GenericSidebar, {
-  SidebarSection,
   QuickAction,
-  BreezeRecordSummary,
   SidebarField,
 } from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
@@ -124,6 +125,13 @@ import {
   CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
+  getCompanies,
+  getCompany,
+  createCompany,
+  updateCompany,
+  deleteCompany,
+  type CompanyData,
+  type EnrichmentData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
@@ -148,7 +156,9 @@ import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
-import renderCreateCompany from "@components/renderCreateCompany";
+import renderCreateCompany, {
+  type CompanyFormPayload,
+} from "@components/renderCreateCompany";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -538,6 +548,263 @@ const getRandomColor = (name: string): string => {
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
+const labelKey = (key: string) =>
+  key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+const hasVal = (v: unknown) => v !== null && v !== undefined && v !== "";
+
+/** Renders enrichment_data: top-level fields, then all structured_data fields (no raw_data). */
+const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
+  const isObj = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  const topLevel: Array<{ key: string; value: unknown }> = [];
+  const skipKeys = ["raw_data", "structured_data", "validation_data"];
+  Object.entries(data).forEach(([k, v]) => {
+    if (skipKeys.includes(k) || !hasVal(v)) return;
+    topLevel.push({ key: k, value: v });
+  });
+
+  const struct = data.structured_data;
+  const grid = {
+    display: "grid" as const,
+    gridTemplateColumns: "160px 1fr",
+    gap: "12px 24px",
+    alignItems: "baseline",
+  };
+  const labelStyle = {
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#6b7280",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.5px",
+  };
+  const valueStyle = {
+    fontSize: "14px",
+    color: "#1f2937",
+    fontWeight: 500,
+    wordBreak: "break-word" as const,
+  };
+  const linkStyle = {
+    ...valueStyle,
+    color: "#2563eb",
+    textDecoration: "underline",
+  };
+
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <h5
+        style={{
+          fontSize: "15px",
+          fontWeight: 700,
+          color: "#1f2937",
+          marginBottom: "16px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            width: "4px",
+            height: "18px",
+            background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+            borderRadius: "2px",
+          }}
+        />
+        Enrichment data
+      </h5>
+      <div
+        style={{
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
+          borderRadius: "12px",
+          padding: "20px",
+        }}
+      >
+        {topLevel.length > 0 && (
+          <div style={{ ...grid, marginBottom: struct ? "20px" : 0 }}>
+            {topLevel.map(({ key, value }) => (
+              <React.Fragment key={key}>
+                <div style={labelStyle}>{labelKey(key)}</div>
+                <div style={valueStyle}>
+                  {Array.isArray(value)
+                    ? value.join(", ")
+                    : typeof value === "object"
+                      ? JSON.stringify(value)
+                      : String(value)}
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+        {struct && isObj(struct) && (
+          <div
+            style={{
+              paddingTop: topLevel.length > 0 ? "20px" : 0,
+              borderTop: topLevel.length > 0 ? "1px solid #e5e7eb" : "none",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6b7280",
+                marginBottom: "12px",
+              }}
+            >
+              Structured data (all fields)
+            </div>
+            <div style={grid}>
+              {hasVal(struct.official_company_name) && (
+                <>
+                  <div style={labelStyle}>Official company name</div>
+                  <div style={valueStyle}>
+                    {String(struct.official_company_name)}
+                  </div>
+                </>
+              )}
+              {struct.headquarters &&
+                (struct.headquarters.address ||
+                  struct.headquarters.city ||
+                  struct.headquarters.country) && (
+                  <>
+                    <div style={labelStyle}>Headquarters</div>
+                    <div style={valueStyle}>
+                      {[
+                        struct.headquarters.address,
+                        struct.headquarters.city,
+                        struct.headquarters.country,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
+                  </>
+                )}
+              {struct.other_locations &&
+                struct.other_locations.length > 0 &&
+                struct.other_locations.map((loc: any, i: number) => {
+                  const line = [loc?.address, loc?.city, loc?.country]
+                    .filter(Boolean)
+                    .join(", ");
+                  if (!line) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>Other location {i + 1}</div>
+                      <div style={valueStyle}>{line}</div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.emails &&
+                struct.emails.length > 0 &&
+                struct.emails.map((e: any, i: number) => {
+                  if (!hasVal(e?.email)) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>
+                        {struct.emails!.length > 1 ? `Email ${i + 1}` : "Email"}
+                      </div>
+                      <div style={valueStyle}>
+                        <a
+                          href={`mailto:${e.email}`}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {e.email}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.phones &&
+                struct.phones.length > 0 &&
+                struct.phones.map((p: any, i: number) => {
+                  if (!hasVal(p?.number)) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>
+                        {struct.phones!.length > 1 ? `Phone ${i + 1}` : "Phone"}
+                      </div>
+                      <div style={valueStyle}>
+                        <a
+                          href={`tel:${p.number}`}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {p.number}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.social_links &&
+                struct.social_links.length > 0 &&
+                struct.social_links.map((s: any, i: number) => {
+                  if (!hasVal(s?.url)) return null;
+                  const linkLabel = s?.platform
+                    ? String(s.platform)
+                    : `Social ${i + 1}`;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>{linkLabel}</div>
+                      <div style={valueStyle}>
+                        <a
+                          href={s.url}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {s.url}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.llm_confidence != null && (
+                <>
+                  <div style={labelStyle}>LLM confidence</div>
+                  <div style={valueStyle}>{String(struct.llm_confidence)}</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {data.validation_data && isObj(data.validation_data) && (
+          <div
+            style={{
+              marginTop: "20px",
+              paddingTop: "20px",
+              borderTop: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6b7280",
+                marginBottom: "12px",
+              }}
+            >
+              Validation data
+            </div>
+            <div style={grid}>
+              {Object.entries(data.validation_data).map(([k, v]) => {
+                if (!hasVal(v)) return null;
+                return (
+                  <React.Fragment key={k}>
+                    <div style={labelStyle}>{labelKey(k)}</div>
+                    <div style={valueStyle}>{String(v)}</div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const CrmCompanyManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -649,6 +916,9 @@ const CrmCompanyManagement = () => {
     useState(false);
   const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
     useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+  const [editingCompanyData, setEditingCompanyData] =
+    useState<CompanyFormPayload | null>(null);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -736,51 +1006,29 @@ const CrmCompanyManagement = () => {
     let cancelled = false;
     setContactFormLoadError(null);
     setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any> }) => {
+    getCompany(editingContactId)
+      .then((company: CompanyData) => {
         if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
+        const nameParts = (company.name || "").trim().split(/\s+/);
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                    value: t.name ?? t.value ?? "",
-                    label: t.name ?? t.label ?? t.value ?? "",
-                  },
-            )
-          : [];
         setContactForm({
           firstName,
           lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phoneNumber: item.phone ?? "",
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "Lead",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          last_called: toDatetimeLocal(
-            d.last_called ?? (item as any).last_called_at,
-          ),
-          last_call_status:
-            d.last_call_status ?? (item as any).last_call_end_reason ?? "",
-          next_call: toDatetimeLocal(d.next_call),
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray,
-          note: item.note ?? d.note ?? "",
-          is_viewed: item.is_viewed ?? d.is_viewed ?? false,
+          email: company.email ?? "",
+          phoneNumber: company.phone ?? "",
+          campaign_id: null,
+          contact_owner: null,
+          lifecycle_stage: "Lead",
+          disposition: "",
+          legal_basis: [],
+          last_called: "",
+          last_call_status: "",
+          next_call: "",
+          scheduled_call_at: "",
+          tags: [],
+          note: "",
+          is_viewed: false,
         });
         if (!cancelled) setContactFormLoading(false);
       })
@@ -794,6 +1042,35 @@ const CrmCompanyManagement = () => {
       cancelled = true;
     };
   }, [showCreateContactSidebar, editingContactId]);
+
+  // Load company into Create Company sidebar when opening for edit
+  useEffect(() => {
+    if (!showCreateCompanySidebar) return;
+    if (editingCompanyId == null) {
+      setEditingCompanyData(null);
+      return;
+    }
+    let cancelled = false;
+    getCompany(editingCompanyId)
+      .then((company: CompanyData) => {
+        if (cancelled) return;
+        setEditingCompanyData({
+          name: company.name ?? "",
+          phone: company.phone ?? undefined,
+          city: company.city ?? undefined,
+          country: company.country ?? undefined,
+          industry: company.industry ?? undefined,
+          domain: company.domain ?? undefined,
+          email: company.email ?? undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setEditingCompanyData(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCreateCompanySidebar, editingCompanyId]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -1431,144 +1708,86 @@ const CrmCompanyManagement = () => {
     );
   };
 
-  // Fetch companies data
+  // Map CompanyData to table shape (CrmDataItem-like)
+  const mapCompanyToRow = useCallback((c: CompanyData): CrmDataItem => {
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone ?? "",
+      created_at: c.created_at ?? "",
+      updated_at: c.updated_at ?? "",
+      last_called_at: null,
+      user_extension: null,
+      campaign_id: null,
+      campaign: null,
+      is_viewed: false,
+      scheduled_call_at: null,
+      status: "active",
+      source_file: null,
+      tags: null,
+      note: null,
+      data: {
+        email: c.email ?? "",
+        city: c.city ?? "",
+        country: c.country ?? "",
+        industry: c.industry ?? "",
+        domain: c.domain ?? "",
+        enrichment_status: c.enrichment_status ?? null,
+        enrichment_data: c.enrichment_data ?? null,
+      },
+    } as CrmDataItem;
+  }, []);
+
+  // Fetch companies data (Companies API)
   const fetchCrmData = useCallback(async () => {
-    // Increment request ID to track the latest request
     requestIdRef.current += 1;
     const currentRequestId = requestIdRef.current;
-
     setLoading(true);
     try {
-      // Use static dummy data (recommended for development)
-      const dummyCompanies = [
-        {
-          id: 1,
-          name: "Acme Corp",
-          phone: "+14155552671",
-          created_at: "2024-01-15T10:30:00Z",
-          updated_at: "2024-02-10T14:20:00Z",
-          last_called_at: "2024-02-10T14:20:00Z",
-          user_extension: "1001",
-          campaign_id: 1,
-          campaign: { id: 1, name: "Winter Campaign 2024" },
-          is_viewed: true,
-          scheduled_call_at: null,
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: null,
-          data: {
-            email: "contact@acmecorp.com",
-            city: "New York",
-            country: "United States",
-            industry: "Technology",
-          },
-        },
-        {
-          id: 2,
-          name: "TechVision Inc",
-          phone: "+14155552672",
-          created_at: "2024-01-20T09:15:00Z",
-          updated_at: "2024-02-12T11:45:00Z",
-          last_called_at: "2024-02-12T11:45:00Z",
-          user_extension: "1002",
-          campaign_id: 1,
-          campaign: { id: 1, name: "Winter Campaign 2024" },
-          is_viewed: false,
-          scheduled_call_at: "2024-02-21T15:00:00Z",
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: "Follow-up needed",
-          data: {
-            email: "info@techvision.com",
-            city: "Los Angeles",
-            country: "United States",
-            industry: "Healthcare",
-          },
-        },
-        {
-          id: 3,
-          name: "Global Solutions Ltd",
-          phone: "+14155552673",
-          created_at: "2024-01-25T16:20:00Z",
-          updated_at: "2024-01-25T16:20:00Z",
-          last_called_at: null,
-          user_extension: null,
-          campaign_id: 2,
-          campaign: { id: 2, name: "Spring Outreach" },
-          is_viewed: false,
-          scheduled_call_at: null,
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: null,
-          data: {
-            email: "hello@globalsolutions.com",
-            city: "Chicago",
-            country: "United States",
-            industry: "Finance",
-          },
-        },
-        {
-          id: 4,
-          name: "Innovation Labs",
-          phone: "+14155552674",
-          created_at: "2024-02-01T08:30:00Z",
-          updated_at: "2024-02-14T10:15:00Z",
-          last_called_at: "2024-02-14T10:15:00Z",
-          user_extension: "1001",
-          campaign_id: 2,
-          campaign: { id: 2, name: "Spring Outreach" },
-          is_viewed: true,
-          scheduled_call_at: "2024-02-22T09:30:00Z",
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: "High priority client",
-          data: {
-            email: "contact@innovationlabs.com",
-            city: "Houston",
-            country: "United States",
-            industry: "Manufacturing",
-          },
-        },
-      ];
+      const params: {
+        page: number;
+        per_page: number;
+        search?: string;
+        industry?: string;
+        country?: string;
+      } = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+      };
+      if (currentFilters.search) params.search = currentFilters.search;
+      if (currentFilters.industry) params.industry = currentFilters.industry;
+      if (currentFilters.country) params.country = currentFilters.country;
 
-      // Only update state if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
+      const response = await getCompanies(params);
+      if (currentRequestId !== requestIdRef.current) return;
 
-      // Use dummy data directly
-      setDataList(dummyCompanies);
-      setTotalRecords(dummyCompanies.length);
-      setTotalAllCompanies(dummyCompanies.length);
-
-      // Set dummy metrics
-      setMetrics({
-        assigned_records: 2,
-        unassigned_records: 2,
-        scheduled_records: 2,
-        not_scheduled_records: 2,
-        scheduled_next_hour_records: 0,
-        scheduled_next_24_hours_records: 1,
-      });
+      const rows = (response.data || []).map(mapCompanyToRow);
+      setDataList(rows);
+      setTotalRecords(response.total ?? 0);
+      setTotalAllCompanies(response.total ?? 0);
+      setMetrics((prev) => ({
+        ...prev,
+        assigned_records: response.total ?? 0,
+        unassigned_records: 0,
+      }));
     } catch (error: any) {
-      // Only handle error if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-      console.error("Failed to fetch CRM data:", error);
+      if (currentRequestId !== requestIdRef.current) return;
       setDataList([]);
       setTotalRecords(0);
+      setTotalAllCompanies(0);
     } finally {
-      // Only set loading to false if this is still the current request
       if (currentRequestId === requestIdRef.current) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [
+    pagination.currentPage,
+    pagination.rowsPerPage,
+    currentFilters.search,
+    currentFilters.industry,
+    currentFilters.country,
+    mapCompanyToRow,
+  ]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -1815,28 +2034,9 @@ const CrmCompanyManagement = () => {
     [session],
   );
 
-  // Load call recordings when view modal opens
-  useEffect(() => {
-    if (showViewModal && selectedDataItem?.phone) {
-      fetchCallRecordings(selectedDataItem.phone);
-    } else {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [showViewModal, selectedDataItem, fetchCallRecordings]);
+  // Call recordings are not shown in company view modal; no fetch on view open
 
-  // Load call recordings when company sidebar (preview modal) opens
-  useEffect(() => {
-    if (showCompanySidebar && selectedCompany?.phone) {
-      fetchCallRecordings(
-        selectedCompany.phone,
-        selectedCompany.user_extension,
-      );
-    } else if (!showCompanySidebar && !showViewModal) {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [showCompanySidebar, selectedCompany, showViewModal, fetchCallRecordings]);
+  // Call recordings not shown in company sidebar; no fetch on sidebar open
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -1912,12 +2112,12 @@ const CrmCompanyManagement = () => {
     setShowDeleteModal(true);
   }, []);
 
-  // Confirm delete
+  // Confirm delete (Companies API)
   const confirmDelete = useCallback(async () => {
     if (!itemToDelete) return;
 
     try {
-      await deleteCrmData(itemToDelete.id);
+      await deleteCompany(itemToDelete.id);
       setShowDeleteModal(false);
       setItemToDelete(null);
       setRefreshKey((prev) => prev + 1);
@@ -2424,7 +2624,9 @@ const CrmCompanyManagement = () => {
   // Handle first column click - navigates to detail page with company ID in URL
   const handleFirstColumnClick = useCallback(
     (company: any) => {
-      router.push(`/crm/prospects/companies-detailpage?id=${company?.id ?? ""}`);
+      router.push(
+        `/crm/prospects/companies-detailpage?id=${company?.id ?? ""}`,
+      );
     },
     [router],
   );
@@ -2535,6 +2737,22 @@ const CrmCompanyManagement = () => {
         },
         emptyValue: "N/A",
       },
+      {
+        key: "enrichment_status",
+        label: "Enrichment",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => row.data?.enrichment_status ?? "—",
+        badge: {
+          getVariant: (row) => {
+            const s = row.data?.enrichment_status;
+            if (s === "success") return "success";
+            if (s === "failed") return "danger";
+            return "secondary";
+          },
+        },
+        emptyValue: "—",
+      },
     ],
     [extensions, callEndReasons, handleCallClick],
   );
@@ -2558,8 +2776,8 @@ const CrmCompanyManagement = () => {
               label: "Edit",
               icon: <FiEdit size={16} />,
               onClick: (row: any) => {
-                setEditingContactId(row.id);
-                setShowCreateContactSidebar(true);
+                setEditingCompanyId(row.id);
+                setShowCreateCompanySidebar(true);
               },
               variant: "link" as const,
             },
@@ -2896,56 +3114,6 @@ const CrmCompanyManagement = () => {
                 <FiPhone size={14} />
               </Button>
             )}
-
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="app-button"
-                id={`dropdown-${props.id}`}
-              >
-                <FiMoreVertical size={14} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
-                ) && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <>
-                        <Dropdown.Item
-                          onClick={() => handleScheduleCall(props)}
-                        >
-                          <FiCalendar size={14} className="me-2" />
-                          Edit Scheduled Call
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          onClick={() => handleUnscheduleCallClick(props)}
-                          className="text-danger"
-                        >
-                          <FiX size={14} className="me-2" />
-                          Unschedule Call
-                        </Dropdown.Item>
-                      </>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
-                    )}
-                    <Dropdown.Divider />
-                  </>
-                )}
-                <Dropdown.Item
-                  onClick={() => {
-                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                  }}
-                >
-                  <FiTarget size={14} className="me-2" />
-                  Convert to Lead
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
           </div>
         ),
       },
@@ -3014,7 +3182,11 @@ const CrmCompanyManagement = () => {
       ref={addContactsRef}
     >
       <button
-        onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
+        onClick={() => {
+          setShowCreateCompanySidebar(false);
+          setEditingCompanyId(null);
+          setShowCreateCompanySidebar(true);
+        }}
         style={{
           padding: "9px 13px",
           backgroundColor: "#000000",
@@ -3036,75 +3208,7 @@ const CrmCompanyManagement = () => {
         }}
       >
         Add companies
-        <ChevronDown size={16} />
       </button>
-
-      {showAddContactsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setShowCreateCompanySidebar(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Create new
-          </button>
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              console.log("Import contacts");
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#d97706",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Import
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -3115,44 +3219,21 @@ const CrmCompanyManagement = () => {
         .filter(Boolean)
         .join(" ")
         .trim();
-      if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
-        toast.error("Name, email and phone are required");
+      if (!name?.trim()) {
+        toast.error("Company name is required");
         return;
       }
-      const sessionUser = session?.user as any;
-      const userExtension = String(sessionUser?.phone ?? "");
-      const assignedTo = userExtension;
-      const uploadedBy = userExtension;
 
       setCreateContactLoading(true);
       try {
-        await createCrmData({
-          name,
-          phone: contactForm.phoneNumber.trim(),
-          user_extension: userExtension,
-          campaign_id: contactForm.campaign_id ?? null,
-          data: {
-            email: contactForm.email.trim(),
-            assigned_to: assignedTo,
-            user_extension: userExtension,
-            uploaded_by: uploadedBy,
-            campaign_id: contactForm.campaign_id ?? undefined,
-            last_called: contactForm.last_called || undefined,
-            last_call_status: contactForm.last_call_status || undefined,
-            disposition: contactForm.disposition || undefined,
-            next_call: contactForm.next_call || undefined,
-            tags: contactForm.tags?.length
-              ? contactForm.tags.map((t) => t.value || t.label)
-              : undefined,
-            is_viewed: contactForm.is_viewed,
-            scheduled_call_at: contactForm.scheduled_call_at || undefined,
-            note: contactForm.note || undefined,
-            contact_owner: contactForm.contact_owner ?? undefined,
-            lifecycle_stage: contactForm.lifecycle_stage || undefined,
-            legal_basis: contactForm.legal_basis?.length
-              ? contactForm.legal_basis
-              : undefined,
-          },
+        await createCompany({
+          name: name.trim(),
+          phone: contactForm.phoneNumber?.trim() || undefined,
+          email: contactForm.email?.trim() || undefined,
+          city: (contactForm as any).city ?? undefined,
+          country: (contactForm as any).country ?? undefined,
+          industry: (contactForm as any).industry ?? undefined,
+          domain: (contactForm as any).domain ?? undefined,
         });
         fetchCrmData();
         setContactForm({
@@ -3177,12 +3258,12 @@ const CrmCompanyManagement = () => {
           setShowCreateContactSidebar(false);
         }
       } catch {
-        // Error already shown by createCrmData
+        // Error already shown by createCompany
       } finally {
         setCreateContactLoading(false);
       }
     },
-    [contactForm, fetchCrmData, session?.user],
+    [contactForm, fetchCrmData],
   );
 
   const handleUpdateContactSubmit = useCallback(async () => {
@@ -3191,44 +3272,26 @@ const CrmCompanyManagement = () => {
       .filter(Boolean)
       .join(" ")
       .trim();
-    if (
-      !name ||
-      !contactForm.email?.trim() ||
-      !contactForm.phoneNumber?.trim()
-    ) {
-      toast.error("Name, email and phone are required");
+    if (!name?.trim()) {
+      toast.error("Company name is required");
       return;
     }
     setCreateContactLoading(true);
     try {
-      await updateCrmData(editingContactId, {
-        name,
-        phone: contactForm.phoneNumber.trim(),
-        data: {
-          email: contactForm.email.trim(),
-          campaign_id: contactForm.campaign_id ?? undefined,
-          last_called: contactForm.last_called || undefined,
-          last_call_status: contactForm.last_call_status || undefined,
-          disposition: contactForm.disposition || undefined,
-          next_call: contactForm.next_call || undefined,
-          tags: contactForm.tags?.length
-            ? contactForm.tags.map((t) => t.value || t.label)
-            : undefined,
-          is_viewed: contactForm.is_viewed,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          note: contactForm.note || undefined,
-          contact_owner: contactForm.contact_owner ?? undefined,
-          lifecycle_stage: contactForm.lifecycle_stage || undefined,
-          legal_basis: contactForm.legal_basis?.length
-            ? contactForm.legal_basis
-            : undefined,
-        },
+      await updateCompany(editingContactId, {
+        name: name.trim(),
+        phone: contactForm.phoneNumber?.trim() || undefined,
+        email: contactForm.email?.trim() || undefined,
+        city: (contactForm as any).city ?? undefined,
+        country: (contactForm as any).country ?? undefined,
+        industry: (contactForm as any).industry ?? undefined,
+        domain: (contactForm as any).domain ?? undefined,
       });
       fetchCrmData();
       setShowCreateContactSidebar(false);
       setEditingContactId(null);
     } catch {
-      // Error already shown by updateCrmData
+      // Error already shown by updateCompany
     } finally {
       setCreateContactLoading(false);
     }
@@ -3239,9 +3302,7 @@ const CrmCompanyManagement = () => {
     if (!showCreateContactSidebar) return null;
 
     const isFormValid =
-      contactForm.email?.trim() &&
-      contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
+      contactForm.firstName?.trim() || contactForm.lastName?.trim();
 
     return (
       <>
@@ -4484,10 +4545,9 @@ const CrmCompanyManagement = () => {
       /> */}
 
           <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showCompanyAnalytics && (
+            {/* Summary stats removed – company list only */}
+            {false && showCompanyAnalytics && (
               <>
-                {/* Summary Stats Grid - Using KPICard design */}
                 <Row className="mb-2">
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
@@ -4497,61 +4557,7 @@ const CrmCompanyManagement = () => {
                       color="primary"
                     />
                   </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Companies with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Companies with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllCompanyStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Companies Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Companies Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
                 </Row>
-
                 <div className="text-center mb-4">
                   <Button
                     variant="link"
@@ -5661,17 +5667,21 @@ const CrmCompanyManagement = () => {
                         color: "#000",
                       }}
                     >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <PhoneIcon size={14} />
-                        {selectedDataItem.phone || "No phone"}
-                      </span>
-                      <span>•</span>
+                      {selectedDataItem.phone && (
+                        <>
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                            }}
+                          >
+                            <PhoneIcon size={14} />
+                            {selectedDataItem.phone}
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
@@ -5680,20 +5690,22 @@ const CrmCompanyManagement = () => {
                             )
                           : "N/A"}
                       </span>
-                      {selectedDataItem.is_viewed && (
+                      {(selectedDataItem.data as any)?.enrichment_status && (
                         <>
                           <span>•</span>
                           <Badge
-                            bg="light"
-                            text="dark"
-                            style={{
-                              background: "rgba(255,255,255,0.25)",
-                              border: "1px solid rgba(255,255,255,0.3)",
-                              color: "white",
-                              fontWeight: 500,
-                            }}
+                            bg={
+                              (selectedDataItem.data as any)
+                                .enrichment_status === "success"
+                                ? "success"
+                                : (selectedDataItem.data as any)
+                                      .enrichment_status === "failed"
+                                  ? "danger"
+                                  : "secondary"
+                            }
+                            style={{ fontWeight: 500 }}
                           >
-                            Viewed
+                            {(selectedDataItem.data as any).enrichment_status}
                           </Badge>
                         </>
                       )}
@@ -5709,1170 +5721,231 @@ const CrmCompanyManagement = () => {
                   overflowY: "auto",
                 }}
               >
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 360px",
-                    minHeight: "500px",
-                  }}
-                >
-                  {/* Left Panel - Main Information */}
+                <div style={{ padding: "32px" }}>
+                  {/* Company information – only fields that have values */}
                   <div
                     style={{
-                      padding: "32px",
-                      borderRight: "1px solid #e5e7eb",
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                      marginBottom: "24px",
                     }}
                   >
-                    {/* Quick Info Cards */}
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(2, 1fr)",
-                        gap: "16px",
-                        marginBottom: "28px",
+                        gridTemplateColumns: "140px 1fr",
+                        gap: "12px 24px",
+                        alignItems: "baseline",
                       }}
                     >
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(102, 126, 234, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
+                      {selectedDataItem.name && (
+                        <>
                           <div
                             style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <User size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#2563eb",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Assigned Agent
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {selectedDataItem.user_extension
-                                ? extensions.find(
-                                    (extension: any) =>
-                                      extension.id.toString() ===
-                                      selectedDataItem.user_extension?.toString(),
-                                  )?.display_name ||
-                                  selectedDataItem.user_extension
-                                : "Unassigned"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #f093fb30",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(240, 147, 251, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#0284c7",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Target size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#f5576c",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Campaign
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {availableCampaigns.find(
-                                (c) =>
-                                  c.value ===
-                                  selectedDataItem.campaign_id?.toString(),
-                              )?.label || "No Campaign"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact Information Section */}
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Contact Details
-                      </h5>
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "140px 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
+                              fontSize: "12px",
+                              fontWeight: 700,
                               color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
                             }}
                           >
-                            <PhoneIcon size={16} style={{ color: "#2563eb" }} />
+                            Name
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {selectedDataItem.name}
+                          </div>
+                        </>
+                      )}
+                      {selectedDataItem.phone && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
                             Phone
                           </div>
                           <div
                             style={{
-                              color: "#1f2937",
                               fontSize: "15px",
+                              color: "#1f2937",
                               fontWeight: 500,
                             }}
                           >
-                            {selectedDataItem.phone || "N/A"}
+                            {selectedDataItem.phone}
                           </div>
-
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.email && (
+                        <>
                           <div
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
+                              fontSize: "12px",
+                              fontWeight: 700,
                               color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
                             }}
                           >
-                            <Calendar size={16} style={{ color: "#2563eb" }} />
+                            Email
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).email}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.city && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            City
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).city}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.country && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Country
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).country}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.industry && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Industry
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).industry}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.domain && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Domain
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).domain}
+                          </div>
+                        </>
+                      )}
+                      {selectedDataItem.created_at && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
                             Created
                           </div>
                           <div
                             style={{
-                              color: "#1f2937",
                               fontSize: "15px",
+                              color: "#1f2937",
                               fontWeight: 500,
                             }}
                           >
-                            {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
-                              : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Call Note Section */}
-                    {selectedDataItem?.note && (
-                      <div style={{ marginBottom: "28px" }}>
-                        <h5
-                          style={{
-                            fontSize: "15px",
-                            fontWeight: 700,
-                            color: "#1f2937",
-                            marginBottom: "16px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "4px",
-                              height: "18px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              borderRadius: "2px",
-                            }}
-                          />
-                          Call Notes
-                        </h5>
-                        <div
-                          style={{
-                            background: "#fffbeb",
-                            border: "1px solid #fcd34d",
-                            borderRadius: "12px",
-                            padding: "16px 20px",
-                            fontSize: "14px",
-                            color: "#78350f",
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {selectedDataItem.note}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Custom Data Fields Section */}
-                    {selectedDataItem.data &&
-                      Object.keys(selectedDataItem.data).length > 0 && (
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Additional Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              {Object.entries(selectedDataItem.data).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      {key
-                                        .replace(/_/g, " ")
-                                        .replace(/\b\w/g, (l) =>
-                                          l.toUpperCase(),
-                                        )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {value !== null && value !== undefined
-                                        ? typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : String(value)
-                                        : "N/A"}
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Call Recordings Section */}
-                    <div style={{ marginBottom: "20px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Call Recordings
-                        <Badge
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {callRecordingsTotal > 0
-                            ? callRecordingsTotal
-                            : callRecordings.length}
-                        </Badge>
-                      </h5>
-
-                      {callRecordingsLoading ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Spinner
-                            animation="border"
-                            variant="primary"
-                            size="sm"
-                            style={{ marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{ color: "#6b7280", fontSize: "14px" }}
-                          >
-                            Loading recordings...
-                          </p>
-                        </div>
-                      ) : callRecordings.length === 0 ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            border: "2px dashed #d1d5db",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <History
-                            size={40}
-                            style={{ color: "#9ca3af", marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            No call recordings found
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div style={{ overflowX: "auto" }}>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                              }}
-                            >
-                              <thead>
-                                <tr
-                                  style={{
-                                    background: "#f9fafb",
-                                    borderBottom: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Date & Time
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Extension
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Direction
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Duration
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "center",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      width: "100px",
-                                    }}
-                                  >
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {callRecordings.map(
-                                  (recording: any, index: number) => {
-                                    const duration =
-                                      parseInt(
-                                        recording.Duration?.toString() || "0",
-                                      ) / 10000000 || 0;
-                                    const isDownloading =
-                                      downloadingRecordings.has(recording.Id);
-                                    const progress =
-                                      downloadProgress[recording.Id] || 0;
-                                    const isOutgoing =
-                                      recording.Direction === "CALL_OUTGOING";
-
-                                    return (
-                                      <tr
-                                        key={recording.Id || index}
-                                        style={{
-                                          borderBottom: "1px solid #f3f4f6",
-                                          transition: "background 0.2s ease",
-                                        }}
-                                        onMouseOver={(e) => {
-                                          e.currentTarget.style.background =
-                                            "#f9fafb";
-                                        }}
-                                        onMouseOut={(e) => {
-                                          e.currentTarget.style.background =
-                                            "white";
-                                        }}
-                                      >
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              fontSize: "13px",
-                                              color: "#1f2937",
-                                              fontWeight: 500,
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalDateFormat,
-                                            )}
-                                          </div>
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "#6b7280",
-                                              marginTop: "2px",
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalTimeFormat,
-                                              "YYYY-MM-DD HH:mm:ss.SSSSSSS",
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {recording.AgentExtension || "N/A"}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "6px",
-                                              padding: "4px 10px",
-                                              borderRadius: "6px",
-                                              fontSize: "12px",
-                                              fontWeight: 600,
-                                              background: isOutgoing
-                                                ? "#dbeafe"
-                                                : "#d1fae5",
-                                              color: isOutgoing
-                                                ? "#1e40af"
-                                                : "#065f46",
-                                            }}
-                                          >
-                                            {isOutgoing
-                                              ? "Outgoing"
-                                              : "Incoming"}
-                                          </span>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {formatDuration(duration)}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "8px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          >
-                                            <button
-                                              style={{
-                                                background: "transparent",
-                                                border: "none",
-                                                color: "#2563eb",
-                                                cursor: "pointer",
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                transition: "all 0.2s ease",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}
-                                              title="Play Recording"
-                                              onClick={() =>
-                                                handlePlayCallRecording(
-                                                  recording,
-                                                )
-                                              }
-                                              onMouseOver={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "#ede9fe";
-                                              }}
-                                              onMouseOut={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "transparent";
-                                              }}
-                                            >
-                                              <FiPlay size={16} />
-                                            </button>
-                                            {isDownloading ? (
-                                              <CircularProgressCircle
-                                                progress={progress}
-                                                size="small"
-                                                color="#28a745"
-                                                backgroundColor="#e9ecef"
-                                                textColor="#495057"
-                                                showPercentage={false}
-                                                className="circular-progress-inline"
-                                              />
-                                            ) : (
-                                              <button
-                                                style={{
-                                                  background: "transparent",
-                                                  border: "none",
-                                                  color: "#2563eb",
-                                                  cursor: "pointer",
-                                                  padding: "6px",
-                                                  borderRadius: "6px",
-                                                  transition: "all 0.2s ease",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                                title="Download Recording"
-                                                onClick={() =>
-                                                  handleDownloadCallRecording(
-                                                    recording,
-                                                  )
-                                                }
-                                                onMouseOver={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "#ede9fe";
-                                                }}
-                                                onMouseOut={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "transparent";
-                                                }}
-                                              >
-                                                <Download size={16} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Panel - Quick Actions & Timeline */}
-                  <div
-                    style={{
-                      padding: "32px 24px",
-                      background: "#fafbfc",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                    }}
-                  >
-                    {/* Quick Actions */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Quick Actions
-                      </h6>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle call action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "white" }} />
-                          </div>
-                          Call Prospect
-                        </button>
-
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle message action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Mail size={16} style={{ color: "white" }} />
-                          </div>
-                          Send Message
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Status Overview */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Status Overview
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Status
-                            </span>
-                            <Badge
-                              bg={
-                                selectedDataItem.is_viewed
-                                  ? "success"
-                                  : "primary"
-                              }
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Total Calls
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {callRecordings.length}
-                            </span>
-                          </div>
-
-                          {selectedDataItem.scheduled_call_at && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                paddingTop: "14px",
-                                borderTop: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                <Calendar
-                                  size={14}
-                                  style={{ color: "#2563eb" }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Scheduled Call
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  marginLeft: "22px",
-                                }}
-                              >
-                                {moment(
-                                  selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Activity Timeline */}
-                    <div style={{ flex: 1 }}>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Recent Activity
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                          maxHeight: "300px",
-                          overflowY: "auto",
-                        }}
-                      >
-                        {callRecordings.length > 0 ? (
-                          <div style={{ position: "relative" }}>
-                            {/* Timeline line */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: "7px",
-                                top: "8px",
-                                bottom: "8px",
-                                width: "2px",
-                                background: "#e5e7eb",
-                              }}
-                            />
-
-                            {callRecordings
-                              .slice(0, 5)
-                              .map((recording: any, index: number) => {
-                                const isOutgoing =
-                                  recording.Direction === "CALL_OUTGOING";
-                                return (
-                                  <div
-                                    key={recording.Id || index}
-                                    style={{
-                                      position: "relative",
-                                      paddingLeft: "28px",
-                                      paddingBottom:
-                                        index <
-                                        Math.min(callRecordings.length, 5) - 1
-                                          ? "16px"
-                                          : "0",
-                                    }}
-                                  >
-                                    {/* Timeline dot */}
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        left: "0",
-                                        top: "4px",
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "50%",
-                                        background: isOutgoing
-                                          ? "#2563eb"
-                                          : "#10b981",
-                                        border: "3px solid white",
-                                        boxShadow: "0 0 0 1px #e5e7eb",
-                                      }}
-                                    />
-
-                                    <div>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          color: "#1f2937",
-                                          fontWeight: 600,
-                                          marginBottom: "4px",
-                                        }}
-                                      >
-                                        {isOutgoing
-                                          ? "Outgoing Call"
-                                          : "Incoming Call"}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "11px",
-                                          color: "#6b7280",
-                                        }}
-                                      >
-                                        {moment(recording.DateTime).format(
-                                          "MMM DD, hh:mm A",
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                            {callRecordings.length > 5 && (
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  marginTop: "12px",
-                                  paddingTop: "12px",
-                                  borderTop: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#2563eb",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  +{callRecordings.length - 5} more activities
-                                </span>
-                              </div>
+                            {moment(selectedDataItem.created_at).format(
+                              "MMMM DD, YYYY",
                             )}
                           </div>
-                        ) : (
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "20px",
-                              color: "#9ca3af",
-                            }}
-                          >
-                            <ClockIcon
-                              size={32}
-                              style={{ marginBottom: "8px", opacity: 0.5 }}
-                            />
-                            <div style={{ fontSize: "13px" }}>
-                              No activity yet
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
                   </div>
+
+                  {/* Enrichment data – only present keys, no static fields */}
+                  {(selectedDataItem.data as any)?.enrichment_data && (
+                    <CompanyViewEnrichmentBlock
+                      data={
+                        (selectedDataItem.data as any)
+                          .enrichment_data as EnrichmentData
+                      }
+                    />
+                  )}
                 </div>
               </Modal.Body>
 
@@ -8112,331 +7185,298 @@ const CrmCompanyManagement = () => {
           />
         </div>{" "}
         {/* End main content area */}
-        {/* Company Detail Sidebar */}
-        {showCompanySidebar && (
-          <GenericSidebar
-            isOpen={showCompanySidebar}
-            onClose={handleCloseCompanySidebar}
-            title={selectedCompany?.name || "Company Details"}
-            subtitle={selectedCompany?.phone || ""}
-            email={selectedCompany?.data?.email}
-            phone={selectedCompany?.phone}
-            avatar={{
-              initials: getInitials(selectedCompany?.name || "NA"),
-              name: selectedCompany?.name || "NA",
-              gradient: getRandomColor(selectedCompany?.name || ""),
-            }}
-            onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content:
-                "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-              timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                navigator.clipboard.writeText(
-                  "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-                );
-                console.log("Summary copied");
+        {/* Company Detail Sidebar – company info only, links (website/social) instead of Call/Note/Meeting */}
+        {showCompanySidebar &&
+          (() => {
+            const enrichment = selectedCompany?.data?.enrichment_data as
+              | EnrichmentData
+              | undefined;
+            const domain = selectedCompany?.data?.domain as string | undefined;
+            const websiteUrl =
+              enrichment?.discovered_website ||
+              (domain
+                ? domain.startsWith("http")
+                  ? domain
+                  : `https://${domain}`
+                : null);
+            const struct = enrichment?.structured_data;
+            const structSocial = struct?.social_links || [];
+            const seenUrls = new Set<string>();
+            const linkActions: QuickAction[] = [];
+            if (websiteUrl && !seenUrls.has(websiteUrl)) {
+              seenUrls.add(websiteUrl);
+              linkActions.push({
+                id: "website",
+                label: "Website",
+                icon: LinkIcon,
+                onClick: () => window.open(websiteUrl, "_blank"),
+              });
+            }
+            structSocial.forEach(
+              (
+                s:
+                  | { platform?: string | null; url?: string | null }
+                  | null
+                  | undefined,
+              ) => {
+                if (!s?.url || seenUrls.has(s.url)) return;
+                seenUrls.add(s.url);
+                const label = s.platform
+                  ? String(s.platform).charAt(0).toUpperCase() +
+                    String(s.platform).slice(1)
+                  : "Social";
+                linkActions.push({
+                  id: `social-${linkActions.length}`,
+                  label,
+                  icon: (s.platform || "").toLowerCase().includes("linkedin")
+                    ? Linkedin
+                    : ExternalLink,
+                  onClick: () => window.open(s.url!, "_blank"),
+                });
               },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
-            record={{
-              id: selectedCompany?.id || selectedCompany?.rawData?.id,
-              type: RECORD_TYPES.COMPANY,
-            }}
-            recordLink={{
-              label: "View record",
-              onClick: () => console.log("View full company record"),
-            }}
-            actionsDropdown={{
-              label: "Actions",
-              items: [
-                {
-                  label: "Convert to Lead",
-                  onClick: () => {
-                    setConvertingCompanyId(selectedCompany?.id);
-                    setShowConvertToLeadModal(true);
-                  },
-                },
-                {
-                  label: "Assign to User",
-                  onClick: () => console.log("Assign"),
-                },
-                {
-                  label: "Delete",
-                  onClick: () => handleDeleteData(selectedCompany),
-                },
-              ],
-            }}
-            quickActions={[
-              {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {}, // This is handled internally now
-                disabled: false,
-              },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {},
-                disabled: !selectedCompany?.phone,
-              },
-              {
-                id: "email",
+            );
+            const aboutFields: SidebarField[] = [];
+            if (selectedCompany?.name)
+              aboutFields.push({
+                label: "Name",
+                value: selectedCompany.name,
+                copyable: true,
+              });
+            if (selectedCompany?.phone)
+              aboutFields.push({
+                label: "Phone",
+                value: selectedCompany.phone,
+                type: "phone",
+                copyable: true,
+                externalLink: `tel:${selectedCompany.phone}`,
+              });
+            if (selectedCompany?.data?.email)
+              aboutFields.push({
                 label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                //disabled: !selectedCompany?.email
-              },
-              {
-                id: "task",
-                label: "Task",
-                icon: CheckSquare,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
-              },
-            ]}
-            sections={[
+                value: selectedCompany.data.email,
+                type: "email",
+                copyable: true,
+                externalLink: `mailto:${selectedCompany.data.email}`,
+              });
+            if (selectedCompany?.data?.city)
+              aboutFields.push({
+                label: "City",
+                value: selectedCompany.data.city,
+              });
+            if (selectedCompany?.data?.country)
+              aboutFields.push({
+                label: "Country",
+                value: selectedCompany.data.country,
+              });
+            if (selectedCompany?.data?.industry)
+              aboutFields.push({
+                label: "Industry",
+                value: selectedCompany.data.industry,
+              });
+            if (selectedCompany?.data?.domain)
+              aboutFields.push({
+                label: "Domain",
+                value: selectedCompany.data.domain,
+              });
+            if (websiteUrl)
+              aboutFields.push({
+                label: "Website",
+                value: websiteUrl,
+                type: "link",
+                externalLink: websiteUrl,
+              });
+            if (selectedCompany?.created_at)
+              aboutFields.push({
+                label: "Created",
+                value: moment(selectedCompany.created_at).format(
+                  "MMM DD, YYYY",
+                ),
+                type: "date",
+              });
+            if (selectedCompany?.updated_at)
+              aboutFields.push({
+                label: "Updated",
+                value: moment(selectedCompany.updated_at).format(
+                  "MMM DD, YYYY",
+                ),
+                type: "date",
+              });
+
+            const structuredSectionFields: SidebarField[] = [];
+            if (struct) {
+              if (struct.official_company_name)
+                structuredSectionFields.push({
+                  label: "Official company name",
+                  value: struct.official_company_name,
+                });
+              const hq = struct.headquarters;
+              if (hq && (hq.address || hq.city || hq.country)) {
+                structuredSectionFields.push({
+                  label: "Headquarters",
+                  value: [hq.address, hq.city, hq.country]
+                    .filter(Boolean)
+                    .join(", "),
+                });
+              }
+              const otherLoc = struct.other_locations;
+              if (otherLoc && otherLoc.length > 0) {
+                otherLoc.forEach(
+                  (
+                    loc: {
+                      address?: string | null;
+                      city?: string | null;
+                      country?: string | null;
+                    },
+                    i: number,
+                  ) => {
+                    const line = [loc.address, loc.city, loc.country]
+                      .filter(Boolean)
+                      .join(", ");
+                    if (line)
+                      structuredSectionFields.push({
+                        label: `Other location ${i + 1}`,
+                        value: line,
+                      });
+                  },
+                );
+              }
+              const structEmails = struct.emails;
+              if (structEmails && structEmails.length > 0) {
+                structEmails.forEach(
+                  (
+                    e: { email?: string | null; type?: string | null },
+                    i: number,
+                  ) => {
+                    if (e?.email)
+                      structuredSectionFields.push({
+                        label:
+                          structEmails!.length > 1 ? `Email ${i + 1}` : "Email",
+                        value: e.email,
+                        type: "email",
+                        externalLink: `mailto:${e.email}`,
+                      });
+                  },
+                );
+              }
+              const structPhones = struct.phones;
+              if (structPhones && structPhones.length > 0) {
+                structPhones.forEach(
+                  (
+                    p: { number?: string | null; type?: string | null },
+                    i: number,
+                  ) => {
+                    if (p?.number)
+                      structuredSectionFields.push({
+                        label:
+                          structPhones!.length > 1 ? `Phone ${i + 1}` : "Phone",
+                        value: p.number,
+                        type: "phone",
+                        externalLink: `tel:${p.number}`,
+                      });
+                  },
+                );
+              }
+              const structSocialLinks = struct.social_links;
+              if (structSocialLinks && structSocialLinks.length > 0) {
+                structSocialLinks.forEach(
+                  (
+                    s: { platform?: string | null; url?: string | null },
+                    i: number,
+                  ) => {
+                    if (s?.url)
+                      structuredSectionFields.push({
+                        label: s.platform
+                          ? String(s.platform)
+                          : `Social ${i + 1}`,
+                        value: s.url,
+                        type: "link",
+                        externalLink: s.url,
+                      });
+                  },
+                );
+              }
+              if (struct.llm_confidence != null)
+                structuredSectionFields.push({
+                  label: "LLM confidence",
+                  value: String(struct.llm_confidence),
+                });
+            }
+
+            const sections = [
               {
                 id: "about-company",
                 title: "About this company",
                 icon: Target,
                 collapsible: true,
                 defaultExpanded: true,
-                actions: [
-                  {
-                    label: "Edit all properties",
-                    onClick: () => console.log("Edit all"),
-                  },
-                ],
-                fields: [
-                  {
-                    label: "Name",
-                    value: selectedCompany?.name || "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Phone",
-                    value: selectedCompany?.phone || "N/A",
-                    type: "phone",
-                    copyable: true,
-                    externalLink: selectedCompany?.phone
-                      ? `tel:${selectedCompany.phone}`
-                      : undefined,
-                  },
-                  {
-                    label: "Email",
-                    value: selectedCompany?.data?.email || "N/A",
-                    type: "email",
-                    copyable: true,
-                    externalLink: selectedCompany?.data?.email
-                      ? `mailto:${selectedCompany.data.email}`
-                      : undefined,
-                    show: !!selectedCompany?.data?.email,
-                  },
-                  {
-                    label: "Assigned To",
-                    value: selectedCompany?.user_extension
-                      ? getNameByExtension(selectedCompany.user_extension)
-                      : "Unassigned",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
-                  },
-                  {
-                    label: "Campaign",
-                    value: selectedCompany?.campaign?.name || "No Campaign",
-                    show: !!selectedCompany?.campaign,
-                    hasDetails: !!selectedCompany?.campaign,
-                    onDetailsClick: () => console.log("Show campaign details"),
-                  },
-                  {
-                    label: "Status",
-                    value: selectedCompany?.status || "Active",
-                    type: "text",
-                  },
-                  {
-                    label: "Created Date",
-                    value: selectedCompany?.created_at
-                      ? moment(selectedCompany.created_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                  {
-                    label: "Last Updated",
-                    value: selectedCompany?.updated_at
-                      ? moment(selectedCompany.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                ],
-              },
-              {
-                id: "recent-activities",
-                title: "Recent activities",
-                icon: History,
-                collapsible: true,
-                defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: History,
-                  message: "No recent activities for this prospect.",
-                  action: {
-                    label: "Log activity",
-                    onClick: () => console.log("Log activity"),
-                  },
-                },
-              },
-              {
-                id: "call-recordings",
-                title: "Call Recordings",
-                icon: PhoneIcon,
-                collapsible: true,
-                defaultExpanded: true,
-                count: callRecordingsTotal ?? callRecordings.length,
-                isLoading: callRecordingsLoading,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
-                ...(callRecordings.length > 0
-                  ? {
-                      customContent: (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
-                          }}
-                        >
-                          {callRecordings.map(
-                            (recording: any, index: number) => {
-                              const duration =
-                                parseInt(
-                                  recording.Duration?.toString() || "0",
-                                ) / 10000000 || 0;
-                              const isOutgoing =
-                                recording.Direction === "CALL_OUTGOING";
-                              return (
-                                <div
-                                  key={recording.Id || index}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "10px 12px",
-                                    background: "#f9fafb",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#1f2937",
-                                      }}
-                                    >
-                                      {formatDateTimeToLocal(
-                                        recording.DateTime,
-                                        GlobalDateFormat,
-                                      )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                        marginTop: "2px",
-                                      }}
-                                    >
-                                      {formatDuration(duration)} ·{" "}
-                                      {isOutgoing ? "Outgoing" : "Incoming"}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    style={{
-                                      background: "transparent",
-                                      border: "none",
-                                      color: "#2563eb",
-                                      cursor: "pointer",
-                                      padding: "6px",
-                                      borderRadius: "6px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                    title="Play Recording"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePlayCallRecording(recording);
-                                    }}
-                                  >
-                                    <FiPlay size={18} />
-                                  </button>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      ),
-                    }
-                  : {
-                      emptyState: {
-                        icon: PhoneIcon,
-                        message: "No call recordings available yet.",
-                        action: {
-                          label: "Make a call",
-                          onClick: () =>
-                            selectedCompany?.phone &&
-                            handleCallClick(selectedCompany),
+                fields:
+                  aboutFields.length > 0
+                    ? aboutFields
+                    : [
+                        {
+                          label: "Name",
+                          value: selectedCompany?.name || "—",
+                          copyable: true,
                         },
-                      },
-                    }),
+                      ],
               },
-              {
-                id: "notes",
-                title: "Notes",
-                icon: FileText,
+            ];
+            if (structuredSectionFields.length > 0) {
+              sections.push({
+                id: "enrichment-structured",
+                title: "Enrichment (structured data)",
+                icon: Layers,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: FileText,
-                  message: "No notes added yet.",
-                  action: {
-                    label: "Add note",
-                    onClick: () => console.log("Add note"),
+                fields: structuredSectionFields,
+              });
+            }
+
+            return (
+              <GenericSidebar
+                isOpen={showCompanySidebar}
+                onClose={handleCloseCompanySidebar}
+                title={selectedCompany?.name || "Company Details"}
+                subtitle={selectedCompany?.phone || ""}
+                email={selectedCompany?.data?.email}
+                phone={selectedCompany?.phone}
+                avatar={{
+                  initials: getInitials(selectedCompany?.name || "NA"),
+                  name: selectedCompany?.name || "NA",
+                  gradient: getRandomColor(selectedCompany?.name || ""),
+                }}
+                record={{
+                  id: selectedCompany?.id || selectedCompany?.rawData?.id,
+                  type: RECORD_TYPES.COMPANY,
+                }}
+                recordLink={{
+                  label: "View record",
+                  onClick: () => {
+                    if (selectedCompany) handleViewData(selectedCompany);
+                    setShowCompanySidebar(false);
                   },
-                },
-              },
-            ]}
-          />
-        )}
+                }}
+                actionsDropdown={{
+                  label: "Actions",
+                  items: [
+                    {
+                      label: "Convert to Lead",
+                      onClick: () => {
+                        setConvertingCompanyId(selectedCompany?.id ?? null);
+                        setShowConvertToLeadModal(true);
+                      },
+                    },
+                    {
+                      label: "Delete",
+                      onClick: () => handleDeleteData(selectedCompany),
+                    },
+                  ],
+                }}
+                quickActions={linkActions}
+                sections={sections}
+              />
+            );
+          })()}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
@@ -8830,12 +7870,19 @@ const CrmCompanyManagement = () => {
                 const allData: CrmDataItem[] = [];
                 let page = 1;
                 for (;;) {
-                  const response = await getCrmData(
-                    buildCrmDataParams({ page, per_page: PER_PAGE }),
-                  );
-                  const chunk = response?.data || [];
+                  const response = await getCompanies({
+                    page,
+                    per_page: PER_PAGE,
+                    search: currentFilters.search,
+                    industry: currentFilters.industry,
+                    country: currentFilters.country,
+                  });
+                  const chunk = (response?.data || []).map(mapCompanyToRow);
                   allData.push(...chunk);
-                  if (chunk.length < PER_PAGE || allData.length >= totalRecords)
+                  if (
+                    chunk.length < PER_PAGE ||
+                    allData.length >= (response?.total ?? 0)
+                  )
                     break;
                   page += 1;
                 }
@@ -8958,10 +8005,25 @@ const CrmCompanyManagement = () => {
       </Modal>
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
-      {/* Create Company Sidebar */}
+      {/* Create Company Sidebar (create + edit) */}
       {renderCreateCompany(
         showCreateCompanySidebar,
         setShowCreateCompanySidebar,
+        {
+          initialData: editingCompanyData,
+          editingId: editingCompanyId,
+          onSave: async (data: CompanyFormPayload, id?: number) => {
+            if (id != null) {
+              await updateCompany(id, data);
+            } else {
+              await createCompany(data);
+            }
+            await fetchCrmData();
+            setShowCreateCompanySidebar(false);
+            setEditingCompanyId(null);
+            setEditingCompanyData(null);
+          },
+        },
       )}
     </React.Fragment>
   );

@@ -1069,6 +1069,221 @@ export const deleteCrmData = async (id: number): Promise<void> => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Companies API (CRUD only; tenant_id ignored)
+// GET/POST /crm/companies, GET/PUT/DELETE /crm/companies/{id}
+// ---------------------------------------------------------------------------
+
+/** Enrichment status for a company */
+export type EnrichmentStatus = "pending" | "failed" | "success";
+
+/** Enrichment payload: all fields nullable */
+export interface EnrichmentData {
+  id?: string | null;
+  status?: string | null;
+  status_display?: string | null;
+  retry_count?: number | null;
+  confidence_score?: number | null;
+  discovered_website?: string | null;
+  error_message?: string | null;
+  input_company_name?: string | null;
+  company_name?: string | null;
+  raw_data?: {
+    emails?: string[] | null;
+    phones?: string[] | null;
+    social_links?: string[] | null;
+    address_blocks?: string[] | null;
+    combined_text?: string | null;
+  } | null;
+  structured_data?: {
+    official_company_name?: string | null;
+    headquarters?: { address?: string | null; city?: string | null; country?: string | null } | null;
+    other_locations?: Array<{ address?: string | null; city?: string | null; country?: string | null }> | null;
+    emails?: Array<{ email?: string | null; type?: string | null }> | null;
+    phones?: Array<{ number?: string | null; type?: string | null }> | null;
+    social_links?: Array<{ platform?: string | null; url?: string | null }> | null;
+    llm_confidence?: number | null;
+  } | null;
+  validation_data?: {
+    is_match?: boolean | null;
+    confidence?: number | null;
+    reason?: string | null;
+  } | null;
+}
+
+export interface CompanyData {
+  id: number;
+  name: string;
+  phone?: string | null;
+  city?: string | null;
+  country?: string | null;
+  industry?: string | null;
+  domain?: string | null;
+  email?: string | null;
+  enrichment_status?: EnrichmentStatus | null;
+  enrichment_data?: EnrichmentData | null;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+}
+
+export interface CompaniesListResponse {
+  data: CompanyData[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from?: number | null;
+  to?: number | null;
+  first_page_url?: string;
+  last_page_url?: string;
+  next_page_url?: string | null;
+  prev_page_url?: string | null;
+  path?: string;
+  links?: any[];
+}
+
+export const getCompanies = async (
+  params: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    industry?: string;
+    country?: string;
+  } = {},
+): Promise<CompaniesListResponse> => {
+  try {
+    const response = await axiosInstance.get("/crm/companies", { params });
+    const raw = response?.data?.data ?? response?.data;
+    if (raw?.data && Array.isArray(raw.data)) {
+      return {
+        data: raw.data,
+        current_page: raw.current_page ?? 1,
+        last_page: raw.last_page ?? 1,
+        per_page: raw.per_page ?? 15,
+        total: raw.total ?? 0,
+        from: raw.from ?? null,
+        to: raw.to ?? null,
+        first_page_url: raw.first_page_url,
+        last_page_url: raw.last_page_url,
+        next_page_url: raw.next_page_url,
+        prev_page_url: raw.prev_page_url,
+        path: raw.path,
+        links: raw.links,
+      };
+    }
+    return {
+      data: [],
+      current_page: 1,
+      last_page: 1,
+      per_page: params.per_page ?? 15,
+      total: 0,
+    };
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message || error?.message || "Failed to fetch companies",
+    );
+    throw error;
+  }
+};
+
+export const getCompany = async (id: number): Promise<CompanyData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/companies/${id}`);
+    const data = response?.data?.data ?? response?.data;
+    if (!data || typeof data.id === "undefined") {
+      throw new Error("Company not found");
+    }
+    return data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message || error?.message || "Failed to fetch company",
+    );
+    throw error;
+  }
+};
+
+export const createCompany = async (data: {
+  name: string;
+  phone?: string;
+  city?: string;
+  country?: string;
+  industry?: string;
+  domain?: string;
+  email?: string;
+}): Promise<CompanyData> => {
+  try {
+    const response = await axiosInstance.post("/crm/companies", data);
+    const created = response?.data?.data ?? response?.data;
+    if (response?.data?.message) {
+      toast.success(response.data.message);
+    } else {
+      toast.success("Company created successfully");
+    }
+    return created;
+  } catch (error: any) {
+    const errData = error?.response?.data;
+    const msg =
+      errData?.message ??
+      (errData?.errors
+        ? Object.values(errData.errors).flat().join(" ")
+        : null) ??
+      error?.message ??
+      "Failed to create company";
+    toast.error(msg);
+    throw error;
+  }
+};
+
+export const updateCompany = async (
+  id: number,
+  data: {
+    name?: string;
+    phone?: string;
+    city?: string;
+    country?: string;
+    industry?: string;
+    domain?: string;
+    email?: string;
+  },
+): Promise<CompanyData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/companies/${id}`, data);
+    const updated = response?.data?.data ?? response?.data;
+    if (response?.data?.message) {
+      toast.success(response.data.message);
+    } else {
+      toast.success("Company updated successfully");
+    }
+    return updated;
+  } catch (error: any) {
+    const errData = error?.response?.data;
+    const msg =
+      errData?.message ??
+      (errData?.errors
+        ? Object.values(errData.errors).flat().join(" ")
+        : null) ??
+      error?.message ??
+      "Failed to update company";
+    toast.error(msg);
+    throw error;
+  }
+};
+
+export const deleteCompany = async (id: number): Promise<void> => {
+  try {
+    const response = await axiosInstance.delete(`/crm/companies/${id}`);
+    toast.success(
+      (response as any)?.data?.message ?? "Company deleted successfully",
+    );
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message || error?.message || "Failed to delete company",
+    );
+    throw error;
+  }
+};
+
 export const assignCrmDataToExtension = async (
   userExtensions: string[],
   itemIds: number[],
@@ -3019,6 +3234,8 @@ export const createTask = async (data: {
   time?: string;
   status?: "pending" | "completed" | "failed";
   notes?: Array<{ note: string }>;
+  record_type?: "prospect" | "lead" | "deal" | "order";
+  record_id?: number;
 }): Promise<TaskData> => {
   try {
     const response = await axiosInstance.post("/crm/tasks", data);
