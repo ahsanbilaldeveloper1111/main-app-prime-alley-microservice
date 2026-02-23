@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
-import { Dropdown, Form } from "react-bootstrap";
+import { Dropdown, Form, Button, Card, Modal, Table } from "react-bootstrap";
 import {
   getDeal,
   updateDeal,
@@ -9,11 +9,13 @@ import {
   getBusinessTypes,
   getIndustries,
   getCrmProducts,
+  createEstimate,
 } from "@utils/crm";
 import type { CrmProduct } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, GlobalDateTimeFormat } from "@utils/Helper";
 import { toast } from "react-toastify";
+import moment from "moment";
 import PhoneInput, {
   parsePhoneNumber as parsePhoneNumberLib,
 } from "react-phone-number-input";
@@ -27,6 +29,11 @@ interface LineItem {
   quantity: number;
   tax: number;
   discount: number;
+  /** For createEstimate payload when saving revision from this section */
+  product_id?: number;
+  unit_price?: number;
+  standard_discount_percentage?: number;
+  special_discount_percentage?: number;
 }
 
 interface DealFormData {
@@ -86,6 +93,10 @@ interface DealFormData {
   companyAssociationLabel: string;
   addTimelineCompany: boolean;
   lineItems: LineItem[];
+  /** Used when saving revision from combined line items section */
+  tax_percentage?: string;
+  standard_discount_percentage?: string;
+  special_discount_percentage?: string;
 }
 
 interface SimpleDropdownProps {
@@ -160,6 +171,9 @@ const initialDealForm: DealFormData = {
   companyAssociationLabel: "Primary",
   addTimelineCompany: false,
   lineItems: [],
+  tax_percentage: "0",
+  standard_discount_percentage: "0",
+  special_discount_percentage: "0",
 };
 
 // ─── Dropdown options ─────────────────────────────────────────────────────────
@@ -301,11 +315,16 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   const isEditMode = !!dealId;
   const [dealForm, setDealForm] = useState(initialDealForm);
   const [lineItemInput, setLineItemInput] = useState<string>("");
+  const [lineItemProductId, setLineItemProductId] = useState<
+    number | undefined
+  >(undefined);
+  const [lineItemUnitPrice, setLineItemUnitPrice] = useState<number>(0);
   const [lineItemQty, setLineItemQty] = useState<number>(0);
   const [lineItemTax, setLineItemTax] = useState<number>(0);
   const [lineItemDiscount, setLineItemDiscount] = useState<number>(0);
   const [lineItemProducts, setLineItemProducts] = useState<CrmProduct[]>([]);
   const [loadingLineItemProducts, setLoadingLineItemProducts] = useState(false);
+  const [savingRevision, setSavingRevision] = useState(false);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -315,6 +334,38 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   const [businessTypes, setBusinessTypes] = useState<any[]>([]);
   const [allIndustries, setAllIndustries] = useState<any[]>([]);
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+
+  // Revisions (edit mode only)
+  const [editEstimates, setEditEstimates] = useState<any[]>([]);
+  const [showAddRevisionModal, setShowAddRevisionModal] = useState(false);
+  const [editEditingRevisionIndex, setEditEditingRevisionIndex] = useState<
+    number | null
+  >(null);
+  const [editRevisionProducts, setEditRevisionProducts] = useState<
+    Array<{
+      product_id: number;
+      product_service: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+      original_currency: string;
+      original_price: number;
+      tax_percentage: string;
+      standard_discount_percentage: string;
+      special_discount_percentage: string;
+    }>
+  >([]);
+  const [editRevisionFormData, setEditRevisionFormData] = useState({
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+  const [editRevisionProductsCatalog, setEditRevisionProductsCatalog] =
+    useState<CrmProduct[]>([]);
+  const [editRevisionLoadingProducts, setEditRevisionLoadingProducts] =
+    useState(false);
+  const [editRevisionSelectedProductIds, setEditRevisionSelectedProductIds] =
+    useState<Array<{ value: number; label: string }>>([]);
 
   const set = (key: keyof DealFormData) => (val: any) =>
     setDealForm((prev) => ({ ...prev, [key]: val }));
@@ -431,7 +482,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
           // Prefill line items (estimations) from latest estimate or deal.estimation_chart
           const sortedEstimates =
-            dealAny.estimates && Array.isArray(dealAny.estimates) && dealAny.estimates.length > 0
+            dealAny.estimates &&
+            Array.isArray(dealAny.estimates) &&
+            dealAny.estimates.length > 0
               ? [...dealAny.estimates].sort((a: any, b: any) => {
                   const dateA = new Date(a.created_at || 0).getTime();
                   const dateB = new Date(b.created_at || 0).getTime();
@@ -440,9 +493,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               : [];
           const latestEstimate = sortedEstimates[0];
           const chart =
-            latestEstimate?.estimation_chart && latestEstimate.estimation_chart.length > 0
+            latestEstimate?.estimation_chart &&
+            latestEstimate.estimation_chart.length > 0
               ? latestEstimate.estimation_chart
-              : dealAny.estimation_chart && Array.isArray(dealAny.estimation_chart) && dealAny.estimation_chart.length > 0
+              : dealAny.estimation_chart &&
+                  Array.isArray(dealAny.estimation_chart) &&
+                  dealAny.estimation_chart.length > 0
                 ? dealAny.estimation_chart
                 : [];
           const taxPct =
@@ -451,28 +507,70 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               : parseFloat(String(dealAny.tax_percentage ?? "0")) || 0;
           const stdDisc =
             latestEstimate != null
-              ? parseFloat(String(latestEstimate.standard_discount_percentage ?? "0")) || 0
-              : parseFloat(String(dealAny.standard_discount_percentage ?? "0")) || 0;
+              ? parseFloat(
+                  String(latestEstimate.standard_discount_percentage ?? "0"),
+                ) || 0
+              : parseFloat(
+                  String(dealAny.standard_discount_percentage ?? "0"),
+                ) || 0;
           const specDisc =
             latestEstimate != null
-              ? parseFloat(String(latestEstimate.special_discount_percentage ?? "0")) || 0
-              : parseFloat(String(dealAny.special_discount_percentage ?? "0")) || 0;
+              ? parseFloat(
+                  String(latestEstimate.special_discount_percentage ?? "0"),
+                ) || 0
+              : parseFloat(
+                  String(dealAny.special_discount_percentage ?? "0"),
+                ) || 0;
           const discountPct = stdDisc + specDisc;
-          const lineItemsFromApi: LineItem[] = chart.map((item: any, idx: number) => ({
-            id: item.id ?? Date.now() + idx,
-            name: item.product_service || "",
-            quantity: item.qty ?? 1,
-            tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
-            discount:
-              item.standard_discount_percentage != null || item.special_discount_percentage != null
-                ? (parseFloat(String(item.standard_discount_percentage ?? "0")) || 0) +
-                  (parseFloat(String(item.special_discount_percentage ?? "0")) || 0)
-                : discountPct,
-          }));
+          const lineItemsFromApi: LineItem[] = chart.map(
+            (item: any, idx: number) => ({
+              id: item.id ?? Date.now() + idx,
+              name: item.product_service || "",
+              quantity: item.qty ?? 1,
+              tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
+              discount:
+                item.standard_discount_percentage != null ||
+                item.special_discount_percentage != null
+                  ? (parseFloat(
+                      String(item.standard_discount_percentage ?? "0"),
+                    ) || 0) +
+                    (parseFloat(
+                      String(item.special_discount_percentage ?? "0"),
+                    ) || 0)
+                  : discountPct,
+              product_id: item.product_id,
+              unit_price:
+                item.unit_price != null
+                  ? parseFloat(String(item.unit_price))
+                  : undefined,
+              standard_discount_percentage:
+                item.standard_discount_percentage != null
+                  ? parseFloat(String(item.standard_discount_percentage)) || 0
+                  : undefined,
+              special_discount_percentage:
+                item.special_discount_percentage != null
+                  ? parseFloat(String(item.special_discount_percentage)) || 0
+                  : undefined,
+            }),
+          );
           setDealForm((prev) => ({
             ...prev,
             lineItems: lineItemsFromApi,
+            tax_percentage: String(
+              latestEstimate?.tax_percentage ?? dealAny.tax_percentage ?? "0",
+            ),
+            standard_discount_percentage: String(
+              latestEstimate?.standard_discount_percentage ??
+                dealAny.standard_discount_percentage ??
+                "0",
+            ),
+            special_discount_percentage: String(
+              latestEstimate?.special_discount_percentage ??
+                dealAny.special_discount_percentage ??
+                "0",
+            ),
           }));
+          setEditEstimates(sortedEstimates);
         } catch (error) {
           console.error("Failed to fetch deal:", error);
           toast.error("Failed to load deal data");
@@ -514,6 +612,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   // Line items
   const addLineItem = () => {
     if (!lineItemInput) return;
+    const discountTotal = lineItemDiscount ?? 0;
     setDealForm((prev) => ({
       ...prev,
       lineItems: [
@@ -523,14 +622,119 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           name: lineItemInput,
           quantity: lineItemQty || 1,
           tax: lineItemTax ?? 0,
-          discount: lineItemDiscount ?? 0,
+          discount: discountTotal,
+          product_id: lineItemProductId,
+          unit_price: lineItemUnitPrice,
+          standard_discount_percentage: Math.floor(discountTotal / 2),
+          special_discount_percentage:
+            discountTotal - Math.floor(discountTotal / 2),
         },
       ],
     }));
     setLineItemInput("");
+    setLineItemProductId(undefined);
+    setLineItemUnitPrice(0);
     setLineItemQty(0);
     setLineItemTax(0);
     setLineItemDiscount(0);
+  };
+
+  // Append line items from a selected revision (adds prefilled rows; does not replace)
+  const appendRevisionAsLineItems = (estimate: any) => {
+    const chart =
+      estimate?.estimation_chart && Array.isArray(estimate.estimation_chart)
+        ? estimate.estimation_chart
+        : [];
+    const taxPct = parseFloat(String(estimate.tax_percentage ?? "0")) || 0;
+    const stdDisc =
+      parseFloat(String(estimate.standard_discount_percentage ?? "0")) || 0;
+    const specDisc =
+      parseFloat(String(estimate.special_discount_percentage ?? "0")) || 0;
+    const lineItemsFromRevision: LineItem[] = chart.map(
+      (item: any, idx: number) => ({
+        id: Date.now() + idx,
+        name: item.product_service || "",
+        quantity: item.qty ?? 1,
+        tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
+        discount:
+          item.standard_discount_percentage != null ||
+          item.special_discount_percentage != null
+            ? (parseFloat(String(item.standard_discount_percentage ?? "0")) ||
+                0) +
+              (parseFloat(String(item.special_discount_percentage ?? "0")) || 0)
+            : stdDisc + specDisc,
+        product_id: item.product_id,
+        unit_price:
+          item.unit_price != null
+            ? parseFloat(String(item.unit_price))
+            : undefined,
+        standard_discount_percentage:
+          item.standard_discount_percentage != null
+            ? parseFloat(String(item.standard_discount_percentage)) || 0
+            : undefined,
+        special_discount_percentage:
+          item.special_discount_percentage != null
+            ? parseFloat(String(item.special_discount_percentage)) || 0
+            : undefined,
+      }),
+    );
+    setDealForm((prev) => ({
+      ...prev,
+      lineItems: [...prev.lineItems, ...lineItemsFromRevision],
+    }));
+  };
+
+  // Save current line items as a new revision (same API as Add Revision modal)
+  const saveRevisionFromLineItems = async () => {
+    if (!dealId || dealForm.lineItems.length === 0) return;
+    setSavingRevision(true);
+    try {
+      const payload = {
+        deal_id: dealId,
+        estimation_chart: dealForm.lineItems.map((item) => {
+          const stdPct =
+            item.standard_discount_percentage ??
+            Math.floor((item.discount ?? 0) / 2);
+          const specPct =
+            item.special_discount_percentage ??
+            (item.discount ?? 0) - Math.floor((item.discount ?? 0) / 2);
+          return {
+            product_id: item.product_id ?? 0,
+            product_service: item.name,
+            description: "",
+            qty: item.quantity,
+            unit_price: item.unit_price ?? 0,
+            original_currency: dealForm.currency || "AED",
+            original_price: item.unit_price ?? 0,
+            tax_percentage: parseFloat(String(item.tax ?? "0")),
+            standard_discount_percentage: stdPct,
+            special_discount_percentage: specPct,
+          };
+        }),
+        standard_discount_percentage: parseFloat(
+          dealForm.standard_discount_percentage || "0",
+        ),
+        special_discount_percentage: parseFloat(
+          dealForm.special_discount_percentage || "0",
+        ),
+        tax_percentage: parseFloat(dealForm.tax_percentage || "0"),
+        currency: dealForm.currency || "AED",
+      };
+      await createEstimate(payload, false);
+      const updated = await getDeal(dealId);
+      const estimates = (updated as any).estimates || [];
+      const sorted = [...estimates].sort(
+        (a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      setEditEstimates(sorted);
+      toast.success("Revision saved!");
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save revision");
+    } finally {
+      setSavingRevision(false);
+    }
   };
 
   const removeLineItem = (id: number) =>
@@ -1415,8 +1619,63 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 </div>
               </div>
 
-              {/* ── Add line item ── */}
+              {/* ── Line items & Revisions (combined) ── */}
               <div style={{ marginTop: "28px" }}>
+                <h3
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    marginBottom: "16px",
+                  }}
+                >
+                  LINE ITEMS & REVISIONS
+                </h3>
+
+                {/* Revision dropdown: add prefilled line items from a revision (edit mode, when any revisions exist) */}
+                {isEditMode && Boolean(dealId) && editEstimates.length >= 1 && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        color: "#141414",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Add line items from revision
+                    </label>
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        style={{
+                          ...dropdownToggleStyle(false),
+                          color: "#a0aec0",
+                        }}
+                      >
+                        Select a previous version
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ width: "100%" }}>
+                        {editEstimates.map((estimate: any) => (
+                          <Dropdown.Item
+                            key={estimate.id}
+                            onClick={() => appendRevisionAsLineItems(estimate)}
+                          >
+                            Version {estimate.version || estimate.id} –{" "}
+                            {estimate.created_at
+                              ? moment(estimate.created_at).format(
+                                  GlobalDateTimeFormat,
+                                )
+                              : ""}{" "}
+                            ({estimate.estimation_chart?.length || 0} items)
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                )}
+
                 <div
                   style={{
                     display: "grid",
@@ -1580,15 +1839,25 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                           : lineItemInput || "Add a line item"}
                       </Dropdown.Toggle>
                       <Dropdown.Menu style={{ width: "100%" }}>
-                        {lineItemProducts.length === 0 && !loadingLineItemProducts ? (
-                          <Dropdown.Item disabled>No products available</Dropdown.Item>
+                        {lineItemProducts.length === 0 &&
+                        !loadingLineItemProducts ? (
+                          <Dropdown.Item disabled>
+                            No products available
+                          </Dropdown.Item>
                         ) : (
                           lineItemProducts.map((p) => (
                             <Dropdown.Item
                               key={p.id}
-                              onClick={() => setLineItemInput(p.name)}
+                              onClick={() => {
+                                setLineItemInput(p.name);
+                                setLineItemProductId(p.id);
+                                setLineItemUnitPrice(
+                                  Number((p as any).price) || 0,
+                                );
+                              }}
                             >
-                              {p.name} – {dealForm.currency} {p.price || "0"}
+                              {p.name} – {dealForm.currency}{" "}
+                              {(p as any).price || "0"}
                             </Dropdown.Item>
                           ))
                         )}
@@ -1600,7 +1869,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                     min={1}
                     value={lineItemQty || ""}
                     placeholder="0"
-                    onChange={(e) => setLineItemQty(Number(e.target.value) ? Number(e.target.value) : 0)}
+                    onChange={(e) =>
+                      setLineItemQty(
+                        Number(e.target.value) ? Number(e.target.value) : 0,
+                      )
+                    }
                     style={{ ...inputStyle, width: "70px" }}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -1612,7 +1885,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                     step={0.01}
                     value={lineItemTax || ""}
                     placeholder="0"
-                    onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
+                    onChange={(e) =>
+                      setLineItemTax(Number(e.target.value) || 0)
+                    }
                     style={{ ...inputStyle, width: "70px" }}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -1624,7 +1899,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                     step={0.01}
                     value={lineItemDiscount || ""}
                     placeholder="0"
-                    onChange={(e) => setLineItemDiscount(Number(e.target.value) || 0)}
+                    onChange={(e) =>
+                      setLineItemDiscount(Number(e.target.value) || 0)
+                    }
                     style={{ ...inputStyle, width: "70px" }}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -1646,6 +1923,21 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                     <Plus size={16} />
                   </button>
                 </div>
+
+                {/* Save revision button (edit mode only): save current line items as new revision */}
+                {isEditMode && Boolean(dealId) && (
+                  <div style={{ marginTop: "16px" }}>
+                    <Button
+                      variant="primary"
+                      disabled={
+                        dealForm.lineItems.length === 0 || savingRevision
+                      }
+                      onClick={saveRevisionFromLineItems}
+                    >
+                      {savingRevision ? "Saving..." : "Save revision"}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Progress & Notes Section */}
@@ -1856,6 +2148,446 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Add/Edit Revision Modal */}
+      <Modal
+        show={showAddRevisionModal}
+        onHide={() => {
+          setShowAddRevisionModal(false);
+          setEditEditingRevisionIndex(null);
+          setEditRevisionProducts([]);
+        }}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {editEditingRevisionIndex !== null
+              ? "Copy Revision / Quotation"
+              : "Add Revision / Quotation"}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Add Products</Form.Label>
+              <Select
+                isMulti
+                value={editRevisionSelectedProductIds}
+                onChange={(selected) =>
+                  setEditRevisionSelectedProductIds(
+                    selected ? [...selected] : [],
+                  )
+                }
+                options={editRevisionProductsCatalog.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} – ${dealForm.currency || "AED"} ${p.price || 0}`,
+                }))}
+                placeholder={
+                  editRevisionLoadingProducts
+                    ? "Loading products..."
+                    : "Select products to add..."
+                }
+                isDisabled={editRevisionLoadingProducts}
+                isSearchable
+              />
+              <div className="d-flex gap-2 mt-2 flex-wrap">
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => {
+                    const toAdd = editRevisionProductsCatalog.filter(
+                      (p) =>
+                        editRevisionSelectedProductIds.some(
+                          (s) => s.value === p.id,
+                        ) &&
+                        !editRevisionProducts.some(
+                          (ep) => ep.product_id === p.id,
+                        ),
+                    );
+                    const newItems = toAdd.map((p) => ({
+                      product_id: p.id,
+                      product_service: p.name || "",
+                      description: "",
+                      qty: 1,
+                      unit_price: parseFloat(String(p.price || "0")),
+                      original_currency: dealForm.currency || "AED",
+                      original_price: parseFloat(String(p.price || "0")),
+                      tax_percentage: editRevisionFormData.tax_percentage,
+                      standard_discount_percentage:
+                        editRevisionFormData.standard_discount_percentage,
+                      special_discount_percentage:
+                        editRevisionFormData.special_discount_percentage,
+                    }));
+                    setEditRevisionProducts([
+                      ...editRevisionProducts,
+                      ...newItems,
+                    ]);
+                    setEditRevisionSelectedProductIds([]);
+                  }}
+                  disabled={editRevisionSelectedProductIds.length === 0}
+                >
+                  <Plus size={14} className="me-1" />
+                  Add Selected Products
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => {
+                    setEditRevisionProducts([
+                      ...editRevisionProducts,
+                      {
+                        product_id: 0,
+                        product_service: "",
+                        description: "",
+                        qty: 1,
+                        unit_price: 0,
+                        original_currency: dealForm.currency || "AED",
+                        original_price: 0,
+                        tax_percentage: editRevisionFormData.tax_percentage,
+                        standard_discount_percentage:
+                          editRevisionFormData.standard_discount_percentage,
+                        special_discount_percentage:
+                          editRevisionFormData.special_discount_percentage,
+                      },
+                    ]);
+                  }}
+                >
+                  <Plus size={14} className="me-1" />
+                  Add Custom Product
+                </Button>
+              </div>
+            </Form.Group>
+
+            <Form.Label>Products in this revision</Form.Label>
+            <div className="table-responsive mb-3">
+              <Table size="sm" hover>
+                <thead className="bg-light">
+                  <tr>
+                    <th>Product</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Tax (%)</th>
+                    <th>Std Disc (%)</th>
+                    <th>Spec Disc (%)</th>
+                    <th>Line Total</th>
+                    <th style={{ minWidth: "auto" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editRevisionProducts.map((item, idx) => {
+                    const subtotal = (item.qty || 0) * (item.unit_price || 0);
+                    const taxPct =
+                      parseFloat(String(item.tax_percentage ?? "0")) || 0;
+                    const stdPct =
+                      parseFloat(
+                        String(item.standard_discount_percentage ?? "0"),
+                      ) || 0;
+                    const specPct =
+                      parseFloat(
+                        String(item.special_discount_percentage ?? "0"),
+                      ) || 0;
+                    const discPct = stdPct + specPct;
+                    const disc = (subtotal * discPct) / 100;
+                    const afterDisc = subtotal - disc;
+                    const tax = (afterDisc * taxPct) / 100;
+                    const lineTotal = afterDisc + tax;
+                    return (
+                      <tr key={idx}>
+                        <td>
+                          <Form.Control
+                            type="text"
+                            size="sm"
+                            placeholder="Product name"
+                            value={item.product_service}
+                            onChange={(e) => {
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = {
+                                ...item,
+                                product_service: e.target.value,
+                              };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            min={1}
+                            size="sm"
+                            style={{ width: 70 }}
+                            value={item.qty}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value, 10) || 1;
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = { ...item, qty: v };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            size="sm"
+                            style={{ width: 90 }}
+                            value={item.unit_price}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value) || 0;
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = {
+                                ...item,
+                                unit_price: v,
+                                original_price: v,
+                              };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            size="sm"
+                            style={{ width: 70 }}
+                            value={item.tax_percentage ?? "0"}
+                            onChange={(e) => {
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = {
+                                ...item,
+                                tax_percentage: e.target.value,
+                              };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            size="sm"
+                            style={{ width: 70 }}
+                            value={item.standard_discount_percentage ?? "0"}
+                            onChange={(e) => {
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = {
+                                ...item,
+                                standard_discount_percentage: e.target.value,
+                              };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <Form.Control
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.01}
+                            size="sm"
+                            style={{ width: 70 }}
+                            value={item.special_discount_percentage ?? "0"}
+                            onChange={(e) => {
+                              const updated = [...editRevisionProducts];
+                              updated[idx] = {
+                                ...item,
+                                special_discount_percentage: e.target.value,
+                              };
+                              setEditRevisionProducts(updated);
+                            }}
+                          />
+                        </td>
+                        <td>
+                          {dealForm.currency || "AED"}{" "}
+                          {lineTotal.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td style={{ minWidth: "auto" }}>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="p-0 text-danger"
+                            onClick={() =>
+                              setEditRevisionProducts(
+                                editRevisionProducts.filter(
+                                  (_, i) => i !== idx,
+                                ),
+                              )
+                            }
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+              {editRevisionProducts.length === 0 && (
+                <div className="text-center text-muted py-3 small">
+                  No products. Select products above and click &quot;Add
+                  Selected Products&quot;.
+                </div>
+              )}
+            </div>
+
+            {editRevisionProducts.length > 0 &&
+              (() => {
+                const subtotalAll = editRevisionProducts.reduce(
+                  (s, i) => s + (i.qty || 0) * (i.unit_price || 0),
+                  0,
+                );
+                let totalDiscount = 0;
+                let totalTax = 0;
+                editRevisionProducts.forEach((i) => {
+                  const st = (i.qty || 0) * (i.unit_price || 0);
+                  const stdPct =
+                    parseFloat(String(i.standard_discount_percentage ?? "0")) ||
+                    0;
+                  const specPct =
+                    parseFloat(String(i.special_discount_percentage ?? "0")) ||
+                    0;
+                  const taxPct =
+                    parseFloat(String(i.tax_percentage ?? "0")) || 0;
+                  const disc = (st * (stdPct + specPct)) / 100;
+                  const afterDisc = st - disc;
+                  totalDiscount += disc;
+                  totalTax += (afterDisc * taxPct) / 100;
+                });
+                const grandTotal = subtotalAll - totalDiscount + totalTax;
+                return (
+                  <Card className="bg-light border-0">
+                    <Card.Body className="py-2">
+                      <div className="d-flex justify-content-between">
+                        <span className="text-muted">Subtotal:</span>
+                        <span>
+                          {dealForm.currency}{" "}
+                          {subtotalAll.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                      {totalDiscount > 0 && (
+                        <div className="d-flex justify-content-between text-danger">
+                          <span>Total Discount:</span>
+                          <span>
+                            - {dealForm.currency}{" "}
+                            {totalDiscount.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      {totalTax > 0 && (
+                        <div className="d-flex justify-content-between">
+                          <span>Total Tax:</span>
+                          <span>
+                            {dealForm.currency}{" "}
+                            {totalTax.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="d-flex justify-content-between fw-bold mt-1 pt-1 border-top">
+                        <span>Grand Total:</span>
+                        <span className="text-success">
+                          {dealForm.currency}{" "}
+                          {grandTotal.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                );
+              })()}
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowAddRevisionModal(false);
+              setEditEditingRevisionIndex(null);
+              setEditRevisionProducts([]);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={editRevisionProducts.length === 0}
+            onClick={async () => {
+              if (!dealId || editRevisionProducts.length === 0) return;
+              try {
+                const payload = {
+                  deal_id: dealId,
+                  estimation_chart: editRevisionProducts.map((item) => ({
+                    product_id: item.product_id,
+                    product_service: item.product_service,
+                    description: item.description || "",
+                    qty: item.qty,
+                    unit_price: item.unit_price,
+                    original_currency:
+                      item.original_currency || dealForm.currency,
+                    original_price: item.original_price ?? item.unit_price,
+                    tax_percentage: parseFloat(
+                      String(item.tax_percentage ?? "0"),
+                    ),
+                    standard_discount_percentage: parseFloat(
+                      String(item.standard_discount_percentage ?? "0"),
+                    ),
+                    special_discount_percentage: parseFloat(
+                      String(item.special_discount_percentage ?? "0"),
+                    ),
+                  })),
+                  standard_discount_percentage: parseFloat(
+                    editRevisionFormData.standard_discount_percentage || "0",
+                  ),
+                  special_discount_percentage: parseFloat(
+                    editRevisionFormData.special_discount_percentage || "0",
+                  ),
+                  tax_percentage: parseFloat(
+                    editRevisionFormData.tax_percentage || "0",
+                  ),
+                  currency: dealForm.currency || "AED",
+                };
+                await createEstimate(payload, false);
+                const updated = await getDeal(dealId);
+                const estimates = (updated as any).estimates || [];
+                const sorted = [...estimates].sort(
+                  (a: any, b: any) =>
+                    new Date(b.created_at).getTime() -
+                    new Date(a.created_at).getTime(),
+                );
+                setEditEstimates(sorted);
+                toast.success(
+                  editEditingRevisionIndex !== null
+                    ? "Revision copied!"
+                    : "Revision added!",
+                );
+                setShowAddRevisionModal(false);
+                setEditEditingRevisionIndex(null);
+                setEditRevisionProducts([]);
+                if (onSuccess) onSuccess();
+              } catch (err: any) {
+                toast.error(err?.message || "Failed to save revision");
+              }
+            }}
+          >
+            {editEditingRevisionIndex !== null
+              ? "Copy Revision"
+              : "Save Revision"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
