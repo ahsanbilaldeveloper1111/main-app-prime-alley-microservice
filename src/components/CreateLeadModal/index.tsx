@@ -140,6 +140,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   );
   const [loading, setLoading] = useState(false);
   const [editFetching, setEditFetching] = useState(false);
+  const [loadingProspectData, setLoadingProspectData] = useState(false);
   const [isOpportunity, setIsOpportunity] = useState(type === "opportunity");
   const isInitialLoad = useRef(true);
   const createAndAddAnotherRef = useRef(false);
@@ -368,6 +369,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   useEffect(() => {
     const fetchCrmDataRecord = async () => {
       if (show && crmDataId && !editLeadId) {
+        setLoadingProspectData(true);
         try {
           const crmDataRecord = await getCrmDataById(crmDataId);
           console.log("ZE CRM DATA RECORD", crmDataRecord);
@@ -493,7 +495,11 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           }));
         } catch (error) {
           console.error("Failed to fetch CRM data record:", error);
+        } finally {
+          setLoadingProspectData(false);
         }
+      } else {
+        setLoadingProspectData(false);
       }
     };
 
@@ -1572,12 +1578,14 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             padding: "40px",
           }}
         >
-          {editFetching ? (
+          {editFetching || loadingProspectData ? (
             <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ flex: 1 }}>
               <div className="spinner-border text-primary" role="status">
                 <span className="visually-hidden">Loading...</span>
               </div>
-              <p className="mt-3 mb-0" style={{ fontSize: "14px", color: "#64748b" }}>Loading lead data...</p>
+              <p className="mt-3 mb-0" style={{ fontSize: "14px", color: "#64748b" }}>
+                {loadingProspectData ? "Loading prospect data..." : "Loading lead data..."}
+              </p>
             </div>
           ) : (
           <Form onSubmit={handleSubmit}>
@@ -2189,23 +2197,23 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         >
           <button
             type="button"
-            disabled={loading || editFetching}
+            disabled={loading || editFetching || loadingProspectData}
             onClick={(e) => handleSubmit(e)}
             style={{
               padding: "10px 20px",
-              backgroundColor: loading || editFetching ? "#cbd5e0" : "#0091ae",
+              backgroundColor: loading || editFetching || loadingProspectData ? "#cbd5e0" : "#0091ae",
               color: "#ffffff",
               border: "none",
               borderRadius: "4px",
               fontSize: "14px",
               fontWeight: "500",
-              cursor: loading || editFetching ? "not-allowed" : "pointer",
+              cursor: loading || editFetching || loadingProspectData ? "not-allowed" : "pointer",
             }}
             onMouseEnter={(e) => {
-              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#007a94";
+              if (!loading && !editFetching && !loadingProspectData) e.currentTarget.style.backgroundColor = "#007a94";
             }}
             onMouseLeave={(e) => {
-              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#0091ae";
+              if (!loading && !editFetching && !loadingProspectData) e.currentTarget.style.backgroundColor = "#0091ae";
             }}
           >
             <CheckCircle size={16} style={{ verticalAlign: "middle", marginRight: "6px" }} />
@@ -2214,7 +2222,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           {!editLeadId && (
           <button
             type="button"
-            disabled={loading || editFetching}
+            disabled={loading || editFetching || loadingProspectData}
             onClick={(e) => {
               createAndAddAnotherRef.current = true;
               handleSubmit(e);
@@ -2222,18 +2230,18 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             style={{
               padding: "10px 20px",
               backgroundColor: "transparent",
-              color: loading || editFetching ? "#a0aec0" : "#141414",
+              color: loading || editFetching || loadingProspectData ? "#a0aec0" : "#141414",
               border: "1px solid #8a8a8a",
               borderRadius: "4px",
               fontSize: "14px",
               fontWeight: "500",
-              cursor: loading || editFetching ? "not-allowed" : "pointer",
+              cursor: loading || editFetching || loadingProspectData ? "not-allowed" : "pointer",
             }}
             onMouseEnter={(e) => {
-              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#f7fafc";
+              if (!loading && !editFetching && !loadingProspectData) e.currentTarget.style.backgroundColor = "#f7fafc";
             }}
             onMouseLeave={(e) => {
-              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "transparent";
+              if (!loading && !editFetching && !loadingProspectData) e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             Create and add another

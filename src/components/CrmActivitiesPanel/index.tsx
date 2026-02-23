@@ -5,10 +5,10 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   X, ChevronDown, ChevronRight, Mail, Calendar, MessageSquare, ClipboardList,
-  FileText, Pencil, Trash2, MessageCircle, AlertCircle,
+  FileText, Pencil, Trash2, MessageCircle, AlertCircle, Phone,
 } from 'lucide-react';
-import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry } from '@utils/crm';
-import { getSmsList, getChats, getWhatsAppChatMessages, sendWhatsApp, type SmsListItem, type SmsListMeta } from '@utils/communication';
+import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, getCampaigns, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry } from '@utils/crm';
+import { getSmsList, getChats, getWhatsAppChatMessages, sendWhatsApp, getEmails, type SmsListItem, type SmsListMeta } from '@utils/communication';
 import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { ListCallLogs } from '@utils/calls';
 import axiosInstance from '@utils/axios';
@@ -55,11 +55,94 @@ interface WhatsAppMessage {
   status?: string;
 }
 
+/** Email item from GET emails response (matches API structure) */
+interface EmailListItem {
+  id: number | string;
+  created_by?: string;
+  to?: string[];
+  subject?: string;
+  content?: string;
+  content_type?: string;
+  cc?: string[] | null;
+  bcc?: string[] | null;
+  reply_to?: string | null;
+  attachments?: string[];
+  status?: string;
+  error_message?: string | null;
+  status_code?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  tenant_id?: string;
+}
+
+/** Pagination meta from GET emails response */
+interface EmailsMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from?: number;
+  to?: number;
+}
+
 export interface CrmActivitiesRecord {
   id?: number;
   data?: { id?: number; name?: string; phone?: string; data?: Record<string, any> };
   audit_trail?: AuditTrailEntry[];
 }
+
+/** Extract HTML from email content (strip markdown code fence if present) */
+function getEmailPreviewHtml(content: string | undefined): string {
+  if (!content || typeof content !== 'string') return '';
+  const raw = content.trim();
+  const htmlMatch = raw.match(/^```html?\s*([\s\S]*?)```$/im) ?? raw.match(/^```\s*([\s\S]*?)```$/im);
+  return htmlMatch ? htmlMatch[1].trim() : raw;
+}
+
+/** Format raw audit value for display (pure, no hooks). */
+function formatValForAudit(v: unknown): string {
+  if (v == null) return '—';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+/** Resolve assigned_to ID/extension to display label (pure). */
+function resolveAssignedToLabel(
+  val: unknown,
+  extensions: Array<{ id?: number; extension?: string; display_name?: string; name?: string }> | null | undefined,
+  fallback: (v: unknown) => string,
+): string {
+  if (val == null) return fallback(val);
+  if (!extensions?.length) return fallback(val);
+  const str = String(val);
+  const num = Number(val);
+  const ext = extensions.find(
+    (e) =>
+      (e?.id != null && (Number(e.id) === num || String(e.id) === str)) ||
+      (e?.extension != null && String(e.extension) === str),
+  );
+  if (ext) return (ext.display_name ?? ext.name ?? fallback(val)).trim() || fallback(val);
+  return fallback(val);
+}
+
+/** Resolve campaign_id to campaign name (pure). */
+function resolveCampaignLabel(
+  val: unknown,
+  campaigns: Array<{ id: number; name: string }> | null | undefined,
+  fallback: (v: unknown) => string,
+): string {
+  if (val == null) return fallback(val);
+  if (!campaigns?.length) return fallback(val);
+  const id = typeof val === 'number' ? val : Number(val);
+  if (Number.isNaN(id)) return fallback(val);
+  const c = campaigns.find((c) => c.id === id);
+  return c?.name ?? fallback(val);
+}
+
+/** Audit trail field names that store user/extension ID – resolved to display name via extensions list */
+const AUDIT_FIELDS_EXTENSION = new Set<string>(['assigned_to', 'contact_owner']);
 
 const ACTIVITY_TYPE_TABS = [
   { id: 'activity', label: 'Activity' },
@@ -72,6 +155,11 @@ const ACTIVITY_TYPE_TABS = [
   { id: 'whatsapp', label: 'WhatsApp' },
 ] as const;
 
+/** Extension item for resolving assigned_to IDs to labels in audit trail */
+export type AuditTrailExtension = { id?: number; extension?: string; display_name?: string; name?: string };
+/** Campaign item for resolving campaign_id to label in audit trail */
+export type AuditTrailCampaign = { id: number; name: string };
+
 export interface CrmActivitiesPanelProps {
   recordType: 'prospect' | 'lead' | 'deal' | 'order';
   recordId: number;
@@ -79,6 +167,15 @@ export interface CrmActivitiesPanelProps {
   recordLoading?: boolean;
   recordName?: string;
   canSendWhatsApp?: boolean;
+  /** Optional: used to show assignee name instead of ID in Activity audit trail */
+  extensions?: AuditTrailExtension[] | null;
+  /** Optional: used to show campaign name instead of ID in Activity audit trail */
+  campaigns?: AuditTrailCampaign[] | null;
+  /** When provided, "Add" buttons open these modals instead of panel-owned modals (parent renders modals). */
+  onOpenNote?: () => void;
+  onOpenEmail?: () => void;
+  onOpenTask?: () => void;
+  onOpenMeeting?: () => void;
 }
 
 export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
@@ -88,7 +185,14 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   recordLoading = false,
   recordName = 'Record',
   canSendWhatsApp = false,
+  extensions: extensionsProp,
+  campaigns,
+  onOpenNote,
+  onOpenEmail,
+  onOpenTask,
+  onOpenMeeting,
 }) => {
+  const useExternalModals = Boolean(onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting);
   const [activityFilter, setActivityFilter] = useState('activity');
   const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
   const [notesList, setNotesList] = useState<CrmNoteItem[]>([]);
@@ -132,6 +236,13 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   } | null>(null);
   const [whatsappReplyMessage, setWhatsappReplyMessage] = useState('');
   const [whatsappReplySendLoading, setWhatsappReplySendLoading] = useState(false);
+  const [emailsList, setEmailsList] = useState<EmailListItem[]>([]);
+  const [emailsLoading, setEmailsLoading] = useState(false);
+  const [emailsError, setEmailsError] = useState<string | null>(null);
+  const [emailsMeta, setEmailsMeta] = useState<EmailsMeta | null>(null);
+  const [emailsPage, setEmailsPage] = useState(1);
+  const [emailsPerPage, setEmailsPerPage] = useState(15);
+  const [selectedEmailId, setSelectedEmailId] = useState<number | string | null>(null);
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
   const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
   const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
@@ -145,6 +256,15 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   const recordingModalAudioUrlRef = useRef<string>('');
 
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  const [campaignsList, setCampaignsList] = useState<AuditTrailCampaign[]>([]);
+
+  useEffect(() => {
+    if (recordType !== 'prospect' && recordType !== 'lead') return;
+    getCampaigns({ per_page: 1000 })
+      .then((res) => setCampaignsList(res?.data ?? []))
+      .catch(() => setCampaignsList([]));
+  }, [recordType]);
+
   const extensionNameMap = useMemo(() => {
     const list = (hierarchyDataExtensions as { id?: string; name?: string }[]) ?? [];
     return list.reduce<Record<string, string>>((acc, ext) => {
@@ -248,6 +368,37 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     if (activityFilter !== 'whatsapp') return;
     fetchWhatsAppChats();
   }, [activityFilter, fetchWhatsAppChats]);
+
+  const fetchEmails = useCallback(() => {
+    if (recordId == null || Number.isNaN(recordId)) return;
+    setEmailsLoading(true);
+    setEmailsError(null);
+    getEmails({
+      page: String(emailsPage),
+      per_page: String(emailsPerPage),
+      record_type: recordType,
+      record_id: String(recordId),
+    })
+      .then((res: unknown) => {
+        const data = (res as { data?: EmailListItem[] })?.data;
+        const meta = (res as { meta?: EmailsMeta })?.meta;
+        setEmailsList(Array.isArray(data) ? data : []);
+        setEmailsMeta(meta ?? null);
+        setEmailsError(null);
+      })
+      .catch((e) => {
+        console.error('Failed to fetch emails', e);
+        setEmailsList([]);
+        setEmailsMeta(null);
+        setEmailsError('Failed to load emails');
+      })
+      .finally(() => setEmailsLoading(false));
+  }, [recordType, recordId, emailsPage, emailsPerPage]);
+
+  useEffect(() => {
+    if (activityFilter !== 'emails' || recordId == null) return;
+    fetchEmails();
+  }, [activityFilter, recordId, fetchEmails]);
 
   const fetchCallRecordings = useCallback(async (phoneNumber: string) => {
     const normalizedPhone = (phoneNumber || '').replace(/\s/g, '');
@@ -406,13 +557,23 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     });
   }, []);
 
+  const extensionsForAudit = useMemo(
+    () => extensionsProp ?? (hierarchyDataExtensions as AuditTrailExtension[] | undefined) ?? null,
+    [extensionsProp, hierarchyDataExtensions],
+  );
+
+  const campaignsForAudit = useMemo(
+    () => campaigns ?? (recordType === 'prospect' || recordType === 'lead' ? campaignsList : null),
+    [campaigns, recordType, campaignsList],
+  );
+
   const activitiesData: ActivityItem[] = useMemo(() => {
     const trail = (record?.audit_trail ?? []) as AuditTrailEntry[];
-    const formatVal = (v: unknown): string => {
-      if (v == null) return '—';
-      if (typeof v === 'string') return v;
-      if (typeof v === 'object') return JSON.stringify(v);
-      return String(v);
+    const fmt = formatValForAudit;
+    const resolveFieldVal = (field: string, raw: unknown): string => {
+      if (AUDIT_FIELDS_EXTENSION.has(field)) return resolveAssignedToLabel(raw, extensionsForAudit, fmt);
+      if (field === 'campaign_id') return resolveCampaignLabel(raw, campaignsForAudit, fmt);
+      return fmt(raw);
     };
     return trail.map((entry) => {
       const event = entry.event === 'created' ? 'created' : 'updated';
@@ -438,12 +599,12 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
             }
             const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
             allKeys.forEach((key) => {
-              const o = formatVal(oldObj[key]);
-              const n = formatVal(newObj[key]);
+              const o = resolveFieldVal(key, oldObj[key]);
+              const n = resolveFieldVal(key, newObj[key]);
               if (o !== n) auditChanges.push({ field: key, oldVal: o, newVal: n });
             });
           } else {
-            auditChanges.push({ field, oldVal: formatVal(rawOld), newVal: formatVal(rawNew) });
+            auditChanges.push({ field, oldVal: resolveFieldVal(field, rawOld), newVal: resolveFieldVal(field, rawNew) });
           }
         });
       }
@@ -458,7 +619,7 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
         auditChanges: auditChanges.length > 0 ? auditChanges : undefined,
       };
     });
-  }, [record?.audit_trail]);
+  }, [record?.audit_trail, extensionsForAudit, campaignsForAudit]);
 
   const renderActivityItem = useCallback((activity: ActivityItem) => {
     const isExpanded = expandedActivities.has(activity.id) || activity.expanded;
@@ -561,7 +722,7 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
               alignItems: 'center',
               gap: '6px',
             }}
-            onClick={() => setShowEmailModal(true)}
+            onClick={onOpenEmail ?? (() => setShowEmailModal(true))}
           >
             <Mail size={16} />
             Create email
@@ -584,7 +745,7 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
               alignItems: 'center',
               gap: '6px',
             }}
-            onClick={() => setShowNotesModal(true)}
+            onClick={onOpenNote ?? (() => setShowNotesModal(true))}
           >
             <ClipboardList size={16} />
             Create note
@@ -607,7 +768,7 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
               alignItems: 'center',
               gap: '6px',
             }}
-            onClick={() => setShowMeetingModal(true)}
+            onClick={onOpenMeeting ?? (() => setShowMeetingModal(true))}
           >
             <Calendar size={16} />
             Create meeting
@@ -636,8 +797,98 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
 
       {activityFilter === 'emails' && (
         <>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px' }}>Emails</h3>
-          <p style={{ fontSize: '14px', color: '#718096' }}>No emails yet.</p>
+          {emailsLoading ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Loading emails…</p>
+            </div>
+          ) : emailsError ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <AlertCircle size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', margin: 0 }}>{emailsError}</p>
+            </div>
+          ) : emailsList.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <Mail size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
+                Emails sent to this contact will appear here.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {emailsList.map((email) => {
+                const isSelected = selectedEmailId === email.id;
+                const stripped = email.content ? email.content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : '';
+                const contentPreview = stripped ? (stripped.length > 120 ? stripped.slice(0, 120) + '…' : stripped) : '—';
+                return (
+                  <div
+                    key={String(email.id)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedEmailId(email.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedEmailId(email.id); } }}
+                    style={{
+                      backgroundColor: '#fff',
+                      border: `1px solid ${isSelected ? '#141414' : '#eaf0f6'}`,
+                      borderRadius: '5px',
+                      padding: '16px 20px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: '#141414' }}>{email.subject || '(No subject)'}</span>
+                          {email.status != null && (
+                            <span style={{
+                              fontSize: '12px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: email.status === 'sent' ? '#d1fae5' : email.status === 'failed' ? '#fee2e2' : '#e2e8f0',
+                              color: email.status === 'sent' ? '#065f46' : email.status === 'failed' ? '#991b1b' : '#475569',
+                            }}>
+                              {email.status}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: '14px', color: '#718096', margin: 0, lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {contentPreview}
+                        </p>
+                      </div>
+                      {email.created_at && (
+                        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          <span style={{ fontSize: '13px', color: '#718096', whiteSpace: 'nowrap' }}>
+                            {moment(email.created_at).format(GlobalDateTimeFormat)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {emailsMeta && (emailsMeta.total > 0 || emailsList.length > 0) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #eaf0f6' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', color: '#718096' }}>Per page:</span>
+                    <select value={emailsPerPage} onChange={(e) => { setEmailsPerPage(Number(e.target.value)); setEmailsPage(1); }} style={{ padding: '4px 8px', border: '1px solid #cbd5e0', borderRadius: '4px', fontSize: '13px' }}>
+                      {[5, 10, 15, 25, 50].map((n) => (<option key={n} value={n}>{n}</option>))}
+                    </select>
+                    <span style={{ fontSize: '13px', color: '#718096' }}>
+                      {emailsMeta.from != null && emailsMeta.to != null ? `Showing ${emailsMeta.from}–${emailsMeta.to} of ${emailsMeta.total}` : `Total ${emailsMeta.total}`}
+                    </span>
+                  </div>
+                  {emailsMeta.last_page > 1 && (
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <button type="button" disabled={emailsPage <= 1} onClick={() => setEmailsPage((p) => Math.max(1, p - 1))} style={{ padding: '6px 12px', border: '1px solid #cbd5e0', borderRadius: '4px', fontSize: '13px', cursor: emailsPage <= 1 ? 'not-allowed' : 'pointer', backgroundColor: '#fff', opacity: emailsPage <= 1 ? 0.6 : 1 }}>Prev</button>
+                      {Array.from({ length: Math.min(emailsMeta.last_page, 10) }, (_, i) => i + 1).map((p) => (
+                        <button key={p} type="button" onClick={() => setEmailsPage(p)} style={{ padding: '6px 12px', border: '1px solid #cbd5e0', borderRadius: '4px', fontSize: '13px', cursor: 'pointer', backgroundColor: p === emailsPage ? '#141414' : '#fff', color: p === emailsPage ? '#fff' : '#141414' }}>{p}</button>
+                      ))}
+                      <button type="button" disabled={emailsPage >= emailsMeta.last_page} onClick={() => setEmailsPage((p) => Math.min(emailsMeta.last_page, p + 1))} style={{ padding: '6px 12px', border: '1px solid #cbd5e0', borderRadius: '4px', fontSize: '13px', cursor: emailsPage >= emailsMeta.last_page ? 'not-allowed' : 'pointer', backgroundColor: '#fff', opacity: emailsPage >= emailsMeta.last_page ? 0.6 : 1 }}>Next</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -720,16 +971,29 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
 
       {activityFilter === 'calls' && (
         <>
-          {callRecordingsLoading && (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>Loading call recordings…</div>
+          {callRecordingsLoading ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Loading call recordings…</p>
+            </div>
+          ) : callRecordings.length === 0 ? (
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <Phone size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
+                Call recordings with this contact will appear here.
+              </p>
+            </div>
+          ) : (
+            <CallLog recordings={callRecordings} onPlayRecording={handlePlayRecording} extensionNameMap={extensionNameMap} />
           )}
-          <CallLog recordings={callRecordings} onPlayRecording={handlePlayRecording} extensionNameMap={extensionNameMap} />
         </>
       )}
 
       {activityFilter === 'tasks' && (
-        <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>Create and manage tasks related to this contact.</p>
+        <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+          <ClipboardList size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+          <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
+            Create and manage tasks related to this contact.
+          </p>
         </div>
       )}
 
@@ -745,8 +1009,11 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
               <p style={{ fontSize: '14px', color: '#141414', margin: 0 }}>{meetingsError}</p>
             </div>
           ) : meetingsList.length === 0 ? (
-            <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-              <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>Schedule and track meetings with this contact.</p>
+            <div style={{ backgroundColor: '#fff', border: '1px solid #eaf0f6', borderRadius: '8px', padding: '40px 24px', textAlign: 'center' }}>
+              <Calendar size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+              <p style={{ fontSize: '14px', color: '#141414', marginBottom: '8px', lineHeight: '1.6' }}>
+                Schedule and track meetings with this contact.
+              </p>
             </div>
           ) : (
             <div>
@@ -977,10 +1244,14 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
         </>
       )}
 
-      <NotesModal isOpen={showNotesModal} onClose={() => setShowNotesModal(false)} recordName={recordName} onSave={handleNoteCreate} />
-      <EmailModal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)} recipientEmail={recordEmail} recipientName={recordName} senderEmail="user@example.com" senderName="Your Name" onSend={() => setShowEmailModal(false)} />
-      <TaskModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} assignedToName="Unassigned" onSave={() => setShowTaskModal(false)} />
-      <MeetingModal isOpen={showMeetingModal} onClose={() => setShowMeetingModal(false)} hostEmail="user@example.com" hostName="Your Name" attendeeEmail={recordEmail} attendeeName={recordName} onSchedule={handleMeetingSchedule} />
+      {!useExternalModals && (
+        <>
+          <NotesModal isOpen={showNotesModal} onClose={() => setShowNotesModal(false)} recordName={recordName} onSave={handleNoteCreate} />
+          <EmailModal isOpen={showEmailModal} onClose={() => setShowEmailModal(false)} recipientEmail={recordEmail} recipientName={recordName} senderEmail="user@example.com" senderName="Your Name" onSend={async () => { await fetchEmails(); setShowEmailModal(false); }} />
+          <TaskModal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} assignedToName="Unassigned" onSave={() => setShowTaskModal(false)} />
+          <MeetingModal isOpen={showMeetingModal} onClose={() => setShowMeetingModal(false)} hostEmail="user@example.com" hostName="Your Name" attendeeEmail={recordEmail} attendeeName={recordName} onSchedule={handleMeetingSchedule} />
+        </>
+      )}
 
       {showRecordingModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeRecordingModal}>
@@ -1008,6 +1279,45 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
                 <div style={{ fontSize: '13px', color: '#718096', marginBottom: '8px' }}>To: {selectedSms.to}</div>
                 <div style={{ fontSize: '13px', color: '#718096', marginBottom: '12px' }}>{selectedSms.created_at && moment(selectedSms.created_at).format(GlobalDateTimeFormat)}</div>
                 <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '6px', whiteSpace: 'pre-wrap', fontSize: '14px', color: '#141414', lineHeight: '1.6' }}>{selectedSms.message || '—'}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {selectedEmailId != null && (() => {
+        const selectedEmail = emailsList.find((e) => e.id === selectedEmailId);
+        if (!selectedEmail) return null;
+        const html = getEmailPreviewHtml(selectedEmail.content);
+        const toDisplay = Array.isArray(selectedEmail.to) ? selectedEmail.to.join(', ') : '—';
+        const fromDisplay = extensionNameMap[selectedEmail.created_by ?? ''] ?? selectedEmail.created_by ?? '—';
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setSelectedEmailId(null)}>
+            <div style={{ backgroundColor: '#fff', borderRadius: '8px', maxWidth: '640px', width: '90%', maxHeight: '85vh', overflow: 'auto', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#141414', margin: 0 }}>{selectedEmail.subject || '(No subject)'}</h3>
+                <button type="button" onClick={() => setSelectedEmailId(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', color: '#718096' }}><X size={20} /></button>
+              </div>
+              <div style={{ padding: '20px' }}>
+                <div style={{ fontSize: '13px', color: '#718096', marginBottom: '4px' }}>From: {fromDisplay}</div>
+                <div style={{ fontSize: '13px', color: '#718096', marginBottom: '8px' }}>To: {toDisplay}</div>
+                <div style={{ fontSize: '13px', color: '#718096', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedEmail.created_at && moment(selectedEmail.created_at).format(GlobalDateTimeFormat)}
+                  {selectedEmail.status != null && (
+                    <span style={{
+                      fontSize: '12px', padding: '2px 8px', borderRadius: '4px',
+                      backgroundColor: selectedEmail.status === 'sent' ? '#d1fae5' : selectedEmail.status === 'failed' ? '#fee2e2' : '#e2e8f0',
+                      color: selectedEmail.status === 'sent' ? '#065f46' : selectedEmail.status === 'failed' ? '#991b1b' : '#475569',
+                    }}>{selectedEmail.status}</span>
+                  )}
+                </div>
+                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '6px', fontSize: '14px', color: '#141414', lineHeight: '1.6', minHeight: '80px', maxHeight: '60vh', overflow: 'auto' }}>
+                  {html ? (
+                    <div dangerouslySetInnerHTML={{ __html: html }} />
+                  ) : (
+                    <span style={{ color: '#718096' }}>No content</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

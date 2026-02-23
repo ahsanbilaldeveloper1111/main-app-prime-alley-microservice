@@ -41,6 +41,7 @@ import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -104,6 +105,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+
+  const prospectRecordId = Number(prospectId) || prospect?.data?.id || 0;
+  const prospectRecordName = prospect?.data?.name ?? "Prospect";
+  const prospectRecordEmail = prospect?.data?.data?.email ?? "";
+
+  const activityModals = useCrmActivityModals({
+    recordType: "prospect",
+    recordId: prospectRecordId,
+    recordName: prospectRecordName,
+    recordEmail: prospectRecordEmail,
+    recordPhone: prospect?.data?.phone ?? "",
+  });
 
   // Load prospect by ID from URL
   useEffect(() => {
@@ -1153,11 +1166,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           {[
-            { icon: ClipboardList, label: "Note", disabled: false },
-            { icon: Mail, label: "Email", disabled: true },
-            { icon: Phone, label: "Call", disabled: true },
-            { icon: ClipboardList, label: "Task", disabled: true },
-            { icon: Calendar, label: "Meeting", disabled: false },
+            { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
+            { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
+            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
+            { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -1171,7 +1184,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 }}
               >
                 <button
-                  // disabled={action.disabled}
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onClick}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1180,7 +1195,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     background: "#ffffff",
                     border: "1px solid #8a8a8a",
                     borderRadius: "50%",
-                    cursor: "pointer",
+                    cursor: action.disabled ? "not-allowed" : "pointer",
                     width: "30px",
                     height: "30px",
                     color: "#141414",
@@ -1253,10 +1268,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                 }}
               >
-                {["Message", "Task", "WhatsApp"].map((action) => (
+                {[
+                  { label: "Message", onClick: activityModals.openSms },
+                  { label: "Task", onClick: activityModals.openTask },
+                  { label: "WhatsApp", onClick: activityModals.openWhatsApp },
+                ].map(({ label, onClick }) => (
                   <button
-                    key={action}
-                    onClick={() => setShowMoreActivities(false)}
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setShowMoreActivities(false);
+                      onClick();
+                    }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -1274,7 +1297,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    {action}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1881,11 +1904,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {activeTab === "activities" && (
           <CrmActivitiesPanel
             recordType="prospect"
-            recordId={Number(prospectId) || prospect?.data?.id || 0}
+            recordId={prospectRecordId}
             record={prospect}
             recordLoading={prospectLoading}
-            recordName={prospect?.data?.name ?? "Prospect"}
+            recordName={prospectRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            {...activityModals.crmActivitiesPanelProps}
           />
         )}
 
@@ -1963,166 +1987,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
               paddingBottom: "0",
             }}
           >
-            {/* Companies - from prospect name + unique company_name from tickets */}
-            {(() => {
-              const companyNames: string[] = prospect?.data?.tickets?.length
-                ? Array.from(
-                    new Set(
-                      prospect?.data.tickets
-                        .map((t: any) => t.company_name)
-                        .filter(Boolean),
-                    ),
-                  )
-                : [];
-              const companiesCount = companyNames.length;
-              return (
-                <div
-                  style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: "10px",
-                    marginBottom: "12px",
-                    overflow: "hidden",
-                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                    border: "1px solid #cccccc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 20px 0",
-                      cursor: "pointer",
-                      backgroundColor: "#ffffff",
-                    }}
-                    onClick={() => toggleSection("companies")}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        flex: 1,
-                      }}
-                    >
-                      <ChevronDown
-                        size={18}
-                        style={{
-                          color: "#141414",
-                          transform: collapsedSections.has("companies")
-                            ? "rotate(-90deg)"
-                            : "rotate(0deg)",
-                          transition: "transform 0.2s ease",
-                        }}
-                      />
-                      <h3
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: "600",
-                          color: "#141414",
-                          margin: 0,
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        Companies ({companiesCount})
-                      </h3>
-                    </div>
-                  </div>
-
-                  {!collapsedSections.has("companies") && (
-                    <div style={{ padding: "20px" }}>
-                      {companiesCount === 0 ? (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: 0,
-                          }}
-                        >
-                          No companies associated.
-                        </p>
-                      ) : (
-                        <>
-                          {(companyNames as string[]).map(
-                            (companyName: string, idx: number) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  marginBottom: "16px",
-                                  border: "1px solid #cccccc",
-                                  borderRadius: "10px",
-                                  padding: "15px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    marginBottom: "8px",
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#006162",
-                                      fontWeight: "500",
-                                    }}
-                                  >
-                                    {companyName}
-                                  </span>
-                                  {idx === 0 && (
-                                    <span
-                                      style={{
-                                        padding: "2px 8px",
-                                        backgroundColor: "#e6f3ff",
-                                        color: "#006162",
-                                        borderRadius: "3px",
-                                        fontSize: "11px",
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      Primary
-                                    </span>
-                                  )}
-                                </div>
-                                <p
-                                  style={{
-                                    fontSize: "13px",
-                                    color: "#666666",
-                                    margin: "4px 0",
-                                  }}
-                                >
-                                  Phone: {prospect?.data?.phone ?? "--"}
-                                </p>
-                              </div>
-                            ),
-                          )}
-                          <a
-                            href="#"
-                            style={{
-                              fontSize: "12px",
-                              color: "#141414",
-                              textDecoration: "none",
-                              fontWeight: "300",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              border: "1px solid #cccccc",
-                              borderRadius: "6px",
-                              padding: "6px 12px",
-                            }}
-                          >
-                            View all associated Companies
-                            <ExternalLink size={12} />
-                          </a>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
 
             {/* Deals - from prospect.data.tickets[].deals */}
             {(() => {
@@ -2588,7 +2452,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {renderRightSidebar()}
       </div>
 
-      {/* Activities modals (Notes, Email, Task, Meeting, Recording, SMS, WhatsApp, Delete confirmations) are rendered inside CrmActivitiesPanel */}
+      {activityModals.modals}
     </>
   );
 };

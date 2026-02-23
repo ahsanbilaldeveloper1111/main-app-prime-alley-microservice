@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   X,
   ChevronDown,
@@ -37,8 +37,11 @@ import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import { useSession } from "next-auth/react";
-import { createMeeting, createCrmNote } from "@utils/crm";
-import { RECORD_TYPES } from "@utils/Helper";
+import { createMeeting, createCrmNote, getCrmNotes, type CrmNoteItem } from "@utils/crm";
+import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
+import { ListCallLogs } from "@utils/calls";
+import { useCti } from "@hooks/useCti";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -5321,6 +5324,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onSmsLog,
 }) => {
   const { data: session } = useSession();
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
   const extension = (session?.user as { extension?: string; phone?: string } | undefined)?.extension
     ?? (session?.user as { extension?: string; phone?: string } | undefined)?.phone
     ?? 'unknown';
@@ -5362,6 +5375,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [moreModalPosition, setMoreModalPosition] = useState({ top: 0, left: 0 });
+  const [sidebarNotesList, setSidebarNotesList] = useState<CrmNoteItem[]>([]);
+  const [sidebarNotesLoading, setSidebarNotesLoading] = useState(false);
+  const [sidebarCallRecordings, setSidebarCallRecordings] = useState<any[]>([]);
+  const [sidebarCallRecordingsLoading, setSidebarCallRecordingsLoading] = useState(false);
+  const callRecordingsFetchKeyRef = useRef<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
@@ -5380,6 +5398,55 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
     setCollapsedSections(collapsed);
   }, [sections]);
+
+  // Fetch notes when sidebar is open and we have a CRM record
+  useEffect(() => {
+    if (!isOpen || !recordType || recordId == null || Number.isNaN(Number(recordId))) {
+      return;
+    }
+    const rType = recordType as "prospect" | "lead" | "deal" | "order";
+    setSidebarNotesLoading(true);
+    getCrmNotes(rType, Number(recordId))
+      .then((res) => {
+        setSidebarNotesList(res?.data ?? []);
+      })
+      .catch(() => setSidebarNotesList([]))
+      .finally(() => setSidebarNotesLoading(false));
+  }, [isOpen, recordType, recordId]);
+
+  // Fetch call recordings when sidebar is open and we have a phone number (ref prevents double call)
+  useEffect(() => {
+    if (!isOpen) {
+      callRecordingsFetchKeyRef.current = null;
+      return;
+    }
+    const normalizedPhone = (phone || "").trim().replace(/\s/g, "");
+    if (!normalizedPhone) {
+      setSidebarCallRecordings([]);
+      return;
+    }
+    const fetchKey = `${normalizedPhone}`;
+    if (callRecordingsFetchKeyRef.current === fetchKey) return;
+    callRecordingsFetchKeyRef.current = fetchKey;
+    setSidebarCallRecordingsLoading(true);
+    ListCallLogs(
+      {
+        page: 1,
+        perPage: 20,
+        search: "",
+        filters: { remote_party_number: [String(normalizedPhone)] },
+        reportType: "recordings",
+        moduleSlug: ModuleSlug.CALL_RECORDINGS,
+      },
+      "call-logs/recordings",
+    )
+      .then((response: any) => {
+        const data = response ?? {};
+        setSidebarCallRecordings(Array.isArray(data.dataList) ? data.dataList : []);
+      })
+      .catch(() => setSidebarCallRecordings([]))
+      .finally(() => setSidebarCallRecordingsLoading(false));
+  }, [isOpen, phone]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -5437,6 +5504,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         setShowNotesModal(false);
         toast.success('Note created successfully');
         onNoteCreate?.(note, createTask, taskDueDate);
+        // Refresh sidebar notes list
+        const rType = recordType as "prospect" | "lead" | "deal" | "order";
+        getCrmNotes(rType, Number(recordId)).then((res) => setSidebarNotesList(res?.data ?? [])).catch(() => {});
       } catch {
         // createCrmNote already shows toast on error
       }
@@ -5533,10 +5603,75 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowCallModal(false);
   };
 
-  const handleCall = (phoneNumber: string) => {
-    onCall?.(phoneNumber);
-    console.log("Calling:", phoneNumber);
-  };
+  /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        setShowCallModal(false);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.success) {
+          setShowCallModal(false);
+          onCall?.(numberToDial);
+        } else if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices, onCall],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.success) {
+          setShowCallModal(false);
+          onCall?.(numberToDial);
+        } else if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
+  );
 
   const handleMeetingClick = () => {
     setShowMeetingModal(true);
@@ -6232,7 +6367,88 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         {/* Section Content */}
         {!isCollapsed && (
           <div style={{ padding: "20px" }}>
-            {section.isLoading ? (
+            {section.id === "notes" ? (
+              sidebarNotesLoading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
+                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                  Loading...
+                </div>
+              ) : sidebarNotesList.length > 0 ? (
+                <div>
+                  {sidebarNotesList.map((note) => {
+                    const updatedAt = new Date(note.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                    return (
+                      <div key={note.id} style={{ backgroundColor: "#fff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "12px 16px", marginBottom: "10px" }}>
+                        <p style={{ fontSize: "14px", color: "#141414", margin: "0 0 8px 0", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>{note.text}</p>
+                        <span style={{ fontSize: "12px", color: "#718096" }}>{updatedAt}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : section.emptyState ? (
+                <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
+                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {section.emptyState.action && (
+                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                      {section.emptyState.action.label}
+                    </button>
+                  )}
+                </div>
+              ) : null
+            ) : (section.id === "calls" || section.id === "call-recordings") ? (
+              sidebarCallRecordingsLoading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
+                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                  Loading...
+                </div>
+              ) : sidebarCallRecordings.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "280px", overflowY: "auto" }}>
+                  {sidebarCallRecordings.map((rec: any, index: number) => {
+                    const dateStr = rec.DateTime ?? rec.start_time ?? rec.created_at ?? "";
+                    const timestamp = dateStr ? (dateStr.length > 10 ? new Date(dateStr).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : dateStr) : "—";
+                    const dir = rec.Direction ?? rec.direction ?? rec.CallDirection ?? "";
+                    const direction = dir.includes("INBOUND") || dir === "Inbound" || dir === "CALL_INCOMING" ? "Incoming" : "Outgoing";
+                    const rawDuration = rec.Duration ?? rec.duration ?? rec.CallDuration ?? 0;
+                    const durationSec = parseInt(String(rawDuration), 10) / 10000000 || 0;
+                    const roundedSec = Math.round(durationSec * 10) / 10;
+                    const durationStr = durationSec >= 60 ? `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}` : roundedSec > 0 ? `${roundedSec}s` : "";
+                    return (
+                      <div
+                        key={rec.Id ?? rec.id ?? index}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          background: "#f9fafb",
+                          borderRadius: "8px",
+                          border: "1px solid #e5e7eb",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 500, color: "#1f2937" }}>{timestamp}</div>
+                          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                            {durationStr ? `${durationStr} · ` : ""}{direction}
+                          </div>
+                        </div>
+                        <Phone size={16} style={{ color: "#718096", flexShrink: 0 }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : section.emptyState ? (
+                <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
+                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {section.emptyState.action && (
+                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                      {section.emptyState.action.label}
+                    </button>
+                  )}
+                </div>
+              ) : null
+            ) : section.isLoading ? (
               <div
                 style={{
                   display: "flex",
@@ -6469,6 +6685,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         company={company}
         callerNumber={callerNumber}
         onCall={handleCall}
+      />
+
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
       />
 
       {/* Meeting Modal - Rendered as floating window */}
