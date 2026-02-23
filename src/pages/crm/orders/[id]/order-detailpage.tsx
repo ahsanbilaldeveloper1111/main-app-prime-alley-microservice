@@ -14,7 +14,7 @@ import { toast } from "react-toastify";
 import moment from "moment";
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel, { CrmActivitiesRecord } from '@components/CrmActivitiesPanel';
+import CrmActivitiesPanel, { CrmActivitiesRecord, type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
 import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
 
 // ============================================================================
@@ -77,6 +77,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Fetch extensions
   useEffect(() => {
@@ -244,6 +245,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
+  // Include audit_trail so Activity tab shows order history
   const orderRecord: CrmActivitiesRecord | null = orderData
     ? {
         id: orderData.id,
@@ -253,6 +255,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
           phone: orderData.customer_phone || '',
           data: orderData,
         },
+        audit_trail: orderData.audit_trail ?? [],
       }
     : null;
 
@@ -269,6 +272,9 @@ const OrderRecordPage: NextPageWithLayout = () => {
     recordEmail: orderRecordEmail,
     recordPhone: orderRecordPhone,
     onTaskCreated: () => tasksRefetch?.(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
   });
 
   // Key Information Fields - Order specific
@@ -1576,6 +1582,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
 
           {activeTab === 'activities' && (
             <CrmActivitiesPanel
+              ref={activitiesPanelRef}
               recordType="order"
               recordId={orderRecordId}
               record={orderRecord}

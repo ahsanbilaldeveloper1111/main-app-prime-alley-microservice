@@ -2,7 +2,7 @@
  * CrmActivitiesPanel – reusable Activities tab content for CRM record detail pages
  * (prospect, lead, deal, order). Renders activity sub-tabs and their content.
  */
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   X, ChevronDown, ChevronRight, Mail, Calendar, MessageSquare, ClipboardList,
   FileText, Pencil, Trash2, MessageCircle, AlertCircle, Phone,
@@ -194,7 +194,6 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   onOpenEmail,
   onOpenTask,
   onOpenMeeting,
-  onTasksRefetchReady,
 }) => {
   const useExternalModals = Boolean(onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting);
   const [activityFilter, setActivityFilter] = useState('activity');
@@ -565,74 +564,6 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     await fetchMeetings();
     setShowMeetingModal(false);
   }, [fetchMeetings]);
-
-  const { data: session } = useSession();
-  const userExtension =
-    (session?.user as { extension?: string; phone?: string } | undefined)?.extension ??
-    (session?.user as { extension?: string; phone?: string } | undefined)?.phone ??
-    '';
-
-  /** Parse TaskModal activityDate preset to YYYY-MM-DD for due_date. */
-  const parseTaskDueDate = useCallback((activityDate: string, activityTime: string): string => {
-    const m = moment();
-    if (activityDate === 'Today') return m.format('YYYY-MM-DD');
-    if (activityDate === 'Tomorrow') return m.add(1, 'day').format('YYYY-MM-DD');
-    if (activityDate?.includes('3 business') || activityDate?.includes('Friday')) return m.add(3, 'day').format('YYYY-MM-DD');
-    if (activityDate === 'In 1 week') return m.add(1, 'week').format('YYYY-MM-DD');
-    if (activityDate === 'In 2 weeks') return m.add(2, 'week').format('YYYY-MM-DD');
-    if (activityDate === 'In 1 month') return m.add(1, 'month').format('YYYY-MM-DD');
-    return moment().add(3, 'day').format('YYYY-MM-DD');
-  }, []);
-
-  const handleTaskSave = useCallback(
-    async (taskForm: {
-      title: string;
-      activityDate: string;
-      activityTime: string;
-      priority: string;
-      notes: string;
-    }) => {
-      const due_date = parseTaskDueDate(taskForm.activityDate, taskForm.activityTime);
-      const urgency = taskForm.priority === 'High' ? 'high' : taskForm.priority === 'Medium' ? 'med' : 'low';
-      const ext = userExtension || 'unknown';
-      try {
-        await createTask({
-          name: taskForm.title.trim(),
-          user_extension: ext,
-          created_by: ext,
-          urgency,
-          due_date,
-          time: taskForm.activityTime?.slice(0, 5) || undefined,
-          status: 'pending',
-          notes: taskForm.notes?.trim() ? [{ note: taskForm.notes.trim() }] : undefined,
-          record_type: recordType,
-          record_id: recordId,
-          email: record?.data?.data?.email ?? undefined,
-          phone: record?.data?.phone ?? undefined,
-          company_name: record?.data?.name ?? undefined,
-        });
-        setShowTaskModal(false);
-        fetchTasks();
-      } catch {
-        // createTask shows toast
-      }
-    },
-    [recordType, recordId, record, userExtension, parseTaskDueDate, fetchTasks],
-  );
-
-  const handleTaskDeleteConfirm = useCallback(async () => {
-    if (taskToDelete?.id == null) return;
-    setTaskDeleteLoading(true);
-    try {
-      await deleteTask(taskToDelete.id);
-      setTaskToDelete(null);
-      fetchTasks();
-    } catch {
-      // deleteTask shows toast
-    } finally {
-      setTaskDeleteLoading(false);
-    }
-  }, [taskToDelete, fetchTasks]);
 
   const handleWhatsAppReplySend = useCallback(async () => {
     if (selectedWhatsAppChatId == null || !whatsappReplyMessage.trim() || !canSendWhatsApp) return;
@@ -1618,4 +1549,5 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   );
 };
 
+export const CrmActivitiesPanel = forwardRef(CrmActivitiesPanelInner);
 export default CrmActivitiesPanel;

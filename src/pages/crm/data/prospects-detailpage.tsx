@@ -40,7 +40,7 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // ============================================================================
@@ -106,6 +106,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   const prospectRecordId = Number(prospectId) || prospect?.data?.id || 0;
   const prospectRecordName = prospect?.data?.name ?? "Prospect";
@@ -118,6 +119,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordEmail: prospectRecordEmail,
     recordPhone: prospect?.data?.phone ?? "",
     onTaskCreated: () => tasksRefetch?.(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
   });
 
   // Load prospect by ID from URL
@@ -1905,6 +1909,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
         {activeTab === "activities" && (
           <CrmActivitiesPanel
+            ref={activitiesPanelRef}
             recordType="prospect"
             recordId={prospectRecordId}
             record={prospect}

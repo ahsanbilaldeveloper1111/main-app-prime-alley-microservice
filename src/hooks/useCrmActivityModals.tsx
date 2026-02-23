@@ -26,6 +26,12 @@ export interface UseCrmActivityModalsParams {
   recordPhone?: string;
   /** Called after a task is created (e.g. from sidebar modal) so the Activities panel can refetch tasks. */
   onTaskCreated?: () => void;
+  /** Called after a note is created so CrmActivitiesPanel can refetch notes. */
+  onNoteCreated?: () => void;
+  /** Called after an email is sent so CrmActivitiesPanel can refetch emails. */
+  onEmailSent?: () => void;
+  /** Called after a meeting is scheduled so CrmActivitiesPanel can refetch meetings. */
+  onMeetingScheduled?: () => void;
 }
 
 export interface UseCrmActivityModalsReturn {
@@ -53,6 +59,9 @@ export function useCrmActivityModals({
   recordEmail = "",
   recordPhone = "",
   onTaskCreated,
+  onNoteCreated,
+  onEmailSent,
+  onMeetingScheduled,
 }: UseCrmActivityModalsParams): UseCrmActivityModalsReturn {
   const { data: session } = useSession();
   const extension =
@@ -94,11 +103,12 @@ export function useCrmActivityModals({
         });
         setShowNotesModal(false);
         toast.success("Note created successfully");
+        onNoteCreated?.();
       } catch {
         // createCrmNote shows toast on error
       }
     },
-    [recordType, recordId],
+    [recordType, recordId, onNoteCreated],
   );
 
   const handleMeetingSchedule = useCallback(
@@ -145,11 +155,12 @@ export function useCrmActivityModals({
             : {}),
         });
         setShowMeetingModal(false);
+        onMeetingScheduled?.();
       } catch {
         // createMeeting shows toast on error
       }
     },
-    [recordType, recordId],
+    [recordType, recordId, onMeetingScheduled],
   );
 
   const handleEmailSend = useCallback(
@@ -175,11 +186,12 @@ export function useCrmActivityModals({
           ...(recordType && { record_type: recordType }),
         });
         setShowEmailModal(false);
+        onEmailSent?.();
       } catch {
         // sendEmail shows toast on error
       }
     },
-    [recordType, recordId],
+    [recordType, recordId, onEmailSent],
   );
 
   const parseTaskDueDate = useCallback(
