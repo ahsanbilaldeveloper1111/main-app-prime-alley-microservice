@@ -6,7 +6,9 @@ import {
   Link,
   Image,
   Paperclip,
+  Sparkles,
 } from "lucide-react";
+import { generateEmail } from "@utils/communication";
 
 interface EmailModalProps {
   isOpen: boolean;
@@ -15,6 +17,8 @@ interface EmailModalProps {
   recipientName?: string;
   senderEmail?: string;
   senderName?: string;
+  /** Optional context for AI generation (e.g. lead, deal, order from CRM). */
+  contextPayload?: { lead?: unknown; deal?: unknown; order?: unknown };
   onSend: (emailData: {
     to: string[];
     cc: string[];
@@ -27,6 +31,16 @@ interface EmailModalProps {
   }) => void | Promise<void>;
 }
 
+/** Extract HTML from content (strip markdown code fence if present). */
+function getEmailPreviewHtml(content: string | undefined): string {
+  if (!content || typeof content !== "string") return "";
+  const raw = content.trim();
+  const htmlMatch =
+    raw.match(/^```html?\s*([\s\S]*?)```$/im) ??
+    raw.match(/^```\s*([\s\S]*?)```$/im);
+  return htmlMatch ? htmlMatch[1].trim() : raw;
+}
+
 const EmailModal: React.FC<EmailModalProps> = ({
   isOpen,
   onClose,
@@ -34,6 +48,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
   recipientName,
   senderEmail = "user@example.com",
   senderName = "Your Name",
+  contextPayload,
   onSend,
 }) => {
   const [toEmails, setToEmails] = useState<string[]>(
@@ -55,8 +70,31 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [createTask, setCreateTask] = useState(false);
   const [showSendDropdown, setShowSendDropdown] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
-  const emailBodyRef = useRef<HTMLTextAreaElement>(null);
   const sendDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Generate email (AI) state – same options as EmailSection
+  const [generatePrompt, setGeneratePrompt] = useState("");
+  const [generateTone, setGenerateTone] = useState("professional");
+  const [emailStyle, setEmailStyle] = useState("modern");
+  const [emailLength, setEmailLength] = useState("medium");
+  const [urgency, setUrgency] = useState("normal");
+  const [industry, setIndustry] = useState("");
+  const [customIndustry, setCustomIndustry] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [customLanguage, setCustomLanguage] = useState("");
+  const [ctaType, setCtaType] = useState("");
+  const [customCtaType, setCustomCtaType] = useState("");
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [showToneDropdown, setShowToneDropdown] = useState(false);
+  const bodyEditorRef = useRef<HTMLDivElement>(null);
+  const bodySetByGenerateRef = useRef(false);
+  const [showStyleDropdown, setShowStyleDropdown] = useState(false);
+  const [showLengthDropdown, setShowLengthDropdown] = useState(false);
+  const [showUrgencyDropdown, setShowUrgencyDropdown] = useState(false);
+  const [showIndustryDropdown, setShowIndustryDropdown] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showCtaDropdown, setShowCtaDropdown] = useState(false);
+  const optionsPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (recipientEmail && !toEmails.includes(recipientEmail)) {
@@ -64,9 +102,16 @@ const EmailModal: React.FC<EmailModalProps> = ({
     }
   }, [recipientEmail]);
 
+  // When we set body from Generate, update the contenteditable div
   useEffect(() => {
-    if (isOpen && emailBodyRef.current) {
-      emailBodyRef.current.focus();
+    if (!bodySetByGenerateRef.current || !bodyEditorRef.current) return;
+    bodyEditorRef.current.innerHTML = emailBody;
+    bodySetByGenerateRef.current = false;
+  }, [emailBody]);
+
+  useEffect(() => {
+    if (isOpen && bodyEditorRef.current) {
+      bodyEditorRef.current.focus();
     }
   }, [isOpen]);
 
@@ -78,11 +123,217 @@ const EmailModal: React.FC<EmailModalProps> = ({
       ) {
         setShowSendDropdown(false);
       }
+      if (
+        optionsPanelRef.current &&
+        !optionsPanelRef.current.contains(event.target as Node)
+      ) {
+        setShowToneDropdown(false);
+        setShowStyleDropdown(false);
+        setShowLengthDropdown(false);
+        setShowUrgencyDropdown(false);
+        setShowIndustryDropdown(false);
+        setShowLanguageDropdown(false);
+        setShowCtaDropdown(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleGenerateEmail = async () => {
+    const query = generatePrompt.trim();
+    if (!query) return;
+    setGenerateLoading(true);
+    try {
+      const res = await generateEmail({
+        query,
+        tone: generateTone,
+        urgency,
+        industry: industry === "custom" ? customIndustry : industry,
+        language: language === "custom" ? customLanguage : language,
+        cta_type: ctaType === "custom" ? customCtaType : ctaType,
+        email_style: emailStyle,
+        email_length: emailLength,
+        ...((bodyEditorRef.current?.innerHTML?.trim() || emailBody) && {
+          previous_content:
+            bodyEditorRef.current?.innerHTML?.trim() || emailBody,
+        }),
+        ...(contextPayload?.lead != null && { lead: contextPayload.lead }),
+        ...(contextPayload?.deal != null && { deal: contextPayload.deal }),
+        ...(contextPayload?.order != null && { order: contextPayload.order }),
+      });
+      const raw = (res.result ?? "").trim();
+      const html = raw ? getEmailPreviewHtml(raw) || raw : "";
+      if (html) {
+        bodySetByGenerateRef.current = true;
+        setEmailBody(html);
+      }
+    } catch {
+      // keep existing body on error
+    } finally {
+      setGenerateLoading(false);
+    }
+  };
+
+  // Options matching EmailSection / CommonOptionsFields
+  const TONE_OPTIONS = [
+    { value: "professional", label: "Professional" },
+    { value: "casual", label: "Casual" },
+    { value: "friendly", label: "Friendly" },
+    { value: "empathetic", label: "Empathetic" },
+    { value: "urgent", label: "Urgent" },
+    { value: "persuasive", label: "Persuasive" },
+  ];
+  const EMAIL_STYLE_OPTIONS = [
+    { value: "modern", label: "Modern" },
+    { value: "corporate", label: "Corporate" },
+    { value: "minimal", label: "Minimal" },
+    { value: "promotional", label: "Promotional" },
+  ];
+  const EMAIL_LENGTH_OPTIONS = [
+    { value: "brief", label: "Brief" },
+    { value: "medium", label: "Medium" },
+    { value: "detailed", label: "Detailed" },
+  ];
+  const URGENCY_OPTIONS = [
+    { value: "low", label: "Low" },
+    { value: "normal", label: "Normal" },
+    { value: "high", label: "High" },
+    { value: "critical", label: "Critical" },
+  ];
+  const INDUSTRY_OPTIONS = [
+    { value: "", label: "Select" },
+    { value: "real_estate", label: "Real Estate" },
+    { value: "sass", label: "Banking" },
+    { value: "health_care", label: "Education" },
+    { value: "ecommerce", label: "Ecommerce" },
+    { value: "healthcare", label: "Healthcare" },
+    { value: "retail", label: "Retail" },
+    { value: "technology", label: "Technology" },
+    { value: "custom", label: "Custom" },
+  ];
+  const LANGUAGE_OPTIONS = [
+    { value: "en", label: "English" },
+    { value: "es", label: "Spanish" },
+    { value: "hi", label: "Hindi" },
+    { value: "ur", label: "Urdu" },
+    { value: "it", label: "Italian" },
+    { value: "pt", label: "Japanese" },
+    { value: "ru", label: "Russian" },
+    { value: "zh", label: "Chinese" },
+    { value: "custom", label: "Custom" },
+  ];
+  const CTA_OPTIONS = [
+    { value: "", label: "Select" },
+    { value: "schedule_call", label: "Schedule call" },
+    { value: "visit_website", label: "Visit website" },
+    { value: "book_demo", label: "Book demo" },
+    { value: "start_trial", label: "Start trial" },
+    { value: "make_payment", label: "Make payment" },
+    { value: "custom", label: "Custom" },
+  ];
+
+  const renderDropdown = (
+    label: string,
+    value: string,
+    options: Array<{ value: string; label: string }>,
+    show: boolean,
+    setShow: (s: boolean) => void,
+    onChange: (v: string) => void,
+    displayLabel?: string,
+  ) => {
+    const display =
+      displayLabel ??
+      options.find((o) => o.value === value)?.label ??
+      (value || "Select");
+    return (
+      <div key={label} style={{ position: "relative" }}>
+        <label
+          style={{
+            fontSize: "12px",
+            fontWeight: "600",
+            color: "#718096",
+            display: "block",
+            marginBottom: "4px",
+          }}
+        >
+          {label}
+        </label>
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          style={{
+            width: "100%",
+            minWidth: "100px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "6px",
+            padding: "6px 10px",
+            border: "1px solid #e2e8f0",
+            borderRadius: "6px",
+            fontSize: "13px",
+            color: "#141414",
+            backgroundColor: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            style={{
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {display}
+          </span>
+          <ChevronDown size={14} />
+        </button>
+        {show && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
+              marginTop: "2px",
+              backgroundColor: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              zIndex: 20,
+              maxHeight: "200px",
+              overflowY: "auto",
+            }}
+          >
+            {options.map((opt) => (
+              <button
+                key={opt.value || "empty"}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setShow(false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  border: "none",
+                  background: "none",
+                  fontSize: "13px",
+                  color: "#141414",
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -155,6 +406,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       const confirmSend = window.confirm("Send email without a subject?");
       if (!confirmSend) return;
     }
+    const bodyToSend = bodyEditorRef.current?.innerHTML?.trim() ?? emailBody;
     setSendLoading(true);
     try {
       await onSend({
@@ -162,7 +414,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         cc: ccEmails,
         bcc: bccEmails,
         subject,
-        body: emailBody,
+        body: bodyToSend,
         createTask,
         taskDueDate: createTask ? "In 3 business days (Friday)" : undefined,
       });
@@ -171,6 +423,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setBccEmails([]);
       setSubject("");
       setEmailBody("");
+      if (bodyEditorRef.current) bodyEditorRef.current.innerHTML = "";
       setShowCc(false);
       setShowBcc(false);
       setCreateTask(false);
@@ -643,25 +896,268 @@ const EmailModal: React.FC<EmailModalProps> = ({
           </div>
         </div>
 
-        {/* Email Body */}
-        <div style={{ padding: "20px" }}>
-          <textarea
-            ref={emailBodyRef}
-            value={emailBody}
-            onChange={(e) => setEmailBody(e.target.value)}
-            placeholder="Type your email message here..."
+        {/* Generate email: prompt + all options (same as EmailSection) + button */}
+        <div
+          ref={optionsPanelRef}
+          style={{
+            padding: "12px 20px",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <label
+            style={{ fontSize: "14px", fontWeight: "600", color: "#141414" }}
+          >
+            Generate email
+          </label>
+          <input
+            type="text"
+            value={generatePrompt}
+            onChange={(e) => setGeneratePrompt(e.target.value)}
+            placeholder="Describe how the email should look..."
             style={{
               width: "100%",
-              height: isMaximized ? "400px" : "200px",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
+              fontSize: "14px",
+              color: "#141414",
+              padding: "8px 12px",
+              outline: "none",
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleGenerateEmail()}
+          />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+              gap: "10px",
+            }}
+          >
+            {renderDropdown(
+              "Tone",
+              generateTone,
+              TONE_OPTIONS,
+              showToneDropdown,
+              setShowToneDropdown,
+              setGenerateTone,
+            )}
+            {renderDropdown(
+              "Email Style",
+              emailStyle,
+              EMAIL_STYLE_OPTIONS,
+              showStyleDropdown,
+              setShowStyleDropdown,
+              setEmailStyle,
+            )}
+            {renderDropdown(
+              "Email Length",
+              emailLength,
+              EMAIL_LENGTH_OPTIONS,
+              showLengthDropdown,
+              setShowLengthDropdown,
+              setEmailLength,
+            )}
+            {renderDropdown(
+              "Urgency",
+              urgency,
+              URGENCY_OPTIONS,
+              showUrgencyDropdown,
+              setShowUrgencyDropdown,
+              setUrgency,
+            )}
+            {renderDropdown(
+              "Industry",
+              industry,
+              INDUSTRY_OPTIONS,
+              showIndustryDropdown,
+              setShowIndustryDropdown,
+              setIndustry,
+            )}
+            {renderDropdown(
+              "Language",
+              language,
+              LANGUAGE_OPTIONS,
+              showLanguageDropdown,
+              setShowLanguageDropdown,
+              setLanguage,
+            )}
+            {renderDropdown(
+              "CTA Type",
+              ctaType,
+              CTA_OPTIONS,
+              showCtaDropdown,
+              setShowCtaDropdown,
+              setCtaType,
+            )}
+          </div>
+          {industry === "custom" && (
+            <div>
+              <label
+                style={{
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#718096",
+                  display: "block",
+                  marginBottom: "4px",
+                }}
+              >
+                Custom Industry
+              </label>
+              <input
+                type="text"
+                value={customIndustry}
+                onChange={(e) => setCustomIndustry(e.target.value)}
+                placeholder="Enter industry"
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              />
+            </div>
+          )}
+          {language === "custom" && (
+            <div>
+              <label
+                style={{
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#718096",
+                  display: "block",
+                  marginBottom: "4px",
+                }}
+              >
+                Custom Language
+              </label>
+              <input
+                type="text"
+                value={customLanguage}
+                onChange={(e) => setCustomLanguage(e.target.value)}
+                placeholder="e.g. en, ar"
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              />
+            </div>
+          )}
+          {ctaType === "custom" && (
+            <div>
+              <label
+                style={{
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  color: "#718096",
+                  display: "block",
+                  marginBottom: "4px",
+                }}
+              >
+                Custom CTA
+              </label>
+              <input
+                type="text"
+                value={customCtaType}
+                onChange={(e) => setCustomCtaType(e.target.value)}
+                placeholder="Enter CTA type"
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                }}
+              />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleGenerateEmail}
+            disabled={!generatePrompt.trim() || generateLoading}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
               border: "none",
+              borderRadius: "6px",
+              fontSize: "14px",
+              fontWeight: "600",
+              color: "#fff",
+              backgroundColor:
+                generatePrompt.trim() && !generateLoading
+                  ? "#0091ae"
+                  : "#cbd5e0",
+              cursor:
+                generatePrompt.trim() && !generateLoading
+                  ? "pointer"
+                  : "not-allowed",
+              alignSelf: "flex-start",
+            }}
+          >
+            <Sparkles size={16} />
+            {generateLoading ? "Generating..." : "Generate"}
+          </button>
+        </div>
+
+        {/* Email body — contenteditable so user sees and edits formatted content directly; that HTML is sent in the payload */}
+        <div
+          style={{
+            padding: "20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+          }}
+        >
+          <label
+            style={{ fontSize: "14px", fontWeight: "600", color: "#141414" }}
+          >
+            Email body
+          </label>
+          <div
+            ref={bodyEditorRef}
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-multiline="true"
+            aria-label="Email body"
+            data-placeholder="Type your email here or use Generate above, edit this content and it will be sent as the email body."
+            onInput={() => {
+              const html = bodyEditorRef.current?.innerHTML ?? "";
+              setEmailBody(html);
+            }}
+            style={{
+              width: "100%",
+              minHeight: isMaximized ? "400px" : "200px",
+              border: "1px solid #e2e8f0",
+              borderRadius: "6px",
               outline: "none",
               fontSize: "14px",
               color: "#141414",
               fontFamily: "inherit",
-              resize: "none",
               lineHeight: "1.6",
+              padding: "10px 12px",
+              overflow: "auto",
+              backgroundColor: "#fff",
             }}
+            className="email-body-editor"
           />
+          <style>{`
+            .email-body-editor:empty::before {
+              content: attr(data-placeholder);
+              color: #a0aec0;
+            }
+            .email-body-editor:focus {
+              border-color: #0091ae;
+              box-shadow: 0 0 0 1px #0091ae;
+            }
+          `}</style>
         </div>
       </div>
 
