@@ -1274,7 +1274,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT) && (
                                     <li className="pc-item">
-                                        <Link className="pc-link" href={`${BASE_URL}/crm/data`}>
+                                        <Link className="pc-link" href={`${BASE_URL}/crm/prospects`}>
                                             <span className="pc-micon"><i className={ICONS.DATABASE}></i></span>
                                             <span className="pc-mtext">{SUBMENU_LABELS.DATA_MANAGEMENT}</span>
                                                 </Link>

@@ -62,7 +62,7 @@ const menuItems = [
     submenuItems: [
       { key: 'crm-dashboard', label: 'Dashboard', permission: 'dashboard-crm', href: '/crm/dashboard' },
       { key: 'crm-campaigns', label: 'Campaigns', permission: 'view-crm-campaigns', href: '/crm/campaigns' },
-      { key: 'crm-data', label: 'Data Management', permission: 'view-crm-data-management', href: '/crm/data' },
+      { key: 'crm-data', label: 'Data Management', permission: 'view-crm-data-management', href: '/crm/prospects' },
       { key: 'crm-leads', label: 'Leads', permission: 'view-crm-leads', href: '/crm/leads' },
       { key: 'crm-opportunities', label: 'Opportunities', permission: 'view-crm-opportunities', href: '/crm/opportunities' },
       { key: 'crm-stages', label: 'Stages', permission: 'view-crm-stages', href: '/crm/stages' },

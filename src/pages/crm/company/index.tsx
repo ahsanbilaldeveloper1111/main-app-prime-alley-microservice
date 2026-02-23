@@ -2424,7 +2424,7 @@ const CrmCompanyManagement = () => {
   // Handle first column click - navigates to detail page with company ID in URL
   const handleFirstColumnClick = useCallback(
     (company: any) => {
-      router.push(`/crm/data/companies-detailpage?id=${company?.id ?? ""}`);
+      router.push(`/crm/prospects/companies-detailpage?id=${company?.id ?? ""}`);
     },
     [router],
   );

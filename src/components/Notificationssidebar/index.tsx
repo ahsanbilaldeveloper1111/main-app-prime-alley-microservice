@@ -610,7 +610,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
         switch (target_type) {
           case 'task':
             if (hasPermission(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER)) {
-              router.push(`/work-planner/tasks-list/${target_id}`);
+              router.push(`/work-planner/tasks/${target_id}`);
             }
             break;
 
@@ -627,7 +627,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
         switch (target_type) {
           case 'prospect':
             if (hasPermission(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)) {
-              router.push(`/crm/data/prospects-detailpage?id=${target_id}`);
+              router.push(`/crm/prospects/prospects-detailpage?id=${target_id}`);
             }
             break;
           case 'lead':

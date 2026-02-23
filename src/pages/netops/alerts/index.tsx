@@ -1,455 +1,238 @@
-import "@assets/scss/datatable-style.scss";
-import '@assets/scss/common.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col } from "react-bootstrap";
-import { toast } from "react-toastify";
-import { useSession } from "next-auth/react";
-
-import AlertsFilters from "@components/filters/AlertsFilters";
-import {
-  getAlerts,
-  getMonitoringDashboard,
-  resolveAlert,
-  Alert,
-  MonitoringDashboardResponse,
-} from "@utils/netops";
-import {
-  convertUTCToUserTimezone,
-  GlobalDateFormat,
-  GlobalTimeFormat,
-} from "@utils/Helper";
-
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "../../partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import '@assets/scss/datatable-style.scss';
+import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import Layout from '@layout/index';
+import BreadcrumbItem from '@common/BreadcrumbItem';
+import GenericTable, { TableColumn } from '@components/GenericTable';
+import { getAlerts, getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import { Button, Row, Col } from 'react-bootstrap';
+import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye, FiPlus, FiCheck } from "react-icons/fi";
+import '@assets/scss/common.scss';
+import { FiRefreshCw } from 'react-icons/fi';
+import '@assets/scss/tabs.scss';
 
+const SEVERITY_LABELS: Record<string, string> = {
+  '0': 'Not classified',
+  '1': 'Information',
+  '2': 'Warning',
+  '3': 'Average',
+  '4': 'High',
+  '5': 'Disaster',
+};
 
+const formatClock = (clock: string) => {
+  const num = parseInt(clock, 10);
+  if (isNaN(num)) return clock;
+  const d = new Date(num * 1000);
+  return d.toLocaleString();
+};
 
-interface Summary {
-  total_alerts: number;
-  critical_alerts: number;
-  high_alerts: number;
-  medium_alerts: number;
-  low_alerts: number;
-}
+const HostAlerts = () => {
+  const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
+  const [hosts, setHosts] = useState<ZebbixHost[]>([]);
+  const [selectedHostId, setSelectedHostId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [searchValue, setSearchValue] = useState('');
+  const [tablePagination, setTablePagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    totalRows: 0,
+    pageSizeOptions: [10, 15, 25, 50, 100] as number[],
+  });
 
-const Alerts = () => {
-  const { data: session, status } = useSession();
-
-  const columns: Column[] = [
+  const tableColumns: TableColumn<ZebbixAlert>[] = [
+    { key: 'eventid', label: 'Event ID', sortable: true },
+    { key: 'name', label: 'Name', sortable: true },
     {
-      key: "alert_type",
-      name: "Alert Type",
-      selector: (row: any) => row.alert_type,
+      key: 'severity',
+      label: 'Severity',
       sortable: true,
-      cell: (props: any) => {
-        const getAlertTypeColor = (type: string) => {
-          switch (type) {
-            case "SERVICE_DOWN":
-              return "danger";
-            case "SERVICE_RECOVERY":
-              return "success";
-            case "DEVICE_DOWN":
-              return "danger";
-            case "DEVICE_RECOVERY":
-              return "success";
-            case "PING_TIMEOUT":
-              return "warning";
-            case "HOST_UNREACHABLE":
-              return "warning";
-            default:
-              return "info";
-          }
-        };
-        return (
-          <span className={`status-badge ${getAlertTypeColor(props.alert_type)}`}>
-            {props.alert_type.replace("_", " ")}
-          </span>
-        );
-      },
+      render: (row) => (
+        <span className="badge bg-warning text-dark">
+          {SEVERITY_LABELS[row.severity] ?? row.severity}
+        </span>
+      ),
     },
     {
-      key: "severity",
-      name: "Severity",
-      selector: (row: any) => row.severity,
+      key: 'clock',
+      label: 'Time',
       sortable: true,
-      cell: (props: any) => {
-        const getSeverityColor = (severity: string) => {
-          switch (severity) {
-            case "CRITICAL":
-              return "danger";
-            case "HIGH":
-              return "warning";
-            case "MEDIUM":
-              return "info";
-            case "LOW":
-              return "info";
-            default:
-              return "info";
-          }
-        };
-        return (
-          <span className={`status-badge ${getSeverityColor(props.severity)}`}>
-            {props.severity}
-          </span>
-        );
-      },
+      render: (row) => formatClock(row.clock ?? ''),
     },
     {
-      key: "message",
-      name: "Message",
-      selector: (row: any) => row.message,
+      key: 'host',
+      label: 'Host',
       sortable: true,
-      cell: (props: any) => {
-        return (
-          <div
-            className="text-truncate"
-            style={{ maxWidth: "400px" }}
-            title={props.message}
-          >
-            {props.message}
-          </div>
-        );
-      },
+      render: (row) => row.hosts?.[0]?.host ?? '-',
     },
-    {
-      key: "is_resolved",
-      name: "Status",
-      selector: (row: any) => row.is_resolved,
-      sortable: true,
-      cell: (props: any) => {
-        return (
-          <span
-            className={`status-badge ${props.is_resolved ? "warning" : "success"}`}
-          >
-            {props.is_resolved ? "Resolved" : "Active"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "created_at",
-      name: "Created At",
-      selector: (row: any) => row.created_at,
-      sortable: true,
-      cell: (props: any) => {
-        const formattedDate = convertUTCToUserTimezone(props.created_at, {
-          outputFormat: "DD-MM-YYYY hh:mm:ss A",
-        });
-        const formattedTime = convertUTCToUserTimezone(props.created_at, {
-          outputFormat: "hh:mm:ss A",
-        });
-        return (
-          <div>
-            <div>{formattedDate}</div>
-            <small className="text-muted">{formattedTime}</small>
-          </div>
-        );
-      },
-    },
-    {
-      key: "resolved_at",
-      name: "Resolved At",
-      selector: (row: any) => row.resolved_at,
-      sortable: true,
-      cell: (props: any) => {
-        if (!props.resolved_at) return <span className="text-muted">N/A</span>;
-        const formattedDate = convertUTCToUserTimezone(props.resolved_at, {
-          outputFormat: "DD-MM-YYYY hh:mm:ss A",
-        });
-        const formattedTime = convertUTCToUserTimezone(props.resolved_at, {
-          outputFormat: "hh:mm:ss A",
-        });
-        return (
-          <div>
-            <div>{formattedDate}</div>
-            <small className="text-muted">{formattedTime}</small>
-          </div>
-        );
-      },
-    },
-    {
-      key: "duration",
-      name: "Duration",
-      selector: (row: any) => row.created_at,
-      sortable: true,
-      cell: (props: any) => {
-        if (props.is_resolved && props.resolved_at) {
-          const created = new Date(props.created_at);
-          const resolved = new Date(props.resolved_at);
-          const duration = Math.floor(
-            (resolved.getTime() - created.getTime()) / (1000 * 60)
-          ); // minutes
-
-          if (duration < 60) {
-            return `${duration}m`;
-          } else if (duration < 1440) {
-            return `${Math.floor(duration / 60)}h ${duration % 60}m`;
-          } else {
-            return `${Math.floor(duration / 1440)}d ${Math.floor(
-              (duration % 1440) / 60
-            )}h`;
-          }
-        } else if (!props.is_resolved) {
-          const created = new Date(props.created_at);
-          const now = new Date();
-          const duration = Math.floor(
-            (now.getTime() - created.getTime()) / (1000 * 60)
-          ); // minutes
-
-          if (duration < 60) {
-            return `${duration}m`;
-          } else if (duration < 1440) {
-            return `${Math.floor(duration / 60)}h ${duration % 60}m`;
-          } else {
-            return `${Math.floor(duration / 1440)}d ${Math.floor(
-              (duration % 1440) / 60
-            )}h`;
-          }
-        }
-        return <span className="text-muted">N/A</span>;
-      },
-    },
-
-    ...(session?.user?.permissions?.includes('resolve-alert-netops') ? [
-      
-    {
-      key: "actions",
-      name: "Actions",
-      selector: (row: any) => row.id,
-      sortable: false,
-      cell: (props: any) => {
-        const actions = [];
-        
-        if (!props.is_resolved) {
-          actions.push({
-            label: 'Resolve',
-            icon: resolvingAlertId === props.id ? (
-              <i className="fas fa-spinner fa-spin"></i>
-            ) : (
-              <FiCheck />
-            ),
-            onClick: () => handleResolveAlert(props.id),
-            className: 'text-success gap-2',
-            disabled: resolvingAlertId === props.id
-          });
-        }
-        
-        return (
-          <DatatableActionButton
-            actions={actions}
-          />
-        );
-      },
-    },
-  ] : []),
-
   ];
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const [summary, setSummary] = useState<Summary>({
-    total_alerts: 0,
-    critical_alerts: 0,
-    high_alerts: 0,
-    medium_alerts: 0,
-    low_alerts: 0,
-  });
-  const [resolvingAlertId, setResolvingAlertId] = useState<number | null>(null);
+  const fetchHosts = useCallback(async () => {
+    try {
+      const response = await getHosts();
+      if (response.error || !response.result) return;
+      const list = response.result ?? [];
+      setHosts(Array.isArray(list) ? list : []);
+      if (list.length > 0 && !selectedHostId) {
+        setSelectedHostId((list[0] as ZebbixHost).hostid);
+      }
+    } catch (error) {
+      console.error('Error fetching hosts:', error);
+    }
+  }, []);
 
-  // Create cards data for PageSummaryGrid
+  const fetchAlerts = useCallback(async () => {
+    if (!selectedHostId) {
+      setAlerts([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await getAlerts(selectedHostId);
+      if (response?.error) {
+        toast.error(response.error.message || 'Failed to fetch alerts');
+        setAlerts([]);
+        return;
+      }
+      const list =
+        Array.isArray((response as any)?.result)
+          ? (response as any).result
+          : Array.isArray((response as any)?.data?.result)
+            ? (response as any).data.result
+            : Array.isArray((response as any)?.data)
+              ? (response as any).data
+              : [];
+      setAlerts(list);
+      setTablePagination((prev) => ({
+        ...prev,
+        totalRows: list.length,
+        currentPage: 1,
+      }));
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      toast.error('Failed to fetch alerts');
+      setAlerts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedHostId]);
+
+  useEffect(() => {
+    fetchHosts();
+  }, [refreshKey]);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [selectedHostId, refreshKey, fetchAlerts]);
+
+  const handleRefresh = () => setRefreshKey((k) => k + 1);
+
+  const filteredAlerts = searchValue.trim()
+    ? alerts.filter(
+        (a) =>
+          a.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          a.eventid?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          a.hosts?.[0]?.host?.toLowerCase().includes(searchValue.toLowerCase())
+      )
+    : alerts;
+
+  const paginatedData = filteredAlerts.slice(
+    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
+    tablePagination.currentPage * tablePagination.rowsPerPage
+  );
+
   const summaryCards: SummaryCard[] = [
     {
-      id: "total-alerts",
-      title: "Total Alerts",
-      value: summary?.total_alerts || 0,
-      description: "Total alerts in the system",
+      id: 'total-alerts',
+      title: 'Total Alerts',
+      value: alerts.length,
+      description: 'Alerts for selected host',
       delay: 0.1,
       showAnimatedNumber: true,
       animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "critical-alerts",
-      title: "Critical",
-      value: summary?.critical_alerts || 0,
-      description: "Critical severity alerts",
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "high-alerts",
-      title: "High",
-      value: summary?.high_alerts || 0,
-      description: "High severity alerts",
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "medium-alerts",
-      title: "Medium",
-      value: summary?.medium_alerts || 0,
-      description: "Medium severity alerts",
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
+      fontStyle: 'style-2',
     },
   ];
 
-  const fetchAlerts = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      try {
-        const [alertsResponse, dashboardResponse] = await Promise.all([
-          getAlerts({
-            page,
-            perPage,
-            limit: perPage,
-            search,
-            ...currentFilters,
-          }),
-          getMonitoringDashboard(),
-        ]);
-
-        // Calculate alert summary from alerts data
-        const alerts = alertsResponse || [];
-        const alertSummary = {
-          total_alerts: alerts.length,
-          critical_alerts: alerts.filter(
-            (alert: Alert) => alert.severity === "CRITICAL"
-          ).length,
-          high_alerts: alerts.filter(
-            (alert: Alert) => alert.severity === "HIGH"
-          ).length,
-          medium_alerts: alerts.filter(
-            (alert: Alert) => alert.severity === "MEDIUM"
-          ).length,
-          low_alerts: alerts.filter((alert: Alert) => alert.severity === "LOW")
-            .length,
-        };
-
-        setSummary(alertSummary);
-
-        // Return alerts data in the format expected by GenericListPage
-        return {
-          data: alerts,
-          total: alerts.length,
-          current_page: page,
-          per_page: perPage,
-          last_page: Math.ceil(alerts.length / perPage),
-        };
-      } catch (error) {
-        console.error("Error fetching alerts:", error);
-        toast.error("Failed to fetch alerts");
-        return {
-          data: [],
-          total: 0,
-          current_page: 1,
-          per_page: perPage,
-          last_page: 1,
-        };
-      }
-    },
-    [currentFilters]
-  );
-
-  const handleFiltersChange = (filters: any) => {
-    setCurrentFilters(filters);
-  };
-
-  const handleResolveAlert = async (alertId: number) => {
-    try {
-      setResolvingAlertId(alertId);
-      await resolveAlert(alertId);
-      toast.success("Alert resolved successfully");
-      // Refresh the data
-      setRefreshKey((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error resolving alert:", error);
-      toast.error("Failed to resolve alert");
-    } finally {
-      setResolvingAlertId(null);
-    }
-  };
-
-  const handleExport = async (
-    exportType: string,
-    filters: Record<string, any>
-  ) => {
-    try {
-      // TODO: Implement export functionality
-      toast.info("Export functionality will be implemented soon");
-    } catch (error) {
-      console.error("Export error:", error);
-      toast.error("Export failed");
-    }
-  };
-
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle="Alerts" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Alerts</h2>
+                <h2 className="mb-0">Host Alerts</h2>
               </Col>
-
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <div className="search-container">
-                           <i className="fas fa-search search-icon"></i>
-                           <input type="text" className="search-bar" placeholder="Search alerts..." onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}/>
-                       </div>
-
-                  <AlertsFilters
-                    onFiltersChange={handleFiltersChange}
-                    onExport={handleExport}
-                    moduleSlug="alerts"
-                  />
-                </div>
+              <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
+                <select
+                  className="form-select"
+                  value={selectedHostId}
+                  onChange={(e) => setSelectedHostId(e.target.value)}
+                  style={{ maxWidth: '280px' }}
+                >
+                  <option value="">Select host</option>
+                  {hosts.map((h) => (
+                    <option key={h.hostid} value={h.hostid}>
+                      {h.name ?? h.host ?? h.hostid}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search alerts..."
+                  value={searchValue}
+                  onChange={(e) => {
+                    setSearchValue(e.target.value);
+                    setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
+                  }}
+                  style={{ maxWidth: '240px' }}
+                />
+                <Button variant="info" onClick={handleRefresh} disabled={loading}>
+                  <FiRefreshCw size={14} /> Refresh
+                </Button>
               </Col>
             </Row>
           </div>
         </Col>
       </Row>
 
-      <PageSummaryGrid cards={summaryCards} />
+      {/* <PageSummaryGrid cards={summaryCards} /> */}
 
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchAlerts}
-        title="Alerts"
-        searchPlaceholder="Search alerts..."
-        defaultPageSize={15}
-        filters={currentFilters}
-        refreshKey={refreshKey}
-        search={false}
-        tableStyle="table-style-2"
+      <GenericTable<ZebbixAlert>
+        data={paginatedData}
+        columns={tableColumns}
+        loading={loading}
+        emptyMessage={selectedHostId ? 'No alerts found for this host.' : 'Select a host to view alerts.'}
+        loadingMessage="Loading alerts..."
+        pagination={{
+          currentPage: tablePagination.currentPage,
+          rowsPerPage: tablePagination.rowsPerPage,
+          totalRows: filteredAlerts.length,
+          pageSizeOptions: tablePagination.pageSizeOptions,
+        }}
+        onPaginationChange={(page, rowsPerPage) => {
+          setTablePagination((prev) => ({
+            ...prev,
+            currentPage: page,
+            rowsPerPage,
+          }));
+        }}
+        sortable={true}
+        hover={true}
+        striped={false}
+        uniqueKey="eventid"
       />
     </React.Fragment>
   );
 };
 
-Alerts.getLayout = (page: ReactElement) => {
+HostAlerts.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default Alerts;
+export default HostAlerts;

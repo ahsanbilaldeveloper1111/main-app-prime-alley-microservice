@@ -2496,7 +2496,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             {prospectError || "No prospect selected"}
           </p>
           <button
-            onClick={() => router.push("/crm/data")}
+            onClick={() => router.push("/crm/prospects")}
             style={{
               padding: "8px 16px",
               backgroundColor: "#006162",

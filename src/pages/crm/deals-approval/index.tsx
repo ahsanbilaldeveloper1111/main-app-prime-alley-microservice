@@ -1228,8 +1228,8 @@ const CrmDeals = () => {
       const id = deal?.id ?? deal?.rawData?.id;
       router.push(
         id
-          ? `/crm/deals-approval/approval-detailpage?id=${id}`
-          : "/crm/deals-approval/approval-detailpage",
+          ? `/crm/approvals/approval-detailpage?id=${id}`
+          : "/crm/approvals/approval-detailpage",
       );
     },
     [router],

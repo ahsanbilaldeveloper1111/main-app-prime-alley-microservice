@@ -37,11 +37,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
-    {path:'/crm/company',permissions: ['']},
-    {path:'/crm/approvals',permissions: ['']},
-    {path:'/crm/deals-approval',permissions: ['']},
-    {path:'/crm/deals-approval/approval-detailpage',permissions: ['']},
-    {path:'/crm/inbox',permissions: ['']},
+   
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },
@@ -59,23 +55,11 @@ export const routePermissions: RoutePermission[] = [
     { path: '/company', permissions: ['set-company-image-users'] },
     { path: '/audit-logs', permissions: [''] },
 
-    
-    {
-        path: '/help-center',
-        permissions: [''],
-        children: [
-            { path: '/knowledge-base', permissions: [''] },
-            { path: '/knowledge-base/[id]', permissions: [''] },
-            { path: '/my-tickets', permissions: [''] },
-            { path: '/my-tickets/new', permissions: [''] },
-            { path: '/my-tickets/[id]', permissions: [''] },
-            { path: '/contact-support', permissions: [''] },
-            { path: '/system-status', permissions: [''] },
-        ]
-    },
 
-    
 
+
+
+    //dashboards services start
     {
         path: '/dashboards',
         permissions: [''],
@@ -85,16 +69,200 @@ export const routePermissions: RoutePermission[] = [
             { path: '/supervisor', permissions: [''] },
         ]
     },
+    //dashboards services end
+
+    //crm services start
+    {
+        path: '/crm',
+        permissions: [PERMISSIONS.CRM_SERVICES],
+        children: [
+            { 
+                path: '/dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]
+            },
+            { 
+                path: '/campaigns',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS]}
+                ]
+            },
+            { 
+                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],//prospects
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
+                ]
+            },
+
+            { 
+                path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
+                ]
+            },
+            { 
+                path: '/deals',permissions: [PERMISSIONS.VIEW_CRM_DEALS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DEALS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DEALS]},
+                ]
+            },
+            { 
+                path: '/orders',permissions: [PERMISSIONS.VIEW_CRM_ORDERS],
+                children: [
+                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_ORDERS]},
+                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_ORDERS]},
+                ]
+            },
+            { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
+            { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
+            { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
+            { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
+            { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
+            { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
+            { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
+            { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
+
+            { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
+            { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
+            { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
+            {path:'/company',permissions: ['']},//companies
+            {path:'/deals-approval',permissions: ['']},//approvals 
+            {path:'/approvals/approval-detailpage',permissions: ['']},
+            {path:'/inbox',permissions: ['']},
+        ]
+    },
+    //crm services end
 
 
-   // {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-   // {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-    {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-    {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-    {path: '/crm-new',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-    {path: '/tickets/dashboardnew',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    //communications services start
+    {
+        path: '/communications',
+        permissions: [PERMISSIONS.CALL_HISTORY_SERVICES],
+        children: [
+            {
+                path: '/dashboard',
+                permissions: [PERMISSIONS.VIEW_CALL_DASHBOARD]
+            },
+            {
+                path: '/call-logs',
+                permissions: [PERMISSIONS.VIEW_CALL_LOGS]
+            },
+            {
+                path: '/recordings',
+                permissions: [PERMISSIONS.VIEW_CALL_RECORDINGS]
+            },
+            {
+                path: '/call-analytics',
+                permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
+                children: [
+                    {
+                        path: '/',
+                        permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML]
+                    }
+                ]
+            },
+            {
+                path: '/wallboards-live',
+                permissions: [PERMISSIONS.CTI_SERVICES],
+                // children: [
+                //     { path: '/',permissions: [PERMISSIONS.VIEW_CTI]},
+                //     { path: '/new',permissions: []},
+                //     { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
+                //     { path: '/management/campaigns',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]},
+                //     { path: '/management/agents',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]},
+                // ]
+            },
+            {
+                path: '/text-messages',
+                permissions: [PERMISSIONS.VIEW_GSM_INBOX]
+            },
+            {
+                path: '/campaign-manager',
+                permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]
+            },
+            {
+                path: '/campaign-console',
+                permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]
+            },
+        ]
+    },
+    //communications services end
 
-    
+    //planner services start
+    {
+        path: '/planner',
+        permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
+        children: [
+            { path: '/orders-delivery',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
+            { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
+            { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
+            { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            {path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
+            { path: '/projects',permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER]},
+            { path: '/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
+            { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
+        ]
+    },
+    //planner services end
+
+
+    //compliance services start
+    {
+        path: '/compliance',
+        permissions: [PERMISSIONS.DNCR_SERVICES],
+        children: [
+            { path: '/api-number-check',permissions: [PERMISSIONS.CHECK_NUMBERS_DNCR]},
+            { path: '/cdr-records',permissions: [PERMISSIONS.VIEW_CDR_DNCR]},
+            { path: '/add-records',permissions: [PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR]},
+        ]
+    },
+    //compliance services end
+
+
+    //finance services start
+    {
+        path: '/finance',
+        permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+
+        children: [
+            { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
+            { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
+            { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
+            { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
+            { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
+            { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
+            { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            // {
+            //     path: '/companies',
+            //     permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],
+            //     children: [
+            //         { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
+            //     ]
+            // }
+        ]
+        
+    },
+    //finance services end
+
+
+    //virtual agents services start
+    {
+        path: '/agents',
+        permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
+        children: [
+            { path: '/outbound-agent',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/inbound-agent',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/agent-campaigns', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+            { path: '/create-campaign',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/pitch-deck',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/live-monitoring',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/analytics',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/usage-reports',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+        ]
+    },
+    //virtual agents services end
+
     //netops services start
     {
         path: '/netops',
@@ -121,7 +289,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
             },
             {
-                path: '/select-server',
+                path: '/server-insights',
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
             {
@@ -136,8 +304,92 @@ export const routePermissions: RoutePermission[] = [
                 path: '/hosts/groups',
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
+            {
+                path: '/gateways',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
+            {
+                path: '/gateway-ports',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
         ]
     },
+    //netops services end
+
+    //workforce services start
+    {
+        path: '/workforce',
+        permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES],
+        children: [
+            { path: '/employees',permissions: [PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT]},
+            { path: '/dashboard',permissions: [PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT]},
+            { path: '/onboarding',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
+            { path: '/approval-requests',permissions: [PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT]},
+            { path: '/org-chart',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT]},
+            {path:'/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
+            {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
+        ]
+    },
+    //workforce services end
+
+
+    //reports services start
+    {
+        path: '/reports',
+        permissions: [PERMISSIONS.REPORTS_SERVICES],
+        children: [
+            { path: '/crm-insights',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
+            { path: '/call-analytics',permissions: [PERMISSIONS.VIEW_CALL_REPORTS]},
+            { path: '/chat-usage', permissions: [PERMISSIONS.REPORTS_SERVICES] },
+        ]
+    },
+    //reports services end
+
+   
+    {path: '/audit-logs',permissions: ['']},
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    {
+        path: '/help-center',
+        permissions: [''],
+        children: [
+            { path: '/knowledge-base', permissions: [''] },
+            { path: '/knowledge-base/[id]', permissions: [''] },
+            { path: '/my-tickets', permissions: [''] },
+            { path: '/my-tickets/new', permissions: [''] },
+            { path: '/my-tickets/[id]', permissions: [''] },
+            { path: '/contact-support', permissions: [''] },
+            { path: '/system-status', permissions: [''] },
+        ]
+    },
+
+
+   // {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+   // {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/crm-new',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+    {path: '/tickets/dashboardnew',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+
+    
+    
      
     
     //controlhub services start
@@ -184,23 +436,9 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
     
-    //call logs services start
-    {
-        path: '/call-logs',
-        permissions: ['view-call-logs'],
-        children: [
-            {
-                path: '/dashboard',
-                permissions: ['dashboard-call-logs']
-            }
-        ]
-    },
+    
 
-    //call recordings services start
-    {
-        path: '/call-recordings',
-        permissions: ['view-call-recordings']
-    },
+ 
     
     //call reports services start
     {
@@ -325,16 +563,7 @@ export const routePermissions: RoutePermission[] = [
                     }
                 ]
             },
-            {
-                path: '/analyze-recordings',
-                permissions: ['transcriptions-analysis-aiml'],
-                children: [
-                    {
-                        path: '/',
-                        permissions: ['transcriptions-analysis-aiml']
-                    }
-                ]
-            },
+           
             {
                 path: '/manage-extensions',
                 permissions: [PERMISSIONS.MANAGE_EXTENSIONS_AIML]
@@ -402,103 +631,12 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    //crm services start
-    {
-        path: '/crm',
-        permissions: [PERMISSIONS.CRM_SERVICES],
-        children: [
-            { 
-                path: '/dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]
-            },
-            { 
-                path: '/campaigns',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS],
-                children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_CAMPAIGNS]}
-                ]
-            },
-            { 
-                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],
-                children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
-                ]
-            },
-            { 
-                path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
-                children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_LEADS]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_LEADS]},
-                ]
-            },
-            { 
-                path: '/deals',permissions: [PERMISSIONS.VIEW_CRM_DEALS],
-                children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DEALS]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DEALS]},
-                ]
-            },
-            { 
-                path: '/orders',permissions: [PERMISSIONS.VIEW_CRM_ORDERS],
-                children: [
-                    { path: '/',permissions: [PERMISSIONS.VIEW_CRM_ORDERS]},
-                    { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_ORDERS]},
-                ]
-            },
-            { path: '/lost-reasons',permissions: [PERMISSIONS.VIEW_CRM_LOST_REASONS]},
-            { path: '/opportunities',permissions: [PERMISSIONS.VIEW_CRM_OPPORTUNITIES]},
-            { path: '/opportunities/create',permissions: [PERMISSIONS.CREATE_CRM_OPPORTUNITIES]},
-            { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
-            { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
-            { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
-            { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},
-            { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
-
-            { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
-            { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
-            { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            // { path: '/approvals',permissions: [PERMISSIONS.VIEW_CRM_APPROVALS]},
-        ]
-    },
     
-    //accounts services start
-    {
-        path: '/accounts',
-        permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
-        children: [
-            {
-                path: '/',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES]
-            }
-        ]
-    },
 
-    //accounting services start
-    {
-        path: '/accounting',
-        permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
-        children: [
-            {
-                path: '/customer',
-                permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
-                children: [
-                    { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
-                    { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
-                    { path: '/product-details',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
-                    { path: '/billing-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
-                    { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
-                    { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
-                    { path: '/orders',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]}
-                ]
-            },
-            {
-                path: '/companies',
-                permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],
-                children: [
-                    { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
-                ]
-            }
-        ]
-    },
+    
+    
+
+
 
     //gsm services start
     {
@@ -540,48 +678,10 @@ export const routePermissions: RoutePermission[] = [
     },
     
 
-    //DNCR services start
-    {
-        path: '/dncr',
-        permissions: [PERMISSIONS.DNCR_SERVICES],
-        children: [
-            { path: '/check-number',permissions: ['check-numbers-dncr']},
-            { path: '/api-number-check',permissions: ['check-numbers-dncr']},
-            { path: '/cdr-records',permissions: ['view-cdr-dncr']},
-            { path: '/add-records',permissions: ['view-local-dnd-blocks-dncr']},
-        ]
-    },
+    
 
-    //work planner services start
-    {
-        path: '/work-planner',
-        permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
-        children: [
-            { path: '/orders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
-            { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
-            { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
-            { path: '/tasks-list', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            {path: '/tasks-list/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
-            { path: '/projects',permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER]},
-            { path: '/projects/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
-            { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
-        ]
-    },
-    // management services start
-    {
-        path: '/staff-management',
-        permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES],
-        children: [
-            { path: '/employees',permissions: [PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT]},
-            { path: '/employees/dashboard',permissions: [PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT]},
-            { path: '/employees/onboarding',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
-            { path: '/approval-request',permissions: [PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT]},
-            { path: '/organizational-chart',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT]},
-            {path:'/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
-            {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
-            {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
-        ]
-    },
+    
+    
 
     //tms services start
     {
@@ -669,19 +769,7 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    //cti services start
-    {
-        path: '/live-calls',
-        permissions: [PERMISSIONS.CTI_SERVICES],
-        children: [
-            { path: '/',permissions: ['view-cti']},
-            { path: '/new',permissions: ['view-cti']},
-            { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
-            { path: '/management/campaigns',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]},
-            { path: '/management/agents',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]},
-
-        ]
-    }
+    
 ];
 
 export function getRequiredPermissions(path: string): string[] {

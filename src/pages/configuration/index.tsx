@@ -6,7 +6,7 @@ import { Button, Modal, Row, Col, Card, Nav } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import Ranks from '@pages/controlhub/ranks';
 import Groups from '@pages/controlhub/groups';
-import GSMManagement from '@pages/gsm/list';
+import GSMManagement from '@pages/netops/gateways';
 import GSMAssignments from '@pages/gsm/assign';
 const Configuration = () => {
     const { data:session, status } = useSession();
