@@ -320,11 +320,15 @@ const GenericTable = <T extends Record<string, any>>({
   statsCards,
 }: GenericTableProps<T>) => {
   const router = useRouter();
-  // Sorting state
+  // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortColumn, setSortColumn] = useState(defaultSortColumn);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
     defaultSortDirection,
   );
+  useEffect(() => {
+    setSortColumn(defaultSortColumn);
+    setSortDirection(defaultSortDirection);
+  }, [defaultSortColumn, defaultSortDirection]);
 
   // Column selection state
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
@@ -472,6 +476,15 @@ const GenericTable = <T extends Record<string, any>>({
     if (!customizableColumns) return columns;
     return columns.filter((col) => selectedColumns.includes(col.key));
   }, [columns, selectedColumns, customizableColumns]);
+
+  // Sortable columns for toolbar Sort dropdown
+  const sortableColumns = useMemo(
+    () =>
+      visibleColumns.filter(
+        (col) => sortable && col.sortable !== false && col.key,
+      ),
+    [visibleColumns, sortable],
+  );
 
   // Truncate text utility
   const truncateText = (
@@ -859,16 +872,43 @@ const GenericTable = <T extends Record<string, any>>({
             )}
 
             {/* Sort */}
-            {toolbar.showSortButton && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={toolbar.onSortClick}
-              >
-                Sort
-              </Button>
-            )}
+            {toolbar.showSortButton &&
+              (toolbar.onSortClick ? (
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  className="gt-toolbar-btn"
+                  onClick={toolbar.onSortClick}
+                >
+                  Sort
+                </Button>
+              ) : (
+                <Dropdown align="end">
+                  <Dropdown.Toggle
+                    variant="outline-secondary"
+                    size="sm"
+                    className="gt-toolbar-btn"
+                  >
+                    Sort
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    {sortableColumns.length === 0 ? (
+                      <Dropdown.Item disabled>No sortable columns</Dropdown.Item>
+                    ) : (
+                      sortableColumns.map((col) => (
+                        <Dropdown.Item
+                          key={col.key}
+                          onClick={() => handleSort(col.key)}
+                        >
+                          {col.label}
+                          {sortColumn === col.key &&
+                            (sortDirection === "asc" ? " ↑" : " ↓")}
+                        </Dropdown.Item>
+                      ))
+                    )}
+                  </Dropdown.Menu>
+                </Dropdown>
+              ))}
 
             {statsCards && statsCards.length > 0 && (
               <Button

@@ -918,10 +918,7 @@ const CrmCompanyManagement = () => {
     recordType: "company",
     recordId: selectedCompany?.id ?? selectedCompany?.rawData?.id ?? 0,
     recordName: selectedCompany?.name ?? "",
-    recordEmail:
-      selectedCompany?.data?.email ??
-      selectedCompany?.email ??
-      "",
+    recordEmail: selectedCompany?.data?.email ?? selectedCompany?.email ?? "",
     recordPhone: selectedCompany?.phone ?? "",
   });
 
@@ -3631,7 +3628,7 @@ const CrmCompanyManagement = () => {
                     </div>
                   </div>
 
-                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
+                  {/* Optional: Campaign, Associate with, Lifecycle stage, Disposition, Legal basis */}
                   <div
                     className="contact-form-section"
                     style={{ marginTop: "24px" }}
@@ -3703,7 +3700,7 @@ const CrmCompanyManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Contact owner
+                        Associate with
                       </label>
                       <Select
                         value={(() => {
@@ -3735,7 +3732,7 @@ const CrmCompanyManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select contact owner"
+                        placeholder="Select associate with"
                         isClearable
                         isSearchable
                         styles={{
@@ -5204,7 +5201,7 @@ const CrmCompanyManagement = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -7215,11 +7212,37 @@ const CrmCompanyManagement = () => {
                 : null);
             const struct = enrichment?.structured_data;
             const companyQuickActions: QuickAction[] = [
-              { id: "note", label: "Note", icon: ClipboardList, onClick: companyActivityModals.openNote },
-              { id: "email", label: "Email", icon: Mail, onClick: companyActivityModals.openEmail },
-              { id: "call", label: "Call", icon: Phone, disabled: true, onClick: () => {} },
-              { id: "task", label: "Task", icon: ClipboardList, onClick: companyActivityModals.openTask },
-              { id: "meeting", label: "Meeting", icon: Calendar, onClick: companyActivityModals.openMeeting },
+              {
+                id: "note",
+                label: "Note",
+                icon: ClipboardList,
+                onClick: companyActivityModals.openNote,
+              },
+              {
+                id: "email",
+                label: "Email",
+                icon: Mail,
+                onClick: companyActivityModals.openEmail,
+              },
+              {
+                id: "call",
+                label: "Call",
+                icon: Phone,
+                disabled: true,
+                onClick: () => {},
+              },
+              {
+                id: "task",
+                label: "Task",
+                icon: ClipboardList,
+                onClick: companyActivityModals.openTask,
+              },
+              {
+                id: "meeting",
+                label: "Meeting",
+                icon: Calendar,
+                onClick: companyActivityModals.openMeeting,
+              },
             ];
             const aboutFields: SidebarField[] = [];
             if (selectedCompany?.name)
@@ -7439,7 +7462,9 @@ const CrmCompanyManagement = () => {
                   label: "View record",
                   onClick: () => {
                     if (selectedCompany?.id != null) {
-                      router.push(`/crm/companies/company-detailpage?id=${selectedCompany.id}`);
+                      router.push(
+                        `/crm/companies/company-detailpage?id=${selectedCompany.id}`,
+                      );
                     }
                     setShowCompanySidebar(false);
                   },

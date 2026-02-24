@@ -1134,21 +1134,24 @@ const CrmOrders = () => {
   }, []);
 
   // Handle view order - open GenericSidebar only (no modal)
-  const handleViewOrder = useCallback(async (orderId: number) => {
-    try {
-      const orderData: any = await getOrder(orderId);
-      setSelectedOrder(orderData);
-      setShowOrderSidebar(true);
-      await fetchOrderDetails(orderId);
-    } catch (error) {
-      console.error("Failed to fetch order:", error);
-      toast.error("Failed to load order details");
-    } finally {
-      setLoadingOrder(false);
-      setLoadingDeal(false);
-      setLoadingLead(false);
-    }
-  }, [fetchOrderDetails]);
+  const handleViewOrder = useCallback(
+    async (orderId: number) => {
+      try {
+        const orderData: any = await getOrder(orderId);
+        setSelectedOrder(orderData);
+        setShowOrderSidebar(true);
+        await fetchOrderDetails(orderId);
+      } catch (error) {
+        console.error("Failed to fetch order:", error);
+        toast.error("Failed to load order details");
+      } finally {
+        setLoadingOrder(false);
+        setLoadingDeal(false);
+        setLoadingLead(false);
+      }
+    },
+    [fetchOrderDetails],
+  );
 
   const handleRowClicked = useCallback(async (orderId: number) => {
     try {
@@ -1902,7 +1905,7 @@ const CrmOrders = () => {
       },
       {
         key: "owner",
-        label: "Owner",
+        label: "Associate with",
         sortable: true,
         type: "text",
         emptyValue: "-",
@@ -2803,7 +2806,7 @@ const CrmOrders = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -2817,7 +2820,7 @@ const CrmOrders = () => {
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Contact Owner",
+                      label: "Associate with",
                       showDropdown: true,
                       dropdownOptions: [
                         {
