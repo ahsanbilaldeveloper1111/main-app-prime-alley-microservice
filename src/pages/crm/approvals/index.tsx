@@ -2265,7 +2265,7 @@ const CrmDeals = () => {
       },
       {
         key: "owner",
-        label: "Owner",
+        label: "Associate with",
         sortable: true,
         type: "text",
         emptyValue: "-",
@@ -3166,7 +3166,7 @@ const CrmDeals = () => {
                 showViewSwitcher: true,
                 showEditColumns: true,
                 onEditColumnsClick: () => setShowColumnEditor(true),
-                showPipelineDropdown: true,
+                showPipelineDropdown: false,
                 pipelineLabel: "All Pipelines",
                 showFiltersButton: true,
                 onFiltersClick: handleOpenFiltersSidebar,
@@ -3180,7 +3180,7 @@ const CrmDeals = () => {
                 filterPills: [
                   {
                     id: "contact_owner",
-                    label: "Contact Owner",
+                    label: "Associate with",
                     showDropdown: true,
                     dropdownOptions: [
                       {
@@ -6096,7 +6096,7 @@ const CrmDeals = () => {
                         marginBottom: "4px",
                       }}
                     >
-                      Owner
+                      Associate with
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 600 }}>
                       {extensions.find(

@@ -121,14 +121,14 @@ export const routePermissions: RoutePermission[] = [
             { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
             { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
-            { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
+            { path: '/activities',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
 
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            {path:'/company',permissions: ['']},//companies
-            {path:'/deals-approval',permissions: ['']},//approvals 
+            {path:'/companies',permissions: ['']},//companies
+            {path:'/approvals',permissions: ['']},//approvals 
             {path:'/approvals/approval-detailpage',permissions: ['']},
             {path:'/inbox',permissions: ['']},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
@@ -846,4 +846,65 @@ export function isProtectedPath(path: string): boolean {
 export function hasRequiredPermissions(userPermissions: string[], path: string): boolean {
     const required = getRequiredPermissions(path);
     return required.every(permission => userPermissions.includes(permission));
+}
+
+/** Route entry for search suggestions (path + display label) */
+export interface SearchableRoute {
+    path: string;
+    label: string;
+}
+
+function pathToLabel(path: string): string {
+    const segments = path.split('/').filter(Boolean);
+    return segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')).join(' / ') || 'Home';
+}
+
+/** True if path contains a dynamic segment ([id], :id, {id}, etc.) */
+function isDynamicPath(path: string): boolean {
+    return /\[[\w-]*\]|:\w+|\{[^}]+\}/.test(path);
+}
+
+/**
+ * Routes (or path prefixes) to exclude from header search suggestions.
+ * Exact match or path starting with an entry (e.g. '/help-center/knowledge-base') is excluded.
+ */
+export const SEARCH_EXCLUDED_ROUTES: string[] = [
+    '/help-center/knowledge-base/[id]',
+    '/help-center/my-tickets/[id]',
+    '/planner/tasks/:id',
+    '/planner/projects/{id}',
+    '/crm-new-dashboard',
+    'worforce/sub-categories',
+    '/workforce/locations',
+];
+
+function isExcludedFromSearch(path: string): boolean {
+    const normalized = path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    return SEARCH_EXCLUDED_ROUTES.some((ex) => {
+        const exNorm = ex.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+        return normalized === exNorm || normalized.startsWith(exNorm + '/');
+    });
+}
+
+/** Flatten routePermissions into a list of searchable routes with full path and label. Excludes dynamic segments and SEARCH_EXCLUDED_ROUTES. */
+export function getSearchableRoutes(): SearchableRoute[] {
+    const result: SearchableRoute[] = [];
+    function traverse(routes: RoutePermission[], currentPath: string = '') {
+        for (const route of routes) {
+            const fullPath = `${currentPath}${route.path}`.replace(/\/+/g, '/') || '/';
+            if (isDynamicPath(fullPath)) continue;
+            const normalized = fullPath.endsWith('/') && fullPath.length > 1 ? fullPath.slice(0, -1) : fullPath;
+            if (isExcludedFromSearch(normalized)) continue;
+            result.push({ path: normalized, label: pathToLabel(normalized) });
+            if (route.children?.length) traverse(route.children, fullPath);
+        }
+    }
+    traverse(routePermissions);
+    return result.filter((r, i, arr) => arr.findIndex(x => x.path === r.path) === i);
+}
+
+/** Check if user can access route (empty permission = allowed) */
+export function canAccessRoute(userPermissions: string[] | undefined, path: string): boolean {
+    const required = getRequiredPermissions(path).filter(Boolean);
+    return required.length === 0 || (userPermissions != null && required.every(p => userPermissions.includes(p)));
 }

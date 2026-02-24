@@ -3640,7 +3640,7 @@ const CrmCompanyManagement = () => {
                     </div>
                   </div>
 
-                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
+                  {/* Optional: Campaign, Associate with, Lifecycle stage, Disposition, Legal basis */}
                   <div
                     className="contact-form-section"
                     style={{ marginTop: "24px" }}
@@ -3712,7 +3712,7 @@ const CrmCompanyManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Contact owner
+                        Associate with
                       </label>
                       <Select
                         value={(() => {
@@ -3744,7 +3744,7 @@ const CrmCompanyManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select contact owner"
+                        placeholder="Select associate with"
                         isClearable
                         isSearchable
                         styles={{
@@ -5213,7 +5213,7 @@ const CrmCompanyManagement = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -7460,7 +7460,9 @@ const CrmCompanyManagement = () => {
                   label: "View record",
                   onClick: () => {
                     if (selectedCompany?.id != null) {
-                      router.push(`/crm/companies/company-detailpage?id=${selectedCompany.id}`);
+                      router.push(
+                        `/crm/companies/company-detailpage?id=${selectedCompany.id}`,
+                      );
                     }
                     setShowCompanySidebar(false);
                   },

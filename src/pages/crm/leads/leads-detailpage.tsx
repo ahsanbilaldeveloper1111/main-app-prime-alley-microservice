@@ -35,7 +35,9 @@ import Layout from "@layout/index";
 import { getLead, type LeadData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, {
+  type CrmActivitiesPanelRef,
+} from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // ============================================================================
@@ -247,7 +249,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         "--",
     },
     {
-      label: "Contact owner",
+      label: "Associate with",
       value: (lead as any)?.created_by ?? lead?.user_extension ?? "--",
     },
     { label: "Source", value: (lead as any)?.source ?? "--" },
@@ -1123,9 +1125,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   lineHeight: "1.4",
                 }}
               >
-                {lead?.company_name
-                  ? `at ${lead.company_name}`
-                  : "—"}
+                {lead?.company_name ? `at ${lead.company_name}` : "—"}
               </p>
               <div
                 style={{
@@ -1213,11 +1213,31 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           {[
-            { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
-            { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
+            {
+              icon: ClipboardList,
+              label: "Note",
+              disabled: false,
+              onClick: activityModals.openNote,
+            },
+            {
+              icon: Mail,
+              label: "Email",
+              disabled: false,
+              onClick: activityModals.openEmail,
+            },
             { icon: Phone, label: "Call", disabled: true, onClick: undefined },
-            { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
-            { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
+            {
+              icon: ClipboardList,
+              label: "Task",
+              disabled: false,
+              onClick: activityModals.openTask,
+            },
+            {
+              icon: Calendar,
+              label: "Meeting",
+              disabled: false,
+              onClick: activityModals.openMeeting,
+            },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -1525,29 +1545,29 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     {field.value}
                   </div>
                   {field.copyable && field.value !== "--" && (
-                      <button
-                        onClick={() => copyToClipboard(field.value ?? "")}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "4px",
-                          cursor: "pointer",
-                          color: "#141414",
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: "3px",
-                        }}
-                        title="Copy"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f5f8fa";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <Copy size={14} />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => copyToClipboard(field.value ?? "")}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        color: "#141414",
+                        display: "flex",
+                        alignItems: "center",
+                        borderRadius: "3px",
+                      }}
+                      title="Copy"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f5f8fa";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -2451,9 +2471,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             size={32}
             style={{ color: "#006162", animation: "spin 1s linear infinite" }}
           />
-          <p style={{ fontSize: "14px", color: "#718096" }}>
-            Loading lead...
-          </p>
+          <p style={{ fontSize: "14px", color: "#718096" }}>Loading lead...</p>
         </div>
       </Layout>
     );

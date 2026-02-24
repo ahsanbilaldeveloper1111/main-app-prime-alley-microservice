@@ -1,9 +1,22 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback, useMemo, useEffect } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import { getStages, createStage, deleteStage, restoreStage, updateStage, StageData } from "@utils/crm";
+import {
+  getStages,
+  createStage,
+  deleteStage,
+  restoreStage,
+  updateStage,
+  StageData,
+} from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
@@ -18,14 +31,8 @@ import {
   Dropdown,
   InputGroup,
 } from "react-bootstrap";
-import Select from 'react-select';
-import {
-  FiTrash2,
-  FiPlus,
-  FiSave,
-  FiEdit2,
-  FiEye,
-} from "react-icons/fi";
+import Select from "react-select";
+import { FiTrash2, FiPlus, FiSave, FiEdit2, FiEye } from "react-icons/fi";
 import {
   History,
   X,
@@ -59,18 +66,18 @@ import {
   Filter,
   RotateCcw,
   AlertCircle,
-} from 'lucide-react';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
+} from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
-} from 'recharts';
+} from "recharts";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -78,10 +85,9 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
-
 
 interface Stage {
   id: number;
@@ -93,7 +99,7 @@ interface Stage {
   description?: string | null;
   is_default: boolean;
   active: boolean;
-  type: 'lead' | 'deal' | 'order' | 'lost_reason';
+  type: "lead" | "deal" | "order" | "lost_reason";
   created_at: string;
   updated_at: string;
   probability: number;
@@ -101,7 +107,14 @@ interface Stage {
 
 // Filter Bar Component
 interface FilterBarProps {
-  quickFilters: { id: string; label: string; count: number; variant?: string; color?: string; icon?: React.ReactNode }[];
+  quickFilters: {
+    id: string;
+    label: string;
+    count: number;
+    variant?: string;
+    color?: string;
+    icon?: React.ReactNode;
+  }[];
   activeFilter: string;
   onFilterChange: (filterId: string) => void;
   searchValue: string;
@@ -123,14 +136,14 @@ const FilterBar: React.FC<FilterBarProps> = ({
   searchPlaceholder = "Search...",
   showAdvancedFilters,
   onToggleAdvancedFilters,
-  advancedFilterCount = 0
+  advancedFilterCount = 0,
 }) => {
   return (
     <Card className="border-0 shadow-sm mb-3">
       <Card.Body className="p-3">
         <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map(filter => {
+            {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
               const hasCustomColor = filter.color;
               const buttonStyle: React.CSSProperties = {};
@@ -141,7 +154,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   buttonStyle.borderColor = bgColor;
                   buttonStyle.color = "#fff";
                 } else {
-                  buttonStyle.background = '#fff';
+                  buttonStyle.background = "#fff";
                   buttonStyle.borderColor = filter.color;
                   buttonStyle.color = filter.color;
                 }
@@ -150,12 +163,22 @@ const FilterBar: React.FC<FilterBarProps> = ({
               return (
                 <Button
                   key={filter.id}
-                  variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
+                  variant={
+                    hasCustomColor
+                      ? undefined
+                      : isActive
+                        ? filter.variant || "primary"
+                        : "outline-secondary"
+                  }
                   onClick={() => onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
-                  {filter.icon && <span className="d-flex align-items-center">{filter.icon}</span>}
+                  {filter.icon && (
+                    <span className="d-flex align-items-center">
+                      {filter.icon}
+                    </span>
+                  )}
                   {filter.label}
                 </Button>
               );
@@ -163,23 +186,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </div>
 
           <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+            <InputGroup
+              style={{ width: "300px", minWidth: "200px" }}
+              className="flex-shrink-0"
+            >
               <Form.Control
-                style={{ height: '41px' }}
+                style={{ height: "41px" }}
                 type="text"
                 placeholder={searchPlaceholder}
                 value={searchValue}
                 onChange={(e) => onSearchChange(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     onSearch();
                   }
                 }}
               />
-              <Button 
-                variant="outline-secondary"
-                onClick={onSearch}
-              >
+              <Button variant="outline-secondary" onClick={onSearch}>
                 <Search size={16} />
               </Button>
             </InputGroup>
@@ -209,69 +232,93 @@ const StagesManagement = () => {
     description: "",
     is_default: false,
     active: true,
-    type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+    type: "lead" as "lead" | "deal" | "order" | "lost_reason",
     probability: 50,
   });
 
-  const [currentFilters, setCurrentFilters] = useState({search: "", type: "" as string});
+  const [currentFilters, setCurrentFilters] = useState({
+    search: "",
+    type: "" as string,
+  });
   const [stagesSearch, setStagesSearch] = useState("");
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
-  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem('stagesSelectedColumns');
-    return saved ? JSON.parse(saved) : ['order', 'stageName', 'category', 'description', 'color'];
+  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(
+    () => {
+      const saved = localStorage.getItem("stagesSelectedColumns");
+      return saved
+        ? JSON.parse(saved)
+        : ["order", "stageName", "category", "description", "color"];
+    },
+  );
+  const [stagesPagination, setStagesPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    sortColumn: "",
+    sortDirection: "asc" as "asc" | "desc",
   });
-  const [stagesPagination, setStagesPagination] = useState({ currentPage: 1, rowsPerPage: 15, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
-  
+
   const handleFiltersChange = (filters: any) => {
     setCurrentFilters(filters);
   };
 
-
-
-  const fetchStages = useCallback(async (type?: string, includeArchived?: boolean) => {
-    setLoadingStages(true);
-    try {
-      const stageType = type ? (type as 'lead' | 'deal' | 'order' | 'lost_reason') : undefined;
-      const params = includeArchived ? { include_archived: true } : undefined;
-      const allStages = await getStages(stageType, params);
-      setStagesData(allStages);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-      setStagesData([]);
-    } finally {
-      setLoadingStages(false);
-    }
-  }, []);
+  const fetchStages = useCallback(
+    async (type?: string, includeArchived?: boolean) => {
+      setLoadingStages(true);
+      try {
+        const stageType = type
+          ? (type as "lead" | "deal" | "order" | "lost_reason")
+          : undefined;
+        const params = includeArchived ? { include_archived: true } : undefined;
+        const allStages = await getStages(stageType, params);
+        setStagesData(allStages);
+      } catch (error) {
+        console.error("Failed to fetch stages:", error);
+        setStagesData([]);
+      } finally {
+        setLoadingStages(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    const includeArchived = activeFilter === 'deleted';
-    const typeFilter = activeFilter === 'all' || activeFilter === 'deleted' ? undefined : activeFilter;
-    setSelectedTypeFilter(typeFilter || '');
-    fetchStages(typeFilter as 'lead' | 'deal' | 'order' | 'lost_reason' | undefined, includeArchived);
+    const includeArchived = activeFilter === "deleted";
+    const typeFilter =
+      activeFilter === "all" || activeFilter === "deleted"
+        ? undefined
+        : activeFilter;
+    setSelectedTypeFilter(typeFilter || "");
+    fetchStages(
+      typeFilter as "lead" | "deal" | "order" | "lost_reason" | undefined,
+      includeArchived,
+    );
   }, [fetchStages, refreshKey, activeFilter]);
 
   const fetchStagesForTable = useCallback(
     async (page = 1, perPage = 15) => {
       try {
         const searchTerm = currentFilters.search;
-        
+
         // Only filter by search on frontend, type is already filtered by API
         let filteredStages = stagesData.filter((stage) => {
           // Search filter
           if (searchTerm) {
-            const matchesSearch = stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                 stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch =
+              stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              stage.description
+                ?.toLowerCase()
+                .includes(searchTerm.toLowerCase());
             if (!matchesSearch) return false;
           }
-          
+
           return true;
         });
-        
+
         return {
           dataList: filteredStages,
           meta: {
@@ -294,7 +341,7 @@ const StagesManagement = () => {
         };
       }
     },
-    [currentFilters, stagesData]
+    [currentFilters, stagesData],
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -313,7 +360,7 @@ const StagesManagement = () => {
         description: "",
         is_default: false,
         active: true,
-        type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+        type: "lead" as "lead" | "deal" | "order" | "lost_reason",
         probability: 50,
       });
       setShowSuccessfulModal(true);
@@ -326,12 +373,12 @@ const StagesManagement = () => {
     }
   };
 
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false)
-  const [successModalTitle, setSuccessModalTitle] = useState('')
-  const [successModalDescription, setSuccessModalDescription] = useState('')
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
   const handleCloseSuccessfulModal = () => {
-      setShowSuccessfulModal(false)
-  }
+    setShowSuccessfulModal(false);
+  };
 
   const handleCloseUpdateModal = () => {
     setShowUpdateModal(false);
@@ -345,10 +392,10 @@ const StagesManagement = () => {
       description: "",
       is_default: false,
       active: true,
-      type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+      type: "lead" as "lead" | "deal" | "order" | "lost_reason",
       probability: 50,
     });
-  }
+  };
 
   const handleUpdateStage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +415,7 @@ const StagesManagement = () => {
         description: "",
         is_default: false,
         active: true,
-        type: 'lead' as 'lead' | 'deal' | 'order' | 'lost_reason',
+        type: "lead" as "lead" | "deal" | "order" | "lost_reason",
         probability: 50,
       });
       setShowSuccessfulModal(true);
@@ -401,7 +448,7 @@ const StagesManagement = () => {
 
   // Restore Stage Handler
   const handleRestoreStage = useCallback(async (stageId: number) => {
-    if (!window.confirm('Are you sure you want to restore this stage?')) return;
+    if (!window.confirm("Are you sure you want to restore this stage?")) return;
 
     try {
       await restoreStage(stageId);
@@ -417,17 +464,17 @@ const StagesManagement = () => {
   }, []);
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newData = {
         ...prev,
-        [field]: value
+        [field]: value,
       };
-      
+
       // If type changes to lost_reason, disable and set probability to 0
-      if (field === 'type' && value === 'lost_reason') {
+      if (field === "type" && value === "lost_reason") {
         newData.probability = 0;
       }
-      
+
       return newData;
     });
   };
@@ -452,7 +499,7 @@ const StagesManagement = () => {
         key: "name",
         name: "Stage",
         selector: (row: Stage) => row.name,
-        sortable: true
+        sortable: true,
       },
       {
         key: "sequence",
@@ -469,7 +516,9 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.type,
         sortable: true,
         cell: (props: Stage) => (
-          <span className={`status-badge ${props.type === 'lead' ? 'primary' : 'success'}`}>
+          <span
+            className={`status-badge ${props.type === "lead" ? "primary" : "success"}`}
+          >
             {props.type.charAt(0).toUpperCase() + props.type.slice(1)}
           </span>
         ),
@@ -487,7 +536,7 @@ const StagesManagement = () => {
                 width: "20px",
                 height: "20px",
                 backgroundColor: props.color,
-                borderRadius: "4px"
+                borderRadius: "4px",
               }}
             />
             <span className="status-badge info">{props.color}</span>
@@ -499,11 +548,7 @@ const StagesManagement = () => {
         name: "Description",
         selector: (row: Stage) => row.description || "",
         sortable: true,
-        cell: (props: Stage) => (
-          
-            <p>{props.description || "No description"}</p>
-         
-        ),
+        cell: (props: Stage) => <p>{props.description || "No description"}</p>,
       },
       {
         key: "created_at",
@@ -511,9 +556,7 @@ const StagesManagement = () => {
         selector: (row: Stage) => row.created_at,
         sortable: true,
         cell: (props: Stage) => (
-          <p>
-            {new Date(props.created_at).toLocaleDateString()}
-          </p>
+          <p>{new Date(props.created_at).toLocaleDateString()}</p>
         ),
       },
       {
@@ -525,85 +568,110 @@ const StagesManagement = () => {
           <DatatableActionButton
             actions={[
               {
-                label: 'View',
+                label: "View",
                 icon: <FiEye />,
                 onClick: () => {
                   setViewingStage(props);
                   setShowViewModal(true);
                 },
-                className: 'text-info',
+                className: "text-info",
               },
-              ...(session?.user?.permissions?.includes('edit-crm-stages') ? [
-              {
-                label: 'Edit',
-                icon: <FiEdit2 />,
-                onClick: () => {
-                  setStageToUpdate(props);
-                  setFormData({
-                    name: props.name,
-                    sequence: props.sequence,
-                    is_won: props.is_won,
-                    fold: props.fold,
-                    color: props.color,
-                    description: props.description || "",
-                    is_default: props.is_default,
-                    active: props.active,
-                    type: props.type,
-                    probability: props.probability,
-                  });
-                  setShowUpdateModal(true);
-                },
-                className: 'text-primary',
-              },
-              ] : []),
+              ...(session?.user?.permissions?.includes("edit-crm-stages")
+                ? [
+                    {
+                      label: "Edit",
+                      icon: <FiEdit2 />,
+                      onClick: () => {
+                        setStageToUpdate(props);
+                        setFormData({
+                          name: props.name,
+                          sequence: props.sequence,
+                          is_won: props.is_won,
+                          fold: props.fold,
+                          color: props.color,
+                          description: props.description || "",
+                          is_default: props.is_default,
+                          active: props.active,
+                          type: props.type,
+                          probability: props.probability,
+                        });
+                        setShowUpdateModal(true);
+                      },
+                      className: "text-primary",
+                    },
+                  ]
+                : []),
 
-              ...(session?.user?.permissions?.includes('delete-crm-stages') ? [
-              {
-                label: 'Delete',
-                icon: <FiTrash2 />,
-                onClick: () => {
-                  setStageToDelete(props);
-                  setShowDeleteModal(true);
-                },
-                className: 'text-danger',
-              },
-              ] : []),
+              ...(session?.user?.permissions?.includes("delete-crm-stages")
+                ? [
+                    {
+                      label: "Delete",
+                      icon: <FiTrash2 />,
+                      onClick: () => {
+                        setStageToDelete(props);
+                        setShowDeleteModal(true);
+                      },
+                      className: "text-danger",
+                    },
+                  ]
+                : []),
             ]}
           />
         ),
       },
     ],
-    []
+    [],
   );
 
   const filters = useMemo(() => ({}), []);
 
   // Helper functions for sorting and pagination
-  const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
-    const newDirection = paginationState.sortColumn === column && paginationState.sortDirection === 'asc' ? 'desc' : 'asc';
-    setPaginationState({ ...paginationState, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
+  const handleSort = (
+    column: string,
+    paginationState: any,
+    setPaginationState: (state: any) => void,
+  ) => {
+    const newDirection =
+      paginationState.sortColumn === column &&
+      paginationState.sortDirection === "asc"
+        ? "desc"
+        : "asc";
+    setPaginationState({
+      ...paginationState,
+      sortColumn: column,
+      sortDirection: newDirection,
+      currentPage: 1,
+    });
   };
 
-  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
+  const sortData = <T extends Record<string, any>>(
+    data: T[],
+    sortColumn: string,
+    sortDirection: "asc" | "desc",
+  ): T[] => {
     if (!sortColumn) return data;
-    
+
     return [...data].sort((a, b) => {
       let aVal = a[sortColumn];
       let bVal = b[sortColumn];
-      
-      if (aVal === undefined) aVal = '';
-      if (bVal === undefined) bVal = '';
-      
+
+      if (aVal === undefined) aVal = "";
+      if (bVal === undefined) bVal = "";
+
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
-      
-      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
-      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+
+      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   };
 
-  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
+  const paginateData = <T,>(
+    data: T[],
+    currentPage: number,
+    rowsPerPage: number,
+  ): T[] => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     return data.slice(startIndex, endIndex);
@@ -617,7 +685,7 @@ const StagesManagement = () => {
     dataLength: number,
     paginationState: any,
     setPaginationState: (state: any) => void,
-    label: string
+    label: string,
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
     const { currentPage, rowsPerPage } = paginationState;
@@ -631,8 +699,14 @@ const StagesManagement = () => {
           <Form.Select
             size="sm"
             value={rowsPerPage}
-            onChange={(e) => setPaginationState({ ...paginationState, rowsPerPage: Number(e.target.value), currentPage: 1 })}
-            style={{ width: 'auto' }}
+            onChange={(e) =>
+              setPaginationState({
+                ...paginationState,
+                rowsPerPage: Number(e.target.value),
+                currentPage: 1,
+              })
+            }
+            style={{ width: "auto" }}
           >
             <option value={10}>10</option>
             <option value={25}>25</option>
@@ -641,7 +715,7 @@ const StagesManagement = () => {
           </Form.Select>
           <span className="text-muted small">entries</span>
         </div>
-        
+
         <div className="text-muted small">
           Showing {startRow} to {endRow} of {dataLength} {label}
         </div>
@@ -651,7 +725,9 @@ const StagesManagement = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === 1}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
+            onClick={() =>
+              setPaginationState({ ...paginationState, currentPage: 1 })
+            }
           >
             <ChevronsLeft size={14} />
           </Button>
@@ -659,11 +735,16 @@ const StagesManagement = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === 1}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage - 1 })}
+            onClick={() =>
+              setPaginationState({
+                ...paginationState,
+                currentPage: currentPage - 1,
+              })
+            }
           >
             <ChevronLeft size={14} />
           </Button>
-          
+
           {[...Array(totalPages)].map((_, index) => {
             const pageNum = index + 1;
             if (
@@ -675,23 +756,42 @@ const StagesManagement = () => {
                 <Button
                   key={pageNum}
                   size="sm"
-                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
-                  onClick={() => setPaginationState({ ...paginationState, currentPage: pageNum })}
+                  variant={
+                    currentPage === pageNum ? "primary" : "outline-secondary"
+                  }
+                  onClick={() =>
+                    setPaginationState({
+                      ...paginationState,
+                      currentPage: pageNum,
+                    })
+                  }
                 >
                   {pageNum}
                 </Button>
               );
-            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-              return <span key={pageNum} className="px-2">...</span>;
+            } else if (
+              pageNum === currentPage - 2 ||
+              pageNum === currentPage + 2
+            ) {
+              return (
+                <span key={pageNum} className="px-2">
+                  ...
+                </span>
+              );
             }
             return null;
           })}
-          
+
           <Button
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === totalPages}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage + 1 })}
+            onClick={() =>
+              setPaginationState({
+                ...paginationState,
+                currentPage: currentPage + 1,
+              })
+            }
           >
             <ChevronRight size={14} />
           </Button>
@@ -699,7 +799,12 @@ const StagesManagement = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === totalPages}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: totalPages })}
+            onClick={() =>
+              setPaginationState({
+                ...paginationState,
+                currentPage: totalPages,
+              })
+            }
           >
             <ChevronsRight size={14} />
           </Button>
@@ -712,9 +817,11 @@ const StagesManagement = () => {
     if (paginationState.sortColumn !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === 'asc' ? 
-      <ArrowUp size={14} className="ms-1" /> : 
-      <ArrowDown size={14} className="ms-1" />;
+    return paginationState.sortDirection === "asc" ? (
+      <ArrowUp size={14} className="ms-1" />
+    ) : (
+      <ArrowDown size={14} className="ms-1" />
+    );
   };
 
   // KPI Card Component
@@ -728,26 +835,34 @@ const StagesManagement = () => {
     onClick?: () => void;
   }
 
-  const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, onClick }) => {
+  const KPICard: React.FC<KPICardData> = ({
+    title,
+    value,
+    change,
+    isPositive,
+    icon,
+    color,
+    onClick,
+  }) => {
     return (
-      <Card 
-        className={onClick ? 'h-100' : ''} 
-        style={{ 
-          cursor: onClick ? 'pointer' : 'default',
-          transition: 'all 0.2s ease',
-          border: '1px solid #e9ecef'
+      <Card
+        className={onClick ? "h-100" : ""}
+        style={{
+          cursor: onClick ? "pointer" : "default",
+          transition: "all 0.2s ease",
+          border: "1px solid #e9ecef",
         }}
         onClick={onClick}
         onMouseEnter={(e) => {
           if (onClick) {
-            e.currentTarget.style.transform = 'translateY(-4px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            e.currentTarget.style.transform = "translateY(-4px)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
           }
         }}
         onMouseLeave={(e) => {
           if (onClick) {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "none";
           }
         }}
       >
@@ -757,7 +872,10 @@ const StagesManagement = () => {
               <div className={`text-${color}`}>{icon}</div>
             </div>
             {change && (
-              <Badge bg={isPositive ? 'success' : 'danger'} className="bg-opacity-10">
+              <Badge
+                bg={isPositive ? "success" : "danger"}
+                className="bg-opacity-10"
+              >
                 {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
                 {change}
               </Badge>
@@ -772,16 +890,17 @@ const StagesManagement = () => {
 
   // Filter and transform stages data (only search filter, type is filtered by API)
   const filteredStages = useMemo(() => {
-    const searchTerm = currentFilters.search || '';
-    
-    return stagesData.filter(stage => {
+    const searchTerm = currentFilters.search || "";
+
+    return stagesData.filter((stage) => {
       // Search filter
       if (searchTerm) {
-        const matchesSearch = stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch =
+          stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
         if (!matchesSearch) return false;
       }
-      
+
       return true;
     });
   }, [stagesData, currentFilters]);
@@ -790,40 +909,41 @@ const StagesManagement = () => {
   const analyticsData = useMemo(() => {
     const total = filteredStages.length;
     const byType = {
-      lead: filteredStages.filter(s => s.type === 'lead').length,
-      deal: filteredStages.filter(s => s.type === 'deal').length,
-      order: filteredStages.filter(s => s.type === 'order').length,
-      lost_reason: filteredStages.filter(s => s.type === 'lost_reason').length,
+      lead: filteredStages.filter((s) => s.type === "lead").length,
+      deal: filteredStages.filter((s) => s.type === "deal").length,
+      order: filteredStages.filter((s) => s.type === "order").length,
+      lost_reason: filteredStages.filter((s) => s.type === "lost_reason")
+        .length,
     };
-    
+
     const stagesByType = [
-      { type: 'Lead', count: byType.lead, fill: '#0d6efd' },
-      { type: 'Deal', count: byType.deal, fill: '#ffc107' },
-      { type: 'Order', count: byType.order, fill: '#20c997' },
-      { type: 'Lost Reason', count: byType.lost_reason, fill: '#dc3545' }
-    ].filter(item => item.count > 0);
+      { type: "Lead", count: byType.lead, fill: "#0d6efd" },
+      { type: "Deal", count: byType.deal, fill: "#ffc107" },
+      { type: "Order", count: byType.order, fill: "#20c997" },
+      { type: "Lost Reason", count: byType.lost_reason, fill: "#dc3545" },
+    ].filter((item) => item.count > 0);
 
     return { total, byType, stagesByType };
   }, [filteredStages]);
 
   const getTypeDisplayName = (type: string) => {
     const typeMap: Record<string, string> = {
-      'lead': 'Lead',
-      'deal': 'Deal',
-      'order': 'Order',
-      'lost_reason': 'Lost Reason'
+      lead: "Lead",
+      deal: "Deal",
+      order: "Order",
+      lost_reason: "Lost Reason",
     };
     return typeMap[type] || type;
   };
 
   const getTypeBadgeColor = (type: string) => {
     const colorMap: Record<string, string> = {
-      'lead': 'primary',
-      'deal': 'warning',
-      'order': 'success',
-      'lost_reason': 'danger'
+      lead: "primary",
+      deal: "warning",
+      order: "success",
+      lost_reason: "danger",
     };
-    return colorMap[type] || 'secondary';
+    return colorMap[type] || "secondary";
   };
 
   // Calculate filter counts
@@ -831,22 +951,24 @@ const StagesManagement = () => {
     const allStages = stagesData;
     const counts: Record<string, number> = {
       all: allStages.length,
-      lead: allStages.filter(s => s.type === 'lead').length,
-      deal: allStages.filter(s => s.type === 'deal').length,
-      order: allStages.filter(s => s.type === 'order').length,
-      lost_reason: allStages.filter(s => s.type === 'lost_reason').length,
+      lead: allStages.filter((s) => s.type === "lead").length,
+      deal: allStages.filter((s) => s.type === "deal").length,
+      order: allStages.filter((s) => s.type === "order").length,
+      lost_reason: allStages.filter((s) => s.type === "lost_reason").length,
       deleted: 0, // Will be calculated when include_archived is true
     };
     return counts;
   }, [stagesData]);
 
-  if (!session?.user?.permissions?.includes('list-crm-stages')) {
+  if (!session?.user?.permissions?.includes("list-crm-stages")) {
     return null;
   }
 
   return (
     <React.Fragment>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .stages-table-wrapper {
           width: 100%;
           overflow: hidden;
@@ -875,7 +997,9 @@ const StagesManagement = () => {
         .stages-table-wrapper .table-responsive table th[style*="width"] {
           max-width: none;
         }
-      `}} />
+      `,
+        }}
+      />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -887,18 +1011,23 @@ const StagesManagement = () => {
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
             <h2 className="mb-1 fw-bold">Stages Management</h2>
-            <p className="text-muted mb-0">Configure and manage your sales pipeline stages</p>
+            <p className="text-muted mb-0">
+              Configure and manage your sales pipeline stages
+            </p>
           </div>
           <div className="d-flex flex-wrap gap-2">
-            <Button 
+            <Button
               variant={showStagesAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowStagesAnalytics(!showStagesAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
-              {showStagesAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+              {showStagesAnalytics ? "Hide Analytics" : "Show Analytics"}
             </Button>
-            {session?.user?.permissions?.includes('add-crm-stages') && (
-              <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            {session?.user?.permissions?.includes("add-crm-stages") && (
+              <Button
+                variant="primary"
+                onClick={() => setShowCreateModal(true)}
+              >
                 <Plus size={16} className="me-2" />
                 Add Custom Stage
               </Button>
@@ -912,7 +1041,7 @@ const StagesManagement = () => {
             {/* Summary Stats */}
             <Row className="mb-4">
               <Col lg={3} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Total Stages"
                   value={analyticsData.total.toString()}
                   icon={<Layers size={24} />}
@@ -920,7 +1049,7 @@ const StagesManagement = () => {
                 />
               </Col>
               <Col lg={3} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Lead Stages"
                   value={analyticsData.byType.lead.toString()}
                   icon={<Target size={24} />}
@@ -928,7 +1057,7 @@ const StagesManagement = () => {
                 />
               </Col>
               <Col lg={3} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Deal Stages"
                   value={analyticsData.byType.deal.toString()}
                   icon={<TrendingUp size={24} />}
@@ -936,7 +1065,7 @@ const StagesManagement = () => {
                 />
               </Col>
               <Col lg={3} md={6} className="mb-3">
-                <KPICard 
+                <KPICard
                   title="Order Stages"
                   value={analyticsData.byType.order.toString()}
                   icon={<Layers size={24} />}
@@ -959,10 +1088,11 @@ const StagesManagement = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ type, count }: any) => `${type}: ${count}`}
+                            label={({ type, count }: any) =>
+                              `${type}: ${count}`
+                            }
                             outerRadius={80}
                             fill="#8884d8"
-                            
                             dataKey="count"
                           >
                             {analyticsData.stagesByType.map((entry, index) => (
@@ -983,47 +1113,47 @@ const StagesManagement = () => {
         <FilterBar
           quickFilters={[
             {
-              id: 'all',
-              label: 'All Types',
+              id: "all",
+              label: "All Types",
               count: filterCounts.all,
-              color: '#6c757d',
-              icon: <Layers size={16} />
+              color: "#6c757d",
+              icon: <Layers size={16} />,
             },
             {
-              id: 'lead',
-              label: 'Lead',
+              id: "lead",
+              label: "Lead",
               count: filterCounts.lead,
-              color: '#0d6efd',
-              icon: <Target size={16} />
+              color: "#0d6efd",
+              icon: <Target size={16} />,
             },
             {
-              id: 'deal',
-              label: 'Deal',
+              id: "deal",
+              label: "Deal",
               count: filterCounts.deal,
-              color: '#ffc107',
-              icon: <TrendingUp size={16} />
+              color: "#ffc107",
+              icon: <TrendingUp size={16} />,
             },
             {
-              id: 'order',
-              label: 'Order',
+              id: "order",
+              label: "Order",
               count: filterCounts.order,
-              color: '#20c997',
-              icon: <Layers size={16} />
+              color: "#20c997",
+              icon: <Layers size={16} />,
             },
             {
-              id: 'lost_reason',
-              label: 'Lost Reason',
+              id: "lost_reason",
+              label: "Lost Reason",
               count: filterCounts.lost_reason,
-              color: '#dc3545',
-              icon: <XCircle size={16} />
+              color: "#dc3545",
+              icon: <XCircle size={16} />,
             },
             {
-              id: 'deleted',
-              label: 'Deleted',
+              id: "deleted",
+              label: "Deleted",
               count: filterCounts.deleted || 0,
-              color: '#dc3545',
-              icon: <Trash2 size={16} />
-            }
+              color: "#dc3545",
+              icon: <Trash2 size={16} />,
+            },
           ]}
           activeFilter={activeFilter}
           onFilterChange={(filterId) => {
@@ -1034,16 +1164,21 @@ const StagesManagement = () => {
           onSearchChange={(value) => setStagesSearch(value)}
           onSearch={() => {
             if (stagesSearch.trim()) {
-              handleFiltersChange({...currentFilters, search: stagesSearch.trim()});
+              handleFiltersChange({
+                ...currentFilters,
+                search: stagesSearch.trim(),
+              });
             } else {
-              handleFiltersChange({...currentFilters, search: null});
+              handleFiltersChange({ ...currentFilters, search: null });
             }
             setStagesPagination({ ...stagesPagination, currentPage: 1 });
-            setRefreshKey(prev => prev + 1);
+            setRefreshKey((prev) => prev + 1);
           }}
           searchPlaceholder="Search stages..."
           showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          onToggleAdvancedFilters={() =>
+            setShowAdvancedFilters(!showAdvancedFilters)
+          }
           advancedFilterCount={0}
         />
 
@@ -1054,13 +1189,16 @@ const StagesManagement = () => {
               <Layers size={16} className="me-2" />
               Customize Table
             </Dropdown.Toggle>
-            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <Dropdown.Menu
+              align="end"
+              style={{ maxHeight: "300px", overflowY: "auto" }}
+            >
               {[
-                { key: 'order', label: 'Order' },
-                { key: 'stageName', label: 'Stage Name' },
-                { key: 'category', label: 'Type' },
-                { key: 'description', label: 'Description' },
-                { key: 'color', label: 'Color' }
+                { key: "order", label: "Sequence" },
+                { key: "stageName", label: "Stage Name" },
+                { key: "category", label: "Type" },
+                { key: "description", label: "Description" },
+                { key: "color", label: "Color" },
               ].map((col) => (
                 <Dropdown.Item key={col.key} as="div">
                   <Form.Check
@@ -1069,30 +1207,63 @@ const StagesManagement = () => {
                     checked={selectedStagesColumns.includes(col.key)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedStagesColumns([...selectedStagesColumns, col.key]);
-                        localStorage.setItem('stagesSelectedColumns', JSON.stringify([...selectedStagesColumns, col.key]));
+                        setSelectedStagesColumns([
+                          ...selectedStagesColumns,
+                          col.key,
+                        ]);
+                        localStorage.setItem(
+                          "stagesSelectedColumns",
+                          JSON.stringify([...selectedStagesColumns, col.key]),
+                        );
                       } else {
-                        const newCols = selectedStagesColumns.filter(c => c !== col.key);
+                        const newCols = selectedStagesColumns.filter(
+                          (c) => c !== col.key,
+                        );
                         setSelectedStagesColumns(newCols);
-                        localStorage.setItem('stagesSelectedColumns', JSON.stringify(newCols));
+                        localStorage.setItem(
+                          "stagesSelectedColumns",
+                          JSON.stringify(newCols),
+                        );
                       }
                     }}
                   />
                 </Dropdown.Item>
               ))}
               <Dropdown.Divider />
-              <Dropdown.Item onClick={() => {
-                const allCols = ['order', 'stageName', 'category', 'description', 'color'];
-                setSelectedStagesColumns(allCols);
-                localStorage.setItem('stagesSelectedColumns', JSON.stringify(allCols));
-              }}>
+              <Dropdown.Item
+                onClick={() => {
+                  const allCols = [
+                    "order",
+                    "stageName",
+                    "category",
+                    "description",
+                    "color",
+                  ];
+                  setSelectedStagesColumns(allCols);
+                  localStorage.setItem(
+                    "stagesSelectedColumns",
+                    JSON.stringify(allCols),
+                  );
+                }}
+              >
                 Select All
               </Dropdown.Item>
-              <Dropdown.Item onClick={() => {
-                const defaultCols = ['order', 'stageName', 'category', 'description', 'color'];
-                setSelectedStagesColumns(defaultCols);
-                localStorage.setItem('stagesSelectedColumns', JSON.stringify(defaultCols));
-              }}>
+              <Dropdown.Item
+                onClick={() => {
+                  const defaultCols = [
+                    "order",
+                    "stageName",
+                    "category",
+                    "description",
+                    "color",
+                  ];
+                  setSelectedStagesColumns(defaultCols);
+                  localStorage.setItem(
+                    "stagesSelectedColumns",
+                    JSON.stringify(defaultCols),
+                  );
+                }}
+              >
                 Reset to Default
               </Dropdown.Item>
             </Dropdown.Menu>
@@ -1100,107 +1271,159 @@ const StagesManagement = () => {
         </div>
 
         {/* Stages Table */}
-        <Card className="border-0 shadow-sm stages-table-wrapper mb-4" style={{ width: '100%' }}>
-          <Card.Body className="p-0" style={{ width: '100%' }}>
+        <Card
+          className="border-0 shadow-sm stages-table-wrapper mb-4"
+          style={{ width: "100%" }}
+        >
+          <Card.Body className="p-0" style={{ width: "100%" }}>
             <div className="table-responsive">
-              <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
+              <Table
+                hover
+                className="mb-0"
+                style={{ width: "100%", margin: 0, tableLayout: "auto" }}
+              >
                 <thead className="bg-light">
                   <tr>
-                
-                    {selectedStagesColumns.includes('stageName') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('name', stagesPagination, setStagesPagination)}
+                    {selectedStagesColumns.includes("stageName") && (
+                      <th
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                        onClick={() =>
+                          handleSort(
+                            "name",
+                            stagesPagination,
+                            setStagesPagination,
+                          )
+                        }
                       >
-                        Stage Name {renderSortIcon('name', stagesPagination)}
+                        Stage Name {renderSortIcon("name", stagesPagination)}
                       </th>
                     )}
-                        {selectedStagesColumns.includes('order') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none', width: '20px', minWidth: '20px' }}
+                    {selectedStagesColumns.includes("order") && (
+                      <th
+                        style={{
+                          cursor: "pointer",
+                          userSelect: "none",
+                          width: "20px",
+                          minWidth: "20px",
+                        }}
                         className="text-center"
-                        onClick={() => handleSort('sequence', stagesPagination, setStagesPagination)}
+                        onClick={() =>
+                          handleSort(
+                            "sequence",
+                            stagesPagination,
+                            setStagesPagination,
+                          )
+                        }
                       >
-                        Order {renderSortIcon('sequence', stagesPagination)}
+                        Sequence {renderSortIcon("sequence", stagesPagination)}
                       </th>
                     )}
-                    {selectedStagesColumns.includes('category') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('type', stagesPagination, setStagesPagination)}
+                    {selectedStagesColumns.includes("category") && (
+                      <th
+                        style={{ cursor: "pointer", userSelect: "none" }}
+                        onClick={() =>
+                          handleSort(
+                            "type",
+                            stagesPagination,
+                            setStagesPagination,
+                          )
+                        }
                       >
-                        Type {renderSortIcon('type', stagesPagination)}
+                        Type {renderSortIcon("type", stagesPagination)}
                       </th>
                     )}
-                    {selectedStagesColumns.includes('description') && <th>Description</th>}
-                    {selectedStagesColumns.includes('color') && <th>Color</th>}
-                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
+                    {selectedStagesColumns.includes("description") && (
+                      <th>Description</th>
+                    )}
+                    {selectedStagesColumns.includes("color") && <th>Color</th>}
+                    <th style={{ width: "120px", minWidth: "120px" }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingStages ? (
                     <tr>
-                      <td colSpan={selectedStagesColumns.length + 1} className="text-center py-4">
+                      <td
+                        colSpan={selectedStagesColumns.length + 1}
+                        className="text-center py-4"
+                      >
                         Loading...
                       </td>
                     </tr>
                   ) : filteredStages.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedStagesColumns.length + 1} className="text-center py-4 text-muted">
+                      <td
+                        colSpan={selectedStagesColumns.length + 1}
+                        className="text-center py-4 text-muted"
+                      >
                         No stages found matching your criteria
                       </td>
                     </tr>
                   ) : (
                     paginateData(
-                      sortData(filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection),
+                      sortData(
+                        filteredStages,
+                        stagesPagination.sortColumn,
+                        stagesPagination.sortDirection,
+                      ),
                       stagesPagination.currentPage,
-                      stagesPagination.rowsPerPage
+                      stagesPagination.rowsPerPage,
                     ).map((stage) => (
                       <tr key={stage.id}>
-                      
-                        {selectedStagesColumns.includes('stageName') && (
+                        {selectedStagesColumns.includes("stageName") && (
                           <td>
                             <div className="d-flex align-items-center gap-2">
-                              <div 
-                                style={{ 
-                                  width: '10px', 
-                                  height: '10px', 
-                                  backgroundColor: stage.color, 
-                                  borderRadius: '50%' 
+                              <div
+                                style={{
+                                  width: "10px",
+                                  height: "10px",
+                                  backgroundColor: stage.color,
+                                  borderRadius: "50%",
                                 }}
                               />
                               <span className="fw-semibold">{stage.name}</span>
                             </div>
                           </td>
                         )}
-                          {selectedStagesColumns.includes('order') && (
-                          <td className="text-center fw-bold" style={{ width: '20px', minWidth: '20px' }}>{stage.sequence}</td>
+                        {selectedStagesColumns.includes("order") && (
+                          <td
+                            className="text-center fw-bold"
+                            style={{ width: "20px", minWidth: "20px" }}
+                          >
+                            {stage.sequence}
+                          </td>
                         )}
-                        {selectedStagesColumns.includes('category') && (
+                        {selectedStagesColumns.includes("category") && (
                           <td>
-                            <Badge bg={getTypeBadgeColor(stage.type)} className="bg-opacity-10 text-dark">
+                            <Badge
+                              bg={getTypeBadgeColor(stage.type)}
+                              className="bg-opacity-10 text-dark"
+                            >
                               {getTypeDisplayName(stage.type)}
                             </Badge>
                           </td>
                         )}
-                        {selectedStagesColumns.includes('description') && (
-                          <td className="small text-muted">{stage.description || 'No description'}</td>
+                        {selectedStagesColumns.includes("description") && (
+                          <td className="small text-muted">
+                            {stage.description || "No description"}
+                          </td>
                         )}
-                        {selectedStagesColumns.includes('color') && (
+                        {selectedStagesColumns.includes("color") && (
                           <td>
                             <Badge style={{ backgroundColor: stage.color }}>
                               {stage.color}
                             </Badge>
                           </td>
                         )}
-                        <td style={{ width: '120px', minWidth: '120px' }}>
+                        <td style={{ width: "120px", minWidth: "120px" }}>
                           <div className="d-flex gap-1">
-                            {activeFilter === 'deleted' ? (
+                            {activeFilter === "deleted" ? (
                               <>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1" 
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1"
                                   title="View"
                                   onClick={() => {
                                     setViewingStage(stage);
@@ -1209,10 +1432,10 @@ const StagesManagement = () => {
                                 >
                                   <Eye size={16} />
                                 </Button>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1 text-success" 
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1 text-success"
                                   title="Restore"
                                   onClick={() => handleRestoreStage(stage.id)}
                                 >
@@ -1221,10 +1444,10 @@ const StagesManagement = () => {
                               </>
                             ) : (
                               <>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1" 
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-1"
                                   title="View"
                                   onClick={() => {
                                     setViewingStage(stage);
@@ -1233,11 +1456,13 @@ const StagesManagement = () => {
                                 >
                                   <Eye size={16} />
                                 </Button>
-                                {session?.user?.permissions?.includes('edit-crm-stages') && (
-                                  <Button 
-                                    variant="link" 
-                                    size="sm" 
-                                    className="p-1" 
+                                {session?.user?.permissions?.includes(
+                                  "edit-crm-stages",
+                                ) && (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-1"
                                     title="Edit Stage"
                                     onClick={() => {
                                       setStageToUpdate(stage);
@@ -1259,11 +1484,13 @@ const StagesManagement = () => {
                                     <Edit size={16} />
                                   </Button>
                                 )}
-                                {session?.user?.permissions?.includes('delete-crm-stages') && (
-                                  <Button 
-                                    variant="link" 
-                                    size="sm" 
-                                    className="p-1 text-danger" 
+                                {session?.user?.permissions?.includes(
+                                  "delete-crm-stages",
+                                ) && (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-1 text-danger"
                                     title="Delete Stage"
                                     onClick={() => {
                                       setStageToDelete(stage);
@@ -1284,17 +1511,16 @@ const StagesManagement = () => {
               </Table>
             </div>
             <div className="p-3">
-              {renderPaginationControls(filteredStages.length, stagesPagination, setStagesPagination, 'stages')}
+              {renderPaginationControls(
+                filteredStages.length,
+                stagesPagination,
+                setStagesPagination,
+                "stages",
+              )}
             </div>
           </Card.Body>
         </Card>
-
-       
       </div>
-
-    
-
-
 
       <FormModal
         show={showCreateModal}
@@ -1303,62 +1529,77 @@ const StagesManagement = () => {
         desc="Please fill in the details below to create a new stage."
         size="lg"
         formHtml={
-         <>
-         <Form onSubmit={handleSubmit}>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Stage Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    placeholder="Enter stage name"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Sequence *</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={formData.sequence}
-                    onChange={(e) => handleInputChange("sequence", parseInt(e.target.value))}
-                    min="1"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+          <>
+            <Form onSubmit={handleSubmit}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
+                      placeholder="Enter stage name"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={formData.sequence}
+                      onChange={(e) =>
+                        handleInputChange("sequence", parseInt(e.target.value))
+                      }
+                      min="1"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Type *</Form.Label>
-                  <Form.Select
-                    value={formData.type}
-                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'deal' | 'order' | 'lost_reason')}
-                    required
-                  >
-                    <option value="lead">Lead</option>
-                    <option value="deal">Deal</option>
-                    <option value="order">Order</option>
-                    <option value="lost_reason">Lost Reason</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Color</Form.Label>
-                  <Form.Control
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => handleInputChange("color", e.target.value)}
-                  />
-                </Form.Group>
-              </Col>
-              {/* <Col md={6}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Type *</Form.Label>
+                    <Form.Select
+                      value={formData.type}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "type",
+                          e.target.value as
+                            | "lead"
+                            | "deal"
+                            | "order"
+                            | "lost_reason",
+                        )
+                      }
+                      required
+                    >
+                      <option value="lead">Lead</option>
+                      <option value="deal">Deal</option>
+                      <option value="order">Order</option>
+                      <option value="lost_reason">Lost Reason</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Color</Form.Label>
+                    <Form.Control
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) =>
+                        handleInputChange("color", e.target.value)
+                      }
+                    />
+                  </Form.Group>
+                </Col>
+                {/* <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Status</Form.Label>
                   <div className="d-flex gap-3">
@@ -1383,37 +1624,43 @@ const StagesManagement = () => {
                   </div>
                 </Form.Group>
               </Col> */}
-            </Row>
+              </Row>
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Probability</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={formData.probability}
-                    onChange={(e) => handleInputChange("probability", parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="100"
-                    disabled={formData.type === 'lost_reason'}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Probability</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={formData.probability}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "probability",
+                          parseInt(e.target.value) || 0,
+                        )
+                      }
+                      min="0"
+                      max="100"
+                      disabled={formData.type === "lost_reason"}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                placeholder="Enter stage description (optional)"
-              />
-            </Form.Group>
-          </Form>
-         </>
+              <Form.Group className="mb-3">
+                <Form.Label>Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) =>
+                    handleInputChange("description", e.target.value)
+                  }
+                  placeholder="Enter stage description (optional)"
+                />
+              </Form.Group>
+            </Form>
+          </>
         }
         submitButtonText="Create Stage"
         cancelButtonText="Cancel"
@@ -1434,92 +1681,113 @@ const StagesManagement = () => {
         desc="Please update the details below for this stage."
         size="lg"
         formHtml={
-         <>
-         <Form onSubmit={handleUpdateStage}>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Stage Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    placeholder="Enter stage name"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Sequence *</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={formData.sequence}
-                    onChange={(e) => handleInputChange("sequence", parseInt(e.target.value))}
-                    min="1"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+          <>
+            <Form onSubmit={handleUpdateStage}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
+                      placeholder="Enter stage name"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={formData.sequence}
+                      onChange={(e) =>
+                        handleInputChange("sequence", parseInt(e.target.value))
+                      }
+                      min="1"
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Type *</Form.Label>
-                  <Form.Select
-                    value={formData.type}
-                    onChange={(e) => handleInputChange("type", e.target.value as 'lead' | 'deal' | 'order' | 'lost_reason')}
-                    required
-                  >
-                    <option value="lead">Lead</option>
-                    <option value="deal">Deal</option>
-                    <option value="order">Order</option>
-                    <option value="lost_reason">Lost Reason</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Color</Form.Label>
-                  <Form.Control
-                    type="color"
-                    value={formData.color}
-                    onChange={(e) => handleInputChange("color", e.target.value)}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Type *</Form.Label>
+                    <Form.Select
+                      value={formData.type}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "type",
+                          e.target.value as
+                            | "lead"
+                            | "deal"
+                            | "order"
+                            | "lost_reason",
+                        )
+                      }
+                      required
+                    >
+                      <option value="lead">Lead</option>
+                      <option value="deal">Deal</option>
+                      <option value="order">Order</option>
+                      <option value="lost_reason">Lost Reason</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Color</Form.Label>
+                    <Form.Control
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) =>
+                        handleInputChange("color", e.target.value)
+                      }
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Probability</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={formData.probability}
-                    onChange={(e) => handleInputChange("probability", parseInt(e.target.value) || 0)}
-                    min="0"
-                    max="100"
-                    disabled={formData.type === 'lost_reason'}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Probability</Form.Label>
+                    <Form.Control
+                      type="number"
+                      value={formData.probability}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "probability",
+                          parseInt(e.target.value) || 0,
+                        )
+                      }
+                      min="0"
+                      max="100"
+                      disabled={formData.type === "lost_reason"}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
 
-
-            <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                placeholder="Enter stage description (optional)"
-              />
-            </Form.Group>
-          </Form>
-         </>
+              <Form.Group className="mb-3">
+                <Form.Label>Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) =>
+                    handleInputChange("description", e.target.value)
+                  }
+                  placeholder="Enter stage description (optional)"
+                />
+              </Form.Group>
+            </Form>
+          </>
         }
         submitButtonText="Update Stage"
         cancelButtonText="Cancel"
@@ -1546,182 +1814,270 @@ const StagesManagement = () => {
 
       {/* Stage View Modal */}
       {viewingStage && (
-        <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
+        <Modal
+          show={showViewModal}
+          onHide={() => setShowViewModal(false)}
+          size="xl"
+          centered
+        >
           {/* Custom Header */}
-          <div style={{
-            color: 'black',
-            padding: '30px',
-            position: 'relative',
-            borderTopLeftRadius: '8px',
-            borderTopRightRadius: '8px',
-            borderBottom: '1px solid #e5e7eb'
-          }}>
-            <button 
+          <div
+            style={{
+              color: "black",
+              padding: "30px",
+              position: "relative",
+              borderTopLeftRadius: "8px",
+              borderTopRightRadius: "8px",
+              borderBottom: "1px solid #e5e7eb",
+            }}
+          >
+            <button
               onClick={() => setShowViewModal(false)}
               style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'black',
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                position: "absolute",
+                top: "20px",
+                right: "20px",
+                background: "rgba(255,255,255,0.2)",
+                border: "none",
+                color: "black",
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                e.currentTarget.style.transform = 'rotate(90deg)';
+                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
+                e.currentTarget.style.transform = "rotate(90deg)";
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.transform = 'rotate(0deg)';
+                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                e.currentTarget.style.transform = "rotate(0deg)";
               }}
             >
               <X size={20} />
             </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
+            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
               {viewingStage.name}
             </h3>
-            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
+            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
               Stage Details
             </p>
           </div>
 
-          <Modal.Body style={{ padding: '30px' }}>
+          <Modal.Body style={{ padding: "30px" }}>
             {/* Stage Information Section */}
-            <div style={{
-              fontSize: '16px',
-              fontWeight: 600,
-              color: '#1f2937',
-              marginBottom: '20px',
-              paddingBottom: '10px',
-              borderBottom: '2px solid #f8f9fa',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <Layers size={18} style={{ color: '#4680ff' }} />
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#1f2937",
+                marginBottom: "20px",
+                paddingBottom: "10px",
+                borderBottom: "2px solid #f8f9fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <Layers size={18} style={{ color: "#4680ff" }} />
               Stage Information
             </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '20px',
-              marginBottom: '30px'
-            }}>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Stage Name</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gap: "20px",
+                marginBottom: "30px",
+              }}
+            >
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Stage Name
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   {viewingStage.name}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Sequence</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Sequence
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   {viewingStage.sequence}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Type</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Type
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   <Badge bg={getTypeBadgeColor(viewingStage.type)}>
                     {getTypeDisplayName(viewingStage.type)}
                   </Badge>
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Color</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    backgroundColor: viewingStage.color,
-                    borderRadius: '4px'
-                  }} />
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Color
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      backgroundColor: viewingStage.color,
+                      borderRadius: "4px",
+                    }}
+                  />
                   {viewingStage.color}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Status</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Status
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   {getStatusBadge(viewingStage)}
                 </div>
               </div>
-              <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Created Date</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+              <div
+                style={{
+                  background: "#f8f9fa",
+                  padding: "16px",
+                  borderRadius: "10px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Created Date
+                </div>
+                <div
+                  style={{
+                    fontSize: "15px",
+                    color: "#1f2937",
+                    fontWeight: 500,
+                  }}
+                >
                   {new Date(viewingStage.created_at).toLocaleDateString()}
                 </div>
               </div>
@@ -1730,55 +2086,61 @@ const StagesManagement = () => {
             {/* Description */}
             {viewingStage.description && (
               <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <FileText size={18} style={{ color: '#4680ff' }} />
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "#1f2937",
+                    marginBottom: "20px",
+                    paddingBottom: "10px",
+                    borderBottom: "2px solid #f8f9fa",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <FileText size={18} style={{ color: "#4680ff" }} />
                   Description
                 </div>
-                <div style={{
-                  background: '#f8f9fa',
-                  padding: '16px',
-                  borderRadius: '10px',
-                  marginBottom: '30px',
-                  fontSize: '14px',
-                  color: '#1f2937',
-                  whiteSpace: 'pre-wrap'
-                }}>
+                <div
+                  style={{
+                    background: "#f8f9fa",
+                    padding: "16px",
+                    borderRadius: "10px",
+                    marginBottom: "30px",
+                    fontSize: "14px",
+                    color: "#1f2937",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
                   {viewingStage.description}
                 </div>
               </>
             )}
 
             {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              flexWrap: 'wrap',
-              paddingTop: '20px',
-              borderTop: '1px solid #e5e7eb'
-            }}>
-              {session?.user?.permissions?.includes('edit-crm-stages') && (
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                flexWrap: "wrap",
+                paddingTop: "20px",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
+              {session?.user?.permissions?.includes("edit-crm-stages") && (
                 <Button
                   variant="primary"
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
+                    padding: "10px 20px",
+                    borderRadius: "8px",
                     fontWeight: 500,
-                    fontSize: '14px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: '#4680ff',
-                    border: 'none'
+                    fontSize: "14px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "#4680ff",
+                    border: "none",
                   }}
                   onClick={() => {
                     setShowViewModal(false);
@@ -1805,16 +2167,16 @@ const StagesManagement = () => {
               <Button
                 variant="outline-secondary"
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
+                  padding: "10px 20px",
+                  borderRadius: "8px",
                   fontWeight: 500,
-                  fontSize: '14px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'white',
-                  color: '#6b7280',
-                  border: '2px solid #e5e7eb'
+                  fontSize: "14px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "white",
+                  color: "#6b7280",
+                  border: "2px solid #e5e7eb",
                 }}
                 onClick={() => setShowViewModal(false)}
               >
@@ -1825,17 +2187,12 @@ const StagesManagement = () => {
         </Modal>
       )}
 
-
-	
-<SuccessfulModal
-          show={showSuccessfulModal}
-          onHide={() => setShowSuccessfulModal(false)}
-          title={successModalTitle}
-          description={successModalDescription}
-        />
-		
-
-
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
+      />
     </React.Fragment>
   );
 };

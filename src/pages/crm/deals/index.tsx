@@ -1310,7 +1310,11 @@ const CrmDeals = () => {
   const handleFirstColumnClick = useCallback(
     (deal: any) => {
       const id = deal?.id ?? deal?.rawData?.id;
-      router.push(id ? `/crm/deals/deals-detailpage?id=${id}` : "/crm/deals/deals-detailpage");
+      router.push(
+        id
+          ? `/crm/deals/deals-detailpage?id=${id}`
+          : "/crm/deals/deals-detailpage",
+      );
     },
     [router],
   );
@@ -2333,7 +2337,7 @@ const CrmDeals = () => {
       },
       {
         key: "owner",
-        label: "Owner",
+        label: "Associate with",
         sortable: true,
         type: "text",
         emptyValue: "-",
@@ -2435,9 +2439,11 @@ const CrmDeals = () => {
               },
               variant: "link" as const,
               className: "text-success",
-              show: (row: any) =>
-                (row.rawData?.approval_status ?? row.approval_status) ===
+              disabled: (row: any) =>
+                (row.rawData?.approval_status ?? row.approval_status) !==
                 "approved",
+              disabledClassName: "text-muted",
+              disabledTitle: "Only approved deals can be converted to orders",
             },
           ]
         : []),
@@ -2811,7 +2817,7 @@ const CrmDeals = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -2825,7 +2831,7 @@ const CrmDeals = () => {
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Contact Owner",
+                      label: "Associate with",
                       showDropdown: true,
                       dropdownOptions: [
                         {
@@ -5742,7 +5748,7 @@ const CrmDeals = () => {
                         marginBottom: "4px",
                       }}
                     >
-                      Owner
+                      Associate with
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 600 }}>
                       {extensions.find(
