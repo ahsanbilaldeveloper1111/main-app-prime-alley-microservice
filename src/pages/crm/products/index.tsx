@@ -115,15 +115,17 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     hasCustomColor
                       ? undefined
                       : isActive
-                      ? (filter.variant || "primary")
-                      : "outline-secondary"
+                        ? filter.variant || "primary"
+                        : "outline-secondary"
                   }
                   onClick={() => onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
                   {filter.icon && (
-                    <span className="d-flex align-items-center">{filter.icon}</span>
+                    <span className="d-flex align-items-center">
+                      {filter.icon}
+                    </span>
                   )}
                   {filter.label}
                 </Button>
@@ -191,7 +193,7 @@ interface ProductDisplayData {
 
 const ProductsPage = () => {
   const { data: session } = useSession();
-  
+
   // State
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -212,15 +214,11 @@ const ProductsPage = () => {
     priceMax: "",
   });
   const [showProductModal, setShowProductModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ProductDisplayData | null>(null);
-  const [selectedProductsColumns, setSelectedProductsColumns] = useState<string[]>([
-    "productName",
-    "sku",
-    "price",
-    "category",
-    "brand",
-    "status",
-  ]);
+  const [editingProduct, setEditingProduct] =
+    useState<ProductDisplayData | null>(null);
+  const [selectedProductsColumns, setSelectedProductsColumns] = useState<
+    string[]
+  >(["productName", "sku", "price", "category", "brand", "status"]);
   const [productFormData, setProductFormData] = useState({
     productName: "",
     sku: "",
@@ -234,10 +232,12 @@ const ProductsPage = () => {
   });
   const [industries, setIndustries] = useState<IndustryData[]>([]);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
-  const [deletingProduct, setDeletingProduct] = useState<ProductDisplayData | null>(null);
+  const [deletingProduct, setDeletingProduct] =
+    useState<ProductDisplayData | null>(null);
   const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
   const [showProductViewModal, setShowProductViewModal] = useState(false);
-  const [viewingProduct, setViewingProduct] = useState<ProductDisplayData | null>(null);
+  const [viewingProduct, setViewingProduct] =
+    useState<ProductDisplayData | null>(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
@@ -285,7 +285,7 @@ const ProductsPage = () => {
   const sortData = <T extends Record<string, any>>(
     data: T[],
     sortColumn: string,
-    sortDirection: "asc" | "desc"
+    sortDirection: "asc" | "desc",
   ): T[] => {
     if (!sortColumn) return data;
 
@@ -305,8 +305,12 @@ const ProductsPage = () => {
     });
   };
 
-  const paginateData = <T,>(data: T[], currentPage: number, rowsPerPage: number): T[] => {
-// pagination handled by backend
+  const paginateData = <T,>(
+    data: T[],
+    currentPage: number,
+    rowsPerPage: number,
+  ): T[] => {
+    // pagination handled by backend
     return data;
   };
 
@@ -318,7 +322,7 @@ const ProductsPage = () => {
     dataLength: number,
     paginationState: any,
     setPaginationState: (state: any) => void,
-    label: string
+    label: string,
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
     const { currentPage, rowsPerPage } = paginationState;
@@ -358,7 +362,9 @@ const ProductsPage = () => {
             size="sm"
             variant="outline-secondary"
             disabled={currentPage === 1}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
+            onClick={() =>
+              setPaginationState({ ...paginationState, currentPage: 1 })
+            }
           >
             <ChevronsLeft size={14} />
           </Button>
@@ -367,7 +373,10 @@ const ProductsPage = () => {
             variant="outline-secondary"
             disabled={currentPage === 1}
             onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: currentPage - 1 })
+              setPaginationState({
+                ...paginationState,
+                currentPage: currentPage - 1,
+              })
             }
           >
             <ChevronLeft size={14} />
@@ -384,9 +393,14 @@ const ProductsPage = () => {
                 <Button
                   key={pageNum}
                   size="sm"
-                  variant={currentPage === pageNum ? "primary" : "outline-secondary"}
+                  variant={
+                    currentPage === pageNum ? "primary" : "outline-secondary"
+                  }
                   onClick={() =>
-                    setPaginationState({ ...paginationState, currentPage: pageNum })
+                    setPaginationState({
+                      ...paginationState,
+                      currentPage: pageNum,
+                    })
                   }
                 >
                   {pageNum}
@@ -410,7 +424,10 @@ const ProductsPage = () => {
             variant="outline-secondary"
             disabled={currentPage === totalPages}
             onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: currentPage + 1 })
+              setPaginationState({
+                ...paginationState,
+                currentPage: currentPage + 1,
+              })
             }
           >
             <ChevronRight size={14} />
@@ -420,7 +437,10 @@ const ProductsPage = () => {
             variant="outline-secondary"
             disabled={currentPage === totalPages}
             onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: totalPages })
+              setPaginationState({
+                ...paginationState,
+                currentPage: totalPages,
+              })
             }
           >
             <ChevronsRight size={14} />
@@ -450,11 +470,15 @@ const ProductsPage = () => {
   // Convert CrmProduct to ProductDisplayData
   const convertToDisplayData = (product: CrmProduct): ProductDisplayData => {
     // Normalize industry_id: convert string to number if needed
-    const rawIndustryId = (product as any).industry_id || (product as any).industry?.id || null;
-    const normalizedIndustryId = rawIndustryId !== null
-      ? (typeof rawIndustryId === 'string' ? Number.parseInt(rawIndustryId, 10) : rawIndustryId)
-      : null;
-    
+    const rawIndustryId =
+      (product as any).industry_id || (product as any).industry?.id || null;
+    const normalizedIndustryId =
+      rawIndustryId !== null
+        ? typeof rawIndustryId === "string"
+          ? Number.parseInt(rawIndustryId, 10)
+          : rawIndustryId
+        : null;
+
     return {
       id: product.id,
       productName: product.name,
@@ -512,7 +536,11 @@ const ProductsPage = () => {
       setTotalProducts(response.total);
       setProducts(response.data);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to fetch products");
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to fetch products",
+      );
     } finally {
       setLoading(false);
     }
@@ -520,7 +548,13 @@ const ProductsPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [productsPagination.currentPage, productsPagination.rowsPerPage, currentFilters, activeFilter, productsFilters]);
+  }, [
+    productsPagination.currentPage,
+    productsPagination.rowsPerPage,
+    currentFilters,
+    activeFilter,
+    productsFilters,
+  ]);
 
   // Convert products to display data (no filtering - done by API)
   const displayProducts = useMemo(() => {
@@ -586,10 +620,13 @@ const ProductsPage = () => {
       setEditingProduct(product);
       // Convert industry_id to number if it's a string (API sometimes returns string)
       const industryId = product.industry_id || product.industry?.id || null;
-      const normalizedIndustryId = industryId !== null 
-        ? (typeof industryId === 'string' ? Number.parseInt(industryId, 10) : industryId)
-        : null;
-      
+      const normalizedIndustryId =
+        industryId !== null
+          ? typeof industryId === "string"
+            ? Number.parseInt(industryId, 10)
+            : industryId
+          : null;
+
       setProductFormData({
         productName: product.productName,
         sku: product.sku,
@@ -620,13 +657,13 @@ const ProductsPage = () => {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate industry is selected
     if (!productFormData.industry_id) {
       toast.error("Please select an industry");
       return;
     }
-    
+
     try {
       if (editingProduct) {
         // Update existing product
@@ -679,14 +716,20 @@ const ProductsPage = () => {
     }
   };
 
-  if (!session?.user?.permissions?.includes('list-crm-products')) {
+  if (!session?.user?.permissions?.includes("list-crm-products")) {
     return null;
   }
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Products" />
-      <style dangerouslySetInnerHTML={{__html: `
+      <BreadcrumbItem
+        mainTitle="CRM"
+        mainLink="/crm/dashboard"
+        subTitle="Products"
+      />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         .products-table-wrapper {
           width: 100%;
           overflow: hidden;
@@ -715,7 +758,9 @@ const ProductsPage = () => {
         .products-table-wrapper .table-responsive table th[style*="width"] {
           max-width: none;
         }
-      `}} />
+      `,
+        }}
+      />
       <div>
         {/* Product Form Modal */}
         <Modal
@@ -741,7 +786,10 @@ const ProductsPage = () => {
                       type="text"
                       value={productFormData.productName}
                       onChange={(e) =>
-                        setProductFormData({ ...productFormData, productName: e.target.value })
+                        setProductFormData({
+                          ...productFormData,
+                          productName: e.target.value,
+                        })
                       }
                       placeholder="Enter product name"
                       required
@@ -760,7 +808,10 @@ const ProductsPage = () => {
                       type="text"
                       value={productFormData.sku}
                       onChange={(e) =>
-                        setProductFormData({ ...productFormData, sku: e.target.value })
+                        setProductFormData({
+                          ...productFormData,
+                          sku: e.target.value,
+                        })
                       }
                       placeholder="Enter SKU"
                       required
@@ -784,7 +835,10 @@ const ProductsPage = () => {
                       step="0.01"
                       value={productFormData.price}
                       onChange={(e) =>
-                        setProductFormData({ ...productFormData, price: e.target.value })
+                        setProductFormData({
+                          ...productFormData,
+                          price: e.target.value,
+                        })
                       }
                       placeholder="0.00"
                       required
@@ -800,13 +854,17 @@ const ProductsPage = () => {
                     <Form.Select
                       value={productFormData.currency}
                       onChange={(e) =>
-                        setProductFormData({ ...productFormData, currency: e.target.value })
+                        setProductFormData({
+                          ...productFormData,
+                          currency: e.target.value,
+                        })
                       }
                     >
-                     
                       <option value="AED">AED</option>
                     </Form.Select>
-                    <Form.Text className="text-muted">Select the currency for this product</Form.Text>
+                    <Form.Text className="text-muted">
+                      Select the currency for this product
+                    </Form.Text>
                   </Form.Group>
                 </Col>
               </Row>
@@ -818,15 +876,31 @@ const ProductsPage = () => {
                       Product Group <span className="text-danger">*</span>
                     </Form.Label>
                     <Select
-                      options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                      value={productFormData.industry_id ? {
-                        value: productFormData.industry_id,
-                        label: industries.find((ind) => ind.id === Number(productFormData.industry_id))?.name || ''
-                      } : null}
+                      options={industries.map((ind) => ({
+                        value: ind.id,
+                        label: ind.name,
+                      }))}
+                      value={
+                        productFormData.industry_id
+                          ? {
+                              value: productFormData.industry_id,
+                              label:
+                                industries.find(
+                                  (ind) =>
+                                    ind.id ===
+                                    Number(productFormData.industry_id),
+                                )?.name || "",
+                            }
+                          : null
+                      }
                       onChange={(selected) =>
                         setProductFormData({
                           ...productFormData,
-                          industry_id: selected ? (typeof selected.value === 'string' ? Number.parseInt(selected.value, 10) : selected.value) : null,
+                          industry_id: selected
+                            ? typeof selected.value === "string"
+                              ? Number.parseInt(selected.value, 10)
+                              : selected.value
+                            : null,
                         })
                       }
                       placeholder="Select product group..."
@@ -837,7 +911,7 @@ const ProductsPage = () => {
                       required
                     />
                     <Form.Text className="text-muted">
-                      Select the industry this product belongs to
+                      Select the product group this product belongs to
                     </Form.Text>
                   </Form.Group>
                 </Col>
@@ -845,17 +919,31 @@ const ProductsPage = () => {
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Category</Form.Label>
                     <CreatableSelect
-                      options={uniqueCategories.map((cat) => ({ value: cat, label: cat }))}
-                      value={productFormData.category ? { value: productFormData.category, label: productFormData.category } : null}
+                      options={uniqueCategories.map((cat) => ({
+                        value: cat,
+                        label: cat,
+                      }))}
+                      value={
+                        productFormData.category
+                          ? {
+                              value: productFormData.category,
+                              label: productFormData.category,
+                            }
+                          : null
+                      }
                       onChange={(selected) =>
-                        setProductFormData({ ...productFormData, category: selected ? selected.value : "" })
+                        setProductFormData({
+                          ...productFormData,
+                          category: selected ? selected.value : "",
+                        })
                       }
                       placeholder="Select or create category..."
                       styles={customSelectStyles}
                       isClearable
                     />
                     <Form.Text className="text-muted">
-                      Choose or create a product category for better organization
+                      Choose or create a product category for better
+                      organization
                     </Form.Text>
                   </Form.Group>
                 </Col>
@@ -866,11 +954,16 @@ const ProductsPage = () => {
                       type="text"
                       value={productFormData.brand}
                       onChange={(e) =>
-                        setProductFormData({ ...productFormData, brand: e.target.value })
+                        setProductFormData({
+                          ...productFormData,
+                          brand: e.target.value,
+                        })
                       }
                       placeholder="Enter brand name"
                     />
-                    <Form.Text className="text-muted">Enter the brand or manufacturer name</Form.Text>
+                    <Form.Text className="text-muted">
+                      Enter the brand or manufacturer name
+                    </Form.Text>
                   </Form.Group>
                 </Col>
               </Row>
@@ -882,12 +975,16 @@ const ProductsPage = () => {
                   rows={3}
                   value={productFormData.description}
                   onChange={(e) =>
-                    setProductFormData({ ...productFormData, description: e.target.value })
+                    setProductFormData({
+                      ...productFormData,
+                      description: e.target.value,
+                    })
                   }
                   placeholder="Enter product description"
                 />
                 <Form.Text className="text-muted">
-                  Provide detailed information about features, specifications, and benefits
+                  Provide detailed information about features, specifications,
+                  and benefits
                 </Form.Text>
               </Form.Group>
 
@@ -898,7 +995,10 @@ const ProductsPage = () => {
                   label="Product Active"
                   checked={productFormData.isActive}
                   onChange={(e) =>
-                    setProductFormData({ ...productFormData, isActive: e.target.checked })
+                    setProductFormData({
+                      ...productFormData,
+                      isActive: e.target.checked,
+                    })
                   }
                 />
                 <Form.Text className="text-muted">
@@ -907,7 +1007,10 @@ const ProductsPage = () => {
               </Form.Group>
 
               <div className="d-flex justify-content-end gap-2 mt-4">
-                <Button variant="secondary" onClick={() => setShowProductModal(false)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowProductModal(false)}
+                >
                   Cancel
                 </Button>
                 <Button variant="primary" type="submit">
@@ -980,7 +1083,9 @@ const ProductsPage = () => {
               <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
                 {viewingProduct.productName}
               </h3>
-              <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
+              <p
+                style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}
+              >
                 Product Details
               </p>
             </div>
@@ -1039,7 +1144,13 @@ const ProductsPage = () => {
                   >
                     Product Name
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
                     {viewingProduct.productName}
                   </div>
                 </div>
@@ -1072,7 +1183,13 @@ const ProductsPage = () => {
                     >
                       Product Group
                     </div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: "15px",
+                        color: "#1f2937",
+                        fontWeight: 500,
+                      }}
+                    >
                       <Badge
                         bg="primary"
                         className="bg-opacity-10 text-dark"
@@ -1080,7 +1197,9 @@ const ProductsPage = () => {
                       >
                         <Building2 size={14} style={{ marginRight: "6px" }} />
                         {viewingProduct.industry?.name ||
-                          industries.find((ind) => ind.id === viewingProduct.industry_id)?.name ||
+                          industries.find(
+                            (ind) => ind.id === viewingProduct.industry_id,
+                          )?.name ||
                           "N/A"}
                       </Badge>
                     </div>
@@ -1114,7 +1233,13 @@ const ProductsPage = () => {
                   >
                     SKU
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
                     <Badge
                       bg="light"
                       text="dark"
@@ -1153,7 +1278,13 @@ const ProductsPage = () => {
                   >
                     Price
                   </div>
-                  <div style={{ fontSize: "20px", color: "#10b981", fontWeight: 700 }}>
+                  <div
+                    style={{
+                      fontSize: "20px",
+                      color: "#10b981",
+                      fontWeight: 700,
+                    }}
+                  >
                     {viewingProduct.currency} {viewingProduct.price.toFixed(2)}
                   </div>
                 </div>
@@ -1185,7 +1316,13 @@ const ProductsPage = () => {
                   >
                     Currency
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
                     {viewingProduct.currency}
                   </div>
                 </div>
@@ -1217,9 +1354,19 @@ const ProductsPage = () => {
                   >
                     Status
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
                     <Badge
-                      bg={viewingProduct.status === "Active" ? "success" : "secondary"}
+                      bg={
+                        viewingProduct.status === "Active"
+                          ? "success"
+                          : "secondary"
+                      }
                       style={{
                         padding: "6px 14px",
                         borderRadius: "20px",
@@ -1259,8 +1406,17 @@ const ProductsPage = () => {
                   >
                     Created Date
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
-                    <Calendar size={14} style={{ color: "#4680ff", marginRight: "6px" }} />
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <Calendar
+                      size={14}
+                      style={{ color: "#4680ff", marginRight: "6px" }}
+                    />
                     {viewingProduct.created}
                   </div>
                 </div>
@@ -1319,7 +1475,13 @@ const ProductsPage = () => {
                   >
                     Category
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
                     <Badge
                       bg="info"
                       className="bg-opacity-10 text-dark"
@@ -1357,8 +1519,17 @@ const ProductsPage = () => {
                   >
                     Brand
                   </div>
-                  <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
-                    <Building2 size={14} style={{ color: "#4680ff", marginRight: "6px" }} />
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <Building2
+                      size={14}
+                      style={{ color: "#4680ff", marginRight: "6px" }}
+                    />
                     {viewingProduct.brand || "N/A"}
                   </div>
                 </div>
@@ -1389,14 +1560,23 @@ const ProductsPage = () => {
                   marginBottom: "30px",
                 }}
               >
-                <p style={{ margin: 0, fontSize: "15px", color: "#4b5563", lineHeight: "1.6" }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "15px",
+                    color: "#4b5563",
+                    lineHeight: "1.6",
+                  }}
+                >
                   {viewingProduct.description || "No description available"}
                 </p>
               </div>
             </Modal.Body>
 
-            <Modal.Footer style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}>
-              {session?.user?.permissions?.includes('edit-crm-products') && (
+            <Modal.Footer
+              style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}
+            >
+              {session?.user?.permissions?.includes("edit-crm-products") && (
                 <Button
                   variant="outline-primary"
                   onClick={() => {
@@ -1409,7 +1589,10 @@ const ProductsPage = () => {
                   Edit Product
                 </Button>
               )}
-              <Button variant="secondary" onClick={() => setShowProductViewModal(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowProductViewModal(false)}
+              >
                 Close
               </Button>
             </Modal.Footer>
@@ -1422,7 +1605,7 @@ const ProductsPage = () => {
             <h3 className="fw-bold mb-1">Products</h3>
             <p className="text-muted mb-0">Manage your product catalog</p>
           </div>
-          {session?.user?.permissions?.includes('add-crm-products') && (
+          {session?.user?.permissions?.includes("add-crm-products") && (
             <Button
               variant="primary"
               onClick={() => handleOpenProductModal()}
@@ -1458,7 +1641,9 @@ const ProductsPage = () => {
           }}
           searchPlaceholder="Search by product name or SKU..."
           showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          onToggleAdvancedFilters={() =>
+            setShowAdvancedFilters(!showAdvancedFilters)
+          }
           advancedFilterCount={
             (productsFilters.industry_id ? 1 : 0) +
             (productsFilters.category ? 1 : 0) +
@@ -1473,19 +1658,34 @@ const ProductsPage = () => {
             <Card.Body>
               <Row className="g-3 align-items-end">
                 <Col sm={6} md={4} xl={4}>
-                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Industry
+                  </Form.Label>
                   <Select
-                    options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                    value={productsFilters.industry_id ? {
-                      value: productsFilters.industry_id,
-                      label: industries.find((ind) => ind.id === productsFilters.industry_id)?.name || ''
-                    } : null}
+                    options={industries.map((ind) => ({
+                      value: ind.id,
+                      label: ind.name,
+                    }))}
+                    value={
+                      productsFilters.industry_id
+                        ? {
+                            value: productsFilters.industry_id,
+                            label:
+                              industries.find(
+                                (ind) => ind.id === productsFilters.industry_id,
+                              )?.name || "",
+                          }
+                        : null
+                    }
                     onChange={(selected) => {
                       setProductsFilters((prev) => ({
                         ...prev,
                         industry_id: selected ? selected.value : null,
                       }));
-                      setProductsPagination({ ...productsPagination, currentPage: 1 });
+                      setProductsPagination({
+                        ...productsPagination,
+                        currentPage: 1,
+                      });
                     }}
                     placeholder="Select industry..."
                     styles={customSelectStyles}
@@ -1495,23 +1695,38 @@ const ProductsPage = () => {
                   />
                 </Col>
                 <Col sm={6} md={4} xl={4}>
-                  <Form.Label className="small fw-bold mb-2">Category</Form.Label>
+                  <Form.Label className="small fw-bold mb-2">
+                    Category
+                  </Form.Label>
                   <CreatableSelect
-                    options={uniqueCategories.map((cat) => ({ value: cat, label: cat }))}
-                    value={productsFilters.category ? { value: productsFilters.category, label: productsFilters.category } : null}
+                    options={uniqueCategories.map((cat) => ({
+                      value: cat,
+                      label: cat,
+                    }))}
+                    value={
+                      productsFilters.category
+                        ? {
+                            value: productsFilters.category,
+                            label: productsFilters.category,
+                          }
+                        : null
+                    }
                     onChange={(selected) => {
                       setProductsFilters((prev) => ({
                         ...prev,
                         category: selected ? selected.value : null,
                       }));
-                      setProductsPagination({ ...productsPagination, currentPage: 1 });
+                      setProductsPagination({
+                        ...productsPagination,
+                        currentPage: 1,
+                      });
                     }}
                     placeholder="Select or create category..."
                     styles={customSelectStyles}
                     isClearable
                   />
                 </Col>
-                
+
                 <Col sm={6} md={4} xl={4}>
                   <Form.Label className="small fw-bold mb-2">Status</Form.Label>
                   <Select
@@ -1519,7 +1734,14 @@ const ProductsPage = () => {
                       { value: "Active", label: "Active" },
                       { value: "Inactive", label: "Inactive" },
                     ]}
-                    value={productsFilters.status ? { value: productsFilters.status, label: productsFilters.status } : null}
+                    value={
+                      productsFilters.status
+                        ? {
+                            value: productsFilters.status,
+                            label: productsFilters.status,
+                          }
+                        : null
+                    }
                     onChange={(selected) => {
                       const statusValue = selected ? selected.value : null;
                       setProductsFilters((prev) => ({
@@ -1534,7 +1756,10 @@ const ProductsPage = () => {
                       } else {
                         setActiveFilter("all");
                       }
-                      setProductsPagination({ ...productsPagination, currentPage: 1 });
+                      setProductsPagination({
+                        ...productsPagination,
+                        currentPage: 1,
+                      });
                     }}
                     placeholder="Select status..."
                     styles={customSelectStyles}
@@ -1566,7 +1791,10 @@ const ProductsPage = () => {
                           priceMax: "",
                         });
                         setActiveFilter("all");
-                        setProductsPagination({ ...productsPagination, currentPage: 1 });
+                        setProductsPagination({
+                          ...productsPagination,
+                          currentPage: 1,
+                        });
                       }}
                     >
                       Reset All Filters
@@ -1585,7 +1813,10 @@ const ProductsPage = () => {
               <Layers size={16} className="me-2" />
               Customize Table
             </Dropdown.Toggle>
-            <Dropdown.Menu align="end" style={{ maxHeight: "300px", overflowY: "auto" }}>
+            <Dropdown.Menu
+              align="end"
+              style={{ maxHeight: "300px", overflowY: "auto" }}
+            >
               {availableColumns.map((col) => (
                 <Dropdown.Item key={col.key} as="div">
                   <Form.Check
@@ -1594,10 +1825,13 @@ const ProductsPage = () => {
                     checked={selectedProductsColumns.includes(col.key)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedProductsColumns([...selectedProductsColumns, col.key]);
+                        setSelectedProductsColumns([
+                          ...selectedProductsColumns,
+                          col.key,
+                        ]);
                       } else {
                         setSelectedProductsColumns(
-                          selectedProductsColumns.filter((c) => c !== col.key)
+                          selectedProductsColumns.filter((c) => c !== col.key),
                         );
                       }
                     }}
@@ -1641,24 +1875,47 @@ const ProductsPage = () => {
         </div>
 
         {/* Products Table */}
-        <Card className="border-0 shadow-sm products-table-wrapper" style={{ width: '100%' }}>
-          <Card.Body className="p-0" style={{ width: '100%' }}>
+        <Card
+          className="border-0 shadow-sm products-table-wrapper"
+          style={{ width: "100%" }}
+        >
+          <Card.Body className="p-0" style={{ width: "100%" }}>
             <div className="table-responsive">
-              <Table hover className="mb-0" style={{ width: '100%', margin: 0, tableLayout: 'auto' }}>
+              <Table
+                hover
+                className="mb-0"
+                style={{ width: "100%", margin: 0, tableLayout: "auto" }}
+              >
                 <thead className="bg-light">
                   <tr>
                     {selectedProductsColumns.includes("productName") && (
                       <th>Product Name</th>
                     )}
                     {selectedProductsColumns.includes("sku") && <th>SKU</th>}
-                    {selectedProductsColumns.includes("price") && <th>Price</th>}
-                    {selectedProductsColumns.includes("currency") && <th>Currency</th>}
-                    {selectedProductsColumns.includes("category") && <th>Category</th>}
-                    {selectedProductsColumns.includes("brand") && <th>Brand</th>}
-                    {selectedProductsColumns.includes("status") && <th>Status</th>}
-                    {selectedProductsColumns.includes("description") && <th>Description</th>}
-                    {selectedProductsColumns.includes("created") && <th>Created</th>}
-                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
+                    {selectedProductsColumns.includes("price") && (
+                      <th>Price</th>
+                    )}
+                    {selectedProductsColumns.includes("currency") && (
+                      <th>Currency</th>
+                    )}
+                    {selectedProductsColumns.includes("category") && (
+                      <th>Category</th>
+                    )}
+                    {selectedProductsColumns.includes("brand") && (
+                      <th>Brand</th>
+                    )}
+                    {selectedProductsColumns.includes("status") && (
+                      <th>Status</th>
+                    )}
+                    {selectedProductsColumns.includes("description") && (
+                      <th>Description</th>
+                    )}
+                    {selectedProductsColumns.includes("created") && (
+                      <th>Created</th>
+                    )}
+                    <th style={{ width: "120px", minWidth: "120px" }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1685,22 +1942,28 @@ const ProductsPage = () => {
                       const sorted = sortData(
                         displayProducts,
                         productsPagination.sortColumn,
-                        productsPagination.sortDirection
+                        productsPagination.sortDirection,
                       );
                       const paginated = paginateData(
                         sorted,
                         productsPagination.currentPage,
-                        productsPagination.rowsPerPage
+                        productsPagination.rowsPerPage,
                       );
 
                       return paginated.map((product) => (
                         <tr key={product.id}>
                           {selectedProductsColumns.includes("productName") && (
-                            <td className="fw-semibold">{product.productName}</td>
+                            <td className="fw-semibold">
+                              {product.productName}
+                            </td>
                           )}
                           {selectedProductsColumns.includes("sku") && (
                             <td>
-                              <Badge bg="light" text="dark" className="font-monospace">
+                              <Badge
+                                bg="light"
+                                text="dark"
+                                className="font-monospace"
+                              >
                                 {product.sku}
                               </Badge>
                             </td>
@@ -1715,7 +1978,10 @@ const ProductsPage = () => {
                           )}
                           {selectedProductsColumns.includes("category") && (
                             <td>
-                              <Badge bg="info" className="bg-opacity-10 text-dark">
+                              <Badge
+                                bg="info"
+                                className="bg-opacity-10 text-dark"
+                              >
                                 {product.category || "N/A"}
                               </Badge>
                             </td>
@@ -1725,20 +1991,29 @@ const ProductsPage = () => {
                           )}
                           {selectedProductsColumns.includes("status") && (
                             <td>
-                              <Badge bg={product.status === "Active" ? "success" : "secondary"}>
+                              <Badge
+                                bg={
+                                  product.status === "Active"
+                                    ? "success"
+                                    : "secondary"
+                                }
+                              >
                                 {product.status}
                               </Badge>
                             </td>
                           )}
                           {selectedProductsColumns.includes("description") && (
-                            <td className="text-muted small" style={{ maxWidth: "200px" }}>
+                            <td
+                              className="text-muted small"
+                              style={{ maxWidth: "200px" }}
+                            >
                               {product.description || "N/A"}
                             </td>
                           )}
                           {selectedProductsColumns.includes("created") && (
                             <td className="text-muted">{product.created}</td>
                           )}
-                          <td style={{ width: '120px', minWidth: '120px' }}>
+                          <td style={{ width: "120px", minWidth: "120px" }}>
                             <div className="d-flex gap-1">
                               <Button
                                 variant="link"
@@ -1752,18 +2027,24 @@ const ProductsPage = () => {
                               >
                                 <Eye size={16} />
                               </Button>
-                              {session?.user?.permissions?.includes('edit-crm-products') && (
+                              {session?.user?.permissions?.includes(
+                                "edit-crm-products",
+                              ) && (
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="p-1"
                                   title="Edit"
-                                  onClick={() => handleOpenProductModal(product)}
+                                  onClick={() =>
+                                    handleOpenProductModal(product)
+                                  }
                                 >
                                   <Edit size={16} />
                                 </Button>
                               )}
-                              {session?.user?.permissions?.includes('delete-crm-products') && (
+                              {session?.user?.permissions?.includes(
+                                "delete-crm-products",
+                              ) && (
                                 <Button
                                   variant="link"
                                   size="sm"
@@ -1791,7 +2072,7 @@ const ProductsPage = () => {
                 totalProducts,
                 productsPagination,
                 setProductsPagination,
-                "products"
+                "products",
               )}
             </div>
           </Card.Body>
@@ -1806,4 +2087,3 @@ ProductsPage.getLayout = (page: React.ReactNode) => {
 };
 
 export default ProductsPage;
-

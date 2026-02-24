@@ -1310,7 +1310,11 @@ const CrmDeals = () => {
   const handleFirstColumnClick = useCallback(
     (deal: any) => {
       const id = deal?.id ?? deal?.rawData?.id;
-      router.push(id ? `/crm/deals/deals-detailpage?id=${id}` : "/crm/deals/deals-detailpage");
+      router.push(
+        id
+          ? `/crm/deals/deals-detailpage?id=${id}`
+          : "/crm/deals/deals-detailpage",
+      );
     },
     [router],
   );
@@ -2435,9 +2439,11 @@ const CrmDeals = () => {
               },
               variant: "link" as const,
               className: "text-success",
-              show: (row: any) =>
-                (row.rawData?.approval_status ?? row.approval_status) ===
+              disabled: (row: any) =>
+                (row.rawData?.approval_status ?? row.approval_status) !==
                 "approved",
+              disabledClassName: "text-muted",
+              disabledTitle: "Only approved deals can be converted to orders",
             },
           ]
         : []),
