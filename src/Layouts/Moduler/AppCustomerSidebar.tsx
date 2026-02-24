@@ -402,7 +402,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'planner-tasks',
           title: 'Tasks',
           icon: <Clock size={16} />,
-          url: '/planner/tasks',
+          url: '/crm/crm-tasks',
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
         },
 
@@ -814,6 +814,28 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       setHoveredItemRect(null);
       hoverTimeoutRef.current = null;
     }, 150);
+  };
+
+  const handleExpandedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    // When hovering over a different item while one is pinned, show the hovered item's flyout
+    if (isFlyoutPinned && module.subItems && module.subItems.length > 0) {
+      const rect = ev.currentTarget.getBoundingClientRect();
+      setHoveredModuleId(module.id);
+      setHoveredItemRect({ top: rect.top, height: rect.height });
+    }
+  };
+
+  const handleExpandedItemMouseLeave = () => {
+    if (isFlyoutPinned) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        // When mouse leaves, stay on the current hovered item briefly before reverting
+        hoverTimeoutRef.current = null;
+      }, 50);
+    }
   };
 
   const handleFlyoutMouseEnter = () => {
@@ -1539,8 +1561,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
@@ -1581,8 +1609,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
@@ -1623,8 +1657,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
