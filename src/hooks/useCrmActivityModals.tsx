@@ -15,7 +15,7 @@ import LogSmsModal from "@components/LogSms";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import { toast } from "react-toastify";
 
-export type CrmRecordType = "prospect" | "lead" | "deal" | "order";
+export type CrmRecordType = "prospect" | "lead" | "deal" | "order" | "company";
 
 export interface UseCrmActivityModalsParams {
   recordType: CrmRecordType;
