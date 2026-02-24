@@ -876,6 +876,16 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
     '/crm-new-dashboard',
     'worforce/sub-categories',
     '/workforce/locations',
+
+    '/coming-soon',
+    '/plan-upgrade',
+    '/live-calls-test',
+    '/live-call-updated',
+    '/test-image-storage',
+    '/test-cti-proxy',
+    '/manager-dashboard',
+    '/dialpad-use',
+    '/help-center-new',
 ];
 
 function isExcludedFromSearch(path: string): boolean {
