@@ -27,6 +27,8 @@ import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -91,13 +93,67 @@ const CompanyDetailPage: NextPageWithLayout = () => {
 
   const companyRecordId = Number(companyId) || company?.id || 0;
   const companyRecordName = company?.name ?? "Company";
+  const enrData = company?.enrichment_data;
+  const enrichmentEmail =
+    enrData?.raw_data?.emails?.[0] ??
+    enrData?.structured_data?.emails?.[0]?.email ??
+    company?.email ??
+    "";
+  const enrichmentPhone =
+    enrData?.structured_data?.phones?.[0]?.number ??
+    enrData?.raw_data?.phones?.[0] ??
+    company?.phone ??
+    "";
+
+  // All phone numbers: company + structured_data.phones + raw_data.phones (unique, for display and Call button)
+  const allPhones = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const add = (n: string | null | undefined) => {
+      const v = (n ?? "").trim();
+      if (!v) return;
+      const key = v.replace(/\s/g, "");
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(v);
+    };
+    add(company?.phone);
+    enrData?.structured_data?.phones?.forEach((p) => add(p?.number));
+    enrData?.raw_data?.phones?.forEach((p) => add(p));
+    return out;
+  }, [company?.phone, enrData?.structured_data?.phones, enrData?.raw_data?.phones]);
+  const firstPhone = allPhones[0] ?? "";
+  const hasAnyPhone = allPhones.length > 0;
+
+  const { dialNumber, isInitialized } = useCti();
+  const handleCallClick = React.useCallback(async () => {
+    if (!firstPhone) {
+      toast.error("No phone number available to call");
+      return;
+    }
+    if (!isInitialized) {
+      toast.error("CTI not initialized. Please wait...");
+      return;
+    }
+    try {
+      const result = await dialNumber(firstPhone);
+      if (result.success) {
+        toast.success(`Calling ${companyRecordName || firstPhone}...`);
+      } else {
+        toast.error(result.error || "Failed to make call");
+      }
+    } catch (err) {
+      console.error("Call error:", err);
+      toast.error("Failed to make call");
+    }
+  }, [firstPhone, companyRecordName, dialNumber, isInitialized]);
 
   const activityModals = useCrmActivityModals({
     recordType: "company",
     recordId: companyRecordId,
     recordName: companyRecordName,
-    recordEmail: company?.email ?? "",
-    recordPhone: company?.phone ?? "",
+    recordEmail: enrichmentEmail,
+    recordPhone: enrichmentPhone,
   });
 
   // Load company by ID from URL
@@ -253,230 +309,303 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     padding: "20px",
     marginBottom: "16px",
   };
-  const fieldRow = (label: string, value: React.ReactNode) => (
-    <div key={label} style={{ marginBottom: "14px" }}>
-      <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>{label}</div>
-      <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{value ?? "--"}</div>
-    </div>
-  );
-  const linkRow = (label: string, href: string | null | undefined, text: string) =>
-    href ? (
-      <div key={label} style={{ marginBottom: "14px" }}>
-        <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>{label}</div>
-        <a href={href} target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px", color: "#006162", textDecoration: "none" }}>
-          {text || href}
-        </a>
-      </div>
-    ) : null;
+
+  const detectSocialPlatform = (url: string): "facebook" | "linkedin" | "twitter" | null => {
+    const u = url.toLowerCase();
+    if (u.includes("facebook.com")) return "facebook";
+    if (u.includes("linkedin.com")) return "linkedin";
+    if (u.includes("twitter.com") || u.includes("x.com")) return "twitter";
+    return null;
+  };
 
   const renderIntelligenceTab = () => {
     const enr: EnrichmentData | null | undefined = company?.enrichment_data;
     const raw = enr?.raw_data;
     const struct = enr?.structured_data;
-    const validation = enr?.validation_data;
-    const hasEnrichment = enr && (enr.status != null || raw || struct || validation);
 
-    if (!hasEnrichment) {
-      return (
-        <div style={cardStyle}>
-          <p style={{ fontSize: "14px", color: "#666", margin: 0 }}>
-            No enrichment data available for this company yet. Enrichment may be pending or not run.
-          </p>
-        </div>
-      );
-    }
+    // Social links: merge raw (string[]) + structured (object[]), dedupe by URL case-insensitive
+    const socialLinksDeduped: string[] = [];
+    const seenUrl = new Set<string>();
+    const addUrl = (url: string | null | undefined) => {
+      const u = (url ?? "").trim();
+      if (!u) return;
+      const key = u.toLowerCase();
+      if (seenUrl.has(key)) return;
+      seenUrl.add(key);
+      socialLinksDeduped.push(u);
+    };
+    raw?.social_links?.forEach(addUrl);
+    struct?.social_links?.forEach((s) => addUrl(s?.url));
+    const socialLinks = socialLinksDeduped;
+
+    const cityVal = struct?.headquarters?.city ?? company?.city ?? "--";
+    const stateVal = struct?.headquarters?.address ?? company?.country ?? "--";
+    const regionVal = struct?.headquarters?.country ?? company?.country ?? "--";
+    const lifecycleStage = enr?.status_display ?? enr?.status ?? "--";
+    const relatedCompany = enr?.company_name ?? company?.name ?? "--";
+    const industryVal = company?.industry ?? "--";
+    const companyDesc = struct?.official_company_name ?? company?.name ?? "--";
+    const firstLinkedIn = socialLinks.find((u) => detectSocialPlatform(u) === "linkedin") ?? "--";
+    const iconBtn = (href: string | null, iconSvg: React.ReactNode, label: string) => (
+      <a
+        href={href || "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          padding: "7px",
+          backgroundColor: "#f0f0f0",
+          border: "none",
+          borderRadius: "4px",
+          cursor: href ? "pointer" : "default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          textDecoration: "none",
+        }}
+        onMouseEnter={(e) => {
+          if (href) e.currentTarget.style.backgroundColor = "#e0e0e0";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "#f0f0f0";
+        }}
+      >
+        {iconSvg}
+      </a>
+    );
+    const facebookUrl = socialLinks.find((u) => detectSocialPlatform(u) === "facebook") ?? null;
+    const linkedinUrl = socialLinks.find((u) => detectSocialPlatform(u) === "linkedin") ?? null;
+    const twitterUrl = socialLinks.find((u) => detectSocialPlatform(u) === "twitter") ?? null;
 
     return (
       <div>
-        {/* Enrichment overview – matches API: id, status, status_display, confidence_score, discovered_website, input_company_name, company_name, error_message */}
-        <div style={cardStyle}>
-          <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: "0 0 16px 0" }}>
-            Enrichment overview
-          </h3>
-          {enr?.id && fieldRow("Enrichment ID", enr.id)}
-          {fieldRow("Status", enr?.status_display ?? enr?.status)}
-          {fieldRow("Confidence score", enr?.confidence_score != null ? String(enr.confidence_score) : undefined)}
-          {fieldRow("Retry count", enr?.retry_count != null ? String(enr.retry_count) : undefined)}
-          {fieldRow("Input company name", enr?.input_company_name)}
-          {fieldRow("Company name", enr?.company_name)}
-          {linkRow("Discovered website", enr?.discovered_website ?? websiteUrl, enr?.discovered_website ?? websiteUrl ?? "")}
-          {enr?.error_message != null && enr.error_message !== "" && fieldRow("Error message", enr.error_message)}
+        {/* Info Banner – same as prospects */}
+        <div
+          style={{
+            padding: "16px 20px",
+            backgroundColor: "#ffffff",
+            border: "1px solid #eaf0f6",
+            borderRadius: "5px",
+            marginBottom: "20px",
+          }}
+        >
+          <p style={{ fontSize: "14px", color: "#666", margin: 0 }}>
+            {enr ? "Enrichment data for this company is shown below." : "HubSpot does not have enrichment data for this record, yet."}
+          </p>
         </div>
 
-        {/* Structured data */}
-        {struct && (
-          <div style={cardStyle}>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", cursor: "pointer" }}
-              onClick={() => toggleSection("intel-structured")}
-            >
-              <ChevronDown
-                size={18}
-                style={{
-                  color: "#141414",
-                  transform: collapsedSections.has("intel-structured") ? "rotate(-90deg)" : "rotate(0deg)",
-                  transition: "transform 0.2s ease",
-                }}
-              />
-              <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>Structured data</h3>
+        {/* Contact Information Card – single row + up to 3 social icons (from raw_data.social_links) */}
+        <div
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #eaf0f6",
+            borderRadius: "5px",
+            padding: "20px",
+            marginBottom: "20px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", flexWrap: "nowrap" }}>
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Lifecycle stage</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "700" }}>{lifecycleStage}</div>
             </div>
-            {!collapsedSections.has("intel-structured") && (
-              <>
-                {fieldRow("Official company name", struct.official_company_name)}
-                {struct.headquarters && fieldRow(
-                  "Headquarters",
-                  [struct.headquarters.address, struct.headquarters.city, struct.headquarters.country]
-                    .filter((v) => v != null && v !== "" && v !== ".")
-                    .join(", ")
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Related company</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{relatedCompany}</div>
+            </div>
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Employment role</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
+            </div>
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>City</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{cityVal}</div>
+            </div>
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>State</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{stateVal}</div>
+            </div>
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Region</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{regionVal}</div>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0, marginLeft: "auto", paddingTop: "2px" }}>
+              {facebookUrl && iconBtn(facebookUrl, <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>, "Facebook")}
+              {linkedinUrl && iconBtn(linkedinUrl, <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>, "LinkedIn")}
+              {twitterUrl && iconBtn(twitterUrl, <svg width="16" height="16" viewBox="0 0 24 24" fill="#555"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>, "X")}
+            </div>
+          </div>
+        </div>
+
+        {/* Two Column Layout – same as prospects */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+          <div style={{ backgroundColor: "#ffffff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "20px" }}>
+            <div style={{ paddingBottom: "16px", borderBottom: "1px solid #eaf0f6", marginBottom: "16px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Industry</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{industryVal}</div>
+            </div>
+            <div style={{ paddingBottom: "16px", borderBottom: "1px solid #eaf0f6", marginBottom: "16px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Company description</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>{companyDesc}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Company keywords</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
+            </div>
+          </div>
+          <div style={{ backgroundColor: "#ffffff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#141414", margin: "0 0 16px 0" }}>Contact Outreach</h3>
+            {/* All emails: structured_data + raw + company */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Emails</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {(() => {
+                  const seen = new Set<string>();
+                  const list: { email: string; type?: string }[] = [];
+                  struct?.emails?.forEach((e) => {
+                    const v = (e?.email ?? "").trim();
+                    if (v && !seen.has(v.toLowerCase())) {
+                      seen.add(v.toLowerCase());
+                      list.push({ email: v, type: e?.type ?? undefined });
+                    }
+                  });
+                  raw?.emails?.forEach((v) => {
+                    const s = (v ?? "").trim();
+                    if (s && !seen.has(s.toLowerCase())) {
+                      seen.add(s.toLowerCase());
+                      list.push({ email: s });
+                    }
+                  });
+                  if (company?.email?.trim() && !seen.has(company.email.trim().toLowerCase())) {
+                    list.push({ email: company.email.trim() });
+                  }
+                  if (list.length === 0) return "--";
+                  return list.map(({ email, type }, i) => (
+                    <span key={i}>
+                      <a href={`mailto:${email}`} style={{ color: "#006162", textDecoration: "none" }}>{email}</a>
+                      {type ? <span style={{ color: "#666", fontSize: "12px", marginLeft: "6px" }}>({type})</span> : null}
+                    </span>
+                  ));
+                })()}
+              </div>
+            </div>
+            {/* All phones: structured_data + raw + company */}
+            <div style={{ marginBottom: "20px" }}>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Phones</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {allPhones.length === 0 ? (
+                  "--"
+                ) : (
+                  allPhones.map((num, i) => (
+                    <a key={i} href={`tel:${num.replace(/\s/g, "")}`} style={{ color: "#006162", textDecoration: "none" }}>{num}</a>
+                  ))
                 )}
-                {struct.other_locations?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Other locations</div>
-                    {struct.other_locations.map((loc, i) => (
-                      <div key={i} style={{ fontSize: "14px", color: "#141414", marginBottom: "4px" }}>
-                        {[loc.address, loc.city, loc.country]
-                          .filter((v) => v != null && v !== "" && v !== ".")
-                          .join(", ") || "—"}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {struct.emails?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Emails</div>
-                    {struct.emails.map((e, i) => (
-                      <div key={i} style={{ fontSize: "14px" }}>
-                        {e.email && <a href={`mailto:${e.email}`} style={{ color: "#006162", textDecoration: "none" }}>{e.email}</a>}
-                        {e.type ? ` (${e.type})` : ""}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {struct.phones?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Phones</div>
-                    {struct.phones.map((p, i) => (
-                      <div key={i} style={{ fontSize: "14px" }}>
-                        {p.number && <a href={`tel:${p.number}`} style={{ color: "#006162", textDecoration: "none" }}>{p.number}</a>}
-                        {p.type ? ` (${p.type})` : ""}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {struct.social_links?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Social links</div>
-                    {struct.social_links.map((s, i) => (
-                      <div key={i} style={{ fontSize: "14px", marginBottom: "4px" }}>
-                        {s.url && (
-                          <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: "#006162", textDecoration: "none" }}>
-                            {s.platform || s.url}
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {struct.llm_confidence != null && fieldRow("LLM confidence", `${struct.llm_confidence}%`)}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Validation data – is_match, confidence, reason */}
-        {validation && (
-          <div style={cardStyle}>
-            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: "0 0 16px 0" }}>Validation</h3>
-            {fieldRow("Is match", validation.is_match != null ? String(validation.is_match) : undefined)}
-            {validation.confidence != null && fieldRow("Confidence", `${validation.confidence}%`)}
-            {fieldRow("Reason", validation.reason)}
-          </div>
-        )}
-
-        {/* Raw data – at bottom */}
-        {raw && (raw.emails?.length || raw.phones?.length || raw.social_links?.length || raw.address_blocks?.length || raw.combined_text) && (
-          <div style={cardStyle}>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", cursor: "pointer" }}
-              onClick={() => toggleSection("intel-raw")}
-            >
-              <ChevronDown
-                size={18}
-                style={{
-                  color: "#141414",
-                  transform: collapsedSections.has("intel-raw") ? "rotate(-90deg)" : "rotate(0deg)",
-                  transition: "transform 0.2s ease",
-                }}
-              />
-              <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>Raw data</h3>
+              </div>
             </div>
-            {!collapsedSections.has("intel-raw") && (
-              <>
-                {raw.emails?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Emails</div>
-                    <div style={{ fontSize: "14px", color: "#141414" }}>
-                      {raw.emails.map((e, i) => (
-                        <a key={i} href={`mailto:${e}`} style={{ color: "#006162", textDecoration: "none", display: "block" }}>{e}</a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {raw.phones?.length ? fieldRow("Phones", raw.phones.join(", ")) : null}
-                {raw.social_links?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Social links</div>
-                    <div style={{ fontSize: "14px", color: "#141414" }}>
-                      {raw.social_links.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#006162", textDecoration: "none", display: "block" }}>{url}</a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {raw.address_blocks?.length ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Address blocks ({raw.address_blocks.length})</div>
-                    {raw.address_blocks.map((block, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          marginBottom: "10px",
-                          padding: "10px",
-                          backgroundColor: "#f7fafc",
-                          border: "1px solid #eaf0f6",
-                          borderRadius: "5px",
-                          fontSize: "12px",
-                          lineHeight: "1.5",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {block}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {raw.combined_text ? (
-                  <div style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Combined text</div>
-                    <div
-                      style={{
-                        padding: "12px",
-                        backgroundColor: "#f7fafc",
-                        border: "1px solid #eaf0f6",
-                        borderRadius: "5px",
-                        fontSize: "12px",
-                        lineHeight: "1.5",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {raw.combined_text}
-                    </div>
-                  </div>
-                ) : null}
-              </>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+              <div>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Job sub role</div>
+                <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Job seniority</div>
+                <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>--</div>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>LinkedIn</div>
+              <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>
+                {firstLinkedIn !== "--" ? (
+                  <a href={firstLinkedIn} target="_blank" rel="noopener noreferrer" style={{ color: "#006162", textDecoration: "none" }}>{firstLinkedIn}</a>
+                ) : (
+                  "--"
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* All structured_data: headquarters, other_locations, llm_confidence */}
+        {struct && (
+          <div style={{ ...cardStyle, marginTop: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: "0 0 16px 0" }}>Structured data</h3>
+            {struct.official_company_name && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Official company name</div>
+                <div style={{ fontSize: "14px", color: "#141414" }}>{struct.official_company_name}</div>
+              </div>
             )}
+            {struct.headquarters && (struct.headquarters.address || struct.headquarters.city || struct.headquarters.country) && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Headquarters</div>
+                <div style={{ fontSize: "14px", color: "#141414" }}>
+                  {[struct.headquarters.address, struct.headquarters.city, struct.headquarters.country].filter(Boolean).join(", ")}
+                </div>
+              </div>
+            )}
+            {struct.other_locations && struct.other_locations.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Other locations</div>
+                <div style={{ fontSize: "14px", color: "#141414", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {struct.other_locations.map((loc, i) => (
+                    <div key={i}>
+                      {[loc?.address, loc?.city, loc?.country].filter((x) => x && x !== ".").join(", ") || "—"}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {struct.emails && struct.emails.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Emails (structured)</div>
+                <div style={{ fontSize: "14px", color: "#141414", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {struct.emails.map((e, i) => (
+                    <span key={i}>
+                      {e?.email}
+                      {e?.type ? <span style={{ color: "#666", fontSize: "12px", marginLeft: "6px" }}>({e.type})</span> : null}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {struct.phones && struct.phones.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>Phones (structured)</div>
+                <div style={{ fontSize: "14px", color: "#141414", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {struct.phones.map((p, i) => (
+                    <span key={i}>
+                      {p?.number}
+                      {p?.type ? <span style={{ color: "#666", fontSize: "12px", marginLeft: "6px" }}>({p.type})</span> : null}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {struct.llm_confidence != null && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "13px", color: "#666", marginBottom: "4px" }}>LLM confidence</div>
+                <div style={{ fontSize: "14px", color: "#141414" }}>{struct.llm_confidence}%</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* All social links at bottom – deduped, case-insensitive */}
+        {socialLinks.length > 0 && (
+          <div style={{ ...cardStyle, marginTop: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: "0 0 16px 0" }}>Social links</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {socialLinks.map((url, i) => (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: "14px", color: "#006162", textDecoration: "none" }}
+                >
+                  {url}
+                </a>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -902,7 +1031,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           {[
             { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
             { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
-            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            { icon: Phone, label: "Call", disabled: !hasAnyPhone, onClick: handleCallClick },
             { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
             { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
