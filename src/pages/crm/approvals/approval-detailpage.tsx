@@ -1586,7 +1586,7 @@ const DealRecordPage: NextPageWithLayout = () => {
       <div style={{ padding: "14px 0", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze Record Summary */}
+            {/* Record Summary */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1630,7 +1630,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{
