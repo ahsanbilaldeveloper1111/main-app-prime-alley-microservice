@@ -4660,8 +4660,8 @@ const CrmCampaigns = () => {
                       "linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)",
                   }}
                 >
-                  <Row cla>
-                  <Col md={6}>
+                  <Row className="g-3">
+                    <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">
                           Distribution Mode{" "}
@@ -4711,39 +4711,44 @@ const CrmCampaigns = () => {
                       </Form.Group>
                     </Col>
                     <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold small text-muted mb-2">
-                      Select Users <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Select
-                      isMulti
-                      options={dataManagementExtensions.map((ext: any) => ({
-                        value:
-                          ext.id?.toString() || ext.extension?.toString() || "",
-                        label:
-                          ext.display_name ||
-                          ext.name ||
-                          `Extension ${ext.id || ext.extension}`,
-                        extension: ext,
-                      }))}
-                      value={selectedUserExtensions}
-                      onChange={(selected) =>
-                        setSelectedUserExtensions(selected || [])
-                      }
-                      placeholder="Select users..."
-                      styles={customSelectStyles}
-                    />
-                    {selectedUserExtensions.length > 0 && (
-                      <div className="mt-2 p-2 rounded-2 bg-white border">
-                        <small className="text-muted">
-                          <strong>{selectedUserExtensions.length}</strong> user
-                          {selectedUserExtensions.length !== 1 ? "s" : ""}{" "}
-                          selected
-                        </small>
-                      </div>
-                    )}
-                  </Form.Group>
-                  </Col>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold small text-muted mb-2">
+                          Select Users <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Select
+                          isMulti
+                          options={dataManagementExtensions.map((ext: any) => ({
+                            value:
+                              ext.id?.toString() ||
+                              ext.extension?.toString() ||
+                              "",
+                            label:
+                              ext.display_name ||
+                              ext.name ||
+                              `Extension ${ext.id || ext.extension}`,
+                            extension: ext,
+                          }))}
+                          value={selectedUserExtensions}
+                          onChange={(selected) =>
+                            setSelectedUserExtensions(selected || [])
+                          }
+                          placeholder="Select users..."
+                          styles={customSelectStyles}
+                        />
+                        {selectedUserExtensions.length > 0 && (
+                          <div className="mt-2 p-2 rounded-2 bg-white border">
+                            <small className="text-muted">
+                              <strong>{selectedUserExtensions.length}</strong>{" "}
+                              user
+                              {selectedUserExtensions.length !== 1
+                                ? "s"
+                                : ""}{" "}
+                              selected
+                            </small>
+                          </div>
+                        )}
+                      </Form.Group>
+                    </Col>
                   </Row>
                 </div>
               )}
