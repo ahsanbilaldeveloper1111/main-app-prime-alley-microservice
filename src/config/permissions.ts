@@ -200,7 +200,13 @@ export const routePermissions: RoutePermission[] = [
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
             { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
             {path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
-            { path: '/projects',permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER]},
+            {
+                path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
+                children: [
+                    { path: '/{id}', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER] }
+                ]
+             },
+            
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
             { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
         ]

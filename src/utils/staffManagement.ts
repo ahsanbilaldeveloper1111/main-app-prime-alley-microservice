@@ -599,6 +599,10 @@ export interface UserRequestCreatePayload {
   user_id?: string;
   subject: string;
   reason?: string | null;
+  /** Start date (YYYY-MM-DD) */
+  start_date?: string | null;
+  /** End date (YYYY-MM-DD, must be >= start_date) */
+  end_date?: string | null;
   dynamic_fields?: Record<string, unknown>;
   comment?: string | null;
 }
@@ -663,6 +667,10 @@ function buildUserRequestFormData(
   if (payload.user_id) form.append("user_id", payload.user_id);
   form.append("subject", payload.subject);
   if (payload.reason != null) form.append("reason", payload.reason);
+  if (payload.start_date != null && payload.start_date !== "")
+    form.append("start_date", payload.start_date);
+  if (payload.end_date != null && payload.end_date !== "")
+    form.append("end_date", payload.end_date);
   if (payload.dynamic_fields)
     form.append(
       "dynamic_fields",

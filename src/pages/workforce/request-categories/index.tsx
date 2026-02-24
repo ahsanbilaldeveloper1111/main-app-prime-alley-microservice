@@ -1091,7 +1091,7 @@ const RequestCategories = () => {
             {categoryForChildren && (
               <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
                 <Plus size={16} className="me-1" />
-                Add child
+                Add Sub Category
               </Button>
             )}
           </div>
@@ -1107,7 +1107,7 @@ const RequestCategories = () => {
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280", width: 120 }}>Actions</th>
+                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1152,6 +1152,26 @@ const RequestCategories = () => {
                           }}
                         >
                           <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowChildrenModal(false);
+                            openFieldsModal(child);
+                          }}
+                          title="Manage fields"
+                          style={{
+                            padding: "4px 8px",
+                            marginRight: "6px",
+                            border: "1px solid #6366f1",
+                            borderRadius: "6px",
+                            backgroundColor: "white",
+                            color: "#6366f1",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <List size={14} />
                         </button>
                         <button
                           type="button"
