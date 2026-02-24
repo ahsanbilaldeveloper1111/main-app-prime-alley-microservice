@@ -1747,7 +1747,7 @@ const CrmCampaigns = () => {
           payload,
         );
 
-        if (response.data.success) {
+        if (response?.data?.data?.success) {
           // Show toast notification
           toast.success(`Successfully assigned ${recordsToAssign} records!`);
 
@@ -4660,6 +4660,57 @@ const CrmCampaigns = () => {
                       "linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)",
                   }}
                 >
+                  <Row cla>
+                  <Col md={6}>
+                      <Form.Group>
+                        <Form.Label className="fw-semibold small text-muted mb-2">
+                          Distribution Mode{" "}
+                          <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Select
+                          options={[
+                            { value: "equal", label: "Equal Distribution" },
+                            {
+                              value: "custom",
+                              label: "Proportional Distribution",
+                            },
+                          ]}
+                          value={
+                            distributionMode
+                              ? {
+                                  value: distributionMode,
+                                  label:
+                                    distributionMode === "equal"
+                                      ? "Equal Distribution"
+                                      : "Proportional Distribution",
+                                }
+                              : { value: "equal", label: "Equal Distribution" }
+                          }
+                          onChange={(selected) =>
+                            setDistributionMode(selected?.value || "equal")
+                          }
+                          placeholder="Select distribution mode..."
+                          styles={customSelectStyles}
+                        />
+                        {distributionMode && (
+                          <div className="mt-2 p-2 rounded-2 bg-white border">
+                            <small className="text-muted d-flex align-items-start gap-2">
+                              <AlertCircle
+                                size={14}
+                                className="mt-1 flex-shrink-0 text-primary"
+                              />
+                              <span>
+                                {distributionMode === "equal" &&
+                                  "Records will be distributed equally across all selected campaigns"}
+                                {distributionMode === "custom" &&
+                                  "You can specify exactly how many records each campaign gets"}
+                              </span>
+                            </small>
+                          </div>
+                        )}
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold small text-muted mb-2">
                       Select Users <span className="text-danger">*</span>
@@ -4692,6 +4743,8 @@ const CrmCampaigns = () => {
                       </div>
                     )}
                   </Form.Group>
+                  </Col>
+                  </Row>
                 </div>
               )}
             </div>
