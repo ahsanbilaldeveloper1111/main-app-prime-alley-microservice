@@ -39,6 +39,7 @@ import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
+import { getSearchableRoutes, canAccessRoute } from '../config/permissions';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
@@ -91,6 +92,19 @@ const Layout = ({ children }: LayoutProps) => {
 	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
 	const headerLogoUrlRef = useRef<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+	const searchWrapperRef = useRef<HTMLDivElement>(null);
+	const searchableRoutes = useMemo(() => getSearchableRoutes(), []);
+	const searchSuggestions = useMemo(() => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return [];
+		const userPerms = session?.user?.permissions;
+		return searchableRoutes.filter(
+			(r) =>
+				(r.path.toLowerCase().includes(q) || r.label.toLowerCase().includes(q)) &&
+				canAccessRoute(userPerms, r.path)
+		).slice(0, 10);
+	}, [searchQuery, searchableRoutes, session?.user?.permissions]);
 	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
 	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
 
@@ -118,6 +132,17 @@ const Layout = ({ children }: LayoutProps) => {
 				headerLogoUrlRef.current = null;
 			}
 		};
+	}, []);
+
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
+			if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+				setShowSearchSuggestions(false);
+				setSearchQuery('');
+			}
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, []);
 
 	const formatTimeAgo = (date: Date) => {
@@ -1095,17 +1120,52 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="container-fluid p-0" style={{ height: '48px' }}>
           <div className="d-flex align-items-center h-100 w-100">
             {/* Search bar */}
-            <div className="crm-prime-search-wrapper" style={{ position: 'relative' }}>
+            <div ref={searchWrapperRef} className="crm-prime-search-wrapper" style={{ position: 'relative' }}>
               <Search className="crm-prime-search-icon" size={14} style={{ right: '40px' }} />
               <input
                 type="text"
                 className="crm-prime-search-input"
                 placeholder="Search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchSuggestions(true);
+                }}
+                onFocus={() => searchQuery.trim() && setShowSearchSuggestions(true)}
                 style={{ paddingRight: '68px' }}
               />
-              
+              {showSearchSuggestions && searchQuery.trim() && searchSuggestions.length > 0 && (
+                <div
+                  className="create-dropdown-menu"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {searchSuggestions.map((r) => (
+                    <button
+                      key={r.path}
+                      type="button"
+                      className="create-dropdown-item"
+                      onClick={() => {
+                        if (canAccessRoute(session?.user?.permissions, r.path)) {
+                          router.push(r.path);
+                          setSearchQuery('');
+                          setShowSearchSuggestions(false);
+                        }
+                      }}
+                    >
+                      <span>{r.label}</span>
+                      <span className="text-muted small ms-1">{r.path}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* Create Button */}
               <div >
                 <button
