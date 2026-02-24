@@ -371,7 +371,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter your task 456"
+            placeholder="Enter your task"
             style={{
               width: '100%',
               border: 'none',
