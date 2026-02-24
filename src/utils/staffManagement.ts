@@ -129,6 +129,7 @@ export interface UserProfileAddress {
   name?: string;
   zip_code?: string;
   city?: string;
+  state?: string;
   country?: string;
   address?: string;
 }
@@ -144,6 +145,7 @@ export interface UserProfilePayload {
   job_title?: string | null;
   employment_type?: string | null;
   contract_type?: string | null;
+  designation?: string | null;
   location?: string | null;
   phone?: string | null;
   status?: string | null;
@@ -305,12 +307,31 @@ export const putUserProfileParent = async (
 
 // --- User Request Categories ---
 
+/** Assignee for a workflow level */
+export interface WorkflowLevelAssignee {
+  user_id: string; // extension number of assignee
+  sort_order?: number;
+}
+
+/** Single approval workflow level */
+export interface WorkflowLevelPayload {
+  level: number; // min 1
+  name?: string | null;
+  approval_rule?: "any" | "all" | null; // any = one approval completes, all = all must approve
+  approve_in_order?: boolean | null;
+  assignees?: WorkflowLevelAssignee[] | null;
+}
+
 export interface UserRequestCategoryPayload {
-  tenant_id?: string | null;
-  name: string;
+  parent_id?: number | null;
+  name?: string | null; // required for child categories, optional for parent
   code?: string | null;
   description?: string | null;
   is_active?: boolean;
+  sort_order?: number | null;
+  tracking_enabled?: boolean | null;
+  tracking_code_prefix?: string | null; // max 50 when tracking enabled
+  workflow_levels?: WorkflowLevelPayload[] | null;
 }
 
 export interface UserRequestCategory extends UserRequestCategoryPayload {
@@ -319,18 +340,36 @@ export interface UserRequestCategory extends UserRequestCategoryPayload {
   [key: string]: unknown;
 }
 
+/** Serialize query params so that null/undefined are still sent (e.g. parent=null). */
+function stringifyRequestParams(params: Record<string, unknown>): string {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === null) {
+      searchParams.set(key, "null");
+    } else if (value !== undefined && value !== "") {
+      searchParams.set(key, String(value));
+    }
+  });
+  return searchParams.toString();
+}
+
 export const getUserRequestCategories = async (params?: {
   page?: number;
   limit?: number;
+  parent?: number | null;
   [key: string]: unknown;
 }): Promise<{
   data: UserRequestCategory[];
   pagination?: ApiPagination;
 }> => {
   try {
+    const requestParams = params ?? {};
     const response = await axiosInstance.get<
       ApiResponse<UserRequestCategory[]>
-    >(`${PREFIX}/user-request-categories`, { params });
+    >(`${PREFIX}/user-request-categories`, {
+      params: requestParams,
+      paramsSerializer: (p: Record<string, unknown>) => stringifyRequestParams(p),
+    });
     return extractDataWithPagination(response);
   } catch (error: unknown) {
     handleApiError(error, "Failed to fetch user request categories");
@@ -560,6 +599,10 @@ export interface UserRequestCreatePayload {
   user_id?: string;
   subject: string;
   reason?: string | null;
+  /** Start date (YYYY-MM-DD) */
+  start_date?: string | null;
+  /** End date (YYYY-MM-DD, must be >= start_date) */
+  end_date?: string | null;
   dynamic_fields?: Record<string, unknown>;
   comment?: string | null;
 }
@@ -624,6 +667,10 @@ function buildUserRequestFormData(
   if (payload.user_id) form.append("user_id", payload.user_id);
   form.append("subject", payload.subject);
   if (payload.reason != null) form.append("reason", payload.reason);
+  if (payload.start_date != null && payload.start_date !== "")
+    form.append("start_date", payload.start_date);
+  if (payload.end_date != null && payload.end_date !== "")
+    form.append("end_date", payload.end_date);
   if (payload.dynamic_fields)
     form.append(
       "dynamic_fields",

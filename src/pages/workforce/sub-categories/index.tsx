@@ -26,7 +26,7 @@ import {
   type WorkflowLevelAssignee,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical, FolderTree } from "lucide-react";
+import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical } from "lucide-react";
 import Select from "react-select";
 
 const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
@@ -186,9 +186,9 @@ function AssigneesList({
   );
 }
 
-const RequestCategories = () => {
+const RequestSubCategories = () => {
   const { data: session } = useSession();
-  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppUsers } = useMainAppLookups();
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; last_page: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -220,16 +220,12 @@ const RequestCategories = () => {
   const [autoGenerateKey, setAutoGenerateKey] = useState(true);
   const [savingField, setSavingField] = useState(false);
   const [reordering, setReordering] = useState(false);
-  const [showChildrenModal, setShowChildrenModal] = useState(false);
-  const [categoryForChildren, setCategoryForChildren] = useState<UserRequestCategory | null>(null);
-  const [childrenList, setChildrenList] = useState<UserRequestCategory[]>([]);
-  const [loadingChildren, setLoadingChildren] = useState(false);
 
   const loadCategories = useCallback(async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null,children: false });
-      setCategories(data);
+      const { data, pagination: p } = await getUserRequestCategories({ page, limit, children: true });
+      setCategories(data ?? []);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
       else setPagination(null);
     } catch {
@@ -243,31 +239,6 @@ const RequestCategories = () => {
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
-
-  const loadChildren = useCallback(async (parentId: number) => {
-    setLoadingChildren(true);
-    try {
-      const { data } = await getUserRequestCategories({ parent_id: parentId, limit: 500 });
-      setChildrenList(data ?? []);
-    } catch {
-      setChildrenList([]);
-    } finally {
-      setLoadingChildren(false);
-    }
-  }, []);
-
-  const openChildrenModal = (cat: UserRequestCategory) => {
-    setCategoryForChildren(cat);
-    setShowChildrenModal(true);
-    loadChildren(cat.id);
-  };
-
-  const openAddChildCategory = (parentCat: UserRequestCategory) => {
-    setEditingCategory(null);
-    setCategoryForm({ ...defaultCategoryForm, parent_id: parentCat.id });
-    setShowCategoryModal(true);
-    setShowChildrenModal(false);
-  };
 
   const openCreateCategory = () => {
     setEditingCategory(null);
@@ -294,10 +265,9 @@ const RequestCategories = () => {
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isSubCategory = categoryForm.parent_id != null && categoryForm.parent_id !== 0;
-    const workflowLevels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
-    if (isSubCategory && (!workflowLevels.length || workflowLevels.every((lvl) => !(lvl.assignees ?? []).filter((a) => (a.user_id ?? "").trim()).length))) {
-      toast.error("Sub-categories require at least one approval workflow level with at least one assignee.");
+    const isChild = categoryForm.parent_id != null && categoryForm.parent_id !== 0;
+    if (isChild && !categoryForm.name?.trim()) {
+      toast.error("Name is required for sub-categories");
       return;
     }
     const payload: UserRequestCategoryPayload = {
@@ -305,7 +275,7 @@ const RequestCategories = () => {
       code: categoryForm.code?.trim() || undefined,
       description: categoryForm.description?.trim() || undefined,
       is_active: categoryForm.is_active,
-      parent_id: categoryForm.parent_id ?? null,
+      parent_id: null,
       sort_order: categoryForm.sort_order ?? 0,
       tracking_enabled: categoryForm.tracking_enabled ?? false,
       tracking_code_prefix: (categoryForm.tracking_code_prefix ?? "").slice(0, 50) || undefined,
@@ -331,7 +301,6 @@ const RequestCategories = () => {
       }
       setShowCategoryModal(false);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (categoryForChildren) loadChildren(categoryForChildren.id);
     } catch {
       // toast in API
     } finally {
@@ -346,8 +315,6 @@ const RequestCategories = () => {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    const parentId = (categoryToDelete as UserRequestCategory & { parent_id?: number }).parent_id;
-    const wasChildOfOpenParent = categoryForChildren && parentId === categoryForChildren.id;
     setDeleting(true);
     try {
       await deleteUserRequestCategory(categoryToDelete.id);
@@ -355,7 +322,6 @@ const RequestCategories = () => {
       setShowDeleteModal(false);
       setCategoryToDelete(null);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (wasChildOfOpenParent && categoryForChildren) loadChildren(categoryForChildren.id);
     } catch {
       // toast in API
     } finally {
@@ -494,9 +460,9 @@ const RequestCategories = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Sub-Categories" />
       <PageHeader
-        title="Request Categories"
+        title="Request Sub-Categories"
         showSearch={false}
         buttons={
           <>
@@ -529,7 +495,7 @@ const RequestCategories = () => {
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Description</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
+                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280", width: 180 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -606,25 +572,6 @@ const RequestCategories = () => {
                           }}
                         >
                           <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openChildrenModal(cat);
-                          }}
-                          title="See children / Add or update"
-                          style={{
-                            padding: "6px 10px",
-                            marginRight: "6px",
-                            border: "1px solid #0d9488",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            color: "#0d9488",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <FolderTree size={14} />
                         </button>
                         <button
                           type="button"
@@ -799,11 +746,7 @@ const RequestCategories = () => {
       {/* Create/Edit Category Modal */}
       <Modal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} centered size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>
-            {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-              ? (editingCategory ? "Edit Sub Category" : "Create Sub Category")
-              : (editingCategory ? "Edit Category" : "Create Category")}
-          </Modal.Title>
+          <Modal.Title>{editingCategory ? "Edit Category" : "Create Category"}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSaveCategory}>
           <Modal.Body>
@@ -831,7 +774,25 @@ const RequestCategories = () => {
                 </Form.Group>
               </div>
               
-              
+              <div className="col-md-6">
+                <Form.Group>
+                  <Form.Label>Parent category</Form.Label>
+                  <Form.Select
+                    value={categoryForm.parent_id ?? ""}
+                    onChange={(e) => setCategoryForm((f) => ({ ...f, parent_id: e.target.value === "" ? undefined : Number(e.target.value) }))}
+                  >
+                    <option value="">— Main category (no parent) —</option>
+                    {categories
+                      .filter((c) => !editingCategory || c.id !== editingCategory.id)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name ?? `Category ${c.id}`}
+                        </option>
+                      ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted">Leave as &quot;Main category&quot; for top-level. Sub-categories get their own fields.</Form.Text>
+                </Form.Group>
+              </div>
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label>Status</Form.Label>
@@ -857,9 +818,7 @@ const RequestCategories = () => {
               </div>
               <div className="col-12">
                 <div className="d-flex align-items-center justify-content-between mb-2">
-                  <Form.Label className="mb-0 fw-semibold">
-                    Approval workflow (level & order){categoryForm.parent_id != null && categoryForm.parent_id !== 0 ? " *" : " (optional)"}
-                  </Form.Label>
+                  <Form.Label className="mb-0 fw-semibold">Approval workflow (level & order) (optional)</Form.Label>
                   <Button
                     type="button"
                     variant="outline-primary"
@@ -878,17 +837,11 @@ const RequestCategories = () => {
                   </Button>
                 </div>
                 <Form.Text className="text-muted d-block mb-2">
-                  {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-                    ? "Required for sub-categories. Add at least one level and assign approvers."
-                    : "Optional for main (parent) categories. Add levels if you want approval workflow; child categories can define their own."}
+                  Optional for main (parent) categories. Add levels if you want approval workflow; child categories can define their own.
                 </Form.Text>
                 {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels?.length ?? 0) === 0 ? (
                   <div className="border rounded p-3 bg-light text-center text-muted">
-                    <p className="mb-2 small">
-                      {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-                        ? "At least one approval level with an assignee is required for sub-categories."
-                        : "No workflow levels. You can add levels and assign approvers, or save as-is."}
-                    </p>
+                    <p className="mb-2 small">No workflow levels. You can add levels and assign approvers, or save as-is.</p>
                     <Button
                       type="button"
                       variant="outline-primary"
@@ -901,7 +854,7 @@ const RequestCategories = () => {
                       }}
                     >
                       <Plus size={14} className="me-1" />
-                      {categoryForm.parent_id != null && categoryForm.parent_id !== 0 ? "Add level (required)" : "Add level (optional)"}
+                      Add level (optional)
                     </Button>
                   </div>
                 ) : (
@@ -1076,132 +1029,6 @@ const RequestCategories = () => {
           </Button>
           <Button variant="danger" onClick={handleDeleteCategory} disabled={deleting}>
             {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Children Modal */}
-      <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Children: {categoryForChildren?.name ?? "—"}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="text-muted">Sub-categories under this category. Add or edit below.</span>
-            {categoryForChildren && (
-              <Button variant="primary" size="sm" onClick={() => openAddChildCategory(categoryForChildren)}>
-                <Plus size={16} className="me-1" />
-                Add Sub Category
-              </Button>
-            )}
-          </div>
-          {loadingChildren ? (
-            <p className="text-muted mb-0">Loading children…</p>
-          ) : childrenList.length === 0 ? (
-            <p className="text-muted mb-0">No child categories yet. Click &quot;Add child&quot; to create one.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {childrenList.map((child, index) => (
-                    <tr
-                      key={child.id}
-                      style={{
-                        borderBottom: index < childrenList.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                    >
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.name ?? "—"}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.code ?? "—"}</td>
-                      <td style={{ padding: "12px" }}>
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            backgroundColor: child.is_active !== false ? "#d1fae5" : "#e5e7eb",
-                            color: child.is_active !== false ? "#065f46" : "#6b7280",
-                          }}
-                        >
-                          {child.is_active !== false ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowChildrenModal(false);
-                            openEditCategory(child);
-                          }}
-                          title="Edit"
-                          style={{
-                            padding: "4px 8px",
-                            marginRight: "6px",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowChildrenModal(false);
-                            openFieldsModal(child);
-                          }}
-                          title="Manage fields"
-                          style={{
-                            padding: "4px 8px",
-                            marginRight: "6px",
-                            border: "1px solid #6366f1",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            color: "#6366f1",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <List size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteCategory(child);
-                          }}
-                          title="Delete"
-                          style={{
-                            padding: "4px 8px",
-                            border: "1px solid #fecaca",
-                            borderRadius: "6px",
-                            backgroundColor: "#fef2f2",
-                            color: "#b91c1c",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowChildrenModal(false)}>
-            Close
           </Button>
         </Modal.Footer>
       </Modal>
@@ -1776,8 +1603,8 @@ const RequestCategories = () => {
   );
 };
 
-RequestCategories.getLayout = (page: ReactElement) => {
+RequestSubCategories.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default RequestCategories;
+export default RequestSubCategories;
