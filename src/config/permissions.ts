@@ -121,14 +121,14 @@ export const routePermissions: RoutePermission[] = [
             { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
             { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
-            { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
+            { path: '/activities',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
 
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            {path:'/company',permissions: ['']},//companies
-            {path:'/deals-approval',permissions: ['']},//approvals 
+            {path:'/companies',permissions: ['']},//companies
+            {path:'/approvals',permissions: ['']},//approvals 
             {path:'/approvals/approval-detailpage',permissions: ['']},
             {path:'/inbox',permissions: ['']},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
