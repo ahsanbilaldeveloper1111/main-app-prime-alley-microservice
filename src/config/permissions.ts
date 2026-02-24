@@ -37,6 +37,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
+    {path:'/crm-tasks',permissions: ['']},
    
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
@@ -126,11 +127,11 @@ export const routePermissions: RoutePermission[] = [
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            { path: '/companies', permissions: [''] },
-            { path: '/approvals', permissions: [''] },
-            { path: '/approvals/approval-detailpage', permissions: [''] },
-            { path: '/inbox', permissions: [''] },
-            { path: '/activities', permissions: [''] },
+            {path:'/company',permissions: ['']},//companies
+            {path:'/deals-approval',permissions: ['']},//approvals 
+            {path:'/approvals/approval-detailpage',permissions: ['']},
+            {path:'/inbox',permissions: ['']},
+            {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
         ]
     },
     //crm services end
