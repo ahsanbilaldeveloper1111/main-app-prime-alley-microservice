@@ -65,7 +65,7 @@ import GsmSync from "@pages/gsm/sync";
 import CompanyPO from "@pages/gsm/company/po";
 
 // Import Billing components
-import PaymentMethods from "@pages/finance/payment-methods";
+import PaymentMethods from "@pages/billing/payment-methods";
 
 // Import NetOps components
 import Devices from "@pages/netops/devices";
@@ -87,6 +87,7 @@ import FAQTypes from "@pages/faqs/types";
 
 // Import Staff Insights & Work Planner components
 import RequestCategories from "@pages/workforce/request-categories";
+import RequestSubCategories from "@pages/workforce/sub-categories";
 import WorkPlannerStatuses from "@pages/planner/statuses";
 
 // Import AI Chat components
@@ -612,7 +613,8 @@ const Settings = () => {
       { key: "types", title: "FAQ Types", icon: Tag, color: "#17a2b8", permission: PERMISSIONS.TICKETS_SERVICES }
     ],
     "staff-insights": [
-      { key: "request-categories", title: "Request Categories", icon: ClipboardList, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT }
+      { key: "request-categories", title: "Request Categories", icon: ClipboardList, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT },
+      // { key: "sub-categories", title: "Sub-Categories", icon: Layers, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT }
     ],
     "work-planner": [
       { key: "statuses", title: "Statuses", icon: CalendarCheck, color: "#26a69a", permission: PERMISSIONS.WORK_PLANNER_SERVICES }
@@ -911,6 +913,7 @@ const Settings = () => {
                 {activeTab === "staff-insights" && shouldRenderTab("staff-insights", activeStaffInsightsTab) && (
                   <div>
                     {activeStaffInsightsTab === "request-categories" && <RequestCategories />}
+                    {/* {activeStaffInsightsTab === "sub-categories" && <RequestSubCategories />} */}
                   </div>
                 )}
 

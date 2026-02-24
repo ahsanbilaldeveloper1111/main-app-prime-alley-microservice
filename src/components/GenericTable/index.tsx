@@ -183,6 +183,7 @@ export interface ToolbarConfig {
   // Filters
   showFiltersButton?: boolean;
   onFiltersClick?: () => void;
+  showFilterPills?: boolean;
   filterPills?: FilterPill[];
   showAdvancedFilters?: boolean;
   onAdvancedFiltersClick?: () => void;
@@ -361,13 +362,21 @@ const GenericTable = <T extends Record<string, any>>({
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
 
   // Filter pills visibility state (hidden by default)
-  const [showFilterPills, setShowFilterPills] = useState(false);
+  const [showFilterPills, setShowFilterPills] = useState(
+    toolbar?.showFilterPills ?? false,
+  );
 
   // Metrics visibility state (hidden by default)
   const [showMetrics, setShowMetrics] = useState(false);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>
   >({});
+
+  useEffect(() => {
+    if (toolbar?.showFilterPills !== undefined) {
+      setShowFilterPills(toolbar.showFilterPills);
+    }
+  }, [toolbar?.showFilterPills]);
 
   // Flatten actions into context menu items (buttons + dropdown options)
   type ContextMenuItem = {

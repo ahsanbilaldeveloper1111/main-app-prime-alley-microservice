@@ -402,7 +402,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'planner-tasks',
           title: 'Tasks',
           icon: <Clock size={16} />,
-          url: '/planner/tasks',
+          url: '/crm/crm-tasks',
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
         },
 
@@ -639,10 +639,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
         },
         { 
-          id: 'workforce-onboarding', 
-          title: 'Onboarding', 
+          id: 'workforce-journey', 
+          title: 'Journey', 
           icon: <UserPlus size={16} />, 
-          url: '/workforce/onboarding', 
+          url: '/workforce/journey', 
           permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
         },
         { 
@@ -663,50 +663,50 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.ACCOUNTS_SERVICES,
       icon: <CreditCard size={16} />,
       color: MENU_COLORS.BILLING,
-      title: 'Finance',
-      label: 'Finance',
+      title: 'Billing',
+      label: 'Billing',
       url: '',
       subItems: [
         { 
           id: 'finance-dashboard', 
           title: 'Dashboard', 
           icon: <LayoutDashboard size={16} />, 
-          url: '/finance/dashboard', 
+          url: '/billing/dashboard', 
           permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
         },
         { 
           id: 'finance-account-overview', 
           title: 'Account Overview', 
           icon: <Eye size={16} />, 
-          url: '/finance/account-overview', 
+          url: '/billing/account-overview', 
           permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
         { 
           id: 'finance-subscriptions', 
           title: 'Subscriptions', 
           icon: <ShoppingBag size={16} />, 
-          url: '/finance/subscriptions', 
+          url: '/billing/subscriptions', 
           permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
         },
         { 
           id: 'finance-order-invoicing', 
           title: 'Order Invoicing', 
           icon: <ShoppingBag size={16} />, 
-          url: '/finance/order-invoicing', 
+          url: '/billing/order-invoicing', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
           id: 'finance-invoices', 
           title: 'Invoices', 
           icon: <DollarSign size={16} />, 
-          url: '/finance/invoices', 
+          url: '/billing/invoices', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
           id: 'finance-payment-history', 
           title: 'Payment History', 
           icon: <FileText size={16} />, 
-          url: '/finance/payment-history', 
+          url: '/billing/payment-history', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
@@ -814,6 +814,28 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       setHoveredItemRect(null);
       hoverTimeoutRef.current = null;
     }, 150);
+  };
+
+  const handleExpandedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    // When hovering over a different item while one is pinned, show the hovered item's flyout
+    if (isFlyoutPinned && module.subItems && module.subItems.length > 0) {
+      const rect = ev.currentTarget.getBoundingClientRect();
+      setHoveredModuleId(module.id);
+      setHoveredItemRect({ top: rect.top, height: rect.height });
+    }
+  };
+
+  const handleExpandedItemMouseLeave = () => {
+    if (isFlyoutPinned) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        // When mouse leaves, stay on the current hovered item briefly before reverting
+        hoverTimeoutRef.current = null;
+      }, 50);
+    }
   };
 
   const handleFlyoutMouseEnter = () => {
@@ -1539,8 +1561,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
@@ -1581,8 +1609,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
@@ -1623,8 +1657,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
-                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
                 {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
