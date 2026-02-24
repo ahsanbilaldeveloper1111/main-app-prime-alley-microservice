@@ -1,7 +1,8 @@
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
-import { Row, Col, Card, Button, Badge, Form, Modal, Spinner} from "react-bootstrap";
+import { Row, Col, Card, Button, Badge, Form, Modal, Spinner } from "react-bootstrap";
 import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
 import ProtectedRoute from "@components/ProtectedRoute";
 import { X } from "lucide-react";
 import { HistoryListRecord, getHistoryChain, HistoryChainRecord, getStages, StageData, getCrmDataById, CrmDataItem } from "@utils/crm";
@@ -14,7 +15,6 @@ import {
   Handshake,
   ShoppingBag,
   Activity,
-  Download,
   Mail,
   Phone,
   FileText,
@@ -27,15 +27,17 @@ import {
   Calendar,
   PlusCircle,
   TrendingUp,
-  Layers,
 } from "lucide-react";
+import "@assets/scss/datatable-style.scss";
 import "@assets/scss/ticketsnew.scss";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
 import { GlobalDateFormat, GlobalTimeFormat, ModuleSlug, convertDateTimeWithOffsetToLocal } from "@utils/Helper";
 import moment from "moment";
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import { toast } from "react-toastify";
+import GenericTable, { TableColumn, TabConfig, FilterPill } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 
 // Types
 interface ActivityRecord {
@@ -50,6 +52,36 @@ interface ActivityRecord {
   dateTime: string;
 }
 
+// Helpers for avatar columns (match leads/deals UI)
+const getInitials = (name: string): string => {
+  if (!name) return "NA";
+  const words = name.trim().split(/\s+/).slice(0, 2);
+  const hasSecondWord = words.length >= 2 && /[a-z]/i.test(words[1]);
+  if (hasSecondWord) {
+    const a = words[0].match(/[a-z]/i)?.[0];
+    const b = words[1].match(/[a-z]/i)?.[0];
+    if (a && b) return (a + b).toUpperCase();
+  }
+  if (words[0]) {
+    const letters = words[0].match(/[a-z]/gi) || [];
+    if (letters.length >= 2) return (letters[0] + letters[1]).toUpperCase();
+    if (letters.length === 1) return letters[0].toUpperCase();
+  }
+  return "NA";
+};
+
+const getRandomColor = (name: string): string => {
+  if (!name) return "#6c757d";
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  const saturation = 50 + (Math.abs(hash) % 30);
+  const lightness = 40 + (Math.abs(hash) % 20);
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
+};
+
 const HistoryPage = () => {
   const router = useRouter();
   // New Activity Tracker States
@@ -61,7 +93,6 @@ const HistoryPage = () => {
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [showActivityTimelineModal, setShowActivityTimelineModal] = useState(false);
-  const [showFilterBar, setShowFilterBar] = useState(false);
   const [selectedActivityRecord, setSelectedActivityRecord] = useState<any>(null);
   const [activitySearch, setActivitySearch] = useState('');
   const [allActivityRecords, setAllActivityRecords] = useState<ActivityRecord[]>([]);
@@ -79,6 +110,12 @@ const HistoryPage = () => {
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
   const [crmData, setCrmData] = useState<CrmDataItem | null>(null);
   const [loadingCrmData, setLoadingCrmData] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
+  const [showAddTabModal, setShowAddTabModal] = useState(false);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const defaultSelectedColumns = ['customer', 'agent', 'lastActivity', 'type', 'stage'];
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => defaultSelectedColumns);
+  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>([]);
 
   // Fetch extensions on component mount
   useEffect(() => {
@@ -202,16 +239,12 @@ const HistoryPage = () => {
     }
   }, [activitySearch, activityFilters.dateRange, activityFilters.agents, pagination.per_page, extensions, activityTypeFilter]);
 
-  // Fetch data on component mount
+  // Single effect: fetch when filters/tab change. Only fetch once extensions are loaded to avoid duplicate calls on mount.
   useEffect(() => {
-    fetchHistoryData(1);
-  }, []);
-
-  // Refetch when filters change (reset to page 1)
-  useEffect(() => {
+    if (extensions?.length === 0) return;
     setPagination(prev => ({ ...prev, current_page: 1 }));
     fetchHistoryData(1);
-  }, [activityFilters.agents, activityFilters.dateRange.start, activityFilters.dateRange.end, extensions, activityTypeFilter]);
+  }, [activityFilters.agents, activityFilters.dateRange.start, activityFilters.dateRange.end, extensions, activityTypeFilter, fetchHistoryData]);
   
   // Valid filter IDs for history
   const validHistoryFilters = ['all', 'leads', 'deals', 'orders'];
@@ -225,7 +258,12 @@ const HistoryPage = () => {
       }
     }
   }, [router.isReady, router.query.tab, activityTypeFilter]);
-  
+
+  // Set draft selected columns when column editor is shown
+  useEffect(() => {
+    if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
+  }, [showColumnEditor]);
+
   // Handler to update filter and URL
   const handleFilterChange = useCallback((filterId: string) => {
     setActivityTypeFilter(filterId);
@@ -384,31 +422,11 @@ const HistoryPage = () => {
       key: 'agent',
       label: 'Agent',
       type: 'avatar',
-      render: (row) => (
-        <div className="d-flex align-items-center gap-2">
-          <div 
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: '#0d6efd',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 600
-            }}
-          >
-            {(() => {
-              const alphabeticChars = row.agent.replace(/[^a-zA-Z]/g, '');
-              const splittedArray = alphabeticChars.split(' ');
-              return [splittedArray[0]?.[0] || '', splittedArray?.[1]?.[0] || ''].join('').toUpperCase();
-            })()}
-          </div>
-          <div className="small">{row.agent}</div>
-        </div>
-      )
+      avatar: {
+        getInitials: (row) => getInitials(row.agent),
+        getColor: (row) => getRandomColor(row.agent),
+      },
+      emptyValue: 'N/A',
     },
     {
       key: 'lastActivity',
@@ -489,144 +507,60 @@ const HistoryPage = () => {
     }
   ];
 
+  const historyTabs: TabConfig[] = [
+    {
+      id: 'all',
+      label: 'All Types',
+      count: typeFilterCounts.all ?? pagination.total ?? 0,
+      removable: false,
+    },
+    ...customTabs.map((t) => ({
+      ...t,
+      // Show count only when this tab is active (API has returned data for this type)
+      count: activityTypeFilter === t.id ? pagination.total : undefined,
+    })),
+  ];
+
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
+  const historyFilterPills: FilterPill[] = [
+    {
+      id: 'agents',
+      label: 'Agents',
+      showDropdown: true,
+      dropdownOptions: [
+        {
+          label: 'All Agents',
+          value: 'all',
+          onClick: () => {
+            setActivityFilters((prev) => ({ ...prev, agents: [] }));
+            setPagination((prev) => ({ ...prev, current_page: 1 }));
+            fetchHistoryData(1);
+          },
+        },
+        ...availableAgents.map((agent) => ({
+          label: agent.label,
+          value: String(agent.value),
+          onClick: () => {
+            setActivityFilters((prev) => ({ ...prev, agents: [agent.value] }));
+            setPagination((prev) => ({ ...prev, current_page: 1 }));
+            fetchHistoryData(1);
+          },
+        })),
+      ],
+    },
+  ];
+
   return (
     <ProtectedRoute requiredPermissions={[PERMISSIONS.VIEW_CRM_HISTORY]}>
       <div>
-      {/* Header */}
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-      <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Activity Management
-      </li>
-    </ol>
-  </nav>
-</div>
-        <div className="d-flex flex-wrap gap-2">
-          <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-          <Button variant="outline-secondary" >
-            <Download size={16} className="me-2" />
-            Export
-          </Button>
-          <Button variant={`${showFiltersSidebar ? "secondary" : "outline-secondary"}`} onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}>
-              <Filter size={16} className="me-2" />
-              Filters
-            </Button>
-        </div>
-      </div>
-
-     {/* Stats Cards */}
-     <StatsCards 
-        data={[
-          {
-            title: 'All Types',
-            value: typeFilterCounts.all || pagination.total || 0,
-            icon: Activity,
-            iconColor: '#6366F1',
-            iconBgColor: '#EEF2FF',
-            subtitle: 'Total activities'
-          },
-          {
-            title: 'Leads',
-            value: typeFilterCounts.leads || 0,
-            icon: Target,
-            iconColor: '#3B82F6',
-            iconBgColor: '#DBEAFE',
-            metric: {
-              text: 'Lead activities',
-              dotColor: '#2563EB'
-            }
-          },
-          {
-            title: 'Deals',
-            value: typeFilterCounts.deals || 0,
-            icon: Handshake,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            subtitle: 'Deal activities'
-          },
-          {
-            title: 'Orders',
-            value: typeFilterCounts.orders || 0,
-            icon: ShoppingBag,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            metric: {
-              text: 'Order activities',
-              dotColor: '#7C3AED'
-            }
-          },
-          {
-            title: 'Deals',
-            value: typeFilterCounts.deals || 0,
-            icon: Handshake,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            subtitle: 'Deal activities'
-          },
-          {
-            title: 'Orders',
-            value: typeFilterCounts.orders || 0,
-            icon: ShoppingBag,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            metric: {
-              text: 'Order activities',
-              dotColor: '#7C3AED'
-            }
-          }
-        ]}
-        gridMinWidth="180px"
+      <BreadcrumbItem
+        mainTitle="CRM"
+        mainLink="/crm/dashboard"
+        subTitle="Activity Management"
       />
-      {/* Quick Filter Buttons */}
-      {showFilterBar && (
-      <Card className="border-0 shadow-sm mb-3">
-        <Card.Body className="p-3">
-          <div className="d-flex gap-2 flex-wrap">
-            {[
-              { id: 'all', label: 'All Types', color: '#6c757d', icon: <Activity size={16} /> },
-              { id: 'leads', label: 'Leads', color: '#0d6efd', icon: <Target size={16} /> },
-              { id: 'deals', label: 'Deals', color: '#28a745', icon: <Handshake size={16} /> },
-              { id: 'orders', label: 'Orders', color: '#20c997', icon: <ShoppingBag size={16} /> }
-            ].map(filter => {
-              const isActive = activityTypeFilter === filter.id;
-              return (
-                <Button
-                  key={filter.id}
-                  variant={isActive ? undefined : 'outline-secondary'}
-                  onClick={() => handleFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={isActive ? {
-                    background: filter.color,
-                    borderColor: filter.color,
-                    color: '#fff'
-                  } : {
-                    background: '#fff',
-                    borderColor: filter.color,
-                    color: filter.color
-                  }}
-                >
-                  {filter.icon}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-        </Card.Body>
-      </Card>
-      )}
       {/* Generic Sidebar for Activity Details */}
       <GenericSidebar
         isOpen={showActivitySidebar}
@@ -650,50 +584,14 @@ const HistoryPage = () => {
                 icon: TrendingUp,
                 customContent: loadingHistory ? (
                   <div className="text-center py-4">
-                    <div className="spinner-border text-primary" role="status">
+                    <Spinner animation="border" variant="primary" size="sm" role="status">
                       <span className="visually-hidden">Loading stages...</span>
-                    </div>
+                    </Spinner>
                   </div>
                 ) : recordStages.length > 0 ? (
                   <div className="position-relative" style={{ padding: '32px 0' }}>
-                    {/* Background Progress Bar */}
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '10%',
-                        right: '10%',
-                        height: '4px',
-                        backgroundColor: '#e3e8ef',
-                        borderRadius: '4px',
-                        transform: 'translateY(-50%)',
-                        zIndex: 0
-                      }}
-                    />
-                    {/* Filled Progress Bar */}
-                    {[
-                      { name: 'Prospect', icon: <Users size={20} />, color: '#9c27b0' },
-                      { name: 'Lead', icon: <Target size={20} />, color: '#2196f3' },
-                      { name: 'Deal', icon: <TrendingUp size={20} />, color: '#ff9800' },
-                      { name: 'Order', icon: <ShoppingBag size={20} />, color: '#4caf50' }
-                    ].length > 0 && (
-                      <div 
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          left: '10%',
-                          width: currentStageIndex > 0 ? `${(currentStageIndex / 3) * 80}%` : '0%',
-                          height: '4px',
-                          background: `linear-gradient(90deg, #667eea 0%, #764ba2 100%)`,
-                          borderRadius: '4px',
-                          transform: 'translateY(-50%)',
-                          zIndex: 0,
-                          transition: 'width 0.5s ease'
-                        }}
-                      />
-                    )}
-                    
-                    {/* Stage Items */}
+                    <div style={{ position: 'absolute', top: '50%', left: '10%', right: '10%', height: '4px', backgroundColor: '#e3e8ef', borderRadius: '4px', transform: 'translateY(-50%)', zIndex: 0 }} />
+                    <div style={{ position: 'absolute', top: '50%', left: '10%', width: currentStageIndex > 0 ? `${(currentStageIndex / 3) * 80}%` : '0%', height: '4px', background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)', borderRadius: '4px', transform: 'translateY(-50%)', zIndex: 0, transition: 'width 0.5s ease' }} />
                     <div className="d-flex justify-content-between align-items-center position-relative" style={{ zIndex: 1 }}>
                       {[
                         { name: 'Prospect', icon: <Users size={20} />, color: '#9c27b0' },
@@ -703,65 +601,13 @@ const HistoryPage = () => {
                       ].map((stage, idx) => {
                         const isCompleted = idx < currentStageIndex;
                         const isCurrent = idx === currentStageIndex;
-                        
                         return (
-                          <div 
-                            key={stage.name} 
-                            className="d-flex flex-column align-items-center"
-                            style={{ flex: 1 }}
-                          >
-                            {/* Stage Circle */}
-                            <div 
-                              className="rounded-circle d-flex align-items-center justify-content-center mb-2"
-                              style={{ 
-                                width: isCurrent ? '64px' : '52px', 
-                                height: isCurrent ? '64px' : '52px',
-                                background: isCurrent 
-                                  ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
-                                  : isCompleted 
-                                    ? stage.color 
-                                    : '#e3e8ef',
-                                color: (isCurrent || isCompleted) ? '#fff' : '#9ca3af',
-                                transition: 'all 0.3s ease',
-                                boxShadow: isCurrent 
-                                  ? `0 8px 24px ${stage.color}66` 
-                                  : isCompleted 
-                                    ? `0 4px 12px ${stage.color}44`
-                                    : 'none'
-                              }}
-                            >
-                              {isCompleted && !isCurrent ? (
-                                <CheckCircle size={24} strokeWidth={3} />
-                              ) : (
-                                stage.icon
-                              )}
+                          <div key={stage.name} className="d-flex flex-column align-items-center" style={{ flex: 1 }}>
+                            <div className="rounded-circle d-flex align-items-center justify-content-center mb-2" style={{ width: isCurrent ? 64 : 52, height: isCurrent ? 64 : 52, background: isCurrent ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)` : isCompleted ? stage.color : '#e3e8ef', color: (isCurrent || isCompleted) ? '#fff' : '#9ca3af', transition: 'all 0.3s ease', boxShadow: isCurrent ? `0 8px 24px ${stage.color}66` : isCompleted ? `0 4px 12px ${stage.color}44` : 'none' }}>
+                              {isCompleted && !isCurrent ? <CheckCircle size={24} strokeWidth={3} /> : stage.icon}
                             </div>
-                            
-                            {/* Stage Label */}
-                            <span 
-                              className="fw-semibold text-center"
-                              style={{ 
-                                fontSize: isCurrent ? '15px' : '13px',
-                                color: isCurrent ? stage.color : isCompleted ? '#374151' : '#9ca3af'
-                              }}
-                            >
-                              {stage.name}
-                            </span>
-                            
-                            {/* Current Stage Badge */}
-                            {isCurrent && (
-                              <Badge 
-                                className="mt-1"
-                                style={{ 
-                                  backgroundColor: `${stage.color}22`,
-                                  color: stage.color,
-                                  fontSize: '11px',
-                                  padding: '4px 10px'
-                                }}
-                              >
-                                CURRENT
-                              </Badge>
-                            )}
+                            <span className="fw-semibold text-center" style={{ fontSize: isCurrent ? 15 : 13, color: isCurrent ? stage.color : isCompleted ? '#374151' : '#9ca3af' }}>{stage.name}</span>
+                            {isCurrent && <Badge className="mt-1" style={{ backgroundColor: `${stage.color}22`, color: stage.color, fontSize: 11, padding: '4px 10px' }}>CURRENT</Badge>}
                           </div>
                         );
                       })}
@@ -780,9 +626,9 @@ const HistoryPage = () => {
                 icon: Clock,
                 customContent: loadingHistory ? (
                   <div className="text-center py-4">
-                    <div className="spinner-border text-primary" role="status">
+                    <Spinner animation="border" variant="primary" size="sm" role="status">
                       <span className="visually-hidden">Loading...</span>
-                    </div>
+                    </Spinner>
                   </div>
                 ) : historyChain.length === 0 ? (
                   <div className="text-center py-4 text-muted">
@@ -791,102 +637,35 @@ const HistoryPage = () => {
                   </div>
                 ) : (
                   <div className="position-relative" style={{ paddingLeft: '56px' }}>
-                    {/* Timeline Line */}
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        left: '30px',
-                        top: '0',
-                        bottom: '20px',
-                        width: '3px',
-                        background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)',
-                        borderRadius: '3px',
-                        opacity: 0.2
-                      }}
-                    />
-
+                    <div style={{ position: 'absolute', left: '30px', top: 0, bottom: '20px', width: '3px', background: 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)', borderRadius: '3px', opacity: 0.2 }} />
                     {historyChain.map((record, index) => {
                       const dateObj = new Date(record.created_at);
                       const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                      
                       const userExtension = record.user_extension_done_by || record.user_extension;
-                      const userName = userExtension 
-                        ? (extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.display_name || 
-                           extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.name || 
-                           userExtension)
-                        : 'System';
+                      const userName = userExtension ? (extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.display_name || extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.name || userExtension) : 'System';
                       const cleanUserName = userName.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                      
                       const getIconForEvent = (event: string, action: string | null) => {
-                        if (event === 'created') {
-                          return { icon: <PlusCircle size={20} />, bg: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)' };
-                        }
-                        if (action?.toLowerCase().includes('stage') || event?.toLowerCase().includes('stage')) {
-                          return { icon: <ArrowRight size={20} />, bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' };
-                        }
-                        if (action?.toLowerCase().includes('call') || event?.toLowerCase().includes('call')) {
-                          return { icon: <Phone size={20} />, bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' };
-                        }
-                        if (action?.toLowerCase().includes('email') || event?.toLowerCase().includes('email')) {
-                          return { icon: <Mail size={20} />, bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' };
-                        }
+                        if (event === 'created') return { icon: <PlusCircle size={20} />, bg: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)' };
+                        if (action?.toLowerCase().includes('stage') || event?.toLowerCase().includes('stage')) return { icon: <ArrowRight size={20} />, bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' };
+                        if (action?.toLowerCase().includes('call') || event?.toLowerCase().includes('call')) return { icon: <Phone size={20} />, bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' };
+                        if (action?.toLowerCase().includes('email') || event?.toLowerCase().includes('email')) return { icon: <Mail size={20} />, bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' };
                         return { icon: <FileText size={20} />, bg: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' };
                       };
-                      
                       const iconData = getIconForEvent(record.event, record.action);
-                      
                       return (
-                        <div 
-                          key={index} 
-                          className="position-relative mb-4 pb-3"
-                        >
-                          {/* Timeline Icon */}
-                          <div 
-                            className="rounded-circle d-flex align-items-center justify-content-center position-absolute"
-                            style={{ 
-                              width: '60px', 
-                              height: '60px',
-                              left: '-56px',
-                              top: '0',
-                              background: iconData.bg,
-                              border: '4px solid #fff',
-                              boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                              color:'#fff'
-                            }}
-                          >
-                            {iconData.icon}
-                          </div>
-                          
-                          {/* Timeline Content */}
-                          <Card 
-                            className="border-0"
-                            style={{ 
-                              backgroundColor: '#fff',
-                              borderLeft: '3px solid #667eea22',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-                            }}
-                          >
+                        <div key={index} className="position-relative mb-4 pb-3">
+                          <div className="rounded-circle d-flex align-items-center justify-content-center position-absolute" style={{ width: 60, height: 60, left: -56, top: 0, background: iconData.bg, border: '4px solid #fff', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', color: '#fff' }}>{iconData.icon}</div>
+                          <Card className="border-0" style={{ backgroundColor: '#fff', borderLeft: '3px solid #667eea22', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                             <Card.Body className="p-3">
                               <div className="d-flex align-items-center justify-content-between mb-2">
                                 <div className="d-flex align-items-center gap-2">
-                                  <Badge bg="light" text="dark" style={{ fontSize: '12px' }}>
-                                    <Calendar size={12} className="me-1" />
-                                    {record.created_at_human || dateStr}
-                                  </Badge>
-                                  <Badge bg="light" text="muted" style={{ fontSize: '12px' }}>
-                                    <Clock size={12} className="me-1" />
-                                    {timeStr}
-                                  </Badge>
+                                  <Badge bg="light" text="dark" style={{ fontSize: '12px' }}><Calendar size={12} className="me-1" />{record.created_at_human || dateStr}</Badge>
+                                  <Badge bg="light" text="muted" style={{ fontSize: '12px' }}><Clock size={12} className="me-1" />{timeStr}</Badge>
                                 </div>
-                                <Badge bg="light" text="muted" style={{ fontSize: '11px' }}>
-                                  <Users size={11} className="me-1" />
-                                  {cleanUserName}
-                                </Badge>
+                                <Badge bg="light" text="muted" style={{ fontSize: '11px' }}><Users size={11} className="me-1" />{cleanUserName}</Badge>
                               </div>
-                              <p className="mb-0 fw-medium text-dark" style={{ fontSize: '15px' }}>
-                                {record.description || record.action_display || 'Activity recorded'}
-                              </p>
+                              <p className="mb-0 fw-medium text-dark" style={{ fontSize: '15px' }}>{record.description || record.action_display || 'Activity recorded'}</p>
                             </Card.Body>
                           </Card>
                         </div>
@@ -906,15 +685,8 @@ const HistoryPage = () => {
                 title: 'Customer Info',
                 icon: Users,
                 fields: [
-                  {
-                    label: 'Name',
-                    value: crmData?.name || selectedActivityRecord?.customer || 'N/A'
-                  },
-                  {
-                    label: 'Phone',
-                    value: crmData?.phone || 'N/A',
-                    icon: Phone
-                  }
+                  { label: 'Name', value: crmData?.name || selectedActivityRecord?.customer || 'N/A' },
+                  { label: 'Phone', value: crmData?.phone || 'N/A', icon: Phone }
                 ]
               },
               {
@@ -922,28 +694,21 @@ const HistoryPage = () => {
                 title: 'Agent Info',
                 icon: Users,
                 fields: [
-                  {
-                    label: 'Agent Name',
-                    value: selectedActivityRecord?.agent || 'N/A'
-                  }
+                  { label: 'Agent Name', value: selectedActivityRecord?.agent || 'N/A' }
                 ]
               }
             ]
           }
         ]}
         actions={[
-          {
-            label: 'Close',
-            onClick: () => setShowActivitySidebar(false),
-            variant: 'outline-secondary'
-          }
+          { label: 'Close', onClick: () => setShowActivitySidebar(false), variant: 'outline-secondary' }
         ]}
       />
 
       {/* Activities Table */}
       <GenericTable
         data={filteredActivityRecords}
-        columns={tableColumns}
+        columns={tableColumns.filter((c) => selectedColumns.includes(c.key))}
         loading={loading}
         emptyMessage={
           <div className="text-center py-4">
@@ -968,7 +733,7 @@ const HistoryPage = () => {
             icon: <Eye size={16} />,
             onClick: (row) => {
               setSelectedActivityRecord(row);
-              setShowActivityTimelineModal(true);
+              setShowActivitySidebar(true);
             },
             variant: 'link'
           }
@@ -979,8 +744,47 @@ const HistoryPage = () => {
         }}
         hover={true}
         striped={false}
-        customizableColumns={true}
-        defaultSelectedColumns={['customer', 'agent', 'lastActivity', 'type', 'stage']}
+        fixedHeight={true}
+        maxHeight="calc(100vh - 380px)"
+        showToolbar={true}
+        toolbar={{
+          showTabs: true,
+          tabsDropdownLabel: "Activity",
+          tabs: historyTabs,
+          activeTab: activityTypeFilter,
+          onTabChange: handleFilterChange,
+          onTabAdd: () => setShowAddTabModal(true),
+          onTabRemove: (tabId) => {
+            setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+            if (activityTypeFilter === tabId) {
+              handleFilterChange('all');
+            }
+          },
+          showSearch: true,
+          searchValue: activitySearch,
+          searchPlaceholder: "Search activities by record name, agent...",
+          onSearchChange: (value) => setActivitySearch(value),
+          onSearch: () => {
+            setPagination(prev => ({ ...prev, current_page: 1 }));
+            fetchHistoryData(1);
+          },
+          showTableViewDropdown: true,
+          tableViewLabel: "Table view",
+          onTableViewClick: () => {},
+          showEditColumns: true,
+          onEditColumnsClick: () => setShowColumnEditor(true),
+          showPipelineDropdown: true,
+          pipelineLabel: "All Pipelines",
+          onPipelineClick: () => {},
+          showFiltersButton: true,
+          filterPills: historyFilterPills,
+          showAdvancedFilters: true,
+          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+          showSortButton: true,
+          onSortClick: () => {},
+          showExportButton: true,
+          onExportClick: () => {},
+        }}
       />
 
 {/* Activity Timeline Modal */}
@@ -1698,7 +1502,117 @@ const HistoryPage = () => {
   </Modal>
 )}
 
+      {/* Add Tab Modal - add Leads, Deals, Orders as tabs */}
+      <Modal show={showAddTabModal} onHide={() => setShowAddTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a type to add as a new tab</p>
+          <div className="d-grid gap-2" style={{ maxHeight: "400px", overflowY: "auto" }}>
+            {[
+              { id: 'leads', label: 'Leads', icon: <Target size={16} /> },
+              { id: 'deals', label: 'Deals', icon: <Handshake size={16} /> },
+              { id: 'orders', label: 'Orders', icon: <ShoppingBag size={16} /> },
+            ].map((opt) => {
+              const isAlreadyAdded = customTabs.some((t) => t.id === opt.id);
+              return (
+                <Button
+                  key={opt.id}
+                  variant="outline-primary"
+                  onClick={() => {
+                    if (!isAlreadyAdded) {
+                      setCustomTabs((prev) => [
+                        ...prev,
+                        {
+                          id: opt.id,
+                          label: opt.label,
+                          removable: true,
+                        },
+                      ]);
+                      setShowAddTabModal(false);
+                      toast.success("Tab added successfully!");
+                    }
+                  }}
+                  disabled={isAlreadyAdded}
+                  className="d-flex align-items-center justify-content-start"
+                  style={{ textAlign: "left" }}
+                >
+                  {opt.icon}
+                  <span className="ms-2">{opt.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowAddTabModal(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
+      {/* Column Editor Modal */}
+      <Modal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Customize Columns</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">
+            Select which columns to display in the table
+          </p>
+          <Row>
+            {tableColumns.map((col) => {
+              const isChecked = draftSelectedColumns.includes(col.key);
+              const isOnlySelected =
+                isChecked && draftSelectedColumns.length === 1;
+              return (
+                <Col key={col.key} md={6} className="mb-2">
+                  <Form.Check
+                    type="checkbox"
+                    id={`history-column-check-${col.key}`}
+                    label={col.label}
+                    checked={isChecked}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setDraftSelectedColumns((prev) =>
+                          prev.includes(col.key) ? prev : [...prev, col.key],
+                        );
+                      } else if (!isOnlySelected) {
+                        setDraftSelectedColumns((prev) =>
+                          prev.filter((k) => k !== col.key),
+                        );
+                      }
+                    }}
+                  />
+                </Col>
+              );
+            })}
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowColumnEditor(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setSelectedColumns(draftSelectedColumns);
+              setShowColumnEditor(false);
+            }}
+          >
+            Apply Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Generic Filter Sidebar */}
       <GenericFilterSidebar

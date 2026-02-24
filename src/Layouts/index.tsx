@@ -43,6 +43,9 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
+import CreateLeadModal from '@components/CreateLeadModal';
+import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
+import { createCompany } from '@utils/crm';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -88,6 +91,8 @@ const Layout = ({ children }: LayoutProps) => {
 	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
 	const headerLogoUrlRef = useRef<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -1127,32 +1132,32 @@ const Layout = ({ children }: LayoutProps) => {
                     />
                     <div className="create-dropdown-menu">
                         <button className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false); /* Add Contact handler */
-                          router.push('/crm/leads');
+                          setShowCreateDropdown(false);
+                          setShowCreateLeadModal(true);
                         }}>
                         Lead
                       </button>
                         <button className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false); /* Add Company handler */
-                          router.push('/crm/company');
+                          setShowCreateDropdown(false);
+                          setShowCreateCompanySidebar(true);
                         }}>
                         Company
                       </button>
                         <button className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false); /* Add Deal handler */
-                          router.push('/crm/deals');
+                          setShowCreateDropdown(false);
+                          router.push('/crm/inbox');
                         }}>
-                        Deal
+                        Inbox
                       </button>
                         <button className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false); /* Add Ticket handler */
-                          router.push('/tickets/list');
+                          setShowCreateDropdown(false);
+                          router.push('/help-center/my-tickets/new');
                         }}>
                         Ticket
                       </button>
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false); /* Add Task handler */
-                          router.push('/planning/tasks');
+                          router.push('/planner/tasks');
                         }}>
                         Task
                       </button>
@@ -1742,6 +1747,24 @@ const Layout = ({ children }: LayoutProps) => {
 			isOpen={showNotificationsSidebar}
 			onClose={() => setShowNotificationsSidebar(false)}
 		/>
+
+		{/* Create Lead Sidebar (from header Create dropdown) */}
+		<CreateLeadModal
+			show={showCreateLeadModal}
+			onHide={() => setShowCreateLeadModal(false)}
+			onSuccess={() => setShowCreateLeadModal(false)}
+		/>
+
+		{/* Create Company Sidebar (from header Create dropdown) */}
+		{showCreateCompanySidebar && (
+			<CreateCompanySidebar
+				onClose={() => setShowCreateCompanySidebar(false)}
+				onSave={async (data: CompanyFormPayload) => {
+					await createCompany(data);
+					setShowCreateCompanySidebar(false);
+				}}
+			/>
+		)}
 		</>
 	);
 };

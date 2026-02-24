@@ -252,9 +252,9 @@ const DealRecordPage: NextPageWithLayout = () => {
     recordEmail: dealRecordEmail,
     recordPhone: dealRecordPhone,
     onTaskCreated: () => tasksRefetch?.(),
-    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
-    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
-    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
   const renderIntelligenceTab = () => {
@@ -1252,7 +1252,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     color: '#141414',
                     margin: 0,
                   }}>
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div style={{
                     padding: '3px 10px',
