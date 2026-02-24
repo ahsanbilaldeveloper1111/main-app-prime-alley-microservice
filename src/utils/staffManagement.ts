@@ -418,7 +418,8 @@ export const updateUserRequestCategory = async (
 
 export const deleteUserRequestCategory = async (id: number): Promise<void> => {
   try {
-    await axiosInstance.delete(`${PREFIX}/user-request-categories/${id}`);
+    const response = await axiosInstance.delete(`${PREFIX}/user-request-categories/${id}`);
+    return extractData(response);
   } catch (error: unknown) {
     handleApiError(error, "Failed to delete user request category");
   }

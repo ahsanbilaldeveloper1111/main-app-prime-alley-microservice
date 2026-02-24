@@ -278,7 +278,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>).CRM_ACTIVITY ?? 'Activities',
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: '/crm/history',//activities
+          url: '/crm/activities'
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },

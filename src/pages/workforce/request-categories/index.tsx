@@ -351,7 +351,7 @@ const RequestCategories = () => {
     setDeleting(true);
     try {
       await deleteUserRequestCategory(categoryToDelete.id);
-      toast.success("Category deleted");
+      
       setShowDeleteModal(false);
       setCategoryToDelete(null);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
