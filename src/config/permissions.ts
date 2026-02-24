@@ -221,9 +221,9 @@ export const routePermissions: RoutePermission[] = [
     //compliance services end
 
 
-    //finance services start
+    //billing services start
     {
-        path: '/finance',
+        path: '/billing',
         permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
 
         children: [
@@ -324,10 +324,14 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/employees',permissions: [PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT]},
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT]},
-            { path: '/onboarding',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
+            { path: '/journey',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
             { path: '/approval-requests',permissions: [PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT]},
-            { path: '/org-chart',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT]},
-            {path:'/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
+            { path: '/org-chart', permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT] },
+            
+            { path: '/request-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
+            { path: '/sub-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
+
+            
             {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
             {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]

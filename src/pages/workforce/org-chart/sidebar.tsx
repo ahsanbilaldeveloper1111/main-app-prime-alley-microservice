@@ -37,6 +37,7 @@ interface RawOrgChartProfile {
   employment_type?: string;
   contract_type?: string;
   status?: string;
+  designation?: string;
   created_at?: string;
   attendance?: { status?: string; check_in_at?: string | null; check_out_at?: string | null };
   [key: string]: unknown;
@@ -621,7 +622,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
               {employee.name}
             </h3>
             <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
-              {employee.title}
+              {rawProfile?.designation}
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
