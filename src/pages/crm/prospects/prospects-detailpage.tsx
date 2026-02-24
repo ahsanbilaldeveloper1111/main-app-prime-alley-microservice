@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
   X,
@@ -42,6 +42,9 @@ import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -123,6 +126,99 @@ const ContactRecordPage: NextPageWithLayout = () => {
     onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
+
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+
+  const phoneList = useMemo(() => {
+    const phone = prospect?.data?.phone;
+    if (!phone || typeof phone !== "string") return [];
+    return phone
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [prospect?.data?.phone]);
+  const hasPhone = phoneList.length > 0;
+  const numberToCall = hasPhone ? phoneList[0] : "";
+
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall],
+  );
+
+  const handleCallClick = useCallback(() => {
+    if (hasPhone) {
+      handleCall(numberToCall);
+    } else {
+      toast.error("No phone number available");
+    }
+  }, [hasPhone, numberToCall, handleCall]);
 
   // Load prospect by ID from URL
   useEffect(() => {
@@ -947,7 +1043,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             }}
           >
             <ChevronDown size={16} style={{ transform: "rotate(90deg)" }} />
-            Contacts
+            Prospects
           </button>
 
           <div style={{ position: "relative" }} ref={dropdownRef}>
@@ -1174,7 +1270,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           {[
             { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
             { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
-            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            { icon: Phone, label: "Call", disabled: !hasPhone, onClick: handleCallClick },
             { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
             { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
@@ -1276,7 +1372,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
               >
                 {[
                   { label: "Message", onClick: activityModals.openSms },
-                  { label: "Task", onClick: activityModals.openTask },
                   { label: "WhatsApp", onClick: activityModals.openWhatsApp },
                 ].map(({ label, onClick }) => (
                   <button
@@ -1527,7 +1622,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       <div style={{ padding: "14px 20px", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze Record Summary */}
+            {/* Record Summary */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1571,7 +1666,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{
@@ -2460,6 +2555,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {renderRightSidebar()}
       </div>
 
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
+      />
       {activityModals.modals}
     </>
   );

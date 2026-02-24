@@ -687,6 +687,12 @@ const GenericTable = <T extends Record<string, any>>({
                     <Dropdown.Item onClick={() => router.push("/crm/orders")}>
                       Orders
                     </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/companies")}>
+                      Company
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/inbox")}>
+                      Inbox
+                    </Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
               )}

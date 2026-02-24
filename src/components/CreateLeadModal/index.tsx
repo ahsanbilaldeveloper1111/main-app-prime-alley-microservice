@@ -540,6 +540,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           description: leadData.description || "",
           source: leadData.source || "",
           company_name: leadData.company_name || "",
+          company_domain: leadData.company_domain || "",
           company_contact: "",
           company_description: "",
           industry: "",
@@ -1544,10 +1545,13 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           >
             {editLeadId ? "Edit Lead" : crmDataId ? "Convert to Lead" : "Create Lead"}
             {!editLeadId && selectedCrmData && (
-              <Badge bg="info" style={{ fontSize: "12px" }}>
+              <Badge
+                bg="info"
+                style={{ fontSize: "12px", cursor: "pointer" }}
+                title={selectedCrmData?.name || `#${selectedCrmData?.id}`}
+              >
                 <FiDatabase className="me-1" size={14} />
-                Pre-filled from Prospect:{" "}
-                {selectedCrmData?.name || `#${selectedCrmData?.id}`}
+                Pre-filled from Prospect
               </Badge>
             )}
           </h2>

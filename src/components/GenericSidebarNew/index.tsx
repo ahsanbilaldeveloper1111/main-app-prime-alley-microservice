@@ -249,7 +249,7 @@ export interface GenericSidebarProps {
 // CALL MODAL COMPONENT
 // ============================================================================
 
-interface CallModalProps {
+export interface CallModalProps {
   isOpen: boolean;
   onClose: () => void;
   contactName: string;
@@ -259,7 +259,7 @@ interface CallModalProps {
   onCall: (phoneNumber: string) => void;
 }
 
-const CallModal: React.FC<CallModalProps> = ({
+export const CallModal: React.FC<CallModalProps> = ({
   isOpen,
   onClose,
   contactName,
@@ -3105,7 +3105,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter your task"
+            placeholder="Enter your task 123"
             style={{
               width: "100%",
               border: "none",
@@ -7276,7 +7276,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       lineHeight: "1.2",
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{
