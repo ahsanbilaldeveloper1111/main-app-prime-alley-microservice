@@ -190,9 +190,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordEmail: leadRecordEmail,
     recordPhone: leadRecordPhone,
     onTaskCreated: () => tasksRefetch?.(),
-    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
-    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
-    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
   const toggleSection = (sectionId: string) => {
@@ -1634,7 +1634,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       <div style={{ padding: "14px 0", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze Record Summary */}
+            {/* Record Summary */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1678,7 +1678,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{

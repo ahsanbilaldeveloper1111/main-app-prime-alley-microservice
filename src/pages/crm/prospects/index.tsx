@@ -702,6 +702,14 @@ const CrmProspectsManagement = () => {
     }
   }, [router.isReady, router.query.tab]);
 
+  // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
+  useEffect(() => {
+    if (!router.isReady || router.query.createContact !== "1") return;
+    setShowCreateContactSidebar(true);
+    const { createContact: _, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+  }, [router.isReady, router.query.createContact]);
+
   // Close Add Contacts dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -3255,7 +3263,7 @@ const CrmProspectsManagement = () => {
                 margin: 0,
               }}
             >
-              {editingContactId ? "Edit Contact" : "Create Contact"}
+              {editingContactId ? "Edit Prospect" : "Create Prospect"}
             </h2>
             <button
               className="contact-sidebar-close-btn"
