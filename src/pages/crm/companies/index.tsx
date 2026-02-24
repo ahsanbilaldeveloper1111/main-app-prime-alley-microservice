@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 import {
   Button,
   Card,
@@ -82,8 +83,14 @@ import {
   FileText,
   Target,
   Layers,
+  Link as LinkIcon,
+  Linkedin,
+  ExternalLink,
+  ClipboardList,
+  MoreHorizontal,
 } from "lucide-react";
-import CreateLeadModal from "@components/CreateLeadModal";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
@@ -95,9 +102,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 
 import GenericSidebar, {
-  SidebarSection,
   QuickAction,
-  BreezeRecordSummary,
   SidebarField,
 } from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
@@ -123,6 +128,13 @@ import {
   CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
+  getCompanies,
+  getCompany,
+  createCompany,
+  updateCompany,
+  deleteCompany,
+  type CompanyData,
+  type EnrichmentData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 
@@ -143,9 +155,13 @@ import {
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
-import { DownloadCallRecording } from "@utils/calls";
+import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
+
+import renderCreateCompany, {
+  type CompanyFormPayload,
+} from "@components/renderCreateCompany";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -535,7 +551,264 @@ const getRandomColor = (name: string): string => {
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
-const CrmProspectsManagement = () => {
+const labelKey = (key: string) =>
+  key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+const hasVal = (v: unknown) => v !== null && v !== undefined && v !== "";
+
+/** Renders enrichment_data: top-level fields, then all structured_data fields (no raw_data). */
+const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
+  const isObj = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  const topLevel: Array<{ key: string; value: unknown }> = [];
+  const skipKeys = ["raw_data", "structured_data", "validation_data"];
+  Object.entries(data).forEach(([k, v]) => {
+    if (skipKeys.includes(k) || !hasVal(v)) return;
+    topLevel.push({ key: k, value: v });
+  });
+
+  const struct = data.structured_data;
+  const grid = {
+    display: "grid" as const,
+    gridTemplateColumns: "160px 1fr",
+    gap: "12px 24px",
+    alignItems: "baseline",
+  };
+  const labelStyle = {
+    fontSize: "12px",
+    fontWeight: 700,
+    color: "#6b7280",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.5px",
+  };
+  const valueStyle = {
+    fontSize: "14px",
+    color: "#1f2937",
+    fontWeight: 500,
+    wordBreak: "break-word" as const,
+  };
+  const linkStyle = {
+    ...valueStyle,
+    color: "#2563eb",
+    textDecoration: "underline",
+  };
+
+  return (
+    <div style={{ marginBottom: "24px" }}>
+      <h5
+        style={{
+          fontSize: "15px",
+          fontWeight: 700,
+          color: "#1f2937",
+          marginBottom: "16px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            width: "4px",
+            height: "18px",
+            background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+            borderRadius: "2px",
+          }}
+        />
+        Enrichment data
+      </h5>
+      <div
+        style={{
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
+          borderRadius: "12px",
+          padding: "20px",
+        }}
+      >
+        {topLevel.length > 0 && (
+          <div style={{ ...grid, marginBottom: struct ? "20px" : 0 }}>
+            {topLevel.map(({ key, value }) => (
+              <React.Fragment key={key}>
+                <div style={labelStyle}>{labelKey(key)}</div>
+                <div style={valueStyle}>
+                  {Array.isArray(value)
+                    ? value.join(", ")
+                    : typeof value === "object"
+                      ? JSON.stringify(value)
+                      : String(value)}
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+        {struct && isObj(struct) && (
+          <div
+            style={{
+              paddingTop: topLevel.length > 0 ? "20px" : 0,
+              borderTop: topLevel.length > 0 ? "1px solid #e5e7eb" : "none",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6b7280",
+                marginBottom: "12px",
+              }}
+            >
+              Structured data (all fields)
+            </div>
+            <div style={grid}>
+              {hasVal(struct.official_company_name) && (
+                <>
+                  <div style={labelStyle}>Official company name</div>
+                  <div style={valueStyle}>
+                    {String(struct.official_company_name)}
+                  </div>
+                </>
+              )}
+              {struct.headquarters &&
+                (struct.headquarters.address ||
+                  struct.headquarters.city ||
+                  struct.headquarters.country) && (
+                  <>
+                    <div style={labelStyle}>Headquarters</div>
+                    <div style={valueStyle}>
+                      {[
+                        struct.headquarters.address,
+                        struct.headquarters.city,
+                        struct.headquarters.country,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
+                  </>
+                )}
+              {struct.other_locations &&
+                struct.other_locations.length > 0 &&
+                struct.other_locations.map((loc: any, i: number) => {
+                  const line = [loc?.address, loc?.city, loc?.country]
+                    .filter(Boolean)
+                    .join(", ");
+                  if (!line) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>Other location {i + 1}</div>
+                      <div style={valueStyle}>{line}</div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.emails &&
+                struct.emails.length > 0 &&
+                struct.emails.map((e: any, i: number) => {
+                  if (!hasVal(e?.email)) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>
+                        {struct.emails!.length > 1 ? `Email ${i + 1}` : "Email"}
+                      </div>
+                      <div style={valueStyle}>
+                        <a
+                          href={`mailto:${e.email}`}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {e.email}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.phones &&
+                struct.phones.length > 0 &&
+                struct.phones.map((p: any, i: number) => {
+                  if (!hasVal(p?.number)) return null;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>
+                        {struct.phones!.length > 1 ? `Phone ${i + 1}` : "Phone"}
+                      </div>
+                      <div style={valueStyle}>
+                        <a
+                          href={`tel:${p.number}`}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {p.number}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.social_links &&
+                struct.social_links.length > 0 &&
+                struct.social_links.map((s: any, i: number) => {
+                  if (!hasVal(s?.url)) return null;
+                  const linkLabel = s?.platform
+                    ? String(s.platform)
+                    : `Social ${i + 1}`;
+                  return (
+                    <React.Fragment key={i}>
+                      <div style={labelStyle}>{linkLabel}</div>
+                      <div style={valueStyle}>
+                        <a
+                          href={s.url}
+                          style={linkStyle}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {s.url}
+                        </a>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              {struct.llm_confidence != null && (
+                <>
+                  <div style={labelStyle}>LLM confidence</div>
+                  <div style={valueStyle}>{String(struct.llm_confidence)}</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {data.validation_data && isObj(data.validation_data) && (
+          <div
+            style={{
+              marginTop: "20px",
+              paddingTop: "20px",
+              borderTop: "1px solid #e5e7eb",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6b7280",
+                marginBottom: "12px",
+              }}
+            >
+              Validation data
+            </div>
+            <div style={grid}>
+              {Object.entries(data.validation_data).map(([k, v]) => {
+                if (!hasVal(v)) return null;
+                return (
+                  <React.Fragment key={k}>
+                    <div style={labelStyle}>{labelKey(k)}</div>
+                    <div style={valueStyle}>{String(v)}</div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CrmCompanyManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -562,9 +835,9 @@ const CrmProspectsManagement = () => {
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-  const [convertingProspectId, setConvertingProspectId] = useState<
-    number | null
-  >(null);
+  const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(
+    null,
+  );
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -635,15 +908,32 @@ const CrmProspectsManagement = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Sidebar states
-  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
+  const [showCompanySidebar, setShowCompanySidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedProspect, setSelectedProspect] = useState<any>(null);
+  const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+
+  // Activity modals for company sidebar (Call, Task, Meeting, Note, Email with record_type company)
+  const companyActivityModals = useCrmActivityModals({
+    recordType: "company",
+    recordId: selectedCompany?.id ?? selectedCompany?.rawData?.id ?? 0,
+    recordName: selectedCompany?.name ?? "",
+    recordEmail:
+      selectedCompany?.data?.email ??
+      selectedCompany?.email ??
+      "",
+    recordPhone: selectedCompany?.phone ?? "",
+  });
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
     useState(false);
+  const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
+    useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
+  const [editingCompanyData, setEditingCompanyData] =
+    useState<CompanyFormPayload | null>(null);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -655,7 +945,8 @@ const CrmProspectsManagement = () => {
     lifecycle_stage: "Lead",
     disposition: "",
     legal_basis: [] as string[],
-    company_domain: "",
+    last_called: "",
+    last_call_status: "",
     next_call: "",
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
@@ -683,8 +974,8 @@ const CrmProspectsManagement = () => {
     Record<string, number>
   >({});
 
-  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
-  const [showAllProspectStats, setShowAllProspectStats] = useState(false);
+  const [showCompanyAnalytics, setShowCompanyAnalytics] = useState(false);
+  const [showAllCompanyStats, setShowAllCompanyStats] = useState(false);
 
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
@@ -720,7 +1011,7 @@ const CrmProspectsManagement = () => {
     }
   }, [showAddContactsDropdown]);
 
-  // Load prospect into form when sidebar opens in edit mode
+  // Load company into form when sidebar opens in edit mode
   useEffect(() => {
     if (!showCreateContactSidebar || !editingContactId) {
       setContactFormLoadError(null);
@@ -730,53 +1021,35 @@ const CrmProspectsManagement = () => {
     let cancelled = false;
     setContactFormLoadError(null);
     setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any> }) => {
+    getCompany(editingContactId)
+      .then((company: CompanyData) => {
         if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
+        const nameParts = (company.name || "").trim().split(/\s+/);
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                    value: t.name ?? t.value ?? "",
-                    label: t.name ?? t.label ?? t.value ?? "",
-                  },
-            )
-          : [];
         setContactForm({
           firstName,
           lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phoneNumber: item.phone ?? "",
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "Lead",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
-          next_call: toDatetimeLocal(d.next_call),
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray,
-          note: item.note ?? d.note ?? "",
-          is_viewed: item.is_viewed ?? d.is_viewed ?? false,
+          email: company.email ?? "",
+          phoneNumber: company.phone ?? "",
+          campaign_id: null,
+          contact_owner: null,
+          lifecycle_stage: "Lead",
+          disposition: "",
+          legal_basis: [],
+          last_called: "",
+          last_call_status: "",
+          next_call: "",
+          scheduled_call_at: "",
+          tags: [],
+          note: "",
+          is_viewed: false,
         });
         if (!cancelled) setContactFormLoading(false);
       })
       .catch(() => {
         if (!cancelled) {
-          setContactFormLoadError("Failed to load prospect");
+          setContactFormLoadError("Failed to load company");
           setContactFormLoading(false);
         }
       });
@@ -784,6 +1057,35 @@ const CrmProspectsManagement = () => {
       cancelled = true;
     };
   }, [showCreateContactSidebar, editingContactId]);
+
+  // Load company into Create Company sidebar when opening for edit
+  useEffect(() => {
+    if (!showCreateCompanySidebar) return;
+    if (editingCompanyId == null) {
+      setEditingCompanyData(null);
+      return;
+    }
+    let cancelled = false;
+    getCompany(editingCompanyId)
+      .then((company: CompanyData) => {
+        if (cancelled) return;
+        setEditingCompanyData({
+          name: company.name ?? "",
+          phone: company.phone ?? undefined,
+          city: company.city ?? undefined,
+          country: company.country ?? undefined,
+          industry: company.industry ?? undefined,
+          domain: company.domain ?? undefined,
+          email: company.email ?? undefined,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setEditingCompanyData(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCreateCompanySidebar, editingCompanyId]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -808,13 +1110,13 @@ const CrmProspectsManagement = () => {
     [router],
   );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [prospectsSearch, setProspectsSearch] = useState("");
+  const [companySearch, setCompanySearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [prospectsFilters, setProspectsFilters] = useState({
+  const [companyFilters, setCompanyFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
     nextCallScheduled: null as string | null,
@@ -827,15 +1129,12 @@ const CrmProspectsManagement = () => {
   // Column customization and pagination states
   const defaultSelectedColumns = [
     "name",
+    "created_at",
     "phone",
-    "source_file",
-    "user_extension",
-    "campaign",
     "last_called_at",
-    "last_call_end_reason",
-    "disposition",
-    "scheduled_call_at",
-    "tags",
+    "city",
+    "country",
+    "industry",
   ];
   const [selectedColumns, setSelectedColumns] = useState<string[]>(
     () => defaultSelectedColumns,
@@ -852,8 +1151,8 @@ const CrmProspectsManagement = () => {
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
-  /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
-  const [totalAllProspects, setTotalAllProspects] = useState(0);
+  /** Total count of all companies (unchanged when switching to Scheduled / Convert to Leads tab) */
+  const [totalAllCompanies, setTotalAllCompanies] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1199,7 +1498,7 @@ const CrmProspectsManagement = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-        
+
         // Also populate the campaignsById map
         const campaignsMap: Record<number, string> = {};
         campaignsResponse.data.forEach((campaign: any) => {
@@ -1342,7 +1641,7 @@ const CrmProspectsManagement = () => {
         </div>
 
         <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} prospects
+          Showing {startRow} to {endRow} of {totalRecords} companies
         </div>
 
         <div className="d-flex gap-1">
@@ -1424,57 +1723,86 @@ const CrmProspectsManagement = () => {
     );
   };
 
-  // Fetch prospects data
+  // Map CompanyData to table shape (CrmDataItem-like)
+  const mapCompanyToRow = useCallback((c: CompanyData): CrmDataItem => {
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone ?? "",
+      created_at: c.created_at ?? "",
+      updated_at: c.updated_at ?? "",
+      last_called_at: null,
+      user_extension: null,
+      campaign_id: null,
+      campaign: null,
+      is_viewed: false,
+      scheduled_call_at: null,
+      status: "active",
+      source_file: null,
+      tags: null,
+      note: null,
+      data: {
+        email: c.email ?? "",
+        city: c.city ?? "",
+        country: c.country ?? "",
+        industry: c.industry ?? "",
+        domain: c.domain ?? "",
+        enrichment_status: c.enrichment_status ?? null,
+        enrichment_data: c.enrichment_data ?? null,
+      },
+    } as CrmDataItem;
+  }, []);
+
+  // Fetch companies data (Companies API)
   const fetchCrmData = useCallback(async () => {
-    // Increment request ID to track the latest request
     requestIdRef.current += 1;
     const currentRequestId = requestIdRef.current;
-
     setLoading(true);
     try {
-      const response = await getCrmData(buildCrmDataParams());
+      const params: {
+        page: number;
+        per_page: number;
+        search?: string;
+        industry?: string;
+        country?: string;
+      } = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+      };
+      if (currentFilters.search) params.search = currentFilters.search;
+      if (currentFilters.industry) params.industry = currentFilters.industry;
+      if (currentFilters.country) params.country = currentFilters.country;
 
-      // Only update state if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
+      const response = await getCompanies(params);
+      if (currentRequestId !== requestIdRef.current) return;
 
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
-
-      // Keep total all prospects only when fetching without tab filter (all prospects)
-      const isAllProspects =
-        memoizedFilters.has_scheduled_calls !== true &&
-        memoizedFilters.has_tickets !== true;
-      if (isAllProspects) {
-        setTotalAllProspects(response.pagination.total || 0);
-      }
-
-      setMetrics(
-        response.metrics || {
-          assigned_records: 0,
-          unassigned_records: 0,
-          scheduled_records: 0,
-          not_scheduled_records: 0,
-          scheduled_next_hour_records: 0,
-          scheduled_next_24_hours_records: 0,
-        },
-      );
+      const rows = (response.data || []).map(mapCompanyToRow);
+      setDataList(rows);
+      setTotalRecords(response.total ?? 0);
+      setTotalAllCompanies(response.total ?? 0);
+      setMetrics((prev) => ({
+        ...prev,
+        assigned_records: response.total ?? 0,
+        unassigned_records: 0,
+      }));
     } catch (error: any) {
-      // Only handle error if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-      console.error("Failed to fetch CRM data:", error);
+      if (currentRequestId !== requestIdRef.current) return;
       setDataList([]);
       setTotalRecords(0);
+      setTotalAllCompanies(0);
     } finally {
-      // Only set loading to false if this is still the current request
       if (currentRequestId === requestIdRef.current) {
         setLoading(false);
       }
     }
-  }, [buildCrmDataParams]);
+  }, [
+    pagination.currentPage,
+    pagination.rowsPerPage,
+    currentFilters.search,
+    currentFilters.industry,
+    currentFilters.country,
+    mapCompanyToRow,
+  ]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -1635,7 +1963,7 @@ const CrmProspectsManagement = () => {
           } failed validation`,
         );
       } else {
-        toast.error("Upload completed but no prospects were processed");
+        toast.error("Upload completed but no companies were processed");
       }
 
       setSelectedFile(null);
@@ -1658,12 +1986,72 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  // Handle view data item - open GenericSidebar only (no modal)
+  // Handle view data item
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
-    setSelectedProspect(item);
-    setShowProspectSidebar(true);
+    setShowViewModal(true);
   }, []);
+
+  // Fetch call recordings (not call logs) for the selected company
+  // Filters by current user's extension and company's phone number
+  const fetchCallRecordings = useCallback(
+    async (phoneNumber: string, userExtension?: string) => {
+      if (!phoneNumber) {
+        setCallRecordings([]);
+        return;
+      }
+
+      if (!userExtension) {
+        setCallRecordings([]);
+        return;
+      }
+
+      setCallRecordingsLoading(true);
+      try {
+        const filters = {
+          remote_party_number: [phoneNumber],
+          extension: [userExtension],
+        };
+
+        // Use ListCallLogs with reportType 'recordings' to fetch call recordings
+        const response = await ListCallLogs(
+          {
+            page: 1,
+            perPage: 5,
+            search: "",
+            filters,
+            reportType: "recordings", // This ensures we get recordings, not logs
+            moduleSlug: ModuleSlug.CALL_RECORDINGS,
+          },
+          "call-logs/recordings", // Endpoint for call recordings
+        );
+
+        if (response?.dataList) {
+          setCallRecordings(response.dataList);
+        } else {
+          setCallRecordings([]);
+        }
+
+        // Store total count from pagination
+        if (response?.total !== undefined) {
+          setCallRecordingsTotal(response.total);
+        } else {
+          setCallRecordingsTotal(0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch call recordings:", error);
+        setCallRecordings([]);
+        setCallRecordingsTotal(0);
+      } finally {
+        setCallRecordingsLoading(false);
+      }
+    },
+    [session],
+  );
+
+  // Call recordings are not shown in company view modal; no fetch on view open
+
+  // Call recordings not shown in company sidebar; no fetch on sidebar open
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -1739,12 +2127,12 @@ const CrmProspectsManagement = () => {
     setShowDeleteModal(true);
   }, []);
 
-  // Confirm delete
+  // Confirm delete (Companies API)
   const confirmDelete = useCallback(async () => {
     if (!itemToDelete) return;
 
     try {
-      await deleteCrmData(itemToDelete.id);
+      await deleteCompany(itemToDelete.id);
       setShowDeleteModal(false);
       setItemToDelete(null);
       setRefreshKey((prev) => prev + 1);
@@ -1973,11 +2361,21 @@ const CrmProspectsManagement = () => {
     taskDueDate?: string,
   ) => {
     console.log("Note created:", {
-      prospectId: selectedProspect.id,
+      companyId: selectedCompany.id,
       note,
       createTask,
       taskDueDate,
     });
+
+    // Here you would typically:
+    // 1. Save the note to your backend/database
+    // 2. If createTask is true, create a task with the due date
+    // 3. Update the UI to show the new note
+    // 4. Maybe refresh the notes section
+
+    alert(
+      `Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || "N/A"}`,
+    );
   };
   // Handle call button click
   const handleCallClick = useCallback(
@@ -2063,11 +2461,11 @@ const CrmProspectsManagement = () => {
     // Close the dialog
     handleAfterCallModalClose();
 
-    // If lead generation is selected, redirect to create lead page with prospect data
+    // If lead generation is selected, redirect to create lead page with company data
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       // Show success message and navigate to create lead page
       toast.success(
-        "Redirecting to create lead page with pre-filled prospect data...",
+        "Redirecting to create lead page with pre-filled company data...",
       );
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
@@ -2210,16 +2608,24 @@ const CrmProspectsManagement = () => {
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
-  // Handle prospect row click
-  const handleProspectClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
-  }, []);
+  // Handle company row click
+  const handleCompanyClick = useCallback(
+    (company: any) => {
+      const id = company?.id ?? company?.rawData?.id;
+      if (id != null) {
+        router.push(`/crm/companies/company-detailpage?id=${id}`);
+      } else {
+        setSelectedCompany(company);
+        setShowCompanySidebar(true);
+      }
+    },
+    [router],
+  );
 
-  // Handle close prospect sidebar
-  const handleCloseProspectSidebar = useCallback(() => {
-    setShowProspectSidebar(false);
-    setSelectedProspect(null);
+  // Handle close company sidebar
+  const handleCloseCompanySidebar = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
   }, []);
 
   // Handle open filters sidebar
@@ -2233,40 +2639,32 @@ const CrmProspectsManagement = () => {
   }, []);
 
   // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
+  const handlePreviewClick = useCallback((company: any) => {
+    setSelectedCompany(company);
+    setShowCompanySidebar(true);
   }, []);
 
-  // Handle first column click - navigates to detail page with prospect ID in URL
-  const handleFirstColumnClick = useCallback(
-    (prospect: any) => {
-      router.push(`/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`);
-    },
-    [router],
-  );
-
   // Stats cards data for metrics
-  const prospectsStatsCards: StatsCardData[] = useMemo(
+  const companyStatsCards: StatsCardData[] = useMemo(
     () => [
       {
-        title: "Prospects missing Owner",
+        title: "Companies missing Owner",
         value: dataList.filter(
           (p: any) => !p.user_extension || p.user_extension === "",
         ).length,
       },
       {
-        title: "Prospects missing Lead Status",
+        title: "Companies missing Lead Status",
         value: dataList.filter(
           (p: any) => !p.disposition || p.disposition === "",
         ).length,
       },
       {
-        title: "Prospects never called",
+        title: "Companies never called",
         value: dataList.filter((p: any) => !p.last_called_at).length,
       },
       {
-        title: "Prospects with no recent activity",
+        title: "Companies with no recent activity",
         value: dataList.filter((p: any) => {
           if (!p.last_called_at) return true;
           const daysSinceActivity = moment().diff(
@@ -2281,11 +2679,11 @@ const CrmProspectsManagement = () => {
   );
 
   // Define columns for GenericTable - Clean declarative definitions
-  const prospectsColumns: TableColumn<any>[] = useMemo(
+  const companyColumns: TableColumn<any>[] = useMemo(
     () => [
       {
         key: "name",
-        label: "Name",
+        label: "Company Name",
         sortable: true,
         type: "avatar",
         avatar: {
@@ -2295,199 +2693,85 @@ const CrmProspectsManagement = () => {
         emptyValue: "N/A",
       },
       {
+        key: "created_at",
+        label: "Create Date",
+        sortable: true,
+        type: "text",
+        accessor: (row) =>
+          row.created_at ? moment(row.created_at).format("MMM DD, YYYY") : "-",
+      },
+      {
         key: "phone",
-        label: "Phone",
+        label: "Phone Number",
         sortable: true,
         type: "custom",
         align: "left",
-      },
-      {
-        key: "source_file",
-        label: "Source",
-        sortable: true,
-        type: "badge",
-        badge: {
-          getVariant: () => "secondary",
-        },
-        emptyValue: "N/A",
-      },
-      {
-        key: "user_extension",
-        label: "Assigned To",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id.toString() === row.user_extension?.toString(),
-          );
-          return row.user_extension
-            ? extension?.display_name || row.user_extension
-            : "Unassigned";
-        },
-        badge: {
-          getVariant: (row) => (row.user_extension ? "success" : "secondary"),
-          showDot: () => true,
-        },
-      },
-      {
-        key: "campaign",
-        label: "Campaign",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => row.campaign?.name || "No Campaign",
-        badge: {
-          getVariant: (row) => (row.campaign ? "primary" : "info"),
-        },
+        render: (row) => (
+          <PhoneContainer
+            phone={row?.phone}
+            onClick={() => handleCallClick(row)}
+          />
+        ),
       },
       {
         key: "last_called_at",
-        label: "Last Called",
+        label: "Last Activity Date",
         sortable: true,
         type: "text",
         accessor: (row) =>
           row.last_called_at
-            ? moment(row.last_called_at).format("MMM DD, HH:mm")
+            ? moment(row.last_called_at).format("MMM DD, YYYY")
             : "-",
       },
       {
-        key: "last_call_end_reason",
-        label: "Last Call Status",
+        key: "city",
+        label: "City",
         sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          if (!row.last_call_end_reason) return null;
-          const endReason = callEndReasons.find(
-            (r) => r.value === row.last_call_end_reason,
-          );
-          return endReason?.label || row.last_call_end_reason;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.last_call_end_reason) return "secondary";
-            const endReason = callEndReasons.find(
-              (r) => r.value === row.last_call_end_reason,
-            );
-            return (endReason?.color as any) || "secondary";
-          },
-        },
-        emptyValue: "-",
+        type: "text",
+        accessor: (row) => row.data?.city || row.city || "N/A",
+        emptyValue: "N/A",
       },
       {
-        key: "disposition",
-        label: "Disposition",
+        key: "country",
+        label: "Country/Region",
         sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          if (!row.disposition) return null;
-          const dispositions = [
-            { value: "interested", label: "Interested", color: "success" },
-            {
-              value: "not_interested",
-              label: "Not Interested",
-              color: "danger",
-            },
-            {
-              value: "callback_requested",
-              label: "Callback Requested",
-              color: "warning",
-            },
-            { value: "no_answer", label: "No Answer", color: "warning" },
-            { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "danger" },
-            { value: "wrong_number", label: "Wrong Number", color: "info" },
-            { value: "follow_up", label: "Follow Up", color: "primary" },
-          ];
-          const disposition = dispositions.find(
-            (d) => d.value === row.disposition,
-          );
-          if (disposition) return disposition.label;
-          // Fallback to random for demo
-          const randomDisposition =
-            dispositions[Math.floor(Math.random() * dispositions.length)];
-          return randomDisposition.label;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.disposition) return "secondary";
-            const dispositions = [
-              { value: "interested", color: "success" },
-              { value: "not_interested", color: "danger" },
-              { value: "callback_requested", color: "warning" },
-              { value: "no_answer", color: "warning" },
-              { value: "busy", color: "info" },
-              { value: "do_not_call", color: "danger" },
-              { value: "wrong_number", color: "info" },
-              { value: "follow_up", color: "primary" },
-            ];
-            const disposition = dispositions.find(
-              (d) => d.value === row.disposition,
-            );
-            if (disposition) return disposition.color as any;
-            // Fallback to random for demo
-            const randomColors = [
-              "success",
-              "danger",
-              "warning",
-              "info",
-              "primary",
-            ];
-            return randomColors[
-              Math.floor(Math.random() * randomColors.length)
-            ] as any;
-          },
-        },
-        emptyValue: "-",
+        type: "text",
+        accessor: (row) => row.data?.country || row.country || "N/A",
+        emptyValue: "N/A",
       },
       {
-        key: "scheduled_call_at",
-        label: "Next Call",
+        key: "industry",
+        label: "Industry",
         sortable: true,
         type: "badge",
-        accessor: (row) => {
-          if (!row.scheduled_call_at) return "Not scheduled";
-          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(row.scheduled_call_at).isBefore(
-            moment().add(1, "hour"),
-          );
-          const formatted = moment(row.scheduled_call_at).format(
-            "MMM DD, HH:mm",
-          );
-          if (isOverdue) return `${formatted} (Overdue)`;
-          if (isNextHour) return `${formatted} (Soon)`;
-          return formatted;
-        },
+        accessor: (row) => row.data?.industry || row.industry || "N/A",
         badge: {
-          getVariant: (row) => {
-            if (!row.scheduled_call_at) return "info";
-            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-            const isNextHour = moment(row.scheduled_call_at).isBefore(
-              moment().add(1, "hour"),
-            );
-            return isOverdue ? "danger" : isNextHour ? "warning" : "info";
-          },
+          getVariant: () => "primary",
         },
+        emptyValue: "N/A",
       },
       {
-        key: "tags",
-        label: "Tags",
-        sortable: false,
-        type: "custom",
-        render: (row) => (
-          <div className="d-flex gap-1 flex-wrap">
-            {(row.tags || []).map((tag: any, idx: number) => (
-              <span key={idx} className="gt-badge gt-badge-secondary">
-                {tag.name || tag}
-              </span>
-            ))}
-          </div>
-        ),
+        key: "enrichment_status",
+        label: "Enrichment",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => row.data?.enrichment_status ?? "—",
+        badge: {
+          getVariant: (row) => {
+            const s = row.data?.enrichment_status;
+            if (s === "success") return "success";
+            if (s === "failed") return "danger";
+            return "secondary";
+          },
+        },
+        emptyValue: "—",
       },
     ],
     [extensions, callEndReasons, handleCallClick],
   );
 
   // Define table actions
-  const prospectsActions: TableAction<any>[] = useMemo(
+  const companyActions: TableAction<any>[] = useMemo(
     () => [
       ...(session?.user?.permissions?.includes("view-crm-data-management")
         ? [
@@ -2505,8 +2789,8 @@ const CrmProspectsManagement = () => {
               label: "Edit",
               icon: <FiEdit size={16} />,
               onClick: (row: any) => {
-                setEditingContactId(row.id);
-                setShowCreateContactSidebar(true);
+                setEditingCompanyId(row.id);
+                setShowCreateCompanySidebar(true);
               },
               variant: "link" as const,
             },
@@ -2564,7 +2848,7 @@ const CrmProspectsManagement = () => {
                     label: "Convert to Lead",
                     icon: <FiTarget size={14} />,
                     onClick: (row: any) => {
-                      setConvertingProspectId(row.id);
+                      setConvertingCompanyId(row.id);
                       setShowConvertToLeadModal(true);
                     },
                   },
@@ -2843,56 +3127,6 @@ const CrmProspectsManagement = () => {
                 <FiPhone size={14} />
               </Button>
             )}
-
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="app-button"
-                id={`dropdown-${props.id}`}
-              >
-                <FiMoreVertical size={14} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
-                ) && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <>
-                        <Dropdown.Item
-                          onClick={() => handleScheduleCall(props)}
-                        >
-                          <FiCalendar size={14} className="me-2" />
-                          Edit Scheduled Call
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          onClick={() => handleUnscheduleCallClick(props)}
-                          className="text-danger"
-                        >
-                          <FiX size={14} className="me-2" />
-                          Unschedule Call
-                        </Dropdown.Item>
-                      </>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
-                    )}
-                    <Dropdown.Divider />
-                  </>
-                )}
-                <Dropdown.Item
-                  onClick={() => {
-                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                  }}
-                >
-                  <FiTarget size={14} className="me-2" />
-                  Convert to Lead
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
           </div>
         ),
       },
@@ -2961,7 +3195,11 @@ const CrmProspectsManagement = () => {
       ref={addContactsRef}
     >
       <button
-        onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
+        onClick={() => {
+          setShowCreateCompanySidebar(false);
+          setEditingCompanyId(null);
+          setShowCreateCompanySidebar(true);
+        }}
         style={{
           padding: "9px 13px",
           backgroundColor: "#000000",
@@ -2982,139 +3220,33 @@ const CrmProspectsManagement = () => {
           e.currentTarget.style.backgroundColor = "#000000";
         }}
       >
-        Add prospects
-        <ChevronDown size={16} />
+        Add companies
       </button>
-
-      {showAddContactsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setEditingContactId(null);
-              setContactForm({
-                firstName: "",
-                lastName: "",
-                email: "",
-                phoneNumber: "",
-                campaign_id: null,
-                contact_owner: null,
-                lifecycle_stage: "Lead",
-                disposition: "",
-                legal_basis: [],
-                company_domain: "",
-                next_call: "",
-                scheduled_call_at: "",
-                tags: [],
-                note: "",
-                is_viewed: false,
-              });
-              setShowCreateContactSidebar(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Create new
-          </button>
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setShowUploadModal(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#d97706",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Import
-          </button>
-        </div>
-      )}
     </div>
   );
 
-  // Create prospect (contact) API submit - POST crm/crm-data { name, phone, data }
+  // Create company (contact) API submit - POST crm/crm-data { name, phone, data }
   const handleCreateContactSubmit = useCallback(
     async (addAnother: boolean) => {
       const name = [contactForm.firstName, contactForm.lastName]
         .filter(Boolean)
         .join(" ")
         .trim();
-      if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
-        toast.error("Name, email and phone are required");
+      if (!name?.trim()) {
+        toast.error("Company name is required");
         return;
       }
-      const sessionUser = session?.user as any;
-      const userExtension = String(sessionUser?.phone ?? "");
-      const assignedTo = userExtension;
-      const uploadedBy = userExtension;
 
       setCreateContactLoading(true);
       try {
-        await createCrmData({
-          name,
-          phone: contactForm.phoneNumber.trim(),
-          user_extension: userExtension,
-          campaign_id: contactForm.campaign_id ?? null,
-          data: {
-            email: contactForm.email.trim(),
-            assigned_to: assignedTo,
-            uploaded_by: uploadedBy,
-            company_domain: contactForm.company_domain || undefined,
-            disposition: contactForm.disposition || undefined,
-            next_call: contactForm.next_call || undefined,
-            tags: contactForm.tags?.length
-              ? contactForm.tags.map((t) => t.value || t.label)
-              : undefined,
-            is_viewed: contactForm.is_viewed,
-            scheduled_call_at: contactForm.scheduled_call_at || undefined,
-            note: contactForm.note || undefined,
-            contact_owner: contactForm.contact_owner ?? undefined,
-            lifecycle_stage: contactForm.lifecycle_stage || undefined,
-            legal_basis: contactForm.legal_basis?.length
-              ? contactForm.legal_basis
-              : undefined,
-          },
+        await createCompany({
+          name: name.trim(),
+          phone: contactForm.phoneNumber?.trim() || undefined,
+          email: contactForm.email?.trim() || undefined,
+          city: (contactForm as any).city ?? undefined,
+          country: (contactForm as any).country ?? undefined,
+          industry: (contactForm as any).industry ?? undefined,
+          domain: (contactForm as any).domain ?? undefined,
         });
         fetchCrmData();
         setContactForm({
@@ -3127,7 +3259,8 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: "Lead",
           disposition: "",
           legal_basis: [],
-          company_domain: "",
+          last_called: "",
+          last_call_status: "",
           next_call: "",
           scheduled_call_at: "",
           tags: [],
@@ -3138,12 +3271,12 @@ const CrmProspectsManagement = () => {
           setShowCreateContactSidebar(false);
         }
       } catch {
-        // Error already shown by createCrmData
+        // Error already shown by createCompany
       } finally {
         setCreateContactLoading(false);
       }
     },
-    [contactForm, fetchCrmData, session?.user],
+    [contactForm, fetchCrmData],
   );
 
   const handleUpdateContactSubmit = useCallback(async () => {
@@ -3152,43 +3285,26 @@ const CrmProspectsManagement = () => {
       .filter(Boolean)
       .join(" ")
       .trim();
-    if (
-      !name ||
-      !contactForm.email?.trim() ||
-      !contactForm.phoneNumber?.trim()
-    ) {
-      toast.error("Name, email and phone are required");
+    if (!name?.trim()) {
+      toast.error("Company name is required");
       return;
     }
     setCreateContactLoading(true);
     try {
-      await updateCrmData(editingContactId, {
-        name,
-        phone: contactForm.phoneNumber.trim(),
-        campaign_id: contactForm.campaign_id ?? null,
-        data: {
-          email: contactForm.email.trim(),
-          company_domain: contactForm.company_domain || undefined,
-          disposition: contactForm.disposition || undefined,
-          next_call: contactForm.next_call || undefined,
-          tags: contactForm.tags?.length
-            ? contactForm.tags.map((t) => t.value || t.label)
-            : undefined,
-          is_viewed: contactForm.is_viewed,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          note: contactForm.note || undefined,
-          contact_owner: contactForm.contact_owner ?? undefined,
-          lifecycle_stage: contactForm.lifecycle_stage || undefined,
-          legal_basis: contactForm.legal_basis?.length
-            ? contactForm.legal_basis
-            : undefined,
-        },
+      await updateCompany(editingContactId, {
+        name: name.trim(),
+        phone: contactForm.phoneNumber?.trim() || undefined,
+        email: contactForm.email?.trim() || undefined,
+        city: (contactForm as any).city ?? undefined,
+        country: (contactForm as any).country ?? undefined,
+        industry: (contactForm as any).industry ?? undefined,
+        domain: (contactForm as any).domain ?? undefined,
       });
       fetchCrmData();
       setShowCreateContactSidebar(false);
       setEditingContactId(null);
     } catch {
-      // Error already shown by updateCrmData
+      // Error already shown by updateCompany
     } finally {
       setCreateContactLoading(false);
     }
@@ -3199,9 +3315,7 @@ const CrmProspectsManagement = () => {
     if (!showCreateContactSidebar) return null;
 
     const isFormValid =
-      contactForm.email?.trim() &&
-      contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
+      contactForm.firstName?.trim() || contactForm.lastName?.trim();
 
     return (
       <>
@@ -3340,7 +3454,7 @@ const CrmProspectsManagement = () => {
                     }}
                   />
                   <span style={{ fontSize: "14px", color: "#64748b" }}>
-                    Loading prospect...
+                    Loading company...
                   </span>
                 </div>
               ) : (
@@ -3538,47 +3652,42 @@ const CrmProspectsManagement = () => {
                       >
                         Campaign
                       </label>
-                      {(() => {
-                        const campaignSelectOptions =
-                          availableCampaigns.map((c) => ({
-                            value: String(c.id),
-                            label: c.label,
-                          }));
-                        return (
-                          <Select
-                            value={
-                              contactForm.campaign_id != null
-                                ? campaignSelectOptions.find(
-                                    (o) =>
-                                      o.value ===
-                                      String(contactForm.campaign_id),
-                                  ) ?? null
-                                : null
-                            }
-                            onChange={(opt: any) =>
-                              setContactForm({
-                                ...contactForm,
-                                campaign_id: opt?.value
-                                  ? Number(opt.value)
-                                  : null,
-                              })
-                            }
-                            options={campaignSelectOptions}
-                            placeholder="Select campaign"
-                            isClearable
-                            isSearchable
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                minHeight: 40,
-                                border: "1px solid #8a8a8a",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                              }),
-                            }}
-                          />
-                        );
-                      })()}
+                      <Select
+                        value={
+                          contactForm.campaign_id != null
+                            ? (() => {
+                                const c = availableCampaigns.find(
+                                  (x) => x.id === contactForm.campaign_id,
+                                );
+                                return c
+                                  ? { value: String(c.id), label: c.label }
+                                  : null;
+                              })()
+                            : null
+                        }
+                        onChange={(opt: any) =>
+                          setContactForm({
+                            ...contactForm,
+                            campaign_id: opt?.value ? Number(opt.value) : null,
+                          })
+                        }
+                        options={availableCampaigns.map((c) => ({
+                          value: String(c.id),
+                          label: c.label,
+                        }))}
+                        placeholder="Select campaign"
+                        isClearable
+                        isSearchable
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: 40,
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                          }),
+                        }}
+                      />
                     </div>
                     <div
                       className="contact-form-field"
@@ -3854,18 +3963,53 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Company domain
+                        Last called
                       </label>
                       <input
-                        type="text"
-                        value={contactForm.company_domain}
+                        type="datetime-local"
+                        value={contactForm.last_called}
                         onChange={(e) =>
                           setContactForm({
                             ...contactForm,
-                            company_domain: e.target.value,
+                            last_called: e.target.value,
                           })
                         }
-                        placeholder="e.g. example.com"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Last call status
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.last_call_status}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            last_call_status: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Answered, No answer"
                         style={{
                           width: "100%",
                           padding: "10px 12px",
@@ -4197,32 +4341,32 @@ const CrmProspectsManagement = () => {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .prospects-table-wrapper {
+        .companies-table-wrapper {
           width: 100%;
           overflow: hidden;
         }
-        .prospects-table-wrapper .table-responsive {
+        .companies-table-wrapper .table-responsive {
           width: 100%;
           overflow-x: auto;
           overflow-y: visible;
           -webkit-overflow-scrolling: touch;
         }
-        .prospects-table-wrapper .table-responsive table {
+        .companies-table-wrapper .table-responsive table {
           width: 100%;
           table-layout: auto;
           margin-bottom: 0;
         }
-        .prospects-table-wrapper .table-responsive table th,
-        .prospects-table-wrapper .table-responsive table td {
+        .companies-table-wrapper .table-responsive table th,
+        .companies-table-wrapper .table-responsive table td {
           padding: 12px 16px;
           vertical-align: middle;
         }
-        .prospects-table-wrapper .table-responsive table td:last-child,
-        .prospects-table-wrapper .table-responsive table th:last-child {
+        .companies-table-wrapper .table-responsive table td:last-child,
+        .companies-table-wrapper .table-responsive table th:last-child {
           max-width: none;
         }
-        .prospects-table-wrapper .table-responsive table td[style*="width"],
-        .prospects-table-wrapper .table-responsive table th[style*="width"] {
+        .companies-table-wrapper .table-responsive table td[style*="width"],
+        .companies-table-wrapper .table-responsive table th[style*="width"] {
           max-width: none;
         }
         .timeline-line {
@@ -4274,7 +4418,7 @@ const CrmProspectsManagement = () => {
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="Prospects"
+        subTitle="Companies"
       />
       {/* Main flex container for content and sidebar */}
       <div
@@ -4348,7 +4492,7 @@ const CrmProspectsManagement = () => {
           {/* <StatsCards 
         data={[
           {
-            title: 'All Prospects',
+            title: 'All Companies',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -4379,7 +4523,7 @@ const CrmProspectsManagement = () => {
             }
           },
           {
-            title: 'All Prospects',
+            title: 'All Companies',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -4414,83 +4558,26 @@ const CrmProspectsManagement = () => {
       /> */}
 
           <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showProspectsAnalytics && (
+            {/* Summary stats removed – company list only */}
+            {false && showCompanyAnalytics && (
               <>
-                {/* Summary Stats Grid - Using KPICard design */}
                 <Row className="mb-2">
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Total Prospects"
+                      title="Total Companies"
                       value={totalRecords}
                       icon={<Users size={24} />}
                       color="primary"
                     />
                   </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllProspectStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Prospects Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Prospects Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
                 </Row>
-
                 <div className="text-center mb-4">
                   <Button
                     variant="link"
-                    onClick={() =>
-                      setShowAllProspectStats(!showAllProspectStats)
-                    }
+                    onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
                     className="text-decoration-none"
                   >
-                    {showAllProspectStats ? (
+                    {showAllCompanyStats ? (
                       <>
                         <ArrowUp size={16} className="me-1" />
                         Show Less
@@ -4515,7 +4602,7 @@ const CrmProspectsManagement = () => {
                   quickFilters={[
                     {
                       id: "all",
-                      label: "All Prospects",
+                      label: "All Companies",
                       color: "#0d6efd",
                       icon: <Users size={16} />,
                     },
@@ -4550,15 +4637,15 @@ const CrmProspectsManagement = () => {
                   //   setShowAdvancedFilters(!showAdvancedFilters)
                   // }
                   // advancedFilterCount={
-                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (prospectsFilters.campaigns !== null &&
-                  //   prospectsFilters.campaigns.length > 0
+                  //   (companyFilters.assignedTo !== null ? 1 : 0) +
+                  //   (companyFilters.campaigns !== null &&
+                  //   companyFilters.campaigns.length > 0
                   //     ? 1
                   //     : 0) +
-                  //   (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
-                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (prospectsFilters.tags !== null &&
-                  //   prospectsFilters.tags.length > 0
+                  //   (companyFilters.nextCallScheduled !== null ? 1 : 0) +
+                  //   (companyFilters.sourceFile !== null ? 1 : 0) +
+                  //   (companyFilters.tags !== null &&
+                  //   companyFilters.tags.length > 0
                   //     ? 1
                   //     : 0)
                   // }
@@ -4580,8 +4667,8 @@ const CrmProspectsManagement = () => {
                         <Form.Control
                           type="text"
                           placeholder="Search by name or phone..."
-                          value={prospectsSearch}
-                          onChange={(e) => setProspectsSearch(e.target.value)}
+                          value={companySearch}
+                          onChange={(e) => setCompanySearch(e.target.value)}
                         />
                       </Col>
                       <Col md={4}>
@@ -4598,10 +4685,10 @@ const CrmProspectsManagement = () => {
                               ext.extension,
                           }))}
                           value={
-                            prospectsFilters.assignedTo
+                            companyFilters.assignedTo
                               ? (() => {
                                   const assignedToId =
-                                    prospectsFilters.assignedTo;
+                                    companyFilters.assignedTo;
                                   const ext = extensions.find(
                                     (e: any) =>
                                       (e.id || e.extension) === assignedToId,
@@ -4625,7 +4712,7 @@ const CrmProspectsManagement = () => {
                             const assignedToValue = selected
                               ? selected.value
                               : null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               assignedTo: assignedToValue,
                             }));
@@ -4648,8 +4735,8 @@ const CrmProspectsManagement = () => {
                             label: c.label,
                           }))}
                           value={
-                            prospectsFilters.campaigns
-                              ? prospectsFilters.campaigns.map(
+                            companyFilters.campaigns
+                              ? companyFilters.campaigns.map(
                                   (campaignId: string) => {
                                     const campaign = availableCampaigns.find(
                                       (c: any) => c.value === campaignId,
@@ -4671,7 +4758,7 @@ const CrmProspectsManagement = () => {
                             const campaignValues = selected
                               ? selected.map((s: any) => s.value)
                               : null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               campaigns: campaignValues,
                             }));
@@ -4688,10 +4775,10 @@ const CrmProspectsManagement = () => {
                           Next Call Scheduled
                         </Form.Label>
                         <Form.Select
-                          value={prospectsFilters.nextCallScheduled || ""}
+                          value={companyFilters.nextCallScheduled || ""}
                           onChange={(e) => {
                             const value = e.target.value || null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               nextCallScheduled: value,
                               nextCallDateFrom: null,
@@ -4709,7 +4796,7 @@ const CrmProspectsManagement = () => {
                           <option value="custom">Custom Date Range</option>
                         </Form.Select>
                       </Col>
-                      {prospectsFilters.nextCallScheduled === "custom" && (
+                      {companyFilters.nextCallScheduled === "custom" && (
                         <>
                           <Col md={4}>
                             <Form.Label className="small fw-bold mb-2">
@@ -4717,10 +4804,10 @@ const CrmProspectsManagement = () => {
                             </Form.Label>
                             <Form.Control
                               type="date"
-                              value={prospectsFilters.nextCallDateFrom || ""}
+                              value={companyFilters.nextCallDateFrom || ""}
                               onChange={(e) => {
                                 const dateValue = e.target.value || null;
-                                setProspectsFilters((prev) => ({
+                                setCompanyFilters((prev) => ({
                                   ...prev,
                                   nextCallDateFrom: dateValue,
                                 }));
@@ -4733,10 +4820,10 @@ const CrmProspectsManagement = () => {
                             </Form.Label>
                             <Form.Control
                               type="date"
-                              value={prospectsFilters.nextCallDateTo || ""}
+                              value={companyFilters.nextCallDateTo || ""}
                               onChange={(e) => {
                                 const dateValue = e.target.value || null;
-                                setProspectsFilters((prev) => ({
+                                setCompanyFilters((prev) => ({
                                   ...prev,
                                   nextCallDateTo: dateValue,
                                 }));
@@ -4752,10 +4839,10 @@ const CrmProspectsManagement = () => {
                         <CreatableSelect
                           options={uniqueSources}
                           value={
-                            prospectsFilters.sourceFile
+                            companyFilters.sourceFile
                               ? {
-                                  value: prospectsFilters.sourceFile,
-                                  label: prospectsFilters.sourceFile,
+                                  value: companyFilters.sourceFile,
+                                  label: companyFilters.sourceFile,
                                 }
                               : null
                           }
@@ -4763,7 +4850,7 @@ const CrmProspectsManagement = () => {
                             const sourceValue = selected
                               ? selected.value
                               : null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               sourceFile: sourceValue,
                             }));
@@ -4785,24 +4872,22 @@ const CrmProspectsManagement = () => {
                             label: tag.label,
                           }))}
                           value={
-                            prospectsFilters.tags
-                              ? prospectsFilters.tags.map(
-                                  (tagValue: string) => {
-                                    const tag = availableTags.find(
-                                      (t: any) => t.value === tagValue,
-                                    );
-                                    return tag
-                                      ? { value: tagValue, label: tag.label }
-                                      : { value: tagValue, label: tagValue };
-                                  },
-                                )
+                            companyFilters.tags
+                              ? companyFilters.tags.map((tagValue: string) => {
+                                  const tag = availableTags.find(
+                                    (t: any) => t.value === tagValue,
+                                  );
+                                  return tag
+                                    ? { value: tagValue, label: tag.label }
+                                    : { value: tagValue, label: tagValue };
+                                })
                               : null
                           }
                           onChange={(selected) => {
                             const tagValues = selected
                               ? selected.map((s: any) => s.value)
                               : null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               tags: tagValues,
                             }));
@@ -4819,46 +4904,45 @@ const CrmProspectsManagement = () => {
                             variant="outline-secondary"
                             className="d-flex align-items-center justify-content-center"
                             onClick={() => {
-                              // Map prospectsFilters to the format expected by handleFiltersChange
+                              // Map companyFilters to the format expected by handleFiltersChange
                               const filtersToApply: Record<string, any> = {};
 
-                              if (prospectsSearch) {
-                                filtersToApply.search = prospectsSearch;
+                              if (companySearch) {
+                                filtersToApply.search = companySearch;
                               }
-                              if (prospectsFilters.assignedTo) {
+                              if (companyFilters.assignedTo) {
                                 filtersToApply.user_extension = [
-                                  prospectsFilters.assignedTo,
+                                  companyFilters.assignedTo,
                                 ];
                               }
                               if (
-                                prospectsFilters.campaigns &&
-                                prospectsFilters.campaigns.length > 0
+                                companyFilters.campaigns &&
+                                companyFilters.campaigns.length > 0
                               ) {
                                 filtersToApply.campaign_id =
-                                  prospectsFilters.campaigns;
+                                  companyFilters.campaigns;
                               }
-                              if (prospectsFilters.sourceFile) {
+                              if (companyFilters.sourceFile) {
                                 filtersToApply.source_file =
-                                  prospectsFilters.sourceFile;
+                                  companyFilters.sourceFile;
                               }
                               if (
-                                prospectsFilters.tags &&
-                                prospectsFilters.tags.length > 0
+                                companyFilters.tags &&
+                                companyFilters.tags.length > 0
                               ) {
-                                filtersToApply.tags = prospectsFilters.tags;
+                                filtersToApply.tags = companyFilters.tags;
                               }
 
                               // Handle next call scheduled filters
                               const now = moment();
                               if (
-                                prospectsFilters.nextCallScheduled === "today"
+                                companyFilters.nextCallScheduled === "today"
                               ) {
                                 const today = now.format("YYYY-MM-DD");
                                 filtersToApply.scheduled_call_from = today;
                                 filtersToApply.scheduled_call_to = today;
                               } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "tomorrow"
+                                companyFilters.nextCallScheduled === "tomorrow"
                               ) {
                                 const tomorrow = moment()
                                   .add(1, "day")
@@ -4866,8 +4950,7 @@ const CrmProspectsManagement = () => {
                                 filtersToApply.scheduled_call_from = tomorrow;
                                 filtersToApply.scheduled_call_to = tomorrow;
                               } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "this_week"
+                                companyFilters.nextCallScheduled === "this_week"
                               ) {
                                 const startOfWeek = moment()
                                   .startOf("week")
@@ -4879,8 +4962,7 @@ const CrmProspectsManagement = () => {
                                   startOfWeek;
                                 filtersToApply.scheduled_call_to = endOfWeek;
                               } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "next_week"
+                                companyFilters.nextCallScheduled === "next_week"
                               ) {
                                 const nextWeekStart = moment()
                                   .add(1, "week")
@@ -4894,20 +4976,20 @@ const CrmProspectsManagement = () => {
                                   nextWeekStart;
                                 filtersToApply.scheduled_call_to = nextWeekEnd;
                               } else if (
-                                prospectsFilters.nextCallScheduled === "overdue"
+                                companyFilters.nextCallScheduled === "overdue"
                               ) {
                                 filtersToApply.scheduled_call_status =
                                   "overdue";
                               } else if (
-                                prospectsFilters.nextCallScheduled === "custom"
+                                companyFilters.nextCallScheduled === "custom"
                               ) {
-                                if (prospectsFilters.nextCallDateFrom) {
+                                if (companyFilters.nextCallDateFrom) {
                                   filtersToApply.scheduled_call_from =
-                                    prospectsFilters.nextCallDateFrom;
+                                    companyFilters.nextCallDateFrom;
                                 }
-                                if (prospectsFilters.nextCallDateTo) {
+                                if (companyFilters.nextCallDateTo) {
                                   filtersToApply.scheduled_call_to =
-                                    prospectsFilters.nextCallDateTo;
+                                    companyFilters.nextCallDateTo;
                                 }
                               }
 
@@ -4925,8 +5007,8 @@ const CrmProspectsManagement = () => {
                             variant="outline-secondary"
                             className="d-flex align-items-center justify-content-center"
                             onClick={() => {
-                              setProspectsSearch("");
-                              setProspectsFilters({
+                              setCompanySearch("");
+                              setCompanyFilters({
                                 assignedTo: null,
                                 campaigns: null,
                                 nextCallScheduled: null,
@@ -4978,9 +5060,9 @@ const CrmProspectsManagement = () => {
             </div>
           )} */}
 
-            {/* Prospects Table */}
+            {/* Companies Table */}
             <div
-              className="prospects-table-wrapper"
+              className="companies-table-wrapper"
               style={{
                 flex: 1,
                 overflow: "hidden",
@@ -4990,10 +5072,10 @@ const CrmProspectsManagement = () => {
             >
               <GenericTable
                 data={dataList}
-                columns={prospectsColumns.filter((c) =>
+                columns={companyColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 )}
-                actions={prospectsActions}
+                actions={companyActions}
                 showActions={false}
                 // Selection
                 selectable={session?.user?.permissions?.includes(
@@ -5038,7 +5120,7 @@ const CrmProspectsManagement = () => {
                 }}
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
-                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+                onFirstColumnClick={(row) => handleCompanyClick(row)}
                 onRowDoubleClick={(row) => {
                   if (
                     session?.user?.permissions?.includes(
@@ -5050,8 +5132,8 @@ const CrmProspectsManagement = () => {
                 }}
                 // Loading & styling
                 loading={loading}
-                emptyMessage="No prospects found matching your criteria"
-                loadingMessage="Loading prospects..."
+                emptyMessage="No companies found matching your criteria"
+                loadingMessage="Loading companies..."
                 hover={true}
                 uniqueKey="id"
                 // Fixed height mode
@@ -5062,16 +5144,12 @@ const CrmProspectsManagement = () => {
                 toolbar={{
                   // Tabs
                   showTabs: true,
-                  showImport: true,
-                  onImportClick: () => {
-                    console.log("Import prospects");
-                  },
-                  tabsDropdownLabel: "Prospects",
+                  tabsDropdownLabel: "Companies",
                   tabs: [
                     {
                       id: "all",
-                      label: "All prospects",
-                      count: totalAllProspects,
+                      label: "All companies",
+                      count: totalAllCompanies,
                       removable: false,
                     },
                     ...customTabs.map((tab) =>
@@ -5098,10 +5176,10 @@ const CrmProspectsManagement = () => {
 
                   // Search
                   showSearch: true,
-                  searchValue: prospectsSearch,
-                  searchPlaceholder: "Search prospects...",
+                  searchValue: companySearch,
+                  searchPlaceholder: "Search companies...",
                   onSearchChange: (value) => {
-                    setProspectsSearch(value);
+                    setCompanySearch(value);
                     // Clear search on empty value
                     if (!value) {
                       const newFilters = { ...currentFilters };
@@ -5111,10 +5189,10 @@ const CrmProspectsManagement = () => {
                     }
                   },
                   onSearch: () => {
-                    if (prospectsSearch) {
+                    if (companySearch) {
                       handleFiltersChange({
                         ...currentFilters,
-                        search: prospectsSearch,
+                        search: companySearch,
                       });
                       setRefreshKey((prev) => prev + 1);
                     }
@@ -5139,8 +5217,8 @@ const CrmProspectsManagement = () => {
                   // Filter Pills
                   filterPills: [
                     {
-                      id: "contact_owner",
-                      label: "Contact Owner",
+                      id: "company_owner",
+                      label: "Company owner",
                       showDropdown: true,
                       dropdownOptions: [
                         {
@@ -5372,7 +5450,7 @@ const CrmProspectsManagement = () => {
                   rightActions: renderAddContactsButton(),
                 }}
                 // Stats cards for metrics
-                statsCards={prospectsStatsCards}
+                statsCards={companyStatsCards}
               />
             </div>
           </div>
@@ -5386,7 +5464,7 @@ const CrmProspectsManagement = () => {
               centered
             >
               <Modal.Header closeButton className="border-bottom bg-light">
-                <Modal.Title>Import Contacts - Prospects</Modal.Title>
+                <Modal.Title>Import Companies</Modal.Title>
               </Modal.Header>
               <Modal.Body className="p-4">
                 <div className="alert alert-info mb-4">
@@ -5588,7 +5666,7 @@ const CrmProspectsManagement = () => {
                       }}
                     >
                       {selectedDataItem.name ||
-                        `Prospect #${selectedDataItem.id}`}
+                        `Company #${selectedDataItem.id}`}
                     </h2>
                     <div
                       style={{
@@ -5602,17 +5680,21 @@ const CrmProspectsManagement = () => {
                         color: "#000",
                       }}
                     >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <PhoneIcon size={14} />
-                        {selectedDataItem.phone || "No phone"}
-                      </span>
-                      <span>•</span>
+                      {selectedDataItem.phone && (
+                        <>
+                          <span
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                            }}
+                          >
+                            <PhoneIcon size={14} />
+                            {selectedDataItem.phone}
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
@@ -5621,20 +5703,22 @@ const CrmProspectsManagement = () => {
                             )
                           : "N/A"}
                       </span>
-                      {selectedDataItem.is_viewed && (
+                      {(selectedDataItem.data as any)?.enrichment_status && (
                         <>
                           <span>•</span>
                           <Badge
-                            bg="light"
-                            text="dark"
-                            style={{
-                              background: "rgba(255,255,255,0.25)",
-                              border: "1px solid rgba(255,255,255,0.3)",
-                              color: "white",
-                              fontWeight: 500,
-                            }}
+                            bg={
+                              (selectedDataItem.data as any)
+                                .enrichment_status === "success"
+                                ? "success"
+                                : (selectedDataItem.data as any)
+                                      .enrichment_status === "failed"
+                                  ? "danger"
+                                  : "secondary"
+                            }
+                            style={{ fontWeight: 500 }}
                           >
-                            Viewed
+                            {(selectedDataItem.data as any).enrichment_status}
                           </Badge>
                         </>
                       )}
@@ -5650,1170 +5734,231 @@ const CrmProspectsManagement = () => {
                   overflowY: "auto",
                 }}
               >
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 360px",
-                    minHeight: "500px",
-                  }}
-                >
-                  {/* Left Panel - Main Information */}
+                <div style={{ padding: "32px" }}>
+                  {/* Company information – only fields that have values */}
                   <div
                     style={{
-                      padding: "32px",
-                      borderRight: "1px solid #e5e7eb",
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                      marginBottom: "24px",
                     }}
                   >
-                    {/* Quick Info Cards */}
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(2, 1fr)",
-                        gap: "16px",
-                        marginBottom: "28px",
+                        gridTemplateColumns: "140px 1fr",
+                        gap: "12px 24px",
+                        alignItems: "baseline",
                       }}
                     >
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(102, 126, 234, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
+                      {selectedDataItem.name && (
+                        <>
                           <div
                             style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <User size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#2563eb",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Assigned Agent
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {selectedDataItem.user_extension
-                                ? extensions.find(
-                                    (extension: any) =>
-                                      extension.id.toString() ===
-                                      selectedDataItem.user_extension?.toString(),
-                                  )?.display_name ||
-                                  selectedDataItem.user_extension
-                                : "Unassigned"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #f093fb30",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(240, 147, 251, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#0284c7",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Target size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#f5576c",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Campaign
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {availableCampaigns.find(
-                                (c) =>
-                                  c.value ===
-                                  selectedDataItem.campaign_id?.toString(),
-                              )?.label || "No Campaign"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact Information Section */}
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Contact Details
-                      </h5>
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "140px 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
+                              fontSize: "12px",
+                              fontWeight: 700,
                               color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
                             }}
                           >
-                            <PhoneIcon size={16} style={{ color: "#2563eb" }} />
+                            Name
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {selectedDataItem.name}
+                          </div>
+                        </>
+                      )}
+                      {selectedDataItem.phone && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
                             Phone
                           </div>
                           <div
                             style={{
-                              color: "#1f2937",
                               fontSize: "15px",
+                              color: "#1f2937",
                               fontWeight: 500,
                             }}
                           >
-                            {selectedDataItem.phone || "N/A"}
+                            {selectedDataItem.phone}
                           </div>
-
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.email && (
+                        <>
                           <div
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
+                              fontSize: "12px",
+                              fontWeight: 700,
                               color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
                             }}
                           >
-                            <Calendar size={16} style={{ color: "#2563eb" }} />
+                            Email
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).email}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.city && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            City
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).city}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.country && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Country
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).country}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.industry && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Industry
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).industry}
+                          </div>
+                        </>
+                      )}
+                      {(selectedDataItem.data as any)?.domain && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
+                            Domain
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {(selectedDataItem.data as any).domain}
+                          </div>
+                        </>
+                      )}
+                      {selectedDataItem.created_at && (
+                        <>
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                            }}
+                          >
                             Created
                           </div>
                           <div
                             style={{
-                              color: "#1f2937",
                               fontSize: "15px",
+                              color: "#1f2937",
                               fontWeight: 500,
                             }}
                           >
-                            {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
-                              : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Call Note Section */}
-                    {selectedDataItem?.note && (
-                      <div style={{ marginBottom: "28px" }}>
-                        <h5
-                          style={{
-                            fontSize: "15px",
-                            fontWeight: 700,
-                            color: "#1f2937",
-                            marginBottom: "16px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "4px",
-                              height: "18px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              borderRadius: "2px",
-                            }}
-                          />
-                          Call Notes
-                        </h5>
-                        <div
-                          style={{
-                            background: "#fffbeb",
-                            border: "1px solid #fcd34d",
-                            borderRadius: "12px",
-                            padding: "16px 20px",
-                            fontSize: "14px",
-                            color: "#78350f",
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {selectedDataItem.note}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Custom Data Fields Section */}
-                    {selectedDataItem.data &&
-                      Object.keys(selectedDataItem.data).length > 0 && (
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Additional Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              {Object.entries(selectedDataItem.data).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      {key
-                                        .replace(/_/g, " ")
-                                        .replace(/\b\w/g, (l) =>
-                                          l.toUpperCase(),
-                                        )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {value !== null && value !== undefined
-                                        ? typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : String(value)
-                                        : "N/A"}
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Call Recordings Section */}
-                    <div style={{ marginBottom: "20px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Call Recordings
-                        <Badge
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {callRecordingsTotal > 0
-                            ? callRecordingsTotal
-                            : callRecordings.length}
-                        </Badge>
-                      </h5>
-
-                      {callRecordingsLoading ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Spinner
-                            animation="border"
-                            variant="primary"
-                            size="sm"
-                            style={{ marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{ color: "#6b7280", fontSize: "14px" }}
-                          >
-                            Loading recordings...
-                          </p>
-                        </div>
-                      ) : callRecordings.length === 0 ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            border: "2px dashed #d1d5db",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <History
-                            size={40}
-                            style={{ color: "#9ca3af", marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            No call recordings found
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div style={{ overflowX: "auto" }}>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                              }}
-                            >
-                              <thead>
-                                <tr
-                                  style={{
-                                    background: "#f9fafb",
-                                    borderBottom: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Date & Time
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Extension
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Direction
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Duration
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "center",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      width: "100px",
-                                    }}
-                                  >
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {callRecordings.map(
-                                  (recording: any, index: number) => {
-                                    const duration =
-                                      parseInt(
-                                        recording.Duration?.toString() || "0",
-                                      ) / 10000000 || 0;
-                                    const isDownloading =
-                                      downloadingRecordings.has(recording.Id);
-                                    const progress =
-                                      downloadProgress[recording.Id] || 0;
-                                    const isOutgoing =
-                                      recording.Direction === "CALL_OUTGOING";
-
-                                    return (
-                                      <tr
-                                        key={recording.Id || index}
-                                        style={{
-                                          borderBottom: "1px solid #f3f4f6",
-                                          transition: "background 0.2s ease",
-                                        }}
-                                        onMouseOver={(e) => {
-                                          e.currentTarget.style.background =
-                                            "#f9fafb";
-                                        }}
-                                        onMouseOut={(e) => {
-                                          e.currentTarget.style.background =
-                                            "white";
-                                        }}
-                                      >
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              fontSize: "13px",
-                                              color: "#1f2937",
-                                              fontWeight: 500,
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalDateFormat,
-                                            )}
-                                          </div>
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "#6b7280",
-                                              marginTop: "2px",
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalTimeFormat,
-                                              "YYYY-MM-DD HH:mm:ss.SSSSSSS",
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {recording.AgentExtension || "N/A"}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "6px",
-                                              padding: "4px 10px",
-                                              borderRadius: "6px",
-                                              fontSize: "12px",
-                                              fontWeight: 600,
-                                              background: isOutgoing
-                                                ? "#dbeafe"
-                                                : "#d1fae5",
-                                              color: isOutgoing
-                                                ? "#1e40af"
-                                                : "#065f46",
-                                            }}
-                                          >
-                                            {isOutgoing
-                                              ? "Outgoing"
-                                              : "Incoming"}
-                                          </span>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {formatDuration(duration)}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "8px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          >
-                                            <button
-                                              style={{
-                                                background: "transparent",
-                                                border: "none",
-                                                color: "#2563eb",
-                                                cursor: "pointer",
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                transition: "all 0.2s ease",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}
-                                              title="Play Recording"
-                                              onClick={() =>
-                                                handlePlayCallRecording(
-                                                  recording,
-                                                )
-                                              }
-                                              onMouseOver={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "#ede9fe";
-                                              }}
-                                              onMouseOut={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "transparent";
-                                              }}
-                                            >
-                                              <FiPlay size={16} />
-                                            </button>
-                                            {isDownloading ? (
-                                              <CircularProgressCircle
-                                                progress={progress}
-                                                size="small"
-                                                color="#28a745"
-                                                backgroundColor="#e9ecef"
-                                                textColor="#495057"
-                                                showPercentage={false}
-                                                className="circular-progress-inline"
-                                              />
-                                            ) : (
-                                              <button
-                                                style={{
-                                                  background: "transparent",
-                                                  border: "none",
-                                                  color: "#2563eb",
-                                                  cursor: "pointer",
-                                                  padding: "6px",
-                                                  borderRadius: "6px",
-                                                  transition: "all 0.2s ease",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                                title="Download Recording"
-                                                onClick={() =>
-                                                  handleDownloadCallRecording(
-                                                    recording,
-                                                  )
-                                                }
-                                                onMouseOver={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "#ede9fe";
-                                                }}
-                                                onMouseOut={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "transparent";
-                                                }}
-                                              >
-                                                <Download size={16} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Panel - Quick Actions & Timeline */}
-                  <div
-                    style={{
-                      padding: "32px 24px",
-                      background: "#fafbfc",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                    }}
-                  >
-                    {/* Quick Actions */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Quick Actions
-                      </h6>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle call action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "white" }} />
-                          </div>
-                          Call Prospect
-                        </button>
-
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle message action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Mail size={16} style={{ color: "white" }} />
-                          </div>
-                          Send Message
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Status Overview */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Status Overview
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Status
-                            </span>
-                            <Badge
-                              bg={
-                                selectedDataItem.is_viewed
-                                  ? "success"
-                                  : "primary"
-                              }
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Total Calls
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {callRecordings.length}
-                            </span>
-                          </div>
-
-                          {selectedDataItem.scheduled_call_at && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                paddingTop: "14px",
-                                borderTop: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                <Calendar
-                                  size={14}
-                                  style={{ color: "#2563eb" }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Scheduled Call
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  marginLeft: "22px",
-                                }}
-                              >
-                                {moment(
-                                  selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Activity Timeline */}
-                    <div style={{ flex: 1 }}>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Recent Activity
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                          maxHeight: "300px",
-                          overflowY: "auto",
-                        }}
-                      >
-                        {callRecordings.length > 0 ? (
-                          <div style={{ position: "relative" }}>
-                            {/* Timeline line */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: "7px",
-                                top: "8px",
-                                bottom: "8px",
-                                width: "2px",
-                                background: "#e5e7eb",
-                              }}
-                            />
-
-                            {callRecordings
-                              .slice(0, 5)
-                              .map((recording: any, index: number) => {
-                                const isOutgoing =
-                                  recording.Direction === "CALL_OUTGOING";
-                                return (
-                                  <div
-                                    key={recording.Id || index}
-                                    style={{
-                                      position: "relative",
-                                      paddingLeft: "28px",
-                                      paddingBottom:
-                                        index <
-                                        Math.min(callRecordings.length, 5) - 1
-                                          ? "16px"
-                                          : "0",
-                                    }}
-                                  >
-                                    {/* Timeline dot */}
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        left: "0",
-                                        top: "4px",
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "50%",
-                                        background: isOutgoing
-                                          ? "#2563eb"
-                                          : "#10b981",
-                                        border: "3px solid white",
-                                        boxShadow: "0 0 0 1px #e5e7eb",
-                                      }}
-                                    />
-
-                                    <div>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          color: "#1f2937",
-                                          fontWeight: 600,
-                                          marginBottom: "4px",
-                                        }}
-                                      >
-                                        {isOutgoing
-                                          ? "Outgoing Call"
-                                          : "Incoming Call"}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "11px",
-                                          color: "#6b7280",
-                                        }}
-                                      >
-                                        {moment(recording.DateTime).format(
-                                          "MMM DD, hh:mm A",
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                            {callRecordings.length > 5 && (
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  marginTop: "12px",
-                                  paddingTop: "12px",
-                                  borderTop: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#2563eb",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  +{callRecordings.length - 5} more activities
-                                </span>
-                              </div>
+                            {moment(selectedDataItem.created_at).format(
+                              "MMMM DD, YYYY",
                             )}
                           </div>
-                        ) : (
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "20px",
-                              color: "#9ca3af",
-                            }}
-                          >
-                            <ClockIcon
-                              size={32}
-                              style={{ marginBottom: "8px", opacity: 0.5 }}
-                            />
-                            <div style={{ fontSize: "13px" }}>
-                              No activity yet
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
                   </div>
+
+                  {/* Enrichment data – only present keys, no static fields */}
+                  {(selectedDataItem.data as any)?.enrichment_data && (
+                    <CompanyViewEnrichmentBlock
+                      data={
+                        (selectedDataItem.data as any)
+                          .enrichment_data as EnrichmentData
+                      }
+                    />
+                  )}
                 </div>
               </Modal.Body>
 
@@ -6831,7 +5976,7 @@ const CrmProspectsManagement = () => {
                 }}
               >
                 <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Prospect ID: <strong>#{selectedDataItem.id}</strong>
+                  Company ID: <strong>#{selectedDataItem.id}</strong>
                 </div>
                 <Button
                   variant="outline-secondary"
@@ -6975,9 +6120,9 @@ const CrmProspectsManagement = () => {
             }}
             onConfirm={confirmDelete}
             itemName={
-              itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined
+              itemToDelete ? `company entry #${itemToDelete.id}` : undefined
             }
-            itemType="prospect entry"
+            itemType="company entry"
             additionalInfo={
               itemToDelete ? (
                 <div className="alert alert-warning mb-3">
@@ -7005,8 +6150,8 @@ const CrmProspectsManagement = () => {
           <FormModal
             show={showDataAssignmentModal}
             onHide={handleDataAssignmentModalClose}
-            title="Smart Prospect Distribution"
-            desc="Please fill the details below to smart prospect distribution."
+            title="Smart Company Distribution"
+            desc="Please fill the details below to smart company distribution."
             size="lg"
             formHtml={
               <>
@@ -8051,267 +7196,298 @@ const CrmProspectsManagement = () => {
             }}
             recording={selectedRecording}
           />
+          {companyActivityModals.modals}
         </div>{" "}
         {/* End main content area */}
-        {/* Prospect Detail Sidebar */}
-        {showProspectSidebar && (
-          <GenericSidebar
-            isOpen={showProspectSidebar}
-            onClose={handleCloseProspectSidebar}
-            title={selectedProspect?.name || "Prospect Details"}
-            subtitle={selectedProspect?.phone || ""}
-            email={selectedProspect?.data?.email}
-            phone={selectedProspect?.phone}
-            record={{
-              id: selectedProspect?.id,
-              type: RECORD_TYPES.PROSPECT,
-            }}
-            avatar={{
-              initials: getInitials(selectedProspect?.name || "NA"),
-              name: selectedProspect?.name || "NA",
-              gradient: getRandomColor(selectedProspect?.name || ""),
-            }}
-            recordType="prospect"
-            recordId={
-              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
-            }
-            onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content:
-                "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-              timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                navigator.clipboard.writeText(
-                  "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-                );
-                console.log("Summary copied");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
-            recordLink={{
-              label: "View record",
-              onClick: () => console.log("View full prospect record"),
-            }}
-            actionsDropdown={{
-              label: "Actions",
-              items: [
-                {
-                  label: "Convert to Lead",
-                  onClick: () => {
-                    setConvertingProspectId(selectedProspect?.id);
-                    setShowConvertToLeadModal(true);
-                  },
-                },
-                {
-                  label: "Assign to User",
-                  onClick: () => console.log("Assign"),
-                },
-                {
-                  label: "Delete",
-                  onClick: () => handleDeleteData(selectedProspect),
-                },
-              ],
-            }}
-            quickActions={[
-              {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {}, // This is handled internally now
-                disabled: false,
-              },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {},
-                disabled: !selectedProspect?.phone,
-              },
-              {
-                id: "email",
+        {/* Company Detail Sidebar – same design as prospects: Call, Task, Meeting, Note, Email with record_type company */}
+        {showCompanySidebar &&
+          (() => {
+            const enrichment = selectedCompany?.data?.enrichment_data as
+              | EnrichmentData
+              | undefined;
+            const domain = selectedCompany?.data?.domain as string | undefined;
+            const websiteUrl =
+              enrichment?.discovered_website ||
+              (domain
+                ? domain.startsWith("http")
+                  ? domain
+                  : `https://${domain}`
+                : null);
+            const struct = enrichment?.structured_data;
+            const companyQuickActions: QuickAction[] = [
+              { id: "note", label: "Note", icon: ClipboardList, onClick: companyActivityModals.openNote },
+              { id: "email", label: "Email", icon: Mail, onClick: companyActivityModals.openEmail },
+              { id: "call", label: "Call", icon: Phone, disabled: true, onClick: () => {} },
+              { id: "task", label: "Task", icon: ClipboardList, onClick: companyActivityModals.openTask },
+              { id: "meeting", label: "Meeting", icon: Calendar, onClick: companyActivityModals.openMeeting },
+            ];
+            const aboutFields: SidebarField[] = [];
+            if (selectedCompany?.name)
+              aboutFields.push({
+                label: "Name",
+                value: selectedCompany.name,
+                copyable: true,
+              });
+            if (selectedCompany?.phone)
+              aboutFields.push({
+                label: "Phone",
+                value: selectedCompany.phone,
+                type: "phone",
+                copyable: true,
+                externalLink: `tel:${selectedCompany.phone}`,
+              });
+            if (selectedCompany?.data?.email)
+              aboutFields.push({
                 label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                //disabled: !selectedProspect?.email
-              },
+                value: selectedCompany.data.email,
+                type: "email",
+                copyable: true,
+                externalLink: `mailto:${selectedCompany.data.email}`,
+              });
+            if (selectedCompany?.data?.city)
+              aboutFields.push({
+                label: "City",
+                value: selectedCompany.data.city,
+              });
+            if (selectedCompany?.data?.country)
+              aboutFields.push({
+                label: "Country",
+                value: selectedCompany.data.country,
+              });
+            if (selectedCompany?.data?.industry)
+              aboutFields.push({
+                label: "Industry",
+                value: selectedCompany.data.industry,
+              });
+            if (selectedCompany?.data?.domain)
+              aboutFields.push({
+                label: "Domain",
+                value: selectedCompany.data.domain,
+              });
+            if (websiteUrl)
+              aboutFields.push({
+                label: "Website",
+                value: websiteUrl,
+                type: "link",
+                externalLink: websiteUrl,
+              });
+            if (selectedCompany?.created_at)
+              aboutFields.push({
+                label: "Created",
+                value: moment(selectedCompany.created_at).format(
+                  "MMM DD, YYYY",
+                ),
+                type: "date",
+              });
+            if (selectedCompany?.updated_at)
+              aboutFields.push({
+                label: "Updated",
+                value: moment(selectedCompany.updated_at).format(
+                  "MMM DD, YYYY",
+                ),
+                type: "date",
+              });
+
+            const structuredSectionFields: SidebarField[] = [];
+            if (struct) {
+              if (struct.official_company_name)
+                structuredSectionFields.push({
+                  label: "Official company name",
+                  value: struct.official_company_name,
+                });
+              const hq = struct.headquarters;
+              if (hq && (hq.address || hq.city || hq.country)) {
+                structuredSectionFields.push({
+                  label: "Headquarters",
+                  value: [hq.address, hq.city, hq.country]
+                    .filter(Boolean)
+                    .join(", "),
+                });
+              }
+              const otherLoc = struct.other_locations;
+              if (otherLoc && otherLoc.length > 0) {
+                otherLoc.forEach(
+                  (
+                    loc: {
+                      address?: string | null;
+                      city?: string | null;
+                      country?: string | null;
+                    },
+                    i: number,
+                  ) => {
+                    const line = [loc.address, loc.city, loc.country]
+                      .filter(Boolean)
+                      .join(", ");
+                    if (line)
+                      structuredSectionFields.push({
+                        label: `Other location ${i + 1}`,
+                        value: line,
+                      });
+                  },
+                );
+              }
+              const structEmails = struct.emails;
+              if (structEmails && structEmails.length > 0) {
+                structEmails.forEach(
+                  (
+                    e: { email?: string | null; type?: string | null },
+                    i: number,
+                  ) => {
+                    if (e?.email)
+                      structuredSectionFields.push({
+                        label:
+                          structEmails!.length > 1 ? `Email ${i + 1}` : "Email",
+                        value: e.email,
+                        type: "email",
+                        externalLink: `mailto:${e.email}`,
+                      });
+                  },
+                );
+              }
+              const structPhones = struct.phones;
+              if (structPhones && structPhones.length > 0) {
+                structPhones.forEach(
+                  (
+                    p: { number?: string | null; type?: string | null },
+                    i: number,
+                  ) => {
+                    if (p?.number)
+                      structuredSectionFields.push({
+                        label:
+                          structPhones!.length > 1 ? `Phone ${i + 1}` : "Phone",
+                        value: p.number,
+                        type: "phone",
+                        externalLink: `tel:${p.number}`,
+                      });
+                  },
+                );
+              }
+              const structSocialLinks = struct.social_links;
+              if (structSocialLinks && structSocialLinks.length > 0) {
+                structSocialLinks.forEach(
+                  (
+                    s: { platform?: string | null; url?: string | null },
+                    i: number,
+                  ) => {
+                    if (s?.url)
+                      structuredSectionFields.push({
+                        label: s.platform
+                          ? String(s.platform)
+                          : `Social ${i + 1}`,
+                        value: s.url,
+                        type: "link",
+                        externalLink: s.url,
+                      });
+                  },
+                );
+              }
+              if (struct.llm_confidence != null)
+                structuredSectionFields.push({
+                  label: "LLM confidence",
+                  value: String(struct.llm_confidence),
+                });
+            }
+
+            const sections = [
               {
-                id: "task",
-                label: "Task",
-                icon: CheckSquare,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
-              },
-            ]}
-            sections={[
-              {
-                id: "about-prospect",
-                title: "About this prospect",
+                id: "about-company",
+                title: "About this company",
                 icon: Target,
                 collapsible: true,
                 defaultExpanded: true,
-                actions: [
-                  {
-                    label: "Edit all properties",
-                    onClick: () => console.log("Edit all"),
-                  },
-                ],
-                fields: [
-                  {
-                    label: "Name",
-                    value: selectedProspect?.name || "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Phone",
-                    value: selectedProspect?.phone || "N/A",
-                    type: "phone",
-                    copyable: true,
-                    externalLink: selectedProspect?.phone
-                      ? `tel:${selectedProspect.phone}`
-                      : undefined,
-                  },
-                  {
-                    label: "Email",
-                    value: selectedProspect?.data?.email || "N/A",
-                    type: "email",
-                    copyable: true,
-                    externalLink: selectedProspect?.data?.email
-                      ? `mailto:${selectedProspect.data.email}`
-                      : undefined,
-                    show: !!selectedProspect?.data?.email,
-                  },
-                  {
-                    label: "Assigned To",
-                    value: selectedProspect?.user_extension
-                      ? getNameByExtension(selectedProspect.user_extension)
-                      : "Unassigned",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
-                  },
-                  {
-                    label: "Campaign",
-                    value: selectedProspect?.campaign?.name || "No Campaign",
-                    show: !!selectedProspect?.campaign,
-                    hasDetails: !!selectedProspect?.campaign,
-                    onDetailsClick: () => console.log("Show campaign details"),
-                  },
-                  {
-                    label: "Status",
-                    value: selectedProspect?.status || "Active",
-                    type: "text",
-                  },
-                  {
-                    label: "Created Date",
-                    value: selectedProspect?.created_at
-                      ? moment(selectedProspect.created_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                  {
-                    label: "Last Updated",
-                    value: selectedProspect?.updated_at
-                      ? moment(selectedProspect.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                ],
+                fields:
+                  aboutFields.length > 0
+                    ? aboutFields
+                    : [
+                        {
+                          label: "Name",
+                          value: selectedCompany?.name || "—",
+                          copyable: true,
+                        },
+                      ],
               },
-              {
-                id: "recent-activities",
-                title: "Recent activities",
-                icon: History,
+            ];
+            if (structuredSectionFields.length > 0) {
+              sections.push({
+                id: "enrichment-structured",
+                title: "Enrichment (structured data)",
+                icon: Layers,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: History,
-                  message: "No recent activities for this prospect.",
-                  action: {
-                    label: "Log activity",
-                    onClick: () => console.log("Log activity"),
+                fields: structuredSectionFields,
+              });
+            }
+
+            return (
+              <GenericSidebar
+                isOpen={showCompanySidebar}
+                onClose={handleCloseCompanySidebar}
+                title={selectedCompany?.name || "Company Details"}
+                subtitle={selectedCompany?.phone || ""}
+                email={selectedCompany?.data?.email}
+                phone={selectedCompany?.phone}
+                avatar={{
+                  initials: getInitials(selectedCompany?.name || "NA"),
+                  name: selectedCompany?.name || "NA",
+                  gradient: getRandomColor(selectedCompany?.name || ""),
+                }}
+                record={{
+                  id: selectedCompany?.id || selectedCompany?.rawData?.id,
+                  type: RECORD_TYPES.COMPANY,
+                }}
+                recordLink={{
+                  label: "View record",
+                  onClick: () => {
+                    if (selectedCompany?.id != null) {
+                      router.push(`/crm/companies/company-detailpage?id=${selectedCompany.id}`);
+                    }
+                    setShowCompanySidebar(false);
                   },
-                },
-              },
-              {
-                id: "call-recordings",
-                title: "Call Recordings",
-                icon: PhoneIcon,
-                collapsible: true,
-                defaultExpanded: true,
-                emptyState: {
-                  icon: PhoneIcon,
-                  message: "No call recordings available yet.",
-                  action: {
-                    label: "Make a call",
-                    onClick: () =>
-                      selectedProspect?.phone &&
-                      handleCallClick(selectedProspect),
-                  },
-                },
-              },
-              {
-                id: "notes",
-                title: "Notes",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: FileText,
-                  message: "No notes added yet.",
-                  action: {
-                    label: "Add note",
-                    onClick: () => console.log("Add note"),
-                  },
-                },
-              },
-            ]}
-          />
-        )}
+                }}
+                actionsDropdown={{
+                  label: "Actions",
+                  items: [
+                    {
+                      label: "Convert to Lead",
+                      onClick: () => {
+                        setConvertingCompanyId(selectedCompany?.id ?? null);
+                        setShowConvertToLeadModal(true);
+                      },
+                    },
+                    {
+                      label: "Delete",
+                      onClick: () => handleDeleteData(selectedCompany),
+                    },
+                  ],
+                }}
+                quickActions={companyQuickActions}
+                sections={sections}
+              />
+            );
+          })()}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
           onClose={handleCloseFiltersSidebar}
           title="Filters"
-          subtitle="Filter prospects by various criteria"
+          subtitle="Filter companies by various criteria"
           width="400px"
           filters={[
             {
               id: "search",
               label: "Search",
               type: "text",
-              value: prospectsSearch,
-              onChange: (value) => setProspectsSearch(value),
+              value: companySearch,
+              onChange: (value) => setCompanySearch(value),
               placeholder: "Search by name or phone...",
             },
             {
               id: "assignedTo",
               label: "Assigned To",
               type: "select",
-              value: prospectsFilters.assignedTo
+              value: companyFilters.assignedTo
                 ? (() => {
-                    const assignedToId = prospectsFilters.assignedTo;
+                    const assignedToId = companyFilters.assignedTo;
                     const ext = extensions.find(
                       (e: any) => (e.id || e.extension) === assignedToId,
                     );
@@ -8325,7 +7501,7 @@ const CrmProspectsManagement = () => {
                 : null,
               onChange: (selected) => {
                 const assignedToValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   assignedTo: assignedToValue,
                 }));
@@ -8343,8 +7519,8 @@ const CrmProspectsManagement = () => {
               id: "campaigns",
               label: "Campaigns",
               type: "multi-select",
-              value: prospectsFilters.campaigns
-                ? prospectsFilters.campaigns.map((campaignId: string) => {
+              value: companyFilters.campaigns
+                ? companyFilters.campaigns.map((campaignId: string) => {
                     const campaign = availableCampaigns.find(
                       (c: any) => c.value === campaignId,
                     );
@@ -8357,7 +7533,7 @@ const CrmProspectsManagement = () => {
                 const campaignValues = selected
                   ? selected.map((s: any) => s.value)
                   : null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   campaigns: campaignValues,
                 }));
@@ -8375,10 +7551,10 @@ const CrmProspectsManagement = () => {
               id: "nextCallScheduled",
               label: "Next Call Scheduled",
               type: "dropdown",
-              value: prospectsFilters.nextCallScheduled || "",
+              value: companyFilters.nextCallScheduled || "",
               onChange: (value) => {
                 const selectedValue = value || null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   nextCallScheduled: selectedValue,
                   nextCallDateFrom: null,
@@ -8400,10 +7576,10 @@ const CrmProspectsManagement = () => {
               id: "nextCallDateFrom",
               label: "Next Call Date (From)",
               type: "date",
-              value: prospectsFilters.nextCallDateFrom || "",
+              value: companyFilters.nextCallDateFrom || "",
               onChange: (value) => {
                 const dateValue = value || null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   nextCallDateFrom: dateValue,
                 }));
@@ -8414,10 +7590,10 @@ const CrmProspectsManagement = () => {
               id: "nextCallDateTo",
               label: "Next Call Date (To)",
               type: "date",
-              value: prospectsFilters.nextCallDateTo || "",
+              value: companyFilters.nextCallDateTo || "",
               onChange: (value) => {
                 const dateValue = value || null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   nextCallDateTo: dateValue,
                 }));
@@ -8428,15 +7604,15 @@ const CrmProspectsManagement = () => {
               id: "sourceFile",
               label: "Source Name",
               type: "select",
-              value: prospectsFilters.sourceFile
+              value: companyFilters.sourceFile
                 ? {
-                    value: prospectsFilters.sourceFile,
-                    label: prospectsFilters.sourceFile,
+                    value: companyFilters.sourceFile,
+                    label: companyFilters.sourceFile,
                   }
                 : null,
               onChange: (selected) => {
                 const sourceValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   sourceFile: sourceValue,
                 }));
@@ -8451,8 +7627,8 @@ const CrmProspectsManagement = () => {
               id: "tags",
               label: "Tags",
               type: "multi-select",
-              value: prospectsFilters.tags
-                ? prospectsFilters.tags.map((tagValue: string) => {
+              value: companyFilters.tags
+                ? companyFilters.tags.map((tagValue: string) => {
                     const tag = availableTags.find(
                       (t: any) => t.value === tagValue,
                     );
@@ -8465,7 +7641,7 @@ const CrmProspectsManagement = () => {
                 const tagValues = selected
                   ? selected.map((s: any) => s.value)
                   : null;
-                setProspectsFilters((prev) => ({
+                setCompanyFilters((prev) => ({
                   ...prev,
                   tags: tagValues,
                 }));
@@ -8483,41 +7659,41 @@ const CrmProspectsManagement = () => {
           onApply={() => {
             const filtersToApply: Record<string, any> = {};
 
-            if (prospectsSearch) {
-              filtersToApply.search = prospectsSearch;
+            if (companySearch) {
+              filtersToApply.search = companySearch;
             }
-            if (prospectsFilters.assignedTo) {
-              filtersToApply.user_extension = [prospectsFilters.assignedTo];
+            if (companyFilters.assignedTo) {
+              filtersToApply.user_extension = [companyFilters.assignedTo];
             }
             if (
-              prospectsFilters.campaigns &&
-              prospectsFilters.campaigns.length > 0
+              companyFilters.campaigns &&
+              companyFilters.campaigns.length > 0
             ) {
-              filtersToApply.campaign_id = prospectsFilters.campaigns;
+              filtersToApply.campaign_id = companyFilters.campaigns;
             }
-            if (prospectsFilters.sourceFile) {
-              filtersToApply.source_file = prospectsFilters.sourceFile;
+            if (companyFilters.sourceFile) {
+              filtersToApply.source_file = companyFilters.sourceFile;
             }
-            if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
-              filtersToApply.tags = prospectsFilters.tags;
+            if (companyFilters.tags && companyFilters.tags.length > 0) {
+              filtersToApply.tags = companyFilters.tags;
             }
 
             // Handle next call scheduled filters
             const now = moment();
-            if (prospectsFilters.nextCallScheduled === "today") {
+            if (companyFilters.nextCallScheduled === "today") {
               const today = now.format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = today;
               filtersToApply.scheduled_call_to = today;
-            } else if (prospectsFilters.nextCallScheduled === "tomorrow") {
+            } else if (companyFilters.nextCallScheduled === "tomorrow") {
               const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = tomorrow;
               filtersToApply.scheduled_call_to = tomorrow;
-            } else if (prospectsFilters.nextCallScheduled === "this_week") {
+            } else if (companyFilters.nextCallScheduled === "this_week") {
               const startOfWeek = moment().startOf("week").format("YYYY-MM-DD");
               const endOfWeek = moment().endOf("week").format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = startOfWeek;
               filtersToApply.scheduled_call_to = endOfWeek;
-            } else if (prospectsFilters.nextCallScheduled === "next_week") {
+            } else if (companyFilters.nextCallScheduled === "next_week") {
               const nextWeekStart = moment()
                 .add(1, "week")
                 .startOf("week")
@@ -8528,16 +7704,16 @@ const CrmProspectsManagement = () => {
                 .format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = nextWeekStart;
               filtersToApply.scheduled_call_to = nextWeekEnd;
-            } else if (prospectsFilters.nextCallScheduled === "overdue") {
+            } else if (companyFilters.nextCallScheduled === "overdue") {
               filtersToApply.scheduled_call_status = "overdue";
-            } else if (prospectsFilters.nextCallScheduled === "custom") {
-              if (prospectsFilters.nextCallDateFrom) {
+            } else if (companyFilters.nextCallScheduled === "custom") {
+              if (companyFilters.nextCallDateFrom) {
                 filtersToApply.scheduled_call_from =
-                  prospectsFilters.nextCallDateFrom;
+                  companyFilters.nextCallDateFrom;
               }
-              if (prospectsFilters.nextCallDateTo) {
+              if (companyFilters.nextCallDateTo) {
                 filtersToApply.scheduled_call_to =
-                  prospectsFilters.nextCallDateTo;
+                  companyFilters.nextCallDateTo;
               }
             }
 
@@ -8550,8 +7726,8 @@ const CrmProspectsManagement = () => {
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
-            setProspectsSearch("");
-            setProspectsFilters({
+            setCompanySearch("");
+            setCompanyFilters({
               assignedTo: null,
               campaigns: null,
               nextCallScheduled: null,
@@ -8572,22 +7748,21 @@ const CrmProspectsManagement = () => {
         />
       </div>{" "}
       {/* End flex container */}
-      {/* Convert to Lead – same sidebar as Create Lead on leads page, with prospect pre-filled */}
-      <CreateLeadModal
-        show={showConvertToLeadModal}
-        onHide={() => {
-          setShowConvertToLeadModal(false);
-          setConvertingProspectId(null);
-        }}
-        onSuccess={() => {
-          setShowConvertToLeadModal(false);
-          setConvertingProspectId(null);
-          setRefreshKey((prev) => prev + 1);
-          toast.success("Prospect converted to lead successfully!");
-        }}
-        type="lead"
-        crmDataId={convertingProspectId ?? undefined}
-      />
+      {/* Convert to Lead Modal */}
+      {convertingCompanyId && (
+        <ConvertToLeadModal
+          show={showConvertToLeadModal}
+          onHide={() => {
+            setShowConvertToLeadModal(false);
+            setConvertingCompanyId(null);
+          }}
+          prospectId={convertingCompanyId}
+          onSuccess={() => {
+            setRefreshKey((prev) => prev + 1);
+            toast.success("Company converted to lead successfully!");
+          }}
+        />
+      )}
       {/* Column Editor Modal */}
       <Modal
         show={showColumnEditor}
@@ -8602,7 +7777,7 @@ const CrmProspectsManagement = () => {
             Select which columns to display in the table
           </p>
           <Row>
-            {prospectsColumns.map((col) => {
+            {companyColumns.map((col) => {
               const isChecked = draftSelectedColumns.includes(col.key);
               const isOnlySelected =
                 isChecked && draftSelectedColumns.length === 1;
@@ -8683,16 +7858,23 @@ const CrmProspectsManagement = () => {
                 const allData: CrmDataItem[] = [];
                 let page = 1;
                 for (;;) {
-                  const response = await getCrmData(
-                    buildCrmDataParams({ page, per_page: PER_PAGE }),
-                  );
-                  const chunk = response?.data || [];
+                  const response = await getCompanies({
+                    page,
+                    per_page: PER_PAGE,
+                    search: currentFilters.search,
+                    industry: currentFilters.industry,
+                    country: currentFilters.country,
+                  });
+                  const chunk = (response?.data || []).map(mapCompanyToRow);
                   allData.push(...chunk);
-                  if (chunk.length < PER_PAGE || allData.length >= totalRecords)
+                  if (
+                    chunk.length < PER_PAGE ||
+                    allData.length >= (response?.total ?? 0)
+                  )
                     break;
                   page += 1;
                 }
-                const exportColumns = prospectsColumns.filter((c) =>
+                const exportColumns = companyColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 );
                 const getCellValue = (row: any, col: TableColumn<any>) => {
@@ -8811,12 +7993,32 @@ const CrmProspectsManagement = () => {
       </Modal>
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
+      {/* Create Company Sidebar (create + edit) */}
+      {renderCreateCompany(
+        showCreateCompanySidebar,
+        setShowCreateCompanySidebar,
+        {
+          initialData: editingCompanyData,
+          editingId: editingCompanyId,
+          onSave: async (data: CompanyFormPayload, id?: number) => {
+            if (id != null) {
+              await updateCompany(id, data);
+            } else {
+              await createCompany(data);
+            }
+            await fetchCrmData();
+            setShowCreateCompanySidebar(false);
+            setEditingCompanyId(null);
+            setEditingCompanyData(null);
+          },
+        },
+      )}
     </React.Fragment>
   );
 };
 
-CrmProspectsManagement.getLayout = (page: ReactElement) => {
+CrmCompanyManagement.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default CrmProspectsManagement;
+export default CrmCompanyManagement;

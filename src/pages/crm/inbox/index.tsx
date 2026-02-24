@@ -1,24 +1,43 @@
 "use client";
 
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useRef, useEffect, useCallback, ReactElement } from "react";
 import Layout from "@layout/index";
 import '../../../app/generic-style.css';
+import { getChats, getWhatsAppChatMessages, sendWhatsApp } from "@utils/communication";
+import { useWhatsAppSocket, type WhatsAppSocketPayload } from "@hooks/useWhatsAppSocket";
 
 // ── Types ──────────────────────────────────────────────────────────────────
-interface Message {
-  id: number;
-  sender: "contact" | "agent";
-  name: string;
-  time: string;
-  channel: string;
-  text: string;
-  isRead?: boolean;
-}
-
 interface SidebarSection {
   label: string;
   count: number;
   expanded: boolean;
+}
+
+/** WhatsApp chat item from getChats API (matches CrmActivitiesPanel / WhatsAppSection) */
+interface WhatsAppChatItem {
+  id: number;
+  phone_number: string;
+  last_message_preview?: string;
+  last_message_at?: string;
+  window_started_at?: string;
+}
+
+/** Single message from getWhatsAppChatMessages / socket (matches WhatsAppSection) */
+interface WhatsAppMessage {
+  id: number;
+  direction: "inbound" | "outbound";
+  message: string;
+  message_type?: string;
+  content_sid?: string;
+  status?: string;
+  created_at: string;
+}
+
+/** Chat window info from getWhatsAppChatMessages response (matches WhatsAppSection) */
+interface WhatsAppChatWindowInfo {
+  is_within_24h_window?: boolean;
+  window_started_at?: string;
+  window_minutes_remaining?: number;
 }
 
 // ── Avatar ─────────────────────────────────────────────────────────────────
@@ -302,11 +321,100 @@ const LeftSidebar = () => {
   );
 };
 
+/** Format last_message_at for list display (e.g. "19h", "2d", "21 Feb") */
+function formatChatTime(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 60) return diffMins <= 1 ? "1m" : `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function payloadToMessage(payload: WhatsAppSocketPayload): WhatsAppMessage {
+  const raw = payload as Record<string, unknown>;
+  const messageText =
+    payload.message ??
+    (typeof raw.body === "string" ? raw.body : "") ??
+    (raw.text as string) ??
+    "";
+  return {
+    id: typeof payload.id === "number" ? payload.id : 0,
+    direction: (payload.direction as WhatsAppMessage["direction"]) ?? "inbound",
+    message: messageText,
+    message_type: payload.message_type ?? (raw.message_type as string),
+    content_sid: payload.content_sid ?? (raw.content_sid as string),
+    status: payload.status ?? (raw.status as string),
+    created_at:
+      payload.created_at ??
+      (raw.created_at as string) ??
+      (raw.timestamp as string) ??
+      new Date().toISOString(),
+  };
+}
+
+/** Derive display props from API/socket message at render time (no stored shape). */
+function getMessageDisplay(m: WhatsAppMessage, contactName: string) {
+  const time = m.created_at
+    ? new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    : "";
+  const text = m.message?.trim() || (m.message_type === "template" ? "Template sent" : "");
+  return {
+    id: m.id,
+    sender: (m.direction === "inbound" ? "contact" : "agent") as "contact" | "agent",
+    name: m.direction === "inbound" ? contactName : "You",
+    time,
+    text,
+    channel: "WhatsApp",
+    isRead: m.direction === "outbound" && m.status === "read",
+  };
+}
+
 // ── Conversation List (Grid 2) ─────────────────────────────────────────────
-const ConversationList = ({ onSelect }: { onSelect: () => void }) => {
-  const [selected, setSelected] = useState(true);
+const ConversationList = ({
+  selectedChat,
+  onSelectChat,
+  refreshChatsRef,
+}: {
+  selectedChat: WhatsAppChatItem | null;
+  onSelectChat: (chat: WhatsAppChatItem) => void;
+  refreshChatsRef: React.MutableRefObject<() => void>;
+}) => {
+  const [chats, setChats] = useState<WhatsAppChatItem[]>([]);
+  const [chatsLoading, setChatsLoading] = useState(true);
+  const [chatsError, setChatsError] = useState<string | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+
+  const fetchWhatsAppChats = useCallback(() => {
+    setChatsLoading(true);
+    setChatsError(null);
+    getChats()
+      .then((res: unknown) => {
+        const data = (res as { data?: WhatsAppChatItem[] })?.data;
+        setChats(Array.isArray(data) ? data : []);
+        setChatsError(null);
+      })
+      .catch((e) => {
+        console.error("Failed to fetch WhatsApp chats", e);
+        setChats([]);
+        setChatsError("Failed to load chats");
+      })
+      .finally(() => setChatsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetchWhatsAppChats();
+  }, [fetchWhatsAppChats]);
+
+  useEffect(() => {
+    refreshChatsRef.current = fetchWhatsAppChats;
+  }, [refreshChatsRef, fetchWhatsAppChats]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -315,6 +423,12 @@ const ConversationList = ({ onSelect }: { onSelect: () => void }) => {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  /** Initials from phone (last 2 digits or first 2 chars of number) */
+  const initialsForPhone = (phone: string) => {
+    const digits = (phone || "").replace(/\D/g, "").slice(-2);
+    return digits || "??";
+  };
 
   return (
     <div style={{
@@ -350,45 +464,153 @@ const ConversationList = ({ onSelect }: { onSelect: () => void }) => {
           )}
         </div>
       </div>
-      {/* Conversation Item */}
-      <div onClick={() => { setSelected(true); onSelect(); }} style={{
-        padding: "15px 16px 26px 16px", borderBottom: "1px solid #e2e8f0",
-        background: selected ? "#ebebeb" : "#fff", cursor: "pointer", display: "flex", gap: 10,
-      }}
-        onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f7fafc"; }}
-        onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "#fff"; }}
-      >
-        <input type="checkbox" style={{ marginTop: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()} />
-        <Avatar initials="RH" size={36} color="#efe7f0" textColor="#6b46c1" />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontWeight: 300, fontSize: 16, color: "#141414" }}>Rizwan haider</span>
-            <span style={{ fontSize: 11, color: "#718096" }}>19h</span>
+      {/* Conversation list */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        {chatsLoading ? (
+          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+            Loading chats...
           </div>
-          <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontWeight: 300 }}>
-            <Icon name="reply" size={11} color="#141414" />
-            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Let's have a quick call</span>
+        ) : chatsError ? (
+          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+            {chatsError}
           </div>
-        </div>
+        ) : chats.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+            No WhatsApp chats yet
+          </div>
+        ) : (
+          chats.map((chat) => {
+            const selected = selectedChat?.id === chat.id;
+            return (
+              <div
+                key={chat.id}
+                onClick={() => onSelectChat(chat)}
+                style={{
+                  padding: "15px 16px 26px 16px", borderBottom: "1px solid #e2e8f0",
+                  background: selected ? "#ebebeb" : "#fff", cursor: "pointer", display: "flex", gap: 10,
+                }}
+                onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f7fafc"; }}
+                onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "#fff"; }}
+              >
+                <input type="checkbox" style={{ marginTop: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()} />
+                <Avatar initials={initialsForPhone(chat.phone_number)} size={36} color="#efe7f0" textColor="#6b46c1" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontWeight: 300, fontSize: 16, color: "#141414" }}>{chat.phone_number || "Unknown"}</span>
+                    <span style={{ fontSize: 11, color: "#718096" }}>{formatChatTime(chat.last_message_at)}</span>
+                  </div>
+                  <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontWeight: 300 }}>
+                    <Icon name="reply" size={11} color="#141414" />
+                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {chat.last_message_preview || "No messages"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 };
 
 // ── Message Thread (Grid 3) ────────────────────────────────────────────────
-const MessageThread = () => {
+const MessageThread = ({
+  selectedChat,
+  refreshChatsRef,
+}: {
+  selectedChat: WhatsAppChatItem | null;
+  refreshChatsRef: React.MutableRefObject<() => void>;
+}) => {
   const [activeTab, setActiveTab] = useState<"whatsapp" | "comment">("whatsapp");
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, sender: "contact", name: "Rizwan haider", time: "05:29", channel: "WhatsApp", text: "Hi" },
-    { id: 2, sender: "agent", name: "Rizwan Haider", time: "05:29", channel: "WhatsApp", text: "Hi there" },
-    { id: 3, sender: "agent", name: "Rizwan Haider", time: "05:31", channel: "WhatsApp", text: "Let's have a quick call", isRead: true },
-  ]);
+  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sendLoading, setSendLoading] = useState(false);
   const [showInsertMenu, setShowInsertMenu] = useState(false);
   const [showWhatsappMenu, setShowWhatsappMenu] = useState(false);
+  const [chatWindowInfo, setChatWindowInfo] = useState<WhatsAppChatWindowInfo | null>(null);
+  const [, setTick] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const insertRef = useRef<HTMLDivElement>(null);
   const waRef = useRef<HTMLDivElement>(null);
+
+  const contactName = selectedChat?.phone_number ?? "Contact";
+
+  useEffect(() => {
+    if (!selectedChat) {
+      setMessages([]);
+      setChatWindowInfo(null);
+      return;
+    }
+    setMessagesLoading(true);
+    getWhatsAppChatMessages({ chat_id: String(selectedChat.id) })
+      .then((res: unknown) => {
+        const data = res as { messages?: WhatsAppMessage[]; chat?: WhatsAppChatWindowInfo };
+        const list = data?.messages;
+        setMessages(Array.isArray(list) ? list : []);
+        setChatWindowInfo(data?.chat ?? null);
+      })
+      .catch(() => {
+        setMessages([]);
+        setChatWindowInfo(null);
+      })
+      .finally(() => setMessagesLoading(false));
+  }, [selectedChat?.id, selectedChat?.phone_number]);
+
+  // Tick every minute so 24h countdown updates
+  useEffect(() => {
+    if (!chatWindowInfo?.is_within_24h_window) return;
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, [chatWindowInfo?.is_within_24h_window]);
+
+  const onMessageReceived = useCallback(
+    (payload: WhatsAppSocketPayload) => {
+      const rawChatId = payload.whats_app_chat_id;
+      if (rawChatId == null) return;
+      const chatIdNum = Number(rawChatId);
+      if (Number.isNaN(chatIdNum)) return;
+      const msg = payloadToMessage(payload);
+      if (selectedChat != null && chatIdNum === selectedChat.id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          // Replace optimistic outbound (temp id < 0) with same text when real message arrives
+          const isOutbound = msg.direction === "outbound";
+          const next = isOutbound
+            ? prev.filter((m) => !(m.id < 0 && m.message?.trim() === msg.message?.trim()))
+            : prev;
+          return [...next, msg];
+        });
+      } else {
+        refreshChatsRef.current();
+      }
+    },
+    [selectedChat, refreshChatsRef]
+  );
+
+  const onStatusUpdated = useCallback(
+    (payload: WhatsAppSocketPayload) => {
+      const rawChatId = payload.whats_app_chat_id;
+      if (rawChatId == null || payload.message_sid == null) return;
+      const chatIdNum = Number(rawChatId);
+      if (selectedChat == null || chatIdNum !== selectedChat.id) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          String(m.id) === String(payload.message_sid) || (payload.id != null && m.id === payload.id)
+            ? { ...m, status: payload.status === "read" ? "read" : m.status }
+            : m
+        )
+      );
+    },
+    [selectedChat]
+  );
+
+  useWhatsAppSocket({
+    selectedChatId: selectedChat?.id ?? null,
+    callbacks: { onMessageReceived, onStatusUpdated },
+  });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -403,83 +625,137 @@ const MessageThread = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
-    setMessages(prev => [...prev, {
-      id: Date.now(), sender: "agent", name: "Rizwan Haider",
-      time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-      channel: "WhatsApp", text: message,
-    }]);
-    setMessage("");
+  const sendMessage = async () => {
+    const text = message.trim();
+    if (!text || !selectedChat?.phone_number) return;
+    setSendLoading(true);
+    try {
+      await sendWhatsApp({ number: selectedChat.phone_number, message: text });
+      setMessage("");
+      // Optimistic append; socket may deliver the real message later (we dedupe in onMessageReceived)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: -Date.now(),
+          direction: "outbound",
+          message: text,
+          created_at: new Date().toISOString(),
+          status: "sent",
+        },
+      ]);
+      refreshChatsRef.current();
+    } catch {
+      // toast handled by sendWhatsApp
+    } finally {
+      setSendLoading(false);
+    }
   };
+
+  const hasMessages = messages.length > 0;
+  const dateLabel = hasMessages ? new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
+
+  // 24h window countdown (backend keys: window_minutes_remaining or window_started_at)
+  let minutesRemaining: number | null = chatWindowInfo?.window_minutes_remaining ?? null;
+  if (minutesRemaining == null && chatWindowInfo?.window_started_at) {
+    const start = new Date(chatWindowInfo.window_started_at).getTime();
+    const end = start + 24 * 60 * 60 * 1000;
+    minutesRemaining = Math.max(0, Math.floor((end - Date.now()) / 60000));
+  }
+  const show24hTimer = selectedChat && chatWindowInfo?.is_within_24h_window !== false && minutesRemaining != null && minutesRemaining > 0;
+  const timerLabel =
+    minutesRemaining != null && minutesRemaining > 0
+      ? `${Math.floor(minutesRemaining / 60)}h ${minutesRemaining % 60}m remaining`
+      : "";
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#fff", minWidth: 0, height: "100%", overflow: "hidden" }}>
+      {/* 24h window timer */}
+      {show24hTimer && (
+        <div style={{
+          flexShrink: 0, padding: "8px 20px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0",
+          display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#166534",
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", flexShrink: 0 }} />
+          {timerLabel}
+        </div>
+      )}
       {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minHeight: 0 }}>
-        {/* Date divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0 20px" }}>
-          <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-          <span style={{
-            fontSize: 12, color: "#141414", background: "#fff", padding: "2px 10px",
-            border: "1px solid #e2e8f0", borderRadius: 12,
-          }}>21 February</span>
-          <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-        </div>
+        {!selectedChat ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
+            Select a chat to view messages.
+          </div>
+        ) : messagesLoading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
+            Loading messages...
+          </div>
+        ) : (
+          <>
+            {dateLabel && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0 20px" }}>
+                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+                <span style={{
+                  fontSize: 12, color: "#141414", background: "#fff", padding: "2px 10px",
+                  border: "1px solid #e2e8f0", borderRadius: 12,
+                }}>{dateLabel}</span>
+                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+              </div>
+            )}
 
-        {messages.map(msg => (
-          <div key={msg.id} style={{
-            marginBottom: 16, display: "flex", flexDirection: msg.sender === "contact" ? "row" : "row-reverse",
-            alignItems: "flex-start", gap: 10,
-          }}>
-            {msg.sender === "contact" && (
-              <div style={{
-                width: 28, height: 28, borderRadius: "50%", background: "#4a90d9",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
-              }}>UV</div>
-            )}
-            {msg.sender === "agent" && (
-              <Avatar initials="RH" size={28} color="#efe7f0" textColor="#6b46c1" />
-            )}
-            <div style={{ maxWidth: "70%" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                flexDirection: msg.sender === "contact" ? "row" : "row-reverse",
-                marginBottom: 4,
-              }}>
-                <span style={{ fontWeight: 600, fontSize: 14, color: "#141414" }}>{msg.name}</span>
-                <span style={{ fontSize: 11, color: "#718096" }}>{msg.time}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <Icon name="whatsapp" size={12} color="#25D366" />
-                  <span style={{ fontSize: 11, color: "#718096" }}>{msg.channel}</span>
-                  <Icon name="chevronDown" size={10} color="#141414" />
+            {messages.map((m) => {
+              const d = getMessageDisplay(m, contactName);
+              return (
+                <div key={m.id} style={{
+                  marginBottom: 16, display: "flex", flexDirection: d.sender === "contact" ? "row" : "row-reverse",
+                  alignItems: "flex-start", gap: 10,
+                }}>
+                  {d.sender === "contact" && (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%", background: "#4a90d9",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                    }}>{(d.name || "").replace(/\D/g, "").slice(-2) || "??"}</div>
+                  )}
+                  {d.sender === "agent" && (
+                    <Avatar initials="You" size={28} color="#efe7f0" textColor="#6b46c1" />
+                  )}
+                  <div style={{ maxWidth: "70%" }}>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      flexDirection: d.sender === "contact" ? "row" : "row-reverse",
+                      marginBottom: 4,
+                    }}>
+                      <span style={{ fontWeight: 600, fontSize: 14, color: "#141414" }}>{d.name}</span>
+                      <span style={{ fontSize: 11, color: "#718096" }}>{d.time}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                        <Icon name="whatsapp" size={12} color="#25D366" />
+                        <span style={{ fontSize: 11, color: "#718096" }}>{d.channel}</span>
+                        <Icon name="chevronDown" size={10} color="#141414" />
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: "8px 12px",
+                      fontSize: 14, color: "#141414", lineHeight: 1.5,
+                    }}>
+                      {d.text}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div style={{
-                padding: "8px 12px", 
-                
-                 fontSize: 14, color: "#141414", lineHeight: 1.5,
-              }}>
-                {msg.text}
-              </div>
-            </div>
-          </div>
-        ))}
+              );
+            })}
 
-        {/* Assignment notice */}
-        <div className="text-secondary" style={{ textAlign: "center", margin: "8px 0", fontSize: 12 }}>
-          You reassigned this thread to yourself at 05:29.{" "}
-          <span className="text-link">Assignment details</span>
-        </div>
-
-        {/* Read receipt */}
-        {messages[messages.length - 1]?.isRead && (
-          <div style={{ textAlign: "right", fontSize: 11, color: "#718096", marginTop: 4 }}>
-            Read at {messages[messages.length - 1].time}
-          </div>
+            {(() => {
+              const last = messages[messages.length - 1];
+              const lastD = last ? getMessageDisplay(last, contactName) : null;
+              return lastD?.isRead ? (
+                <div style={{ textAlign: "right", fontSize: 11, color: "#718096", marginTop: 4 }}>
+                  Read at {lastD.time}
+                </div>
+              ) : null;
+            })()}
+            <div ref={bottomRef} />
+          </>
         )}
-        <div ref={bottomRef} />
       </div>
 
       {/* Composer */}
@@ -535,7 +811,8 @@ const MessageThread = () => {
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Write a message. Press '/' or highlight text to access AI commands."
+            placeholder={selectedChat ? "Write a message. Press '/' or highlight text to access AI commands." : "Select a chat to reply."}
+            disabled={!selectedChat}
             style={{
               width: "100%", minHeight: 80, border: "none", outline: "none", resize: "none",
               fontSize: 13, color: "#141414", background: "transparent", fontFamily: "inherit",
@@ -604,14 +881,14 @@ const MessageThread = () => {
           <div style={{ display: "flex", alignItems: "center" }}>
             <button 
               onClick={sendMessage} 
-              className={message.trim() ? "btn btn-primary" : "btn"}
-              disabled={!message.trim()}
+              className={message.trim() && selectedChat ? "btn btn-primary" : "btn"}
+              disabled={!message.trim() || !selectedChat || sendLoading}
               style={{
                 borderRadius: "4px 0 0 4px",
                 ...(!message.trim() && { background: "#e6e6e6", color: "#aaa" })
               }}
             >
-              Send
+              {sendLoading ? "Sending..." : "Send"}
             </button>
             <Dropdown
               trigger={
@@ -783,7 +1060,7 @@ const ContactPanel = () => {
 };
 
 // ── Top Bar (shared by Grid 3 & 4) ────────────────────────────────────────
-const TopBar = () => {
+const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actRef = useRef<HTMLDivElement>(null);
 
@@ -810,14 +1087,20 @@ const TopBar = () => {
       {/* Contact info */}
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: "#141414", display: "flex", alignItems: "center", gap: 6 }}>
-          Rizwan haider
+          {selectedChat ? selectedChat.phone_number : "Rizwan haider"}
         </div>
         <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, fontWeight: 300 }}>
-          Founder at{" "}
-          <span style={{ color: "#006162", cursor: "pointer", display: "flex", alignItems: "center", gap: 2, fontWeight: 500 }}>
-            Prime Alley Technology <Icon name="externalLink" size={10} color="#006162" />
-          </span>
-          <span>• Created 19 hours ago</span>
+          {selectedChat ? (
+            <span>WhatsApp</span>
+          ) : (
+            <>
+              Founder at{" "}
+              <span style={{ color: "#006162", cursor: "pointer", display: "flex", alignItems: "center", gap: 2, fontWeight: 500 }}>
+                Prime Alley Technology <Icon name="externalLink" size={10} color="#006162" />
+              </span>
+              <span>• Created 19 hours ago</span>
+            </>
+          )}
         </div>
       </div>
       {/* Owner */}
@@ -877,7 +1160,8 @@ const TopBar = () => {
 
 // ── Root Component ─────────────────────────────────────────────────────────
 function CRMInbox() {
-  const [conversationOpen, setConversationOpen] = useState(true);
+  const [selectedChat, setSelectedChat] = useState<WhatsAppChatItem | null>(null);
+  const refreshChatsRef = useRef<() => void>(() => {});
 
   return (
     <div style={{
@@ -892,15 +1176,19 @@ function CRMInbox() {
       {/* Grid 1: Left sidebar */}
       <LeftSidebar />
 
-      {/* Grid 2: Conversation list */}
-      <ConversationList onSelect={() => setConversationOpen(true)} />
+      {/* Grid 2: Conversation list (WhatsApp chats from API) */}
+      <ConversationList
+        selectedChat={selectedChat}
+        onSelectChat={setSelectedChat}
+        refreshChatsRef={refreshChatsRef}
+      />
 
       {/* Grids 3+4 share a column with top bar */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <TopBar />
+        <TopBar selectedChat={selectedChat} />
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Grid 3: Message thread */}
-          {conversationOpen && <MessageThread />}
+          <MessageThread selectedChat={selectedChat} refreshChatsRef={refreshChatsRef} />
           {/* Grid 4: Contact panel */}
           <ContactPanel />
         </div>

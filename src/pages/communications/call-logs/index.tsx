@@ -192,22 +192,7 @@ const CallLogs = () => {
             iconBgColor: '#E0F2FE',
             subtitle: 'Total placed call count',
         },
-        {
-            title: 'Inbound',
-            value: summary?.inbound || 0,
-            icon: PhoneIncoming,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            subtitle: 'Total received call count',
-        },
-        {
-            title: 'Outbound',
-            value: summary?.outbound || 0,
-            icon: PhoneOutgoing,
-            iconColor: '#0EA5E9',
-            iconBgColor: '#E0F2FE',
-            subtitle: 'Total placed call count',
-        }
+        
     ];
 
     const [tableLoading, setTableLoading] = useState(false);

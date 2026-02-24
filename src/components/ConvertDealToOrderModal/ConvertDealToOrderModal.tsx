@@ -116,9 +116,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     items: [] as OrderItem[],
   });
 
-  const focusStyle = (e: React.FocusEvent<HTMLInputElement>) =>
+  const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "#0091ae");
-  const blurStyle = (e: React.FocusEvent<HTMLInputElement>) =>
+  const blurStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "#8a8a8a");
 
   useEffect(() => {

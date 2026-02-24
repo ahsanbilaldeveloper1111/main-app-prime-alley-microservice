@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
+  X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -8,6 +9,7 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
+  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
@@ -15,18 +17,34 @@ import {
   ThumbsUp,
   ThumbsDown,
   Sparkles,
+  User,
+  Building2,
+  Briefcase,
   FileText,
   Ticket,
   Paperclip,
   Link2,
+  Tag,
+  DollarSign,
+  Search,
+  Filter,
   AlertCircle,
   ShoppingCart,
+  Pencil,
+  Trash2,
+  MessageCircle,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getDeal, type DealData } from "@utils/crm";
+import { getAllCrmDataById, type CrmDataItem } from "@utils/crm";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -64,23 +82,22 @@ interface RevenueSection {
   addButtonText?: string;
   onAddClick?: () => void;
 }
-// Add this function to toggle activity expansion
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-const DealRecordPage: NextPageWithLayout = () => {
+const ContactRecordPage: NextPageWithLayout = () => {
   const router = useRouter();
-  const { id: dealId } = router.query;
+  const { id: prospectId } = router.query;
   const { hasPermission } = usePermissions();
   const canSendWhatsApp = hasPermission(
     HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM,
   );
 
-  const [deal, setDeal] = useState<DealData | null>(null);
-  const [dealLoading, setDealLoading] = useState(true);
-  const [dealError, setDealError] = useState<string | null>(null);
+  const [prospect, setProspect] = useState<CrmDataItem | null>(null);
+  const [prospectLoading, setProspectLoading] = useState(true);
+  const [prospectError, setProspectError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState("about");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
@@ -89,36 +106,147 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
-  // Load deal by ID from URL
+  const prospectRecordId = Number(prospectId) || prospect?.data?.id || 0;
+  const prospectRecordName = prospect?.data?.name ?? "Prospect";
+  const prospectRecordEmail = prospect?.data?.data?.email ?? "";
+
+  const activityModals = useCrmActivityModals({
+    recordType: "prospect",
+    recordId: prospectRecordId,
+    recordName: prospectRecordName,
+    recordEmail: prospectRecordEmail,
+    recordPhone: prospect?.data?.phone ?? "",
+    onTaskCreated: () => tasksRefetch?.(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
+  });
+
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+
+  const phoneList = useMemo(() => {
+    const phone = prospect?.data?.phone;
+    if (!phone || typeof phone !== "string") return [];
+    return phone
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [prospect?.data?.phone]);
+  const hasPhone = phoneList.length > 0;
+  const numberToCall = hasPhone ? phoneList[0] : "";
+
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall],
+  );
+
+  const handleCallClick = useCallback(() => {
+    if (hasPhone) {
+      handleCall(numberToCall);
+    } else {
+      toast.error("No phone number available");
+    }
+  }, [hasPhone, numberToCall, handleCall]);
+
+  // Load prospect by ID from URL
   useEffect(() => {
-    if (!router.isReady || dealId == null || dealId === "") {
-      setDealLoading(false);
+    if (!router.isReady || prospectId == null || prospectId === "") {
+      setProspectLoading(false);
       return;
     }
-    const id = Number(dealId);
+    const id = Number(prospectId);
     if (Number.isNaN(id)) {
-      setDealError("Invalid deal ID");
-      setDealLoading(false);
+      setProspectError("Invalid prospect ID");
+      setProspectLoading(false);
       return;
     }
-    setDealLoading(true);
-    setDealError(null);
-    getDeal(id)
-      .then((data: DealData) => {
-        setDeal(data);
-        setDealError(null);
+    setProspectLoading(true);
+    setProspectError(null);
+    getAllCrmDataById(id)
+      .then((data: CrmDataItem) => {
+        setProspect(data);
+        setProspectError(null);
       })
       .catch(() => {
-        setDeal(null);
-        setDealError("Failed to load deal");
+        setProspect(null);
+        setProspectError("Failed to load prospect");
       })
       .finally(() => {
-        setDealLoading(false);
+        setProspectLoading(false);
       });
-  }, [router.isReady, dealId]);
+  }, [router.isReady, prospectId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -152,159 +280,73 @@ const DealRecordPage: NextPageWithLayout = () => {
     });
   };
 
-  // Revenue data
-  const subscriptionsData: SubscriptionItem[] = [
-    {
-      id: "1",
-      name: "Connect Pro",
-      status: "active",
-      nextBillingDate: "03/13/2026",
-      nextPaymentAmount: "$500.00",
-      contactEmail: "deal@example.com",
-      link: "#",
-    },
-  ];
-
-  const revenueSections: RevenueSection[] = [
-    {
-      id: "quotes",
-      title: "Quotes",
-      count: 0,
-      description: "Track the sales documents associated with this record.",
-      buttonText: "Create quote",
-      buttonIcon: FileText,
-      onButtonClick: () => console.log("Create quote"),
-      addButtonText: "Add",
-      onAddClick: () => console.log("Add quote"),
-    },
-    {
-      id: "invoices",
-      title: "Invoices",
-      count: 0,
-      description:
-        "Send your customer a request for payment and associate it with this record.",
-      buttonText: "Set up payments",
-      onButtonClick: () => console.log("Set up payments"),
-      addButtonText: "Add",
-      onAddClick: () => console.log("Add invoice"),
-    },
-    {
-      id: "payment-links",
-      title: "Payment Links",
-      count: 0,
-      description:
-        "Add a payment link to accept a payment and associate it with this record.",
-      buttonText: "Set up payments",
-      onButtonClick: () => console.log("Set up payments"),
-      addButtonText: "Add",
-      onAddClick: () => console.log("Add payment link"),
-    },
-    {
-      id: "subscriptions",
-      title: "Subscriptions",
-      count: 1,
-      description: "",
-      buttonText: "",
-      items: subscriptionsData,
-      onButtonClick: () => console.log("Subscriptions"),
-      addButtonText: "Add",
-      onAddClick: () => console.log("Add subscription"),
-    },
-    {
-      id: "payments",
-      title: "Payments",
-      count: 0,
-      description:
-        "Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.",
-      buttonText: "Set up payments",
-      onButtonClick: () => console.log("Set up payments"),
-    },
-  ];
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
-
-  const formatDealAmount = (d: DealData | null) => {
-    if (!d) return "--";
-    const curr = d.currency ?? "";
-    const val = d.net_value ?? d.grand_total ?? "";
-    return val ? `${curr} ${val}` : "--";
-  };
-  const formatDate = (d: string | null | undefined) =>
-    d
-      ? new Date(d).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : "--";
 
   // Tabs
   const tabs = [
     { id: "about", label: "About" },
     { id: "activities", label: "Activities" },
-    { id: "revenue", label: "Revenue" },
     { id: "intelligence", label: "Intelligence" },
   ];
 
-  // Key Information Fields - from deal API
+  // Key Information Fields (from prospect + tickets/leads)
+  const firstTicket = prospect?.data?.tickets?.[0];
   const keyInfoFields: KeyInfoField[] = [
     {
       label: "Email",
-      value: deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--",
+      value: prospect?.data?.data?.email ?? "--",
       copyable: true,
     },
     {
       label: "Phone Number",
-      value:
-        [deal?.decision_maker_phone_country_code, deal?.decision_maker_phone]
-          .filter(Boolean)
-          .join(" ") ||
-        (deal as any)?.main_decision_maker?.phone ||
-        "--",
+      value: prospect?.data?.phone ?? "--",
       copyable: true,
     },
-    { label: "Company Name", value: deal?.company_name ?? "--" },
-    { label: "Deal Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
-    { label: "Deal Value", value: formatDealAmount(deal) },
-    { label: "Expected Close Date", value: formatDate(deal?.expected_close_date) },
-    { label: "Contact owner", value: deal?.assigned_to ?? "--" },
+    {
+      label: "Company Name",
+      value:
+        firstTicket?.company_name ??
+        prospect?.data?.company_name ??
+        prospect?.data?.name ??
+        "--",
+    },
+    {
+      label: "Lead Status",
+      value: firstTicket?.status ?? prospect?.data?.disposition ?? "--",
+    },
+    {
+      label: "Lifecycle Stage",
+      value: prospect?.data?.lifecycle_stage ?? "--",
+    },
+    { label: "Buying Role", value: prospect?.data?.buying_role ?? "--" },
+    { label: "Contact owner", value: prospect?.data?.contact_owner ?? "--" },
   ];
-
-  // Normalize deal for CrmActivitiesPanel
-  const dealRecord = deal
-    ? {
-        id: deal.id,
-        data: {
-          id: deal.id,
-          name: deal.name,
-          phone:
-            deal.decision_maker_phone ?? (deal as any).phone ?? null,
-          data: {},
-        },
-      }
-    : null;
 
   const renderIntelligenceTab = () => {
     return (
       <div>
         {/* Info Banner */}
-        {/* <div style={{
-          padding: '16px 20px',
-          backgroundColor: '#fffbeb',
-          border: '1px solid #fde68a',
-          borderRadius: '5px',
-          marginBottom: '20px',
-        }}>
-          <p style={{
-            fontSize: '14px',
-            color: '#92400e',
-            margin: 0,
-          }}>
+        <div
+          style={{
+            padding: "16px 20px",
+            backgroundColor: "#ffffff",
+            border: "1px solid #eaf0f6",
+            borderRadius: "5px",
+            marginBottom: "20px",
+          }}
+        >
+          <p
+            style={{
+              fontSize: "14px",
+              color: "#666",
+              margin: 0,
+            }}
+          >
             HubSpot does not have enrichment data for this record, yet.
           </p>
-        </div> */}
+        </div>
 
         {/* Contact Information Card */}
         <div
@@ -316,23 +358,39 @@ const DealRecordPage: NextPageWithLayout = () => {
             marginBottom: "20px",
           }}
         >
+          {/* Single row: all fields + social icons */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              display: "flex",
+              alignItems: "flex-start",
               gap: "20px",
-              marginBottom: "16px",
+              flexWrap: "nowrap",
             }}
           >
-            <div>
+            {/* Lifecycle stage */}
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
+              <div
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
+              >
+                Lifecycle stage
+              </div>
               <div
                 style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
+                  fontSize: "14px",
+                  color: "#141414",
+                  fontWeight: "700",
                 }}
               >
-                Deal Stage
+                Lead
+              </div>
+            </div>
+
+            {/* Related company */}
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
+              <div
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
+              >
+                Related company
               </div>
               <div
                 style={{
@@ -341,36 +399,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                {deal?.stage?.name ?? deal?.status ?? "--"}
+                --
               </div>
             </div>
-            <div>
+
+            {/* Employment role */}
+            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Related company
-              </div>
-              <span
-                style={{
-                  fontSize: "14px",
-                  color: "#006162",
-                  fontWeight: "500",
-                }}
-              >
-                {deal?.company_name ?? "--"}
-              </span>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Employment role
               </div>
@@ -384,13 +420,11 @@ const DealRecordPage: NextPageWithLayout = () => {
                 --
               </div>
             </div>
-            <div>
+
+            {/* City */}
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 City
               </div>
@@ -401,16 +435,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                --
+                {firstTicket?.company_city ?? "--"}
               </div>
             </div>
-            <div>
+
+            {/* State */}
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 State
               </div>
@@ -421,16 +453,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                --
+                {firstTicket?.company_province ?? "--"}
               </div>
             </div>
-            <div>
+
+            {/* Region */}
+            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Region
               </div>
@@ -444,83 +474,88 @@ const DealRecordPage: NextPageWithLayout = () => {
                 --
               </div>
             </div>
-          </div>
 
-          {/* Social Icons */}
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              paddingTop: "16px",
-              borderTop: "1px solid #eaf0f6",
-            }}
-          >
-            <button
+            {/* Social Icons — same row, pushed to the right */}
+            <div
               style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
                 display: "flex",
+                gap: "8px",
                 alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
+                flexShrink: 0,
+                marginLeft: "auto",
+                paddingTop: "2px",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-              </svg>
-            </button>
+              {/* Facebook */}
+              <button
+                style={{
+                  padding: "7px",
+                  backgroundColor: "#f0f0f0",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e0e0e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f0f0f0";
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                </svg>
+              </button>
+              {/* LinkedIn */}
+              <button
+                style={{
+                  padding: "7px",
+                  backgroundColor: "#f0f0f0",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e0e0e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f0f0f0";
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
+              </button>
+              {/* X / Twitter */}
+              <button
+                style={{
+                  padding: "7px",
+                  backgroundColor: "#f0f0f0",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#e0e0e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#f0f0f0";
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -541,13 +576,15 @@ const DealRecordPage: NextPageWithLayout = () => {
               padding: "20px",
             }}
           >
-            <div style={{ marginBottom: "20px" }}>
+            <div
+              style={{
+                paddingBottom: "16px",
+                borderBottom: "1px solid #eaf0f6",
+                marginBottom: "16px",
+              }}
+            >
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Industry
               </div>
@@ -558,17 +595,19 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                {deal?.industry ?? "--"}
+                --
               </div>
             </div>
 
-            <div style={{ marginBottom: "20px" }}>
+            <div
+              style={{
+                paddingBottom: "16px",
+                borderBottom: "1px solid #eaf0f6",
+                marginBottom: "16px",
+              }}
+            >
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Company description
               </div>
@@ -579,17 +618,13 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                {deal?.company_name ? `${deal.company_name} deal` : "--"}
+                --
               </div>
             </div>
 
             <div>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Company keywords
               </div>
@@ -617,7 +652,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             <h3
               style={{
                 fontSize: "16px",
-                fontWeight: "600",
+                fontWeight: "700",
                 color: "#141414",
                 margin: "0 0 16px 0",
               }}
@@ -627,11 +662,7 @@ const DealRecordPage: NextPageWithLayout = () => {
 
             <div style={{ marginBottom: "20px" }}>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 Email
               </div>
@@ -642,7 +673,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                {deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--"}
+                {prospect?.data?.data?.email ?? "--"}
               </div>
             </div>
 
@@ -658,7 +689,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 <div
                   style={{
                     fontSize: "13px",
-                    color: "#7c98b6",
+                    color: "#666",
                     marginBottom: "6px",
                   }}
                 >
@@ -678,7 +709,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 <div
                   style={{
                     fontSize: "13px",
-                    color: "#7c98b6",
+                    color: "#666",
                     marginBottom: "6px",
                   }}
                 >
@@ -698,11 +729,7 @@ const DealRecordPage: NextPageWithLayout = () => {
 
             <div>
               <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
+                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
               >
                 LinkedIn
               </div>
@@ -804,7 +831,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     marginBottom: "12px",
                   }}
                 >
-                  <FileText size={18} color="#7c98b6" />
+                  <FileText size={18} color="#141414" />
                   <a
                     href={item.link}
                     style={{
@@ -1016,7 +1043,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             }}
           >
             <ChevronDown size={16} style={{ transform: "rotate(90deg)" }} />
-            Deals Approval
+            Prospects
           </button>
 
           <div style={{ position: "relative" }} ref={dropdownRef}>
@@ -1125,8 +1152,8 @@ const DealRecordPage: NextPageWithLayout = () => {
                 flexShrink: 0,
               }}
             >
-              {deal?.name
-                ? deal.name
+              {prospect?.data?.name
+                ? prospect?.data.name
                     .trim()
                     .split(/\s+/)
                     .map((s: string) => s[0])
@@ -1145,7 +1172,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   lineHeight: "1.3",
                 }}
               >
-                {deal?.name ?? "Unknown"}
+                {prospect?.data?.name ?? "Unknown"}
               </h2>
               <p
                 style={{
@@ -1155,7 +1182,9 @@ const DealRecordPage: NextPageWithLayout = () => {
                   lineHeight: "1.4",
                 }}
               >
-                {deal?.company_name ?? "--"}
+                {firstTicket?.company_name
+                  ? `Director at ${firstTicket?.company_name}`
+                  : "Prospect"}
               </p>
               <div
                 style={{
@@ -1164,10 +1193,10 @@ const DealRecordPage: NextPageWithLayout = () => {
                   gap: "8px",
                 }}
               >
-                {(deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email) ? (
+                {prospect?.data?.data?.email ? (
                   <>
                     <a
-                      href={`mailto:${deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email}`}
+                      href={`mailto:${prospect?.data?.data?.email}`}
                       style={{
                         fontSize: "14px",
                         color: "#006162",
@@ -1181,41 +1210,39 @@ const DealRecordPage: NextPageWithLayout = () => {
                         e.currentTarget.style.textDecoration = "none";
                       }}
                     >
-                      {deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email}
+                      {prospect?.data?.data?.email}
                     </a>
                     <button
                       onClick={() =>
-                        copyToClipboard(
-                          deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "",
-                        )
+                        copyToClipboard(prospect?.data?.data?.email ?? "")
                       }
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: "4px",
-                    cursor: "pointer",
-                    color: "#718096",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  title="Copy email"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: "4px",
-                    cursor: "pointer",
-                    color: "#718096",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  title="Link"
-                >
-                  <Link2 size={14} />
-                </button>
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        color: "#718096",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                      title="Copy email"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        color: "#718096",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                      title="Link"
+                    >
+                      <Link2 size={14} />
+                    </button>
                   </>
                 ) : (
                   <span style={{ fontSize: "14px", color: "#718096" }}>
@@ -1241,11 +1268,11 @@ const DealRecordPage: NextPageWithLayout = () => {
           }}
         >
           {[
-            { icon: ClipboardList, label: "Note", disabled: false },
-            { icon: Mail, label: "Email", disabled: true },
-            { icon: Phone, label: "Call", disabled: true },
-            { icon: ClipboardList, label: "Task", disabled: true },
-            { icon: Calendar, label: "Meeting", disabled: false },
+            { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
+            { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
+            { icon: Phone, label: "Call", disabled: !hasPhone, onClick: handleCallClick },
+            { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
+            { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -1259,7 +1286,9 @@ const DealRecordPage: NextPageWithLayout = () => {
                 }}
               >
                 <button
-                  // disabled={action.disabled}
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onClick}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1268,7 +1297,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     background: "#ffffff",
                     border: "1px solid #8a8a8a",
                     borderRadius: "50%",
-                    cursor: "pointer",
+                    cursor: action.disabled ? "not-allowed" : "pointer",
                     width: "30px",
                     height: "30px",
                     color: "#141414",
@@ -1341,10 +1370,17 @@ const DealRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                 }}
               >
-                {["Message", "Task", "WhatsApp"].map((action) => (
+                {[
+                  { label: "Message", onClick: activityModals.openSms },
+                  { label: "WhatsApp", onClick: activityModals.openWhatsApp },
+                ].map(({ label, onClick }) => (
                   <button
-                    key={action}
-                    onClick={() => setShowMoreActivities(false)}
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setShowMoreActivities(false);
+                      onClick();
+                    }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -1362,7 +1398,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    {action}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1583,10 +1619,10 @@ const DealRecordPage: NextPageWithLayout = () => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ padding: "14px 0", flex: 1 }}>
+      <div style={{ padding: "14px 20px", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze Record Summary */}
+            {/* Record Summary */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1630,7 +1666,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{
@@ -1689,10 +1725,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                       borderRadius: "10px",
                     }}
                   >
-                    {deal?.name ?? "This deal"} is a deal at {deal?.company_name ?? "N/A"}, currently in the{" "}
-                    {deal?.stage?.name ?? deal?.status ?? "N/A"} stage. Deal value: {formatDealAmount(deal)}. Expected close:{" "}
-                    {formatDate(deal?.expected_close_date)}. The deal owner is {deal?.assigned_to ?? "N/A"}. Recommended next
-                    steps: review for approval and consider a follow-up call to discuss next steps.
+                    {prospect?.data?.name ?? "This prospect"} is a Director at{" "}
+                    {firstTicket?.company_name ??
+                      prospect?.data?.company_name ??
+                      "N/A"}
+                    , currently in the Opportunity stage. Recent activity shows
+                    strong engagement. The contact is revenue-generating.
+                    Recommended next steps: consider a follow-up call to discuss
+                    potential opportunities.
                   </div>
 
                   <div
@@ -1828,7 +1868,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     margin: 0,
                   }}
                 >
-                  Deal profile
+                  Contact profile
                 </h3>
               </div>
 
@@ -1841,14 +1881,20 @@ const DealRecordPage: NextPageWithLayout = () => {
                   }}
                 >
                   {[
-                    { label: "Company name", value: deal?.company_name ?? "--" },
+                    {
+                      label: "Company name",
+                      value: firstTicket?.company_name ?? "--",
+                    },
                     { label: "Street address", value: "--" },
-                    { label: "City", value: "--" },
+                    { label: "City", value: firstTicket?.company_city ?? "--" },
                     { label: "Postal code", value: "--" },
-                    { label: "State/Region", value: "--" },
+                    {
+                      label: "State",
+                      value: firstTicket?.company_province ?? "--",
+                    },
                     {
                       label: "Email",
-                      value: deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--",
+                      value: prospect?.data?.data?.email ?? "--",
                       link: true,
                     },
                   ].map((field, index) => (
@@ -1875,141 +1921,101 @@ const DealRecordPage: NextPageWithLayout = () => {
                 </div>
               </div>
             </div>
+            {/* Enrollments */}
+            {/* <div
+              style={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #cccccc",
+                borderRadius: "10px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "16px 20px",
+                  cursor: "pointer",
+                  borderBottom: collapsedSections.has("enrollments")
+                    ? "none"
+                    : "1px solid #eaf0f6",
+                }}
+                onClick={() => toggleSection("enrollments")}
+              >
+                <ChevronDown
+                  size={18}
+                  style={{
+                    color: "#141414",
+                    marginRight: "10px",
+                    transform: collapsedSections.has("enrollments")
+                      ? "rotate(-90deg)"
+                      : "rotate(0deg)",
+                    transition: "transform 0.2s ease",
+                  }}
+                />
+                <h3
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    margin: 0,
+                  }}
+                >
+                  Enrollments
+                </h3>
+              </div>
+
+              {!collapsedSections.has("enrollments") && (
+                <div style={{ padding: "20px" }}>
+                  <h4
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Communication subscriptions
+                  </h4>
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#666666",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Ahmad Hussain has not specified any preferences.
+                  </p>
+                  <a
+                    href="#"
+                    style={{
+                      fontSize: "14px",
+                      color: "#006162",
+                      textDecoration: "none",
+                      fontWeight: "500",
+                    }}
+                  >
+                    View subscriptions
+                  </a>
+                </div>
+              )}
+            </div> */}
           </>
         )}
 
         {activeTab === "activities" && (
           <CrmActivitiesPanel
-            recordType="deal"
-            recordId={Number(dealId) || deal?.id || 0}
-            record={dealRecord}
-            recordLoading={dealLoading}
-            recordName={deal?.name ?? "Deal"}
+            ref={activitiesPanelRef}
+            recordType="prospect"
+            recordId={prospectRecordId}
+            record={prospect}
+            recordLoading={prospectLoading}
+            recordName={prospectRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            onTasksRefetchReady={(fn: () => void) => setTasksRefetch(() => fn)}
+            {...activityModals.crmActivitiesPanelProps}
           />
         )}
 
-        {activeTab === "revenue" && (
-          <div>
-            {/* Quote-to-cash Section */}
-            <div
-              style={{
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "16px",
-                  cursor: "pointer",
-                }}
-                onClick={() => toggleSection("quote-to-cash")}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: "#141414",
-                    transform: collapsedSections.has("quote-to-cash")
-                      ? "rotate(-90deg)"
-                      : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
-                  }}
-                />
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    color: "#141414",
-                    margin: 0,
-                  }}
-                >
-                  Quote-to-cash
-                </h2>
-              </div>
-
-              {!collapsedSections.has("quote-to-cash") && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  {revenueSections
-                    .slice(0, 5)
-                    .map((section) => renderRevenueSection(section))}
-                </div>
-              )}
-            </div>
-
-            {/* e-Commerce Section */}
-            <div
-              style={{
-                marginBottom: "24px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "16px",
-                  cursor: "pointer",
-                }}
-                onClick={() => toggleSection("e-commerce")}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: "#141414",
-                    transform: collapsedSections.has("e-commerce")
-                      ? "rotate(-90deg)"
-                      : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
-                  }}
-                />
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: "600",
-                    color: "#141414",
-                    margin: 0,
-                  }}
-                >
-                  e-Commerce
-                </h2>
-              </div>
-
-              {!collapsedSections.has("e-commerce") && (
-                <div
-                  style={{
-                    padding: "40px",
-                    textAlign: "center",
-                    backgroundColor: "#f7fafc",
-                    borderRadius: "5px",
-                    border: "1px solid #eaf0f6",
-                  }}
-                >
-                  <ShoppingCart
-                    size={48}
-                    style={{ marginBottom: "16px", color: "#cbd5e0" }}
-                  />
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      color: "#7c98b6",
-                      margin: 0,
-                    }}
-                  >
-                    No e-commerce data available
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
         {activeTab === "intelligence" && renderIntelligenceTab()}
       </div>
     </div>
@@ -2084,642 +2090,324 @@ const DealRecordPage: NextPageWithLayout = () => {
               paddingBottom: "0",
             }}
           >
-            {/* Companies */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                marginBottom: "12px",
-                overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #cccccc",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 20px 0",
-                  cursor: "pointer",
-                  backgroundColor: "#ffffff",
-                }}
-                onClick={() => toggleSection("companies")}
-              >
+
+            {/* Deals - from prospect.data.tickets[].deals */}
+            {(() => {
+              const allDeals =
+                prospect?.data?.tickets?.flatMap((t: any) => t.deals ?? []) ??
+                [];
+              const dealsCount = allDeals.length;
+              const formatAmount = (deal: any) => {
+                const curr = deal.currency ?? "";
+                const val = deal.net_value ?? deal.grand_total ?? "";
+                return val ? `${curr} ${val}` : "--";
+              };
+              const formatDate = (d: string | null | undefined) =>
+                d
+                  ? new Date(d).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "--";
+              return (
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    flex: 1,
+                    backgroundColor: "#ffffff",
+                    borderRadius: "10px",
+                    marginBottom: "12px",
+                    overflow: "hidden",
+                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+                    border: "1px solid #cccccc",
                   }}
                 >
-                  <ChevronDown
-                    size={18}
+                  <div
                     style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("companies")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                      lineHeight: "1.2",
-                    }}
-                  >
-                    Companies ({deal?.company_name ? 1 : 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#141414",
-                    fontSize: "12px",
-                    fontWeight: "500",
-                    padding: "6px",
-                    borderRadius: "3px",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f5f8fa";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: "300" }}>+</span>{" "}
-                  <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                    Add
-                  </span>
-                </button>
-              </div>
-
-              {!collapsedSections.has("companies") && (
-                <div style={{ padding: "20px" }}>
-                  {deal?.company_name ? (
-                    <>
-                      <div
-                        style={{
-                          marginBottom: "16px",
-                          border: "1px solid #cccccc",
-                          borderRadius: "10px",
-                          padding: "15px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#006162",
-                              fontWeight: "500",
-                            }}
-                          >
-                            {deal.company_name}
-                          </span>
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              backgroundColor: "#e6f3ff",
-                              color: "#006162",
-                              borderRadius: "3px",
-                              fontSize: "11px",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Primary
-                          </span>
-                        </div>
-                        {deal.industry && (
-                          <p
-                            style={{
-                              fontSize: "13px",
-                              color: "#666666",
-                              margin: "4px 0",
-                            }}
-                          >
-                            Industry: {deal.industry}
-                          </p>
-                        )}
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Phone:{" "}
-                          {[deal.decision_maker_phone_country_code, deal.decision_maker_phone]
-                            .filter(Boolean)
-                            .join(" ") || "--"}
-                        </p>
-                      </div>
-                      <a
-                    href="#"
-                    style={{
-                      fontSize: "12px",
-                      color: "#141414",
-                      textDecoration: "none",
-                      fontWeight: "300",
-                      display: "inline-flex", // ✅ change this
-                      alignItems: "center",
-                      gap: "4px",
-                      border: "1px solid #cccccc",
-                      borderRadius: "6px",
-                      padding: "6px 12px",
-                    }}
-                  >
-                    View all associated Companies
-                    <ExternalLink size={12} />
-                      </a>
-                    </>
-                  ) : (
-                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
-                      No companies associated.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Deals */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                marginBottom: "12px",
-                overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #cccccc",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 20px 0",
-                  cursor: "pointer",
-                  backgroundColor: "#ffffff",
-                }}
-                onClick={() => toggleSection("deals")}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    flex: 1,
-                  }}
-                >
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("deals")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                      lineHeight: "1.2",
-                    }}
-                  >
-                    Deals ({deal ? 1 : 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#141414",
-                    fontSize: "20px",
-                    padding: "6px",
-                    borderRadius: "3px",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f5f8fa";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: "300" }}>+</span>{" "}
-                  <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                    Add
-                  </span>
-                </button>
-              </div>
-
-              {!collapsedSections.has("deals") && (
-                <div style={{ padding: "20px" }}>
-                  {deal ? (
-                    <>
-                      <div
-                        style={{
-                          marginBottom: "16px",
-                          border: "1px solid #cccccc",
-                          borderRadius: "10px",
-                          padding: "15px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "14px",
-                            color: "#006162",
-                            fontWeight: "500",
-                            display: "block",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          {deal.name}
-                        </span>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Amount: {formatDealAmount(deal)}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Close Date: {formatDate(deal.expected_close_date)}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Deal Stage: {deal.stage?.name ?? deal.status ?? "--"}
-                        </p>
-                      </div>
-                      <a
-                    href="#"
-                    style={{
-                      fontSize: "13px",
-                      color: "#006162",
-                      textDecoration: "none",
-                      fontWeight: "500",
                       display: "flex",
                       alignItems: "center",
-                      gap: "4px",
+                      justifyContent: "space-between",
+                      padding: "14px 20px 0",
+                      cursor: "pointer",
+                      backgroundColor: "#ffffff",
                     }}
+                    onClick={() => toggleSection("deals")}
                   >
-                    View all associated Deals
-                    <ExternalLink size={12} />
-                      </a>
-                    </>
-                  ) : (
-                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
-                      No deals.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Tickets */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                marginBottom: "12px",
-                overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #cccccc",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 20px 0",
-                  cursor: "pointer",
-                  backgroundColor: "#ffffff",
-                }}
-                onClick={() => toggleSection("tickets")}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    flex: 1,
-                  }}
-                >
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("tickets")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                      lineHeight: "1.2",
-                    }}
-                  >
-                    Tickets ({deal?.ticket ? 1 : 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#141414",
-                    fontSize: "20px",
-                    padding: "6px",
-                    borderRadius: "3px",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f5f8fa";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: "300" }}>+</span>{" "}
-                  <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                    Add
-                  </span>
-                </button>
-              </div>
-
-              {!collapsedSections.has("tickets") && (
-                <div style={{ padding: "20px" }}>
-                  {deal?.ticket ? (
-                    <>
-                      <div
-                        style={{
-                          marginBottom: "16px",
-                          border: "1px solid #cccccc",
-                          borderRadius: "10px",
-                          padding: "15px",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "14px",
-                            color: "#006162",
-                            fontWeight: "500",
-                            display: "block",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          {(deal.ticket as any)?.name ?? "Lead"}
-                        </span>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Company: {(deal.ticket as any)?.company_name ?? "--"}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: "4px 0",
-                          }}
-                        >
-                          Status: {(deal.ticket as any)?.status ?? "--"}
-                        </p>
-                      </div>
-                      <a
-                        href="#"
-                        style={{
-                          fontSize: "13px",
-                          color: "#006162",
-                          textDecoration: "none",
-                          fontWeight: "500",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                      >
-                        View all associated Tickets
-                        <ExternalLink size={12} />
-                      </a>
-                    </>
-                  ) : (
                     <div
                       style={{
-                        padding: "32px 20px",
-                        textAlign: "center",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        flex: 1,
                       }}
                     >
-                      <Ticket
-                        size={48}
-                        style={{ color: "#cbd5e0", marginBottom: "16px" }}
-                      />
-                      <p
+                      <ChevronDown
+                        size={18}
                         style={{
-                          fontSize: "14px",
-                          color: "#718096",
+                          color: "#141414",
+                          transform: collapsedSections.has("deals")
+                            ? "rotate(-90deg)"
+                            : "rotate(0deg)",
+                          transition: "transform 0.2s ease",
+                        }}
+                      />
+                      <h3
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: "600",
+                          color: "#141414",
                           margin: 0,
-                          lineHeight: "1.6",
+                          lineHeight: "1.2",
                         }}
                       >
-                        Track the customer requests associated with this record.
-                      </p>
+                        Deals ({dealsCount})
+                      </h3>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
 
-            {/* Attachments */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "10px",
-                overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                border: "1px solid #cccccc",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 20px 0",
-                  cursor: "pointer",
-                  backgroundColor: "#ffffff",
-                }}
-                onClick={() => toggleSection("attachments")}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    flex: 1,
-                  }}
-                >
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("attachments")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                      lineHeight: "1.2",
-                    }}
-                  >
-                    Attachments ({deal?.attachments?.length ?? 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#141414",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    padding: "6px",
-                    borderRadius: "3px",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f5f8fa";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: "14px", fontWeight: "300" }}>+</span>{" "}
-                  <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                    Add
-                  </span>
-                </button>
-              </div>
-
-              {!collapsedSections.has("attachments") && (
-                <div style={{ padding: "20px" }}>
-                  {(deal?.attachments?.length ?? 0) > 0 ? (
-                    <>
-                      {deal!.attachments!.map((att: any) => (
-                        <div
-                          key={att.id}
+                  {!collapsedSections.has("deals") && (
+                    <div style={{ padding: "20px" }}>
+                      {dealsCount === 0 ? (
+                        <p
                           style={{
-                            marginBottom: "12px",
-                            border: "1px solid #cccccc",
-                            borderRadius: "8px",
-                            padding: "12px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
+                            fontSize: "13px",
+                            color: "#666666",
+                            margin: 0,
                           }}
                         >
-                          <Paperclip size={18} style={{ color: "#718096" }} />
+                          No deals associated.
+                        </p>
+                      ) : (
+                        <>
+                          {allDeals.map((deal: any) => (
+                            <div
+                              key={deal.id}
+                              style={{
+                                marginBottom: "16px",
+                                border: "1px solid #cccccc",
+                                borderRadius: "10px",
+                                padding: "15px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "14px",
+                                  color: "#006162",
+                                  fontWeight: "500",
+                                  display: "block",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                {deal.name}
+                              </span>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#666666",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                Amount: {formatAmount(deal)}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#666666",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                Close Date:{" "}
+                                {formatDate(deal.expected_close_date)}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#666666",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                Deal Stage: {deal.status ?? "--"}
+                              </p>
+                            </div>
+                          ))}
                           <a
-                            href={att.file_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="#"
                             style={{
-                              fontSize: "14px",
+                              fontSize: "13px",
                               color: "#006162",
                               textDecoration: "none",
                               fontWeight: "500",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
                             }}
                           >
-                            {att.file_path?.split("/").pop() ?? `Attachment ${att.id}`}
+                            View all associated Deals
+                            <ExternalLink size={12} />
                           </a>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div
-                      style={{
-                        padding: "32px 20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <Paperclip
-                        size={48}
-                        style={{ color: "#cbd5e0", marginBottom: "16px" }}
-                      />
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          color: "#718096",
-                          margin: 0,
-                          lineHeight: "1.6",
-                        }}
-                      >
-                        No attachments yet
-                      </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
+
+            {/* Leads (API: tickets) */}
+            {(() => {
+              const leads = prospect?.data?.tickets ?? [];
+              const leadsCount = leads.length;
+              return (
+                <div
+                  style={{
+                    backgroundColor: "#ffffff",
+                    borderRadius: "10px",
+                    marginBottom: "12px",
+                    overflow: "hidden",
+                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+                    border: "1px solid #cccccc",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "14px 20px 0",
+                      cursor: "pointer",
+                      backgroundColor: "#ffffff",
+                    }}
+                    onClick={() => toggleSection("tickets")}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        flex: 1,
+                      }}
+                    >
+                      <ChevronDown
+                        size={18}
+                        style={{
+                          color: "#141414",
+                          transform: collapsedSections.has("tickets")
+                            ? "rotate(-90deg)"
+                            : "rotate(0deg)",
+                          transition: "transform 0.2s ease",
+                        }}
+                      />
+                      <h3
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: "600",
+                          color: "#141414",
+                          margin: 0,
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        Leads ({leadsCount})
+                      </h3>
+                    </div>
+                  </div>
+
+                  {!collapsedSections.has("tickets") && (
+                    <div style={{ padding: "20px" }}>
+                      {leadsCount === 0 ? (
+                        <div
+                          style={{ padding: "32px 20px", textAlign: "center" }}
+                        >
+                          <Ticket
+                            size={48}
+                            style={{ color: "#cbd5e0", marginBottom: "16px" }}
+                          />
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: "#718096",
+                              margin: 0,
+                              lineHeight: "1.6",
+                            }}
+                          >
+                            Track the customer requests associated with this
+                            record.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {leads.map((lead: any) => (
+                            <div
+                              key={lead.id}
+                              style={{
+                                marginBottom: "16px",
+                                border: "1px solid #cccccc",
+                                borderRadius: "10px",
+                                padding: "15px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "14px",
+                                  color: "#006162",
+                                  fontWeight: "500",
+                                  display: "block",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                {lead.name}
+                              </span>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#666666",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                Company: {lead.company_name ?? "--"}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#666666",
+                                  margin: "4px 0",
+                                }}
+                              >
+                                Status: {lead.status ?? "--"}
+                              </p>
+                              {(lead.deals?.length ?? 0) > 0 && (
+                                <p
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#666666",
+                                    margin: "4px 0",
+                                  }}
+                                >
+                                  Deals: {lead.deals.length}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                          <a
+                            href="#"
+                            style={{
+                              fontSize: "13px",
+                              color: "#006162",
+                              textDecoration: "none",
+                              fontWeight: "500",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            View all associated Leads
+                            <ExternalLink size={12} />
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -2730,7 +2418,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   // MAIN RENDER
   // ============================================================================
 
-  if (dealLoading) {
+  if (prospectLoading) {
     return (
       <Layout>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -2749,14 +2437,14 @@ const DealRecordPage: NextPageWithLayout = () => {
             style={{ color: "#006162", animation: "spin 1s linear infinite" }}
           />
           <p style={{ fontSize: "14px", color: "#718096" }}>
-            Loading deal...
+            Loading prospect...
           </p>
         </div>
       </Layout>
     );
   }
 
-  if (dealError || (!dealId && !deal)) {
+  if (prospectError || (!prospectId && !prospect)) {
     return (
       <Layout>
         <div
@@ -2772,10 +2460,10 @@ const DealRecordPage: NextPageWithLayout = () => {
         >
           <AlertCircle size={48} style={{ color: "#e53e3e" }} />
           <p style={{ fontSize: "16px", color: "#141414", fontWeight: 500 }}>
-            {dealError || "No deal selected"}
+            {prospectError || "No prospect selected"}
           </p>
           <button
-            onClick={() => router.push("/crm/approvals")}
+            onClick={() => router.push("/crm/prospects")}
             style={{
               padding: "8px 16px",
               backgroundColor: "#006162",
@@ -2787,14 +2475,14 @@ const DealRecordPage: NextPageWithLayout = () => {
               cursor: "pointer",
             }}
           >
-            Back to deals approval
+            Back to prospects
           </button>
         </div>
       </Layout>
     );
   }
 
-  if (!deal) {
+  if (!prospect) {
     return null;
   }
 
@@ -2866,12 +2554,26 @@ const DealRecordPage: NextPageWithLayout = () => {
         {/* Right Sidebar - Associated Records */}
         {renderRightSidebar()}
       </div>
+
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
+      />
+      {activityModals.modals}
     </>
   );
 };
 
-DealRecordPage.getLayout = (page: ReactElement) => {
+ContactRecordPage.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default DealRecordPage;
+export default ContactRecordPage;

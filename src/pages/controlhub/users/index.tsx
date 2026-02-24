@@ -16,6 +16,7 @@ import InsightTab from './partials/InsightTab';
 import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
 import ResetPasswordModal from '@components/ResetPasswordModal';
+import ChangeStatusModal from './partials/ChangeStatusModal';
 
 // Import hooks and utilities
 import { useUserColumns } from '@hooks/controlhub/users/userColumns';
@@ -35,6 +36,11 @@ const Users = () => {
     // Reset password modal state
     const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
     const [selectedUsername, setSelectedUsername] = useState<string>('');
+
+    // Change status modal state
+    const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
+    const [changeStatusRow, setChangeStatusRow] = useState<any>(null);
+    const [changeStatusNewStatus, setChangeStatusNewStatus] = useState<string | null>(null);
 
     // Handle reset password button click
     const handleResetPasswordClick = useCallback((username: string) => {
@@ -59,14 +65,27 @@ const Users = () => {
         handleFiltersChange
     } = useUsersData(session, baseColumns, roleId);
 
-    // Refresh list after status change (API is called in userColumns dropdown)
+    // Refresh list after status change
     const handleAfterStatusChange = useCallback(() => {
         fetchUsers();
     }, [fetchUsers]);
 
+    const handleStatusOptionSelect = useCallback((row: any, status: string) => {
+        setChangeStatusRow(row);
+        setChangeStatusNewStatus(status);
+        setShowChangeStatusModal(true);
+    }, []);
+
+    const handleCloseChangeStatusModal = useCallback(() => {
+        setShowChangeStatusModal(false);
+        setChangeStatusRow(null);
+        setChangeStatusNewStatus(null);
+    }, []);
+
     const { columns } = useUserColumns(session, customFieldColumns, {
         onResetPassword: handleResetPasswordClick,
-        onChangeStatus: handleAfterStatusChange
+        onChangeStatus: handleAfterStatusChange,
+        onStatusOptionSelect: handleStatusOptionSelect
     });
     
     const {
@@ -167,6 +186,14 @@ const Users = () => {
                     show={showResetPasswordModal}
                     onHide={handleCloseResetPasswordModal}
                     username={selectedUsername}
+                />
+
+                <ChangeStatusModal
+                    show={showChangeStatusModal}
+                    onHide={handleCloseChangeStatusModal}
+                    row={changeStatusRow}
+                    newStatus={changeStatusNewStatus}
+                    onSuccess={handleAfterStatusChange}
                 />
             </React.Fragment>
         </ProtectedRoute>

@@ -87,7 +87,7 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             { 
-                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],//prospects
+                path: '/prospects',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],
                 children: [
                     { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
                     { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
@@ -201,7 +201,13 @@ export const routePermissions: RoutePermission[] = [
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
             { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
             {path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
-            { path: '/projects',permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER]},
+            {
+                path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
+                children: [
+                    { path: '/{id}', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER] }
+                ]
+             },
+            
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
             { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
         ]
@@ -222,9 +228,9 @@ export const routePermissions: RoutePermission[] = [
     //compliance services end
 
 
-    //finance services start
+    //billing services start
     {
-        path: '/finance',
+        path: '/billing',
         permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
 
         children: [
@@ -303,7 +309,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
             {
-                path: '/hosts/groups',
+                path: '/host-groups',
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
             {
@@ -325,10 +331,14 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/employees',permissions: [PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT]},
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT]},
-            { path: '/onboarding',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
+            { path: '/journey',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
             { path: '/approval-requests',permissions: [PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT]},
-            { path: '/org-chart',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT]},
-            {path:'/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
+            { path: '/org-chart', permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT] },
+            
+            { path: '/request-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
+            { path: '/sub-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
+
+            
             {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
             {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]

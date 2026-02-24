@@ -1,6 +1,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { getMainAppDepartments, getMainAppUsers } from "@utils/staffManagement";
+import {  getMainAppUsers } from "@utils/staffManagement";
+import { GetDepartments } from "@utils/users";
 
 export interface MainAppDepartmentLookup {
   id: number;
@@ -32,9 +33,10 @@ export function useMainAppLookups() {
     const fetchData = async () => {
       try {
         const [departments, usersRaw] = await Promise.all([
-          getMainAppDepartments(companyIdentifier),
+          GetDepartments(),
           getMainAppUsers(companyIdentifier),
         ]);
+        console.log(departments);
         setMainAppDepartments(Array.isArray(departments) ? (departments as MainAppDepartmentLookup[]) : []);
         setMainAppUsers(
           Array.isArray(usersRaw)

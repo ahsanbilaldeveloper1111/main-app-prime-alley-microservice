@@ -228,7 +228,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data',//prospects
+          url: '/crm/prospects',
         },
         {
           id: 'crm-leads',
@@ -256,7 +256,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
           icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: '/crm/deals-approval',//approvals 
+          url: '/crm/approvals', 
         },
         
         {
@@ -264,7 +264,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: '/crm/company'//companies
+          url: '/crm/companies'
         },
         {
           id: 'crm-inbox',
@@ -275,7 +275,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'crm-activities',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CRM_ACTIVITY,
+          title: (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>).CRM_ACTIVITY ?? 'Activities',
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history',//activities
@@ -639,10 +639,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
         },
         { 
-          id: 'workforce-onboarding', 
-          title: 'Onboarding', 
+          id: 'workforce-journey', 
+          title: 'Journey', 
           icon: <UserPlus size={16} />, 
-          url: '/workforce/onboarding', 
+          url: '/workforce/journey', 
           permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
         },
         { 
@@ -663,50 +663,50 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.ACCOUNTS_SERVICES,
       icon: <CreditCard size={16} />,
       color: MENU_COLORS.BILLING,
-      title: 'Finance',
-      label: 'Finance',
+      title: 'Billing',
+      label: 'Billing',
       url: '',
       subItems: [
         { 
           id: 'finance-dashboard', 
           title: 'Dashboard', 
           icon: <LayoutDashboard size={16} />, 
-          url: '/finance/dashboard', 
+          url: '/billing/dashboard', 
           permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
         },
         { 
           id: 'finance-account-overview', 
           title: 'Account Overview', 
           icon: <Eye size={16} />, 
-          url: '/finance/account-overview', 
+          url: '/billing/account-overview', 
           permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
         { 
           id: 'finance-subscriptions', 
           title: 'Subscriptions', 
           icon: <ShoppingBag size={16} />, 
-          url: '/finance/subscriptions', 
+          url: '/billing/subscriptions', 
           permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
         },
         { 
           id: 'finance-order-invoicing', 
           title: 'Order Invoicing', 
           icon: <ShoppingBag size={16} />, 
-          url: '/finance/order-invoicing', 
+          url: '/billing/order-invoicing', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
           id: 'finance-invoices', 
           title: 'Invoices', 
           icon: <DollarSign size={16} />, 
-          url: '/finance/invoices', 
+          url: '/billing/invoices', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
           id: 'finance-payment-history', 
           title: 'Payment History', 
           icon: <FileText size={16} />, 
-          url: '/finance/payment-history', 
+          url: '/billing/payment-history', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))

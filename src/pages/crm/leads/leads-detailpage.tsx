@@ -98,6 +98,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
@@ -188,9 +189,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordName: leadRecordName,
     recordEmail: leadRecordEmail,
     recordPhone: leadRecordPhone,
-    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
-    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
-    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+    onTaskCreated: () => tasksRefetch?.(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
   const toggleSection = (sectionId: string) => {
@@ -1632,7 +1634,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       <div style={{ padding: "14px 0", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze Record Summary */}
+            {/* Record Summary */}
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -1676,7 +1678,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Breeze record summary
+                    Record summary
                   </h3>
                   <div
                     style={{
@@ -1981,6 +1983,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             recordLoading={leadLoading}
             recordName={leadRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
             {...activityModals.crmActivitiesPanelProps}
           />
         )}

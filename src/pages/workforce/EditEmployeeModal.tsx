@@ -7,7 +7,6 @@ import { toast } from "react-toastify";
 import {
   getUserProfile,
   updateUserProfile,
-  getMainAppDepartments,
   getMainAppUsers,
   type UserProfile,
   type UserProfilePayload,
@@ -55,15 +54,29 @@ const selectStyles = {
   multiValueRemove: (provided: Record<string, unknown>) => ({ ...provided, color: "#0d6efd", "&:hover": { backgroundColor: "#b6d4fe", color: "#0d6efd" } }),
 };
 
-function mapProfileToAddressFormItem(a: UserProfileAddress & { state?: string }): AddressFormItem {
+function mapProfileToAddressFormItem(a: UserProfileAddress): AddressFormItem {
   const countryName = a.country ?? "";
-  const stateName = a.state ?? "";
+  let stateName = a.state ?? "";
+  const cityName = (a.city ?? "").trim();
   const countries = Country.getAllCountries();
   const country = countries.find((c) => c.name === countryName);
   const countryCode = country?.isoCode ?? "";
   const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
-  const stateObj = states.find((s) => s.name === stateName);
-  const stateCode = stateObj?.isoCode ?? "";
+  let stateObj = states.find((s) => s.name === stateName);
+  let stateCode = stateObj?.isoCode ?? "";
+  // When API returns city/country but no state, resolve state from city via country-state-city
+  if (countryCode && cityName && !stateCode) {
+    for (const s of states) {
+      const cities = City.getCitiesOfState(countryCode, s.isoCode);
+      const match = cities.find((c) => (c.name ?? "").trim() === cityName || (c.name ?? "").toLowerCase() === cityName.toLowerCase());
+      if (match) {
+        stateObj = s;
+        stateName = s.name;
+        stateCode = s.isoCode;
+        break;
+      }
+    }
+  }
   return {
     name: a.name ?? "",
     zip_code: a.zip_code ?? "",
@@ -94,7 +107,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   onSuccess,
   title = "Edit Employee",
 }) => {
-  const { companyIdentifier } = useMainAppLookups();
+  const { companyIdentifier, mainAppDepartments } = useMainAppLookups();
   const [form, setForm] = useState<Partial<UserProfilePayload>>({});
   const [addresses, setAddresses] = useState<AddressFormItem[]>([]);
   const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
@@ -116,17 +129,8 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         return;
       }
       setLoadingDepartmentsLocal(true);
-      try {
-        const data = await getMainAppDepartments(tenantId);
-        setDepartments(Array.isArray(data) ? (data as { id: number; name?: string }[]) : []);
-      } catch {
-        setDepartments([]);
-      } finally {
-        setLoadingDepartmentsLocal(false);
-      }
-    },
-    []
-  );
+    setDepartments(Array.isArray(mainAppDepartments) ? (mainAppDepartments as { id: number; name?: string }[]) : []);
+  }, [mainAppDepartments]);
 
   const fetchUsersByDepartment = useCallback(
     async (departmentId: number) => {
@@ -165,6 +169,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       employee_code: profile.employee_code ?? "",
       identification_number: profile.identification_number ?? "",
       job_title: profile.job_title ?? "",
+      designation: profile.designation ?? "",
       department_id: profile.department_id ?? null,
       location_id: profile.location_id ?? null,
       employment_type: profile.employment_type ?? "",
@@ -172,19 +177,19 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       phone: profile.phone ?? "",
       status: profile.status ?? "active",
     });
-    const addrs = (profile as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
+    const addrs = (profile as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
     setAddresses(
       Array.isArray(addrs) && addrs.length > 0
-        ? addrs.map((a) => mapProfileToAddressFormItem(a as UserProfileAddress & { state?: string }))
+        ? addrs.map((a) => mapProfileToAddressFormItem(a))
         : [{ ...defaultAddress }]
     );
     const tenantId = (profile as UserProfile & { tenant_id?: string }).tenant_id ?? "";
     fetchDepartments(tenantId);
     if (profile.department_id == null) setDepartmentUsers([]);
     getUserProfile(profile.id).then((full) => {
-      const fullAddrs = (full as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
+      const fullAddrs = (full as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
       if (Array.isArray(fullAddrs) && fullAddrs.length > 0) {
-        setAddresses(fullAddrs.map((a) => mapProfileToAddressFormItem(a as UserProfileAddress & { state?: string })));
+        setAddresses(fullAddrs.map((a) => mapProfileToAddressFormItem(a)));
       }
     }).catch(() => {});
   }, [show, profile?.id]);
@@ -218,6 +223,21 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       toast.error("User ID is required");
       return;
     }
+
+    if (!form.designation?.toString().trim()) {
+      toast.error("Designation is required");
+      return;
+    }
+    if (!form.employment_type?.toString().trim()) {
+      toast.error("Employment type is required");
+      return;
+    }
+    if (!form.department_id) {
+      toast.error("Department is required");
+      return;
+    }
+
+
     setSubmitting(true);
     try {
       await updateUserProfile(profile.id, {
@@ -226,6 +246,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         employee_code: form.employee_code?.toString().trim() || null,
         identification_number: form.identification_number?.toString().trim() || null,
         job_title: form.job_title?.toString().trim() || null,
+        designation: form.designation?.toString().trim() || null,
         department_id: form.department_id ?? null,
         location_id: form.location_id ?? null,
         employment_type: form.employment_type?.toString().trim() || null,
@@ -257,7 +278,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Department</Form.Label>
+            <Form.Label>Department <span className="text-danger">*</span> </Form.Label>
             <Form.Select
               value={form.department_id ?? ""}
               onChange={(e) => {
@@ -267,7 +288,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 if (deptId != null) fetchUsersByDepartment(deptId);
                 else setDepartmentUsers([]);
               }}
-              disabled={departmentsLoading}
+              
             >
               <option value="">Select department</option>
               {departments.map((d) => (
@@ -276,10 +297,10 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 </option>
               ))}
             </Form.Select>
-            {departmentsLoading && <Form.Text className="text-muted">Loading…</Form.Text>}
+           
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>User *</Form.Label>
+            <Form.Label>User <span className="text-danger">*</span> </Form.Label>
             <Select<{ value: string; label: string }>
               className="basic-single"
               classNamePrefix="select"
@@ -315,15 +336,16 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
             />
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>Job Title</Form.Label>
+            <Form.Label>Designation <span className="text-danger">*</span> </Form.Label>
             <Form.Control
-              value={form.job_title ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
-              placeholder="Job title"
+              value={form.designation ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))}
+              placeholder="Designation"
+              required
             />
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>Employment Type</Form.Label>
+            <Form.Label>Employment Type <span className="text-danger">*</span> </Form.Label>
             <Form.Select
               value={form.employment_type ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, employment_type: e.target.value }))}
@@ -484,7 +506,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                                 options={cityOptions}
                                 placeholder="Select City"
                                 isDisabled={!addr.stateCode}
-                                value={addr.city ? cityOptions.find((o) => o.value === addr.city) ?? null : null}
+                                value={addr.city ? (cityOptions.find((o) => o.value === addr.city) ?? { value: addr.city, label: addr.city }) : null}
                                 onChange={(opt) => setAddresses((prev) => prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a)))}
                                 styles={selectStyles}
                               />

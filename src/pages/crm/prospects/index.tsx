@@ -11,7 +11,6 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import {
   Button,
   Card,
@@ -84,7 +83,7 @@ import {
   Target,
   Layers,
 } from "lucide-react";
-import ConvertToLeadModal from "@components/ConvertToLeadModal";
+import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
@@ -144,11 +143,9 @@ import {
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
-import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
+import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
-
-import renderCreateCompany from "@components/renderCreateCompany";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -538,7 +535,7 @@ const getRandomColor = (name: string): string => {
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
-const CrmCompanyManagement = () => {
+const CrmProspectsManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -565,9 +562,9 @@ const CrmCompanyManagement = () => {
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-  const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(
-    null,
-  );
+  const [convertingProspectId, setConvertingProspectId] = useState<
+    number | null
+  >(null);
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -638,16 +635,14 @@ const CrmCompanyManagement = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Sidebar states
-  const [showCompanySidebar, setShowCompanySidebar] = useState(false);
+  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<any>(null);
+  const [selectedProspect, setSelectedProspect] = useState<any>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
-    useState(false);
-  const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
     useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
@@ -660,8 +655,7 @@ const CrmCompanyManagement = () => {
     lifecycle_stage: "Lead",
     disposition: "",
     legal_basis: [] as string[],
-    last_called: "",
-    last_call_status: "",
+    company_domain: "",
     next_call: "",
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
@@ -689,8 +683,8 @@ const CrmCompanyManagement = () => {
     Record<string, number>
   >({});
 
-  const [showCompanyAnalytics, setShowCompanyAnalytics] = useState(false);
-  const [showAllCompanyStats, setShowAllCompanyStats] = useState(false);
+  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
+  const [showAllProspectStats, setShowAllProspectStats] = useState(false);
 
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
@@ -707,6 +701,14 @@ const CrmCompanyManagement = () => {
       }
     }
   }, [router.isReady, router.query.tab]);
+
+  // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
+  useEffect(() => {
+    if (!router.isReady || router.query.createContact !== "1") return;
+    setShowCreateContactSidebar(true);
+    const { createContact: _, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+  }, [router.isReady, router.query.createContact]);
 
   // Close Add Contacts dropdown when clicking outside
   useEffect(() => {
@@ -726,7 +728,7 @@ const CrmCompanyManagement = () => {
     }
   }, [showAddContactsDropdown]);
 
-  // Load company into form when sidebar opens in edit mode
+  // Load prospect into form when sidebar opens in edit mode
   useEffect(() => {
     if (!showCreateContactSidebar || !editingContactId) {
       setContactFormLoadError(null);
@@ -769,11 +771,7 @@ const CrmCompanyManagement = () => {
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
           disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          last_called: toDatetimeLocal(
-            d.last_called ?? (item as any).last_called_at,
-          ),
-          last_call_status:
-            d.last_call_status ?? (item as any).last_call_end_reason ?? "",
+          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
           next_call: toDatetimeLocal(d.next_call),
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
@@ -786,7 +784,7 @@ const CrmCompanyManagement = () => {
       })
       .catch(() => {
         if (!cancelled) {
-          setContactFormLoadError("Failed to load company");
+          setContactFormLoadError("Failed to load prospect");
           setContactFormLoading(false);
         }
       });
@@ -818,13 +816,13 @@ const CrmCompanyManagement = () => {
     [router],
   );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [companySearch, setCompanySearch] = useState("");
+  const [prospectsSearch, setProspectsSearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [companyFilters, setCompanyFilters] = useState({
+  const [prospectsFilters, setProspectsFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
     nextCallScheduled: null as string | null,
@@ -837,12 +835,15 @@ const CrmCompanyManagement = () => {
   // Column customization and pagination states
   const defaultSelectedColumns = [
     "name",
-    "created_at",
     "phone",
+    "source_file",
+    "user_extension",
+    "campaign",
     "last_called_at",
-    "city",
-    "country",
-    "industry",
+    "last_call_end_reason",
+    "disposition",
+    "scheduled_call_at",
+    "tags",
   ];
   const [selectedColumns, setSelectedColumns] = useState<string[]>(
     () => defaultSelectedColumns,
@@ -859,8 +860,8 @@ const CrmCompanyManagement = () => {
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
-  /** Total count of all companies (unchanged when switching to Scheduled / Convert to Leads tab) */
-  const [totalAllCompanies, setTotalAllCompanies] = useState(0);
+  /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
+  const [totalAllProspects, setTotalAllProspects] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1206,7 +1207,7 @@ const CrmCompanyManagement = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-
+        
         // Also populate the campaignsById map
         const campaignsMap: Record<number, string> = {};
         campaignsResponse.data.forEach((campaign: any) => {
@@ -1349,7 +1350,7 @@ const CrmCompanyManagement = () => {
         </div>
 
         <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} companies
+          Showing {startRow} to {endRow} of {totalRecords} prospects
         </div>
 
         <div className="d-flex gap-1">
@@ -1431,7 +1432,7 @@ const CrmCompanyManagement = () => {
     );
   };
 
-  // Fetch companies data
+  // Fetch prospects data
   const fetchCrmData = useCallback(async () => {
     // Increment request ID to track the latest request
     requestIdRef.current += 1;
@@ -1439,121 +1440,34 @@ const CrmCompanyManagement = () => {
 
     setLoading(true);
     try {
-      // Use static dummy data (recommended for development)
-      const dummyCompanies = [
-        {
-          id: 1,
-          name: "Acme Corp",
-          phone: "+14155552671",
-          created_at: "2024-01-15T10:30:00Z",
-          updated_at: "2024-02-10T14:20:00Z",
-          last_called_at: "2024-02-10T14:20:00Z",
-          user_extension: "1001",
-          campaign_id: 1,
-          campaign: { id: 1, name: "Winter Campaign 2024" },
-          is_viewed: true,
-          scheduled_call_at: null,
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: null,
-          data: {
-            email: "contact@acmecorp.com",
-            city: "New York",
-            country: "United States",
-            industry: "Technology",
-          },
-        },
-        {
-          id: 2,
-          name: "TechVision Inc",
-          phone: "+14155552672",
-          created_at: "2024-01-20T09:15:00Z",
-          updated_at: "2024-02-12T11:45:00Z",
-          last_called_at: "2024-02-12T11:45:00Z",
-          user_extension: "1002",
-          campaign_id: 1,
-          campaign: { id: 1, name: "Winter Campaign 2024" },
-          is_viewed: false,
-          scheduled_call_at: "2024-02-21T15:00:00Z",
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: "Follow-up needed",
-          data: {
-            email: "info@techvision.com",
-            city: "Los Angeles",
-            country: "United States",
-            industry: "Healthcare",
-          },
-        },
-        {
-          id: 3,
-          name: "Global Solutions Ltd",
-          phone: "+14155552673",
-          created_at: "2024-01-25T16:20:00Z",
-          updated_at: "2024-01-25T16:20:00Z",
-          last_called_at: null,
-          user_extension: null,
-          campaign_id: 2,
-          campaign: { id: 2, name: "Spring Outreach" },
-          is_viewed: false,
-          scheduled_call_at: null,
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: null,
-          data: {
-            email: "hello@globalsolutions.com",
-            city: "Chicago",
-            country: "United States",
-            industry: "Finance",
-          },
-        },
-        {
-          id: 4,
-          name: "Innovation Labs",
-          phone: "+14155552674",
-          created_at: "2024-02-01T08:30:00Z",
-          updated_at: "2024-02-14T10:15:00Z",
-          last_called_at: "2024-02-14T10:15:00Z",
-          user_extension: "1001",
-          campaign_id: 2,
-          campaign: { id: 2, name: "Spring Outreach" },
-          is_viewed: true,
-          scheduled_call_at: "2024-02-22T09:30:00Z",
-          status: "active",
-          source_file: null,
-          tags: null,
-          note: "High priority client",
-          data: {
-            email: "contact@innovationlabs.com",
-            city: "Houston",
-            country: "United States",
-            industry: "Manufacturing",
-          },
-        },
-      ];
+      const response = await getCrmData(buildCrmDataParams());
 
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
         return;
       }
 
-      // Use dummy data directly
-      setDataList(dummyCompanies);
-      setTotalRecords(dummyCompanies.length);
-      setTotalAllCompanies(dummyCompanies.length);
+      setDataList(response.data || []);
+      setTotalRecords(response.pagination.total || 0);
 
-      // Set dummy metrics
-      setMetrics({
-        assigned_records: 2,
-        unassigned_records: 2,
-        scheduled_records: 2,
-        not_scheduled_records: 2,
-        scheduled_next_hour_records: 0,
-        scheduled_next_24_hours_records: 1,
-      });
+      // Keep total all prospects only when fetching without tab filter (all prospects)
+      const isAllProspects =
+        memoizedFilters.has_scheduled_calls !== true &&
+        memoizedFilters.has_tickets !== true;
+      if (isAllProspects) {
+        setTotalAllProspects(response.pagination.total || 0);
+      }
+
+      setMetrics(
+        response.metrics || {
+          assigned_records: 0,
+          unassigned_records: 0,
+          scheduled_records: 0,
+          not_scheduled_records: 0,
+          scheduled_next_hour_records: 0,
+          scheduled_next_24_hours_records: 0,
+        },
+      );
     } catch (error: any) {
       // Only handle error if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -1568,7 +1482,7 @@ const CrmCompanyManagement = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [buildCrmDataParams]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -1729,7 +1643,7 @@ const CrmCompanyManagement = () => {
           } failed validation`,
         );
       } else {
-        toast.error("Upload completed but no companies were processed");
+        toast.error("Upload completed but no prospects were processed");
       }
 
       setSelectedFile(null);
@@ -1752,91 +1666,12 @@ const CrmCompanyManagement = () => {
     }
   };
 
-  // Handle view data item
+  // Handle view data item - open GenericSidebar only (no modal)
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
-    setShowViewModal(true);
+    setSelectedProspect(item);
+    setShowProspectSidebar(true);
   }, []);
-
-  // Fetch call recordings (not call logs) for the selected company
-  // Filters by current user's extension and company's phone number
-  const fetchCallRecordings = useCallback(
-    async (phoneNumber: string, userExtension?: string) => {
-      if (!phoneNumber) {
-        setCallRecordings([]);
-        return;
-      }
-
-      if (!userExtension) {
-        setCallRecordings([]);
-        return;
-      }
-
-      setCallRecordingsLoading(true);
-      try {
-        const filters = {
-          remote_party_number: [phoneNumber],
-          extension: [userExtension],
-        };
-
-        // Use ListCallLogs with reportType 'recordings' to fetch call recordings
-        const response = await ListCallLogs(
-          {
-            page: 1,
-            perPage: 5,
-            search: "",
-            filters,
-            reportType: "recordings", // This ensures we get recordings, not logs
-            moduleSlug: ModuleSlug.CALL_RECORDINGS,
-          },
-          "call-logs/recordings", // Endpoint for call recordings
-        );
-
-        if (response?.dataList) {
-          setCallRecordings(response.dataList);
-        } else {
-          setCallRecordings([]);
-        }
-
-        // Store total count from pagination
-        if (response?.total !== undefined) {
-          setCallRecordingsTotal(response.total);
-        } else {
-          setCallRecordingsTotal(0);
-        }
-      } catch (error) {
-        console.error("Failed to fetch call recordings:", error);
-        setCallRecordings([]);
-        setCallRecordingsTotal(0);
-      } finally {
-        setCallRecordingsLoading(false);
-      }
-    },
-    [session],
-  );
-
-  // Load call recordings when view modal opens
-  useEffect(() => {
-    if (showViewModal && selectedDataItem?.phone) {
-      fetchCallRecordings(selectedDataItem.phone);
-    } else {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [showViewModal, selectedDataItem, fetchCallRecordings]);
-
-  // Load call recordings when company sidebar (preview modal) opens
-  useEffect(() => {
-    if (showCompanySidebar && selectedCompany?.phone) {
-      fetchCallRecordings(
-        selectedCompany.phone,
-        selectedCompany.user_extension,
-      );
-    } else if (!showCompanySidebar && !showViewModal) {
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    }
-  }, [showCompanySidebar, selectedCompany, showViewModal, fetchCallRecordings]);
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -2146,21 +1981,11 @@ const CrmCompanyManagement = () => {
     taskDueDate?: string,
   ) => {
     console.log("Note created:", {
-      companyId: selectedCompany.id,
+      prospectId: selectedProspect.id,
       note,
       createTask,
       taskDueDate,
     });
-
-    // Here you would typically:
-    // 1. Save the note to your backend/database
-    // 2. If createTask is true, create a task with the due date
-    // 3. Update the UI to show the new note
-    // 4. Maybe refresh the notes section
-
-    alert(
-      `Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || "N/A"}`,
-    );
   };
   // Handle call button click
   const handleCallClick = useCallback(
@@ -2246,11 +2071,11 @@ const CrmCompanyManagement = () => {
     // Close the dialog
     handleAfterCallModalClose();
 
-    // If lead generation is selected, redirect to create lead page with company data
+    // If lead generation is selected, redirect to create lead page with prospect data
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       // Show success message and navigate to create lead page
       toast.success(
-        "Redirecting to create lead page with pre-filled company data...",
+        "Redirecting to create lead page with pre-filled prospect data...",
       );
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
@@ -2393,16 +2218,16 @@ const CrmCompanyManagement = () => {
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
-  // Handle company row click
-  const handleCompanyClick = useCallback((company: any) => {
-    setSelectedCompany(company);
-    setShowCompanySidebar(true);
+  // Handle prospect row click
+  const handleProspectClick = useCallback((prospect: any) => {
+    setSelectedProspect(prospect);
+    setShowProspectSidebar(true);
   }, []);
 
-  // Handle close company sidebar
-  const handleCloseCompanySidebar = useCallback(() => {
-    setShowCompanySidebar(false);
-    setSelectedCompany(null);
+  // Handle close prospect sidebar
+  const handleCloseProspectSidebar = useCallback(() => {
+    setShowProspectSidebar(false);
+    setSelectedProspect(null);
   }, []);
 
   // Handle open filters sidebar
@@ -2416,40 +2241,40 @@ const CrmCompanyManagement = () => {
   }, []);
 
   // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((company: any) => {
-    setSelectedCompany(company);
-    setShowCompanySidebar(true);
+  const handlePreviewClick = useCallback((prospect: any) => {
+    setSelectedProspect(prospect);
+    setShowProspectSidebar(true);
   }, []);
 
-  // Handle first column click - navigates to detail page with company ID in URL
+  // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
-    (company: any) => {
-      router.push(`/crm/prospects/companies-detailpage?id=${company?.id ?? ""}`);
+    (prospect: any) => {
+      router.push(`/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`);
     },
     [router],
   );
 
   // Stats cards data for metrics
-  const companyStatsCards: StatsCardData[] = useMemo(
+  const prospectsStatsCards: StatsCardData[] = useMemo(
     () => [
       {
-        title: "Companies missing Owner",
+        title: "Prospects missing Owner",
         value: dataList.filter(
           (p: any) => !p.user_extension || p.user_extension === "",
         ).length,
       },
       {
-        title: "Companies missing Lead Status",
+        title: "Prospects missing Lead Status",
         value: dataList.filter(
           (p: any) => !p.disposition || p.disposition === "",
         ).length,
       },
       {
-        title: "Companies never called",
+        title: "Prospects never called",
         value: dataList.filter((p: any) => !p.last_called_at).length,
       },
       {
-        title: "Companies with no recent activity",
+        title: "Prospects with no recent activity",
         value: dataList.filter((p: any) => {
           if (!p.last_called_at) return true;
           const daysSinceActivity = moment().diff(
@@ -2464,11 +2289,11 @@ const CrmCompanyManagement = () => {
   );
 
   // Define columns for GenericTable - Clean declarative definitions
-  const companyColumns: TableColumn<any>[] = useMemo(
+  const prospectsColumns: TableColumn<any>[] = useMemo(
     () => [
       {
         key: "name",
-        label: "Company Name",
+        label: "Name",
         sortable: true,
         type: "avatar",
         avatar: {
@@ -2478,69 +2303,199 @@ const CrmCompanyManagement = () => {
         emptyValue: "N/A",
       },
       {
-        key: "created_at",
-        label: "Create Date",
-        sortable: true,
-        type: "text",
-        accessor: (row) =>
-          row.created_at ? moment(row.created_at).format("MMM DD, YYYY") : "-",
-      },
-      {
         key: "phone",
-        label: "Phone Number",
+        label: "Phone",
         sortable: true,
         type: "custom",
         align: "left",
-        render: (row) => (
-          <PhoneContainer
-            phone={row?.phone}
-            onClick={() => handleCallClick(row)}
-          />
-        ),
+      },
+      {
+        key: "source_file",
+        label: "Source",
+        sortable: true,
+        type: "badge",
+        badge: {
+          getVariant: () => "secondary",
+        },
+        emptyValue: "N/A",
+      },
+      {
+        key: "user_extension",
+        label: "Assigned To",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => {
+          const extension = extensions.find(
+            (ext: any) => ext.id.toString() === row.user_extension?.toString(),
+          );
+          return row.user_extension
+            ? extension?.display_name || row.user_extension
+            : "Unassigned";
+        },
+        badge: {
+          getVariant: (row) => (row.user_extension ? "success" : "secondary"),
+          showDot: () => true,
+        },
+      },
+      {
+        key: "campaign",
+        label: "Campaign",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => row.campaign?.name || "No Campaign",
+        badge: {
+          getVariant: (row) => (row.campaign ? "primary" : "info"),
+        },
       },
       {
         key: "last_called_at",
-        label: "Last Activity Date",
+        label: "Last Called",
         sortable: true,
         type: "text",
         accessor: (row) =>
           row.last_called_at
-            ? moment(row.last_called_at).format("MMM DD, YYYY")
+            ? moment(row.last_called_at).format("MMM DD, HH:mm")
             : "-",
       },
       {
-        key: "city",
-        label: "City",
-        sortable: true,
-        type: "text",
-        accessor: (row) => row.data?.city || row.city || "N/A",
-        emptyValue: "N/A",
-      },
-      {
-        key: "country",
-        label: "Country/Region",
-        sortable: true,
-        type: "text",
-        accessor: (row) => row.data?.country || row.country || "N/A",
-        emptyValue: "N/A",
-      },
-      {
-        key: "industry",
-        label: "Industry",
+        key: "last_call_end_reason",
+        label: "Last Call Status",
         sortable: true,
         type: "badge",
-        accessor: (row) => row.data?.industry || row.industry || "N/A",
-        badge: {
-          getVariant: () => "primary",
+        accessor: (row) => {
+          if (!row.last_call_end_reason) return null;
+          const endReason = callEndReasons.find(
+            (r) => r.value === row.last_call_end_reason,
+          );
+          return endReason?.label || row.last_call_end_reason;
         },
-        emptyValue: "N/A",
+        badge: {
+          getVariant: (row) => {
+            if (!row.last_call_end_reason) return "secondary";
+            const endReason = callEndReasons.find(
+              (r) => r.value === row.last_call_end_reason,
+            );
+            return (endReason?.color as any) || "secondary";
+          },
+        },
+        emptyValue: "-",
+      },
+      {
+        key: "disposition",
+        label: "Disposition",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => {
+          if (!row.disposition) return null;
+          const dispositions = [
+            { value: "interested", label: "Interested", color: "success" },
+            {
+              value: "not_interested",
+              label: "Not Interested",
+              color: "danger",
+            },
+            {
+              value: "callback_requested",
+              label: "Callback Requested",
+              color: "warning",
+            },
+            { value: "no_answer", label: "No Answer", color: "warning" },
+            { value: "busy", label: "Busy", color: "info" },
+            { value: "do_not_call", label: "Do Not Call", color: "danger" },
+            { value: "wrong_number", label: "Wrong Number", color: "info" },
+            { value: "follow_up", label: "Follow Up", color: "primary" },
+          ];
+          const disposition = dispositions.find(
+            (d) => d.value === row.disposition,
+          );
+          if (disposition) return disposition.label;
+          // Fallback to random for demo
+          const randomDisposition =
+            dispositions[Math.floor(Math.random() * dispositions.length)];
+          return randomDisposition.label;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.disposition) return "secondary";
+            const dispositions = [
+              { value: "interested", color: "success" },
+              { value: "not_interested", color: "danger" },
+              { value: "callback_requested", color: "warning" },
+              { value: "no_answer", color: "warning" },
+              { value: "busy", color: "info" },
+              { value: "do_not_call", color: "danger" },
+              { value: "wrong_number", color: "info" },
+              { value: "follow_up", color: "primary" },
+            ];
+            const disposition = dispositions.find(
+              (d) => d.value === row.disposition,
+            );
+            if (disposition) return disposition.color as any;
+            // Fallback to random for demo
+            const randomColors = [
+              "success",
+              "danger",
+              "warning",
+              "info",
+              "primary",
+            ];
+            return randomColors[
+              Math.floor(Math.random() * randomColors.length)
+            ] as any;
+          },
+        },
+        emptyValue: "-",
+      },
+      {
+        key: "scheduled_call_at",
+        label: "Next Call",
+        sortable: true,
+        type: "badge",
+        accessor: (row) => {
+          if (!row.scheduled_call_at) return "Not scheduled";
+          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+          const isNextHour = moment(row.scheduled_call_at).isBefore(
+            moment().add(1, "hour"),
+          );
+          const formatted = moment(row.scheduled_call_at).format(
+            "MMM DD, HH:mm",
+          );
+          if (isOverdue) return `${formatted} (Overdue)`;
+          if (isNextHour) return `${formatted} (Soon)`;
+          return formatted;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.scheduled_call_at) return "info";
+            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+            const isNextHour = moment(row.scheduled_call_at).isBefore(
+              moment().add(1, "hour"),
+            );
+            return isOverdue ? "danger" : isNextHour ? "warning" : "info";
+          },
+        },
+      },
+      {
+        key: "tags",
+        label: "Tags",
+        sortable: false,
+        type: "custom",
+        render: (row) => (
+          <div className="d-flex gap-1 flex-wrap">
+            {(row.tags || []).map((tag: any, idx: number) => (
+              <span key={idx} className="gt-badge gt-badge-secondary">
+                {tag.name || tag}
+              </span>
+            ))}
+          </div>
+        ),
       },
     ],
     [extensions, callEndReasons, handleCallClick],
   );
 
   // Define table actions
-  const companyActions: TableAction<any>[] = useMemo(
+  const prospectsActions: TableAction<any>[] = useMemo(
     () => [
       ...(session?.user?.permissions?.includes("view-crm-data-management")
         ? [
@@ -2617,7 +2572,7 @@ const CrmCompanyManagement = () => {
                     label: "Convert to Lead",
                     icon: <FiTarget size={14} />,
                     onClick: (row: any) => {
-                      setConvertingCompanyId(row.id);
+                      setConvertingProspectId(row.id);
                       setShowConvertToLeadModal(true);
                     },
                   },
@@ -3035,7 +2990,7 @@ const CrmCompanyManagement = () => {
           e.currentTarget.style.backgroundColor = "#000000";
         }}
       >
-        Add companies
+        Add prospects
         <ChevronDown size={16} />
       </button>
 
@@ -3058,7 +3013,25 @@ const CrmCompanyManagement = () => {
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
-              setShowCreateCompanySidebar(true);
+              setEditingContactId(null);
+              setContactForm({
+                firstName: "",
+                lastName: "",
+                email: "",
+                phoneNumber: "",
+                campaign_id: null,
+                contact_owner: null,
+                lifecycle_stage: "Lead",
+                disposition: "",
+                legal_basis: [],
+                company_domain: "",
+                next_call: "",
+                scheduled_call_at: "",
+                tags: [],
+                note: "",
+                is_viewed: false,
+              });
+              setShowCreateContactSidebar(true);
             }}
             style={{
               width: "100%",
@@ -3082,7 +3055,7 @@ const CrmCompanyManagement = () => {
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
-              console.log("Import contacts");
+              setShowUploadModal(true);
             }}
             style={{
               width: "100%",
@@ -3108,7 +3081,7 @@ const CrmCompanyManagement = () => {
     </div>
   );
 
-  // Create company (contact) API submit - POST crm/crm-data { name, phone, data }
+  // Create prospect (contact) API submit - POST crm/crm-data { name, phone, data }
   const handleCreateContactSubmit = useCallback(
     async (addAnother: boolean) => {
       const name = [contactForm.firstName, contactForm.lastName]
@@ -3134,11 +3107,8 @@ const CrmCompanyManagement = () => {
           data: {
             email: contactForm.email.trim(),
             assigned_to: assignedTo,
-            user_extension: userExtension,
             uploaded_by: uploadedBy,
-            campaign_id: contactForm.campaign_id ?? undefined,
-            last_called: contactForm.last_called || undefined,
-            last_call_status: contactForm.last_call_status || undefined,
+            company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
             next_call: contactForm.next_call || undefined,
             tags: contactForm.tags?.length
@@ -3165,8 +3135,7 @@ const CrmCompanyManagement = () => {
           lifecycle_stage: "Lead",
           disposition: "",
           legal_basis: [],
-          last_called: "",
-          last_call_status: "",
+          company_domain: "",
           next_call: "",
           scheduled_call_at: "",
           tags: [],
@@ -3204,11 +3173,10 @@ const CrmCompanyManagement = () => {
       await updateCrmData(editingContactId, {
         name,
         phone: contactForm.phoneNumber.trim(),
+        campaign_id: contactForm.campaign_id ?? null,
         data: {
           email: contactForm.email.trim(),
-          campaign_id: contactForm.campaign_id ?? undefined,
-          last_called: contactForm.last_called || undefined,
-          last_call_status: contactForm.last_call_status || undefined,
+          company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
           next_call: contactForm.next_call || undefined,
           tags: contactForm.tags?.length
@@ -3295,7 +3263,7 @@ const CrmCompanyManagement = () => {
                 margin: 0,
               }}
             >
-              {editingContactId ? "Edit Contact" : "Create Contact"}
+              {editingContactId ? "Edit Prospect" : "Create Prospect"}
             </h2>
             <button
               className="contact-sidebar-close-btn"
@@ -3380,7 +3348,7 @@ const CrmCompanyManagement = () => {
                     }}
                   />
                   <span style={{ fontSize: "14px", color: "#64748b" }}>
-                    Loading company...
+                    Loading prospect...
                   </span>
                 </div>
               ) : (
@@ -3578,42 +3546,47 @@ const CrmCompanyManagement = () => {
                       >
                         Campaign
                       </label>
-                      <Select
-                        value={
-                          contactForm.campaign_id != null
-                            ? (() => {
-                                const c = availableCampaigns.find(
-                                  (x) => x.id === contactForm.campaign_id,
-                                );
-                                return c
-                                  ? { value: String(c.id), label: c.label }
-                                  : null;
-                              })()
-                            : null
-                        }
-                        onChange={(opt: any) =>
-                          setContactForm({
-                            ...contactForm,
-                            campaign_id: opt?.value ? Number(opt.value) : null,
-                          })
-                        }
-                        options={availableCampaigns.map((c) => ({
-                          value: String(c.id),
-                          label: c.label,
-                        }))}
-                        placeholder="Select campaign"
-                        isClearable
-                        isSearchable
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            minHeight: 40,
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                          }),
-                        }}
-                      />
+                      {(() => {
+                        const campaignSelectOptions =
+                          availableCampaigns.map((c) => ({
+                            value: String(c.id),
+                            label: c.label,
+                          }));
+                        return (
+                          <Select
+                            value={
+                              contactForm.campaign_id != null
+                                ? campaignSelectOptions.find(
+                                    (o) =>
+                                      o.value ===
+                                      String(contactForm.campaign_id),
+                                  ) ?? null
+                                : null
+                            }
+                            onChange={(opt: any) =>
+                              setContactForm({
+                                ...contactForm,
+                                campaign_id: opt?.value
+                                  ? Number(opt.value)
+                                  : null,
+                              })
+                            }
+                            options={campaignSelectOptions}
+                            placeholder="Select campaign"
+                            isClearable
+                            isSearchable
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                minHeight: 40,
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                              }),
+                            }}
+                          />
+                        );
+                      })()}
                     </div>
                     <div
                       className="contact-form-field"
@@ -3889,53 +3862,18 @@ const CrmCompanyManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Last called
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={contactForm.last_called}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            last_called: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Last call status
+                        Company domain
                       </label>
                       <input
                         type="text"
-                        value={contactForm.last_call_status}
+                        value={contactForm.company_domain}
                         onChange={(e) =>
                           setContactForm({
                             ...contactForm,
-                            last_call_status: e.target.value,
+                            company_domain: e.target.value,
                           })
                         }
-                        placeholder="e.g. Answered, No answer"
+                        placeholder="e.g. example.com"
                         style={{
                           width: "100%",
                           padding: "10px 12px",
@@ -4267,32 +4205,32 @@ const CrmCompanyManagement = () => {
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .companies-table-wrapper {
+        .prospects-table-wrapper {
           width: 100%;
           overflow: hidden;
         }
-        .companies-table-wrapper .table-responsive {
+        .prospects-table-wrapper .table-responsive {
           width: 100%;
           overflow-x: auto;
           overflow-y: visible;
           -webkit-overflow-scrolling: touch;
         }
-        .companies-table-wrapper .table-responsive table {
+        .prospects-table-wrapper .table-responsive table {
           width: 100%;
           table-layout: auto;
           margin-bottom: 0;
         }
-        .companies-table-wrapper .table-responsive table th,
-        .companies-table-wrapper .table-responsive table td {
+        .prospects-table-wrapper .table-responsive table th,
+        .prospects-table-wrapper .table-responsive table td {
           padding: 12px 16px;
           vertical-align: middle;
         }
-        .companies-table-wrapper .table-responsive table td:last-child,
-        .companies-table-wrapper .table-responsive table th:last-child {
+        .prospects-table-wrapper .table-responsive table td:last-child,
+        .prospects-table-wrapper .table-responsive table th:last-child {
           max-width: none;
         }
-        .companies-table-wrapper .table-responsive table td[style*="width"],
-        .companies-table-wrapper .table-responsive table th[style*="width"] {
+        .prospects-table-wrapper .table-responsive table td[style*="width"],
+        .prospects-table-wrapper .table-responsive table th[style*="width"] {
           max-width: none;
         }
         .timeline-line {
@@ -4344,7 +4282,7 @@ const CrmCompanyManagement = () => {
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="Companies"
+        subTitle="Prospects"
       />
       {/* Main flex container for content and sidebar */}
       <div
@@ -4418,7 +4356,7 @@ const CrmCompanyManagement = () => {
           {/* <StatsCards 
         data={[
           {
-            title: 'All Companies',
+            title: 'All Prospects',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -4449,7 +4387,7 @@ const CrmCompanyManagement = () => {
             }
           },
           {
-            title: 'All Companies',
+            title: 'All Prospects',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -4485,13 +4423,13 @@ const CrmCompanyManagement = () => {
 
           <div className="container-fluid">
             {/* Analytics Section - Collapsible */}
-            {showCompanyAnalytics && (
+            {showProspectsAnalytics && (
               <>
                 {/* Summary Stats Grid - Using KPICard design */}
                 <Row className="mb-2">
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Total Companies"
+                      title="Total Prospects"
                       value={totalRecords}
                       icon={<Users size={24} />}
                       color="primary"
@@ -4499,7 +4437,7 @@ const CrmCompanyManagement = () => {
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Companies with Calls Scheduled"
+                      title="Prospects with Calls Scheduled"
                       value={metrics.scheduled_records}
                       icon={<Calendar size={24} />}
                       color="success"
@@ -4507,7 +4445,7 @@ const CrmCompanyManagement = () => {
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Companies with No Calls Scheduled"
+                      title="Prospects with No Calls Scheduled"
                       value={metrics.not_scheduled_records}
                       icon={<XCircle size={24} />}
                       color="secondary"
@@ -4521,7 +4459,7 @@ const CrmCompanyManagement = () => {
                       color="info"
                     />
                   </Col>
-                  {showAllCompanyStats && (
+                  {showAllProspectStats && (
                     <>
                       <Col xl={3} lg={4} md={6} className="mb-3">
                         <KPICard
@@ -4534,7 +4472,7 @@ const CrmCompanyManagement = () => {
 
                       <Col xl={3} lg={4} md={6} className="mb-3">
                         <KPICard
-                          title=" Companies Assigned to Team Members"
+                          title=" Prospects Assigned to Team Members"
                           value={metrics.assigned_records}
                           icon={<UserPlus size={24} />}
                           color="primary"
@@ -4542,7 +4480,7 @@ const CrmCompanyManagement = () => {
                       </Col>
                       <Col xl={3} lg={4} md={6} className="mb-3">
                         <KPICard
-                          title="Companies Not Assigned to Team Members"
+                          title="Prospects Not Assigned to Team Members"
                           value={metrics.unassigned_records}
                           icon={<AlertCircleIcon size={24} />}
                           color="warning"
@@ -4555,10 +4493,12 @@ const CrmCompanyManagement = () => {
                 <div className="text-center mb-4">
                   <Button
                     variant="link"
-                    onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
+                    onClick={() =>
+                      setShowAllProspectStats(!showAllProspectStats)
+                    }
                     className="text-decoration-none"
                   >
-                    {showAllCompanyStats ? (
+                    {showAllProspectStats ? (
                       <>
                         <ArrowUp size={16} className="me-1" />
                         Show Less
@@ -4583,7 +4523,7 @@ const CrmCompanyManagement = () => {
                   quickFilters={[
                     {
                       id: "all",
-                      label: "All Companies",
+                      label: "All Prospects",
                       color: "#0d6efd",
                       icon: <Users size={16} />,
                     },
@@ -4618,15 +4558,15 @@ const CrmCompanyManagement = () => {
                   //   setShowAdvancedFilters(!showAdvancedFilters)
                   // }
                   // advancedFilterCount={
-                  //   (companyFilters.assignedTo !== null ? 1 : 0) +
-                  //   (companyFilters.campaigns !== null &&
-                  //   companyFilters.campaigns.length > 0
+                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
+                  //   (prospectsFilters.campaigns !== null &&
+                  //   prospectsFilters.campaigns.length > 0
                   //     ? 1
                   //     : 0) +
-                  //   (companyFilters.nextCallScheduled !== null ? 1 : 0) +
-                  //   (companyFilters.sourceFile !== null ? 1 : 0) +
-                  //   (companyFilters.tags !== null &&
-                  //   companyFilters.tags.length > 0
+                  //   (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
+                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
+                  //   (prospectsFilters.tags !== null &&
+                  //   prospectsFilters.tags.length > 0
                   //     ? 1
                   //     : 0)
                   // }
@@ -4648,8 +4588,8 @@ const CrmCompanyManagement = () => {
                         <Form.Control
                           type="text"
                           placeholder="Search by name or phone..."
-                          value={companySearch}
-                          onChange={(e) => setCompanySearch(e.target.value)}
+                          value={prospectsSearch}
+                          onChange={(e) => setProspectsSearch(e.target.value)}
                         />
                       </Col>
                       <Col md={4}>
@@ -4666,10 +4606,10 @@ const CrmCompanyManagement = () => {
                               ext.extension,
                           }))}
                           value={
-                            companyFilters.assignedTo
+                            prospectsFilters.assignedTo
                               ? (() => {
                                   const assignedToId =
-                                    companyFilters.assignedTo;
+                                    prospectsFilters.assignedTo;
                                   const ext = extensions.find(
                                     (e: any) =>
                                       (e.id || e.extension) === assignedToId,
@@ -4693,7 +4633,7 @@ const CrmCompanyManagement = () => {
                             const assignedToValue = selected
                               ? selected.value
                               : null;
-                            setCompanyFilters((prev) => ({
+                            setProspectsFilters((prev) => ({
                               ...prev,
                               assignedTo: assignedToValue,
                             }));
@@ -4716,8 +4656,8 @@ const CrmCompanyManagement = () => {
                             label: c.label,
                           }))}
                           value={
-                            companyFilters.campaigns
-                              ? companyFilters.campaigns.map(
+                            prospectsFilters.campaigns
+                              ? prospectsFilters.campaigns.map(
                                   (campaignId: string) => {
                                     const campaign = availableCampaigns.find(
                                       (c: any) => c.value === campaignId,
@@ -4739,7 +4679,7 @@ const CrmCompanyManagement = () => {
                             const campaignValues = selected
                               ? selected.map((s: any) => s.value)
                               : null;
-                            setCompanyFilters((prev) => ({
+                            setProspectsFilters((prev) => ({
                               ...prev,
                               campaigns: campaignValues,
                             }));
@@ -4756,10 +4696,10 @@ const CrmCompanyManagement = () => {
                           Next Call Scheduled
                         </Form.Label>
                         <Form.Select
-                          value={companyFilters.nextCallScheduled || ""}
+                          value={prospectsFilters.nextCallScheduled || ""}
                           onChange={(e) => {
                             const value = e.target.value || null;
-                            setCompanyFilters((prev) => ({
+                            setProspectsFilters((prev) => ({
                               ...prev,
                               nextCallScheduled: value,
                               nextCallDateFrom: null,
@@ -4777,7 +4717,7 @@ const CrmCompanyManagement = () => {
                           <option value="custom">Custom Date Range</option>
                         </Form.Select>
                       </Col>
-                      {companyFilters.nextCallScheduled === "custom" && (
+                      {prospectsFilters.nextCallScheduled === "custom" && (
                         <>
                           <Col md={4}>
                             <Form.Label className="small fw-bold mb-2">
@@ -4785,10 +4725,10 @@ const CrmCompanyManagement = () => {
                             </Form.Label>
                             <Form.Control
                               type="date"
-                              value={companyFilters.nextCallDateFrom || ""}
+                              value={prospectsFilters.nextCallDateFrom || ""}
                               onChange={(e) => {
                                 const dateValue = e.target.value || null;
-                                setCompanyFilters((prev) => ({
+                                setProspectsFilters((prev) => ({
                                   ...prev,
                                   nextCallDateFrom: dateValue,
                                 }));
@@ -4801,10 +4741,10 @@ const CrmCompanyManagement = () => {
                             </Form.Label>
                             <Form.Control
                               type="date"
-                              value={companyFilters.nextCallDateTo || ""}
+                              value={prospectsFilters.nextCallDateTo || ""}
                               onChange={(e) => {
                                 const dateValue = e.target.value || null;
-                                setCompanyFilters((prev) => ({
+                                setProspectsFilters((prev) => ({
                                   ...prev,
                                   nextCallDateTo: dateValue,
                                 }));
@@ -4820,10 +4760,10 @@ const CrmCompanyManagement = () => {
                         <CreatableSelect
                           options={uniqueSources}
                           value={
-                            companyFilters.sourceFile
+                            prospectsFilters.sourceFile
                               ? {
-                                  value: companyFilters.sourceFile,
-                                  label: companyFilters.sourceFile,
+                                  value: prospectsFilters.sourceFile,
+                                  label: prospectsFilters.sourceFile,
                                 }
                               : null
                           }
@@ -4831,7 +4771,7 @@ const CrmCompanyManagement = () => {
                             const sourceValue = selected
                               ? selected.value
                               : null;
-                            setCompanyFilters((prev) => ({
+                            setProspectsFilters((prev) => ({
                               ...prev,
                               sourceFile: sourceValue,
                             }));
@@ -4853,22 +4793,24 @@ const CrmCompanyManagement = () => {
                             label: tag.label,
                           }))}
                           value={
-                            companyFilters.tags
-                              ? companyFilters.tags.map((tagValue: string) => {
-                                  const tag = availableTags.find(
-                                    (t: any) => t.value === tagValue,
-                                  );
-                                  return tag
-                                    ? { value: tagValue, label: tag.label }
-                                    : { value: tagValue, label: tagValue };
-                                })
+                            prospectsFilters.tags
+                              ? prospectsFilters.tags.map(
+                                  (tagValue: string) => {
+                                    const tag = availableTags.find(
+                                      (t: any) => t.value === tagValue,
+                                    );
+                                    return tag
+                                      ? { value: tagValue, label: tag.label }
+                                      : { value: tagValue, label: tagValue };
+                                  },
+                                )
                               : null
                           }
                           onChange={(selected) => {
                             const tagValues = selected
                               ? selected.map((s: any) => s.value)
                               : null;
-                            setCompanyFilters((prev) => ({
+                            setProspectsFilters((prev) => ({
                               ...prev,
                               tags: tagValues,
                             }));
@@ -4885,45 +4827,46 @@ const CrmCompanyManagement = () => {
                             variant="outline-secondary"
                             className="d-flex align-items-center justify-content-center"
                             onClick={() => {
-                              // Map companyFilters to the format expected by handleFiltersChange
+                              // Map prospectsFilters to the format expected by handleFiltersChange
                               const filtersToApply: Record<string, any> = {};
 
-                              if (companySearch) {
-                                filtersToApply.search = companySearch;
+                              if (prospectsSearch) {
+                                filtersToApply.search = prospectsSearch;
                               }
-                              if (companyFilters.assignedTo) {
+                              if (prospectsFilters.assignedTo) {
                                 filtersToApply.user_extension = [
-                                  companyFilters.assignedTo,
+                                  prospectsFilters.assignedTo,
                                 ];
                               }
                               if (
-                                companyFilters.campaigns &&
-                                companyFilters.campaigns.length > 0
+                                prospectsFilters.campaigns &&
+                                prospectsFilters.campaigns.length > 0
                               ) {
                                 filtersToApply.campaign_id =
-                                  companyFilters.campaigns;
+                                  prospectsFilters.campaigns;
                               }
-                              if (companyFilters.sourceFile) {
+                              if (prospectsFilters.sourceFile) {
                                 filtersToApply.source_file =
-                                  companyFilters.sourceFile;
+                                  prospectsFilters.sourceFile;
                               }
                               if (
-                                companyFilters.tags &&
-                                companyFilters.tags.length > 0
+                                prospectsFilters.tags &&
+                                prospectsFilters.tags.length > 0
                               ) {
-                                filtersToApply.tags = companyFilters.tags;
+                                filtersToApply.tags = prospectsFilters.tags;
                               }
 
                               // Handle next call scheduled filters
                               const now = moment();
                               if (
-                                companyFilters.nextCallScheduled === "today"
+                                prospectsFilters.nextCallScheduled === "today"
                               ) {
                                 const today = now.format("YYYY-MM-DD");
                                 filtersToApply.scheduled_call_from = today;
                                 filtersToApply.scheduled_call_to = today;
                               } else if (
-                                companyFilters.nextCallScheduled === "tomorrow"
+                                prospectsFilters.nextCallScheduled ===
+                                "tomorrow"
                               ) {
                                 const tomorrow = moment()
                                   .add(1, "day")
@@ -4931,7 +4874,8 @@ const CrmCompanyManagement = () => {
                                 filtersToApply.scheduled_call_from = tomorrow;
                                 filtersToApply.scheduled_call_to = tomorrow;
                               } else if (
-                                companyFilters.nextCallScheduled === "this_week"
+                                prospectsFilters.nextCallScheduled ===
+                                "this_week"
                               ) {
                                 const startOfWeek = moment()
                                   .startOf("week")
@@ -4943,7 +4887,8 @@ const CrmCompanyManagement = () => {
                                   startOfWeek;
                                 filtersToApply.scheduled_call_to = endOfWeek;
                               } else if (
-                                companyFilters.nextCallScheduled === "next_week"
+                                prospectsFilters.nextCallScheduled ===
+                                "next_week"
                               ) {
                                 const nextWeekStart = moment()
                                   .add(1, "week")
@@ -4957,20 +4902,20 @@ const CrmCompanyManagement = () => {
                                   nextWeekStart;
                                 filtersToApply.scheduled_call_to = nextWeekEnd;
                               } else if (
-                                companyFilters.nextCallScheduled === "overdue"
+                                prospectsFilters.nextCallScheduled === "overdue"
                               ) {
                                 filtersToApply.scheduled_call_status =
                                   "overdue";
                               } else if (
-                                companyFilters.nextCallScheduled === "custom"
+                                prospectsFilters.nextCallScheduled === "custom"
                               ) {
-                                if (companyFilters.nextCallDateFrom) {
+                                if (prospectsFilters.nextCallDateFrom) {
                                   filtersToApply.scheduled_call_from =
-                                    companyFilters.nextCallDateFrom;
+                                    prospectsFilters.nextCallDateFrom;
                                 }
-                                if (companyFilters.nextCallDateTo) {
+                                if (prospectsFilters.nextCallDateTo) {
                                   filtersToApply.scheduled_call_to =
-                                    companyFilters.nextCallDateTo;
+                                    prospectsFilters.nextCallDateTo;
                                 }
                               }
 
@@ -4988,8 +4933,8 @@ const CrmCompanyManagement = () => {
                             variant="outline-secondary"
                             className="d-flex align-items-center justify-content-center"
                             onClick={() => {
-                              setCompanySearch("");
-                              setCompanyFilters({
+                              setProspectsSearch("");
+                              setProspectsFilters({
                                 assignedTo: null,
                                 campaigns: null,
                                 nextCallScheduled: null,
@@ -5041,9 +4986,9 @@ const CrmCompanyManagement = () => {
             </div>
           )} */}
 
-            {/* Companies Table */}
+            {/* Prospects Table */}
             <div
-              className="companies-table-wrapper"
+              className="prospects-table-wrapper"
               style={{
                 flex: 1,
                 overflow: "hidden",
@@ -5053,10 +4998,10 @@ const CrmCompanyManagement = () => {
             >
               <GenericTable
                 data={dataList}
-                columns={companyColumns.filter((c) =>
+                columns={prospectsColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 )}
-                actions={companyActions}
+                actions={prospectsActions}
                 showActions={false}
                 // Selection
                 selectable={session?.user?.permissions?.includes(
@@ -5113,8 +5058,8 @@ const CrmCompanyManagement = () => {
                 }}
                 // Loading & styling
                 loading={loading}
-                emptyMessage="No companies found matching your criteria"
-                loadingMessage="Loading companies..."
+                emptyMessage="No prospects found matching your criteria"
+                loadingMessage="Loading prospects..."
                 hover={true}
                 uniqueKey="id"
                 // Fixed height mode
@@ -5125,12 +5070,16 @@ const CrmCompanyManagement = () => {
                 toolbar={{
                   // Tabs
                   showTabs: true,
-                  tabsDropdownLabel: "Companies",
+                  showImport: true,
+                  onImportClick: () => {
+                    console.log("Import prospects");
+                  },
+                  tabsDropdownLabel: "Prospects",
                   tabs: [
                     {
                       id: "all",
-                      label: "All companies",
-                      count: totalAllCompanies,
+                      label: "All prospects",
+                      count: totalAllProspects,
                       removable: false,
                     },
                     ...customTabs.map((tab) =>
@@ -5157,10 +5106,10 @@ const CrmCompanyManagement = () => {
 
                   // Search
                   showSearch: true,
-                  searchValue: companySearch,
-                  searchPlaceholder: "Search companies...",
+                  searchValue: prospectsSearch,
+                  searchPlaceholder: "Search prospects...",
                   onSearchChange: (value) => {
-                    setCompanySearch(value);
+                    setProspectsSearch(value);
                     // Clear search on empty value
                     if (!value) {
                       const newFilters = { ...currentFilters };
@@ -5170,10 +5119,10 @@ const CrmCompanyManagement = () => {
                     }
                   },
                   onSearch: () => {
-                    if (companySearch) {
+                    if (prospectsSearch) {
                       handleFiltersChange({
                         ...currentFilters,
-                        search: companySearch,
+                        search: prospectsSearch,
                       });
                       setRefreshKey((prev) => prev + 1);
                     }
@@ -5198,8 +5147,8 @@ const CrmCompanyManagement = () => {
                   // Filter Pills
                   filterPills: [
                     {
-                      id: "company_owner",
-                      label: "Company owner",
+                      id: "contact_owner",
+                      label: "Contact Owner",
                       showDropdown: true,
                       dropdownOptions: [
                         {
@@ -5431,7 +5380,7 @@ const CrmCompanyManagement = () => {
                   rightActions: renderAddContactsButton(),
                 }}
                 // Stats cards for metrics
-                statsCards={companyStatsCards}
+                statsCards={prospectsStatsCards}
               />
             </div>
           </div>
@@ -5445,7 +5394,7 @@ const CrmCompanyManagement = () => {
               centered
             >
               <Modal.Header closeButton className="border-bottom bg-light">
-                <Modal.Title>Import Companies</Modal.Title>
+                <Modal.Title>Import Contacts - Prospects</Modal.Title>
               </Modal.Header>
               <Modal.Body className="p-4">
                 <div className="alert alert-info mb-4">
@@ -5647,7 +5596,7 @@ const CrmCompanyManagement = () => {
                       }}
                     >
                       {selectedDataItem.name ||
-                        `Company #${selectedDataItem.id}`}
+                        `Prospect #${selectedDataItem.id}`}
                     </h2>
                     <div
                       style={{
@@ -6890,7 +6839,7 @@ const CrmCompanyManagement = () => {
                 }}
               >
                 <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Company ID: <strong>#{selectedDataItem.id}</strong>
+                  Prospect ID: <strong>#{selectedDataItem.id}</strong>
                 </div>
                 <Button
                   variant="outline-secondary"
@@ -7034,9 +6983,9 @@ const CrmCompanyManagement = () => {
             }}
             onConfirm={confirmDelete}
             itemName={
-              itemToDelete ? `company entry #${itemToDelete.id}` : undefined
+              itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined
             }
-            itemType="company entry"
+            itemType="prospect entry"
             additionalInfo={
               itemToDelete ? (
                 <div className="alert alert-warning mb-3">
@@ -7064,8 +7013,8 @@ const CrmCompanyManagement = () => {
           <FormModal
             show={showDataAssignmentModal}
             onHide={handleDataAssignmentModalClose}
-            title="Smart Company Distribution"
-            desc="Please fill the details below to smart company distribution."
+            title="Smart Prospect Distribution"
+            desc="Please fill the details below to smart prospect distribution."
             size="lg"
             formHtml={
               <>
@@ -8112,43 +8061,47 @@ const CrmCompanyManagement = () => {
           />
         </div>{" "}
         {/* End main content area */}
-        {/* Company Detail Sidebar */}
-        {showCompanySidebar && (
+        {/* Prospect Detail Sidebar */}
+        {showProspectSidebar && (
           <GenericSidebar
-            isOpen={showCompanySidebar}
-            onClose={handleCloseCompanySidebar}
-            title={selectedCompany?.name || "Company Details"}
-            subtitle={selectedCompany?.phone || ""}
-            email={selectedCompany?.data?.email}
-            phone={selectedCompany?.phone}
-            avatar={{
-              initials: getInitials(selectedCompany?.name || "NA"),
-              name: selectedCompany?.name || "NA",
-              gradient: getRandomColor(selectedCompany?.name || ""),
+            isOpen={showProspectSidebar}
+            onClose={handleCloseProspectSidebar}
+            title={selectedProspect?.name || "Prospect Details"}
+            subtitle={selectedProspect?.phone || ""}
+            email={selectedProspect?.data?.email}
+            phone={selectedProspect?.phone}
+            record={{
+              id: selectedProspect?.id,
+              type: RECORD_TYPES.PROSPECT,
             }}
+            avatar={{
+              initials: getInitials(selectedProspect?.name || "NA"),
+              name: selectedProspect?.name || "NA",
+              gradient: getRandomColor(selectedProspect?.name || ""),
+            }}
+            recordType="prospect"
+            recordId={
+              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
+            }
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content:
-                "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+                "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
               timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
               onRefresh: () => console.log("Refresh AI summary"),
               onThumbsUp: () => console.log("Thumbs up"),
               onThumbsDown: () => console.log("Thumbs down"),
               onCopy: () => {
                 navigator.clipboard.writeText(
-                  "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+                  "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
                 );
                 console.log("Summary copied");
               },
               onAskQuestion: () => console.log("Ask AI a question"),
             }}
-            record={{
-              id: selectedCompany?.id || selectedCompany?.rawData?.id,
-              type: RECORD_TYPES.COMPANY,
-            }}
             recordLink={{
               label: "View record",
-              onClick: () => console.log("View full company record"),
+              onClick: () => console.log("View full prospect record"),
             }}
             actionsDropdown={{
               label: "Actions",
@@ -8156,7 +8109,7 @@ const CrmCompanyManagement = () => {
                 {
                   label: "Convert to Lead",
                   onClick: () => {
-                    setConvertingCompanyId(selectedCompany?.id);
+                    setConvertingProspectId(selectedProspect?.id);
                     setShowConvertToLeadModal(true);
                   },
                 },
@@ -8166,7 +8119,7 @@ const CrmCompanyManagement = () => {
                 },
                 {
                   label: "Delete",
-                  onClick: () => handleDeleteData(selectedCompany),
+                  onClick: () => handleDeleteData(selectedProspect),
                 },
               ],
             }}
@@ -8183,14 +8136,14 @@ const CrmCompanyManagement = () => {
                 label: "Call",
                 icon: Phone,
                 onClick: () => {},
-                disabled: !selectedCompany?.phone,
+                disabled: !selectedProspect?.phone,
               },
               {
                 id: "email",
                 label: "Email",
                 icon: Mail,
                 onClick: () => {},
-                //disabled: !selectedCompany?.email
+                //disabled: !selectedProspect?.email
               },
               {
                 id: "task",
@@ -8216,8 +8169,8 @@ const CrmCompanyManagement = () => {
             ]}
             sections={[
               {
-                id: "about-company",
-                title: "About this company",
+                id: "about-prospect",
+                title: "About this prospect",
                 icon: Target,
                 collapsible: true,
                 defaultExpanded: true,
@@ -8230,52 +8183,52 @@ const CrmCompanyManagement = () => {
                 fields: [
                   {
                     label: "Name",
-                    value: selectedCompany?.name || "N/A",
+                    value: selectedProspect?.name || "N/A",
                     copyable: true,
                   },
                   {
                     label: "Phone",
-                    value: selectedCompany?.phone || "N/A",
+                    value: selectedProspect?.phone || "N/A",
                     type: "phone",
                     copyable: true,
-                    externalLink: selectedCompany?.phone
-                      ? `tel:${selectedCompany.phone}`
+                    externalLink: selectedProspect?.phone
+                      ? `tel:${selectedProspect.phone}`
                       : undefined,
                   },
                   {
                     label: "Email",
-                    value: selectedCompany?.data?.email || "N/A",
+                    value: selectedProspect?.data?.email || "N/A",
                     type: "email",
                     copyable: true,
-                    externalLink: selectedCompany?.data?.email
-                      ? `mailto:${selectedCompany.data.email}`
+                    externalLink: selectedProspect?.data?.email
+                      ? `mailto:${selectedProspect.data.email}`
                       : undefined,
-                    show: !!selectedCompany?.data?.email,
+                    show: !!selectedProspect?.data?.email,
                   },
                   {
                     label: "Assigned To",
-                    value: selectedCompany?.user_extension
-                      ? getNameByExtension(selectedCompany.user_extension)
+                    value: selectedProspect?.user_extension
+                      ? getNameByExtension(selectedProspect.user_extension)
                       : "Unassigned",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
                   },
                   {
                     label: "Campaign",
-                    value: selectedCompany?.campaign?.name || "No Campaign",
-                    show: !!selectedCompany?.campaign,
-                    hasDetails: !!selectedCompany?.campaign,
+                    value: selectedProspect?.campaign?.name || "No Campaign",
+                    show: !!selectedProspect?.campaign,
+                    hasDetails: !!selectedProspect?.campaign,
                     onDetailsClick: () => console.log("Show campaign details"),
                   },
                   {
                     label: "Status",
-                    value: selectedCompany?.status || "Active",
+                    value: selectedProspect?.status || "Active",
                     type: "text",
                   },
                   {
                     label: "Created Date",
-                    value: selectedCompany?.created_at
-                      ? moment(selectedCompany.created_at).format(
+                    value: selectedProspect?.created_at
+                      ? moment(selectedProspect.created_at).format(
                           "MMM DD, YYYY",
                         )
                       : "N/A",
@@ -8283,8 +8236,8 @@ const CrmCompanyManagement = () => {
                   },
                   {
                     label: "Last Updated",
-                    value: selectedCompany?.updated_at
-                      ? moment(selectedCompany.updated_at).format(
+                    value: selectedProspect?.updated_at
+                      ? moment(selectedProspect.updated_at).format(
                           "MMM DD, YYYY",
                         )
                       : "N/A",
@@ -8314,109 +8267,16 @@ const CrmCompanyManagement = () => {
                 icon: PhoneIcon,
                 collapsible: true,
                 defaultExpanded: true,
-                count: callRecordingsTotal ?? callRecordings.length,
-                isLoading: callRecordingsLoading,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () =>
+                      selectedProspect?.phone &&
+                      handleCallClick(selectedProspect),
                   },
-                ],
-                ...(callRecordings.length > 0
-                  ? {
-                      customContent: (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
-                          }}
-                        >
-                          {callRecordings.map(
-                            (recording: any, index: number) => {
-                              const duration =
-                                parseInt(
-                                  recording.Duration?.toString() || "0",
-                                ) / 10000000 || 0;
-                              const isOutgoing =
-                                recording.Direction === "CALL_OUTGOING";
-                              return (
-                                <div
-                                  key={recording.Id || index}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "10px 12px",
-                                    background: "#f9fafb",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#1f2937",
-                                      }}
-                                    >
-                                      {formatDateTimeToLocal(
-                                        recording.DateTime,
-                                        GlobalDateFormat,
-                                      )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                        marginTop: "2px",
-                                      }}
-                                    >
-                                      {formatDuration(duration)} ·{" "}
-                                      {isOutgoing ? "Outgoing" : "Incoming"}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    style={{
-                                      background: "transparent",
-                                      border: "none",
-                                      color: "#2563eb",
-                                      cursor: "pointer",
-                                      padding: "6px",
-                                      borderRadius: "6px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                    title="Play Recording"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePlayCallRecording(recording);
-                                    }}
-                                  >
-                                    <FiPlay size={18} />
-                                  </button>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      ),
-                    }
-                  : {
-                      emptyState: {
-                        icon: PhoneIcon,
-                        message: "No call recordings available yet.",
-                        action: {
-                          label: "Make a call",
-                          onClick: () =>
-                            selectedCompany?.phone &&
-                            handleCallClick(selectedCompany),
-                        },
-                      },
-                    }),
+                },
               },
               {
                 id: "notes",
@@ -8442,24 +8302,24 @@ const CrmCompanyManagement = () => {
           isOpen={showFiltersSidebar}
           onClose={handleCloseFiltersSidebar}
           title="Filters"
-          subtitle="Filter companies by various criteria"
+          subtitle="Filter prospects by various criteria"
           width="400px"
           filters={[
             {
               id: "search",
               label: "Search",
               type: "text",
-              value: companySearch,
-              onChange: (value) => setCompanySearch(value),
+              value: prospectsSearch,
+              onChange: (value) => setProspectsSearch(value),
               placeholder: "Search by name or phone...",
             },
             {
               id: "assignedTo",
               label: "Assigned To",
               type: "select",
-              value: companyFilters.assignedTo
+              value: prospectsFilters.assignedTo
                 ? (() => {
-                    const assignedToId = companyFilters.assignedTo;
+                    const assignedToId = prospectsFilters.assignedTo;
                     const ext = extensions.find(
                       (e: any) => (e.id || e.extension) === assignedToId,
                     );
@@ -8473,7 +8333,7 @@ const CrmCompanyManagement = () => {
                 : null,
               onChange: (selected) => {
                 const assignedToValue = selected ? selected.value : null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   assignedTo: assignedToValue,
                 }));
@@ -8491,8 +8351,8 @@ const CrmCompanyManagement = () => {
               id: "campaigns",
               label: "Campaigns",
               type: "multi-select",
-              value: companyFilters.campaigns
-                ? companyFilters.campaigns.map((campaignId: string) => {
+              value: prospectsFilters.campaigns
+                ? prospectsFilters.campaigns.map((campaignId: string) => {
                     const campaign = availableCampaigns.find(
                       (c: any) => c.value === campaignId,
                     );
@@ -8505,7 +8365,7 @@ const CrmCompanyManagement = () => {
                 const campaignValues = selected
                   ? selected.map((s: any) => s.value)
                   : null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   campaigns: campaignValues,
                 }));
@@ -8523,10 +8383,10 @@ const CrmCompanyManagement = () => {
               id: "nextCallScheduled",
               label: "Next Call Scheduled",
               type: "dropdown",
-              value: companyFilters.nextCallScheduled || "",
+              value: prospectsFilters.nextCallScheduled || "",
               onChange: (value) => {
                 const selectedValue = value || null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   nextCallScheduled: selectedValue,
                   nextCallDateFrom: null,
@@ -8548,10 +8408,10 @@ const CrmCompanyManagement = () => {
               id: "nextCallDateFrom",
               label: "Next Call Date (From)",
               type: "date",
-              value: companyFilters.nextCallDateFrom || "",
+              value: prospectsFilters.nextCallDateFrom || "",
               onChange: (value) => {
                 const dateValue = value || null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   nextCallDateFrom: dateValue,
                 }));
@@ -8562,10 +8422,10 @@ const CrmCompanyManagement = () => {
               id: "nextCallDateTo",
               label: "Next Call Date (To)",
               type: "date",
-              value: companyFilters.nextCallDateTo || "",
+              value: prospectsFilters.nextCallDateTo || "",
               onChange: (value) => {
                 const dateValue = value || null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   nextCallDateTo: dateValue,
                 }));
@@ -8576,15 +8436,15 @@ const CrmCompanyManagement = () => {
               id: "sourceFile",
               label: "Source Name",
               type: "select",
-              value: companyFilters.sourceFile
+              value: prospectsFilters.sourceFile
                 ? {
-                    value: companyFilters.sourceFile,
-                    label: companyFilters.sourceFile,
+                    value: prospectsFilters.sourceFile,
+                    label: prospectsFilters.sourceFile,
                   }
                 : null,
               onChange: (selected) => {
                 const sourceValue = selected ? selected.value : null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   sourceFile: sourceValue,
                 }));
@@ -8599,8 +8459,8 @@ const CrmCompanyManagement = () => {
               id: "tags",
               label: "Tags",
               type: "multi-select",
-              value: companyFilters.tags
-                ? companyFilters.tags.map((tagValue: string) => {
+              value: prospectsFilters.tags
+                ? prospectsFilters.tags.map((tagValue: string) => {
                     const tag = availableTags.find(
                       (t: any) => t.value === tagValue,
                     );
@@ -8613,7 +8473,7 @@ const CrmCompanyManagement = () => {
                 const tagValues = selected
                   ? selected.map((s: any) => s.value)
                   : null;
-                setCompanyFilters((prev) => ({
+                setProspectsFilters((prev) => ({
                   ...prev,
                   tags: tagValues,
                 }));
@@ -8631,41 +8491,41 @@ const CrmCompanyManagement = () => {
           onApply={() => {
             const filtersToApply: Record<string, any> = {};
 
-            if (companySearch) {
-              filtersToApply.search = companySearch;
+            if (prospectsSearch) {
+              filtersToApply.search = prospectsSearch;
             }
-            if (companyFilters.assignedTo) {
-              filtersToApply.user_extension = [companyFilters.assignedTo];
+            if (prospectsFilters.assignedTo) {
+              filtersToApply.user_extension = [prospectsFilters.assignedTo];
             }
             if (
-              companyFilters.campaigns &&
-              companyFilters.campaigns.length > 0
+              prospectsFilters.campaigns &&
+              prospectsFilters.campaigns.length > 0
             ) {
-              filtersToApply.campaign_id = companyFilters.campaigns;
+              filtersToApply.campaign_id = prospectsFilters.campaigns;
             }
-            if (companyFilters.sourceFile) {
-              filtersToApply.source_file = companyFilters.sourceFile;
+            if (prospectsFilters.sourceFile) {
+              filtersToApply.source_file = prospectsFilters.sourceFile;
             }
-            if (companyFilters.tags && companyFilters.tags.length > 0) {
-              filtersToApply.tags = companyFilters.tags;
+            if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
+              filtersToApply.tags = prospectsFilters.tags;
             }
 
             // Handle next call scheduled filters
             const now = moment();
-            if (companyFilters.nextCallScheduled === "today") {
+            if (prospectsFilters.nextCallScheduled === "today") {
               const today = now.format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = today;
               filtersToApply.scheduled_call_to = today;
-            } else if (companyFilters.nextCallScheduled === "tomorrow") {
+            } else if (prospectsFilters.nextCallScheduled === "tomorrow") {
               const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = tomorrow;
               filtersToApply.scheduled_call_to = tomorrow;
-            } else if (companyFilters.nextCallScheduled === "this_week") {
+            } else if (prospectsFilters.nextCallScheduled === "this_week") {
               const startOfWeek = moment().startOf("week").format("YYYY-MM-DD");
               const endOfWeek = moment().endOf("week").format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = startOfWeek;
               filtersToApply.scheduled_call_to = endOfWeek;
-            } else if (companyFilters.nextCallScheduled === "next_week") {
+            } else if (prospectsFilters.nextCallScheduled === "next_week") {
               const nextWeekStart = moment()
                 .add(1, "week")
                 .startOf("week")
@@ -8676,16 +8536,16 @@ const CrmCompanyManagement = () => {
                 .format("YYYY-MM-DD");
               filtersToApply.scheduled_call_from = nextWeekStart;
               filtersToApply.scheduled_call_to = nextWeekEnd;
-            } else if (companyFilters.nextCallScheduled === "overdue") {
+            } else if (prospectsFilters.nextCallScheduled === "overdue") {
               filtersToApply.scheduled_call_status = "overdue";
-            } else if (companyFilters.nextCallScheduled === "custom") {
-              if (companyFilters.nextCallDateFrom) {
+            } else if (prospectsFilters.nextCallScheduled === "custom") {
+              if (prospectsFilters.nextCallDateFrom) {
                 filtersToApply.scheduled_call_from =
-                  companyFilters.nextCallDateFrom;
+                  prospectsFilters.nextCallDateFrom;
               }
-              if (companyFilters.nextCallDateTo) {
+              if (prospectsFilters.nextCallDateTo) {
                 filtersToApply.scheduled_call_to =
-                  companyFilters.nextCallDateTo;
+                  prospectsFilters.nextCallDateTo;
               }
             }
 
@@ -8698,8 +8558,8 @@ const CrmCompanyManagement = () => {
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
-            setCompanySearch("");
-            setCompanyFilters({
+            setProspectsSearch("");
+            setProspectsFilters({
               assignedTo: null,
               campaigns: null,
               nextCallScheduled: null,
@@ -8720,21 +8580,22 @@ const CrmCompanyManagement = () => {
         />
       </div>{" "}
       {/* End flex container */}
-      {/* Convert to Lead Modal */}
-      {convertingCompanyId && (
-        <ConvertToLeadModal
-          show={showConvertToLeadModal}
-          onHide={() => {
-            setShowConvertToLeadModal(false);
-            setConvertingCompanyId(null);
-          }}
-          prospectId={convertingCompanyId}
-          onSuccess={() => {
-            setRefreshKey((prev) => prev + 1);
-            toast.success("Company converted to lead successfully!");
-          }}
-        />
-      )}
+      {/* Convert to Lead – same sidebar as Create Lead on leads page, with prospect pre-filled */}
+      <CreateLeadModal
+        show={showConvertToLeadModal}
+        onHide={() => {
+          setShowConvertToLeadModal(false);
+          setConvertingProspectId(null);
+        }}
+        onSuccess={() => {
+          setShowConvertToLeadModal(false);
+          setConvertingProspectId(null);
+          setRefreshKey((prev) => prev + 1);
+          toast.success("Prospect converted to lead successfully!");
+        }}
+        type="lead"
+        crmDataId={convertingProspectId ?? undefined}
+      />
       {/* Column Editor Modal */}
       <Modal
         show={showColumnEditor}
@@ -8749,7 +8610,7 @@ const CrmCompanyManagement = () => {
             Select which columns to display in the table
           </p>
           <Row>
-            {companyColumns.map((col) => {
+            {prospectsColumns.map((col) => {
               const isChecked = draftSelectedColumns.includes(col.key);
               const isOnlySelected =
                 isChecked && draftSelectedColumns.length === 1;
@@ -8839,7 +8700,7 @@ const CrmCompanyManagement = () => {
                     break;
                   page += 1;
                 }
-                const exportColumns = companyColumns.filter((c) =>
+                const exportColumns = prospectsColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 );
                 const getCellValue = (row: any, col: TableColumn<any>) => {
@@ -8958,17 +8819,12 @@ const CrmCompanyManagement = () => {
       </Modal>
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
-      {/* Create Company Sidebar */}
-      {renderCreateCompany(
-        showCreateCompanySidebar,
-        setShowCreateCompanySidebar,
-      )}
     </React.Fragment>
   );
 };
 
-CrmCompanyManagement.getLayout = (page: ReactElement) => {
+CrmProspectsManagement.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default CrmCompanyManagement;
+export default CrmProspectsManagement;

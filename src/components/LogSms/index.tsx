@@ -37,7 +37,7 @@ import {
   Italic,
   Underline,
   Link,
-  Image,
+  Image as ImageIcon,
   List,
   Paperclip,
   Plus,
@@ -91,7 +91,7 @@ function formatDisplayDate(isoLocal: string): string {
 
 const DEFAULT_GENERATE_QUERY = 'Write a short, professional SMS message (concise, suitable for text).';
 
-const smsMessageModal: React.FC<smsMessageModalProps> = ({
+const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   isOpen,
   onClose,
   associatedRecords = [],
@@ -729,7 +729,7 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
           </button>
           {/* Image */}
           <button style={toolbarBtnStyle} title="Insert Image" onClick={handleImage} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Image size={16} />
+            <ImageIcon size={16} aria-hidden />
           </button>
           {/* Code / Quote */}
           <button style={toolbarBtnStyle} title="Code" onClick={handleCode} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
@@ -938,4 +938,4 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
   );
 };
 
-export default smsMessageModal;
+export default SmsMessageModal;

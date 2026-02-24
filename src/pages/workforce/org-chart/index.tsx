@@ -947,7 +947,7 @@ const OrganizationalChart = () => {
                 </button>
                 {!isFullscreen && (
                 <button
-                  onClick={() => router.push('/staff-management/employees')}
+                  onClick={() => router.push('/workforce/employees')}
                   style={{
                     padding: '8px 16px',
                     border: 'none',

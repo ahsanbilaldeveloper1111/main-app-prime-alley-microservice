@@ -18,14 +18,30 @@ interface SimpleDropdownProps {
   testId?: string;
 }
 
+/** API payload for create/update company (no enrichment_data, no tenant_id) */
+export interface CompanyFormPayload {
+  name: string;
+  phone?: string;
+  city?: string;
+  country?: string;
+  industry?: string;
+  domain?: string;
+  email?: string;
+}
+
 interface CreateCompanySidebarProps {
   onClose: () => void;
+  /** When set, form is in edit mode and pre-filled with this data */
+  initialData?: CompanyFormPayload | null;
+  /** When set, onSave is called with this id for update */
+  editingId?: number | null;
+  /** Called on submit: (payload, editingId) => promise. If editingId, update; else create */
+  onSave?: (data: CompanyFormPayload, editingId?: number) => Promise<void>;
 }
 
 // ─── Company Data Mapping ─────────────────────────────────────────────────────
 const companyDataMapping: Record<string, Partial<typeof initialCompanyForm>> = {
   'American Broadcasting': {
-    companyOwner: 'Rizwan Haider',
     industry: 'Broadcast Media',
     country: 'United States',
     city: 'Burbank',
@@ -42,7 +58,6 @@ const companyDataMapping: Record<string, Partial<typeof initialCompanyForm>> = {
 const initialCompanyForm = {
   companyDomainName: '',
   companyName: '',
-  companyOwner: 'Rizwan Haider',
   industry: '',
   type: '',
   country: '',
@@ -54,10 +69,11 @@ const initialCompanyForm = {
   timeZone: '',
   description: '',
   linkedInCompanyPage: '',
+  email: '',
+  phone: '',
 };
 
 // ─── Dropdown options ─────────────────────────────────────────────────────────
-const COMPANY_OWNER_OPTIONS = ['Rizwan Haider', 'John Doe', 'Jane Smith'];
 
 const INDUSTRY_OPTIONS = [
   'Broadcast Media',
@@ -202,7 +218,12 @@ const getCities = (countryCode: string, stateCode: string) => {
 };
 
 // ─── Main Sidebar Component ───────────────────────────────────────────────────
-export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onClose }) => {
+export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
+  onClose,
+  initialData,
+  editingId,
+  onSave,
+}) => {
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
   
   // Location state for country/state/city dropdowns
@@ -304,34 +325,79 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
     selectedCity,
   ]);
 
-  // Auto-fill form when company name matches known data
+  // Autofill form when initialData is provided (edit mode)
   useEffect(() => {
+    if (!initialData) return;
+    setCompanyForm((prev) => ({
+      ...prev,
+      companyName: initialData.name ?? '',
+      companyDomainName: initialData.domain ?? '',
+      industry: initialData.industry ?? '',
+      country: initialData.country ?? '',
+      city: initialData.city ?? '',
+      email: initialData.email ?? '',
+      phone: initialData.phone ?? '',
+    }));
+    if (initialData.country) {
+      const country = Country.getAllCountries().find(
+        (c: { name: string }) => c.name === initialData!.country
+      );
+      if (country)
+        setSelectedCountry({
+          value: country.isoCode,
+          label: country.name,
+          isoCode: country.isoCode,
+        });
+    }
+  }, [initialData]);
+
+  // Auto-fill form when company name matches known data (create mode only)
+  useEffect(() => {
+    if (editingId != null || initialData) return;
     const companyName = companyForm.companyName.trim();
     if (companyName && companyDataMapping[companyName]) {
       const autoFillData = companyDataMapping[companyName];
       setCompanyForm((prev) => ({
         ...prev,
         ...autoFillData,
-        companyName: prev.companyName, // Preserve the company name
+        companyName: prev.companyName,
       }));
     }
-  }, [companyForm.companyName]);
+  }, [companyForm.companyName, editingId, initialData]);
 
-  const isFormValid = companyForm.companyDomainName.trim() !== '' || companyForm.companyName.trim() !== '';
+  const isFormValid = companyForm.companyName.trim() !== '';
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = '#0091ae');
   const blurStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = '#8a8a8a');
 
-  const handleCreate = () => {
-    if (!isFormValid) return;
-    console.log('Creating company:', companyForm);
-    onClose();
+  const buildPayload = (): CompanyFormPayload => ({
+    name: companyForm.companyName.trim(),
+    domain: companyForm.companyDomainName.trim() || undefined,
+    industry: companyForm.industry.trim() || undefined,
+    country: companyForm.country.trim() || undefined,
+    city: companyForm.city.trim() || undefined,
+    email: companyForm.email.trim() || undefined,
+    phone: companyForm.phone.trim() || undefined,
+  });
+
+  const handleSubmit = async () => {
+    if (!isFormValid || !onSave) return;
+    try {
+      await onSave(buildPayload(), editingId ?? undefined);
+      onClose();
+    } catch {
+      // toasts handled in API
+    }
   };
 
-  const handleCreateAnother = () => {
-    if (!isFormValid) return;
-    console.log('Creating company and adding another:', companyForm);
-    setCompanyForm(initialCompanyForm);
+  const handleCreateAnother = async () => {
+    if (!isFormValid || !onSave) return;
+    try {
+      await onSave(buildPayload(), undefined);
+      setCompanyForm(initialCompanyForm);
+    } catch {
+      // toasts handled in API
+    }
   };
 
   return (
@@ -372,7 +438,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
           }}
         >
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#141414', margin: 0 }}>
-            Create Company
+            {editingId != null ? 'Edit Company' : 'Create Company'}
           </h2>
           <button
             onClick={onClose}
@@ -419,7 +485,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
 
           {/* Company name */}
           <div style={fieldWrap}>
-            <FieldLabel text="Company name" />
+            <FieldLabel text="Company name" required />
             <input
               type="text"
               data-test-id="companyname-input"
@@ -431,14 +497,33 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
             />
           </div>
 
-          {/* Company owner */}
+          {/* Email */}
           <div style={fieldWrap}>
-            <FieldLabel text="Company owner" />
-            <SimpleDropdown
-              value={companyForm.companyOwner}
-              options={COMPANY_OWNER_OPTIONS}
-              onChange={set('companyOwner')}
-              testId="companyowner-input"
+            <FieldLabel text="Email" />
+            <input
+              type="email"
+              data-test-id="company-email-input"
+              value={companyForm.email}
+              onChange={setE('email')}
+              placeholder="company@example.com"
+              style={inputStyle}
+              onFocus={focusStyle}
+              onBlur={blurStyle}
+            />
+          </div>
+
+          {/* Phone */}
+          <div style={fieldWrap}>
+            <FieldLabel text="Phone" />
+            <input
+              type="tel"
+              data-test-id="company-phone-input"
+              value={companyForm.phone}
+              onChange={setE('phone')}
+              placeholder="+1 234 567 8900"
+              style={inputStyle}
+              onFocus={focusStyle}
+              onBlur={blurStyle}
             />
           </div>
 
@@ -648,7 +733,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
         >
           <button
             type="submit"
-            onClick={handleCreate}
+            onClick={handleSubmit}
             style={{
               padding: '10px 20px',
               backgroundColor: '#141414',
@@ -662,27 +747,29 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2d2d2d'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#141414'; }}
           >
-            Create
+            {editingId != null ? 'Save' : 'Create'}
           </button>
 
-          <button
-            type="button"
-            onClick={handleCreateAnother}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: 'transparent',
-              color: '#141414',
-              border: '1px solid #8a8a8a',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7fafc'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            Create and add another
-          </button>
+          {editingId == null && (
+            <button
+              type="button"
+              onClick={handleCreateAnother}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'transparent',
+                color: '#141414',
+                border: '1px solid #8a8a8a',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7fafc'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              Create and add another
+            </button>
+          )}
 
           <button
             type="button"
@@ -709,9 +796,26 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
 }
 
 // ─── renderCreateCompany helper (same pattern as renderCreateContact) ──────────
-const renderCreateCompany = (showCreateCompanySidebar: boolean, setShowCreateCompanySidebar: React.Dispatch<React.SetStateAction<boolean>>) => {
+export interface RenderCreateCompanyOptions {
+  initialData?: CompanyFormPayload | null;
+  editingId?: number | null;
+  onSave?: (data: CompanyFormPayload, editingId?: number) => Promise<void>;
+}
+
+const renderCreateCompany = (
+  showCreateCompanySidebar: boolean,
+  setShowCreateCompanySidebar: React.Dispatch<React.SetStateAction<boolean>>,
+  options?: RenderCreateCompanyOptions
+) => {
   if (!showCreateCompanySidebar) return null;
-  return <CreateCompanySidebar onClose={() => setShowCreateCompanySidebar(false)} />;
+  return (
+    <CreateCompanySidebar
+      onClose={() => setShowCreateCompanySidebar(false)}
+      initialData={options?.initialData}
+      editingId={options?.editingId}
+      onSave={options?.onSave}
+    />
+  );
 };
 
 export default renderCreateCompany;

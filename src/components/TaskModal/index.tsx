@@ -46,6 +46,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [showQueueDropdown, setShowQueueDropdown] = useState(false);
   const [showAssignedToDropdown, setShowAssignedToDropdown] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customTime, setCustomTime] = useState('08:00');
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -242,10 +244,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
       return;
     }
 
+    const dateToSend = activityDate === 'Custom...' ? customDate : activityDate;
+    const timeToSend = activityDate === 'Custom...' ? customTime : activityTime;
+
     onSave({
       title,
-      activityDate,
-      activityTime,
+      activityDate: dateToSend,
+      activityTime: timeToSend,
       reminder,
       repeat,
       taskType,
@@ -256,9 +261,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
     });
 
     // Reset form
+    const today = new Date().toISOString().slice(0, 10);
     setTitle('');
     setActivityDate('In 3 business days (Friday)');
     setActivityTime('08:00');
+    setCustomDate(today);
+    setCustomTime('08:00');
     setReminder('No reminder');
     setRepeat(false);
     setTaskType('To-do');
@@ -384,7 +392,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           marginBottom: '20px' 
         }}>
           {/* Activity Date */}
-          <div>
+          <div style={{ position: 'relative' }}>
             <label style={{ 
               fontSize: '13px', 
               color: '#141414', 
@@ -409,7 +417,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   textAlign: 'left',
                 }}
               >
-                {activityDate}
+                {activityDate === 'Custom...' ? customDate : activityDate}
               </button>
               <button
                 onClick={() => setShowTimePicker(!showTimePicker)}
@@ -428,7 +436,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 <Clock size={16} />
-                {activityTime}
+                {activityDate === 'Custom...' ? customTime : activityTime}
               </button>
             </div>
             
@@ -449,8 +457,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <button
                     key={option}
                     onClick={() => {
-                      setActivityDate(option);
-                      setShowDatePicker(false);
+                      if (option === 'Custom...') {
+                        setActivityDate('Custom...');
+                        setActivityTime(customTime);
+                        setShowDatePicker(false);
+                      } else {
+                        setActivityDate(option);
+                        setShowDatePicker(false);
+                      }
                     }}
                     style={{
                       width: '100%',
@@ -473,6 +487,48 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {option}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Custom date/time inputs when Custom is selected */}
+            {activityDate === 'Custom...' && (
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center',
+                marginTop: '10px',
+                flexWrap: 'wrap',
+              }}>
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '5px',
+                    fontSize: '14px',
+                    color: '#141414',
+                    backgroundColor: '#ffffff',
+                  }}
+                />
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomTime(v);
+                    setActivityTime(v);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '5px',
+                    fontSize: '14px',
+                    color: '#141414',
+                    backgroundColor: '#ffffff',
+                  }}
+                />
               </div>
             )}
           </div>

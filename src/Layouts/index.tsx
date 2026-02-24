@@ -43,6 +43,9 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
+import CreateLeadModal from '@components/CreateLeadModal';
+import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
+import { createCompany } from '@utils/crm';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -88,6 +91,8 @@ const Layout = ({ children }: LayoutProps) => {
 	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
 	const headerLogoUrlRef = useRef<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -1126,19 +1131,34 @@ const Layout = ({ children }: LayoutProps) => {
                       onClick={() => setShowCreateDropdown(false)}
                     />
                     <div className="create-dropdown-menu">
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Contact handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateLeadModal(true);
+                        }}>
                         Lead
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Company handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateCompanySidebar(true);
+                        }}>
                         Company
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Deal handler */ }}>
-                        Deal
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          router.push('/crm/inbox');
+                        }}>
+                        Inbox
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Ticket handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          router.push('/help-center/my-tickets/new');
+                        }}>
                         Ticket
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Task handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Task handler */
+                          router.push('/planner/tasks');
+                        }}>
                         Task
                       </button>
                     </div>
@@ -1175,9 +1195,9 @@ const Layout = ({ children }: LayoutProps) => {
                 <button
                   className="crm-prime-topbar-icon"
                   onClick={(e) => {
-                    router.push('/live-calls');
+                    router.push('/communications/wallboards-live');
                   }}
-                  title="Live Wallboards"
+                  title="Wallboards (Live)"
                 >
                   <MonitorCheck size={14} />
                 </button>
@@ -1405,10 +1425,10 @@ const Layout = ({ children }: LayoutProps) => {
                         </div>
                         <div className="user-dropdown-header-text">
                           <div className="user-dropdown-name">
-                            {loggedInName || 'Ocean Agent 01'}
+                            {loggedInName || 'User'}
                           </div>
                           <div className="user-dropdown-email">
-                            {session?.user?.email || 'ocean1@sipzon.com'}
+                            {session?.user?.email || 'user@example.com'}
                           </div>
                           <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences
@@ -1727,6 +1747,24 @@ const Layout = ({ children }: LayoutProps) => {
 			isOpen={showNotificationsSidebar}
 			onClose={() => setShowNotificationsSidebar(false)}
 		/>
+
+		{/* Create Lead Sidebar (from header Create dropdown) */}
+		<CreateLeadModal
+			show={showCreateLeadModal}
+			onHide={() => setShowCreateLeadModal(false)}
+			onSuccess={() => setShowCreateLeadModal(false)}
+		/>
+
+		{/* Create Company Sidebar (from header Create dropdown) */}
+		{showCreateCompanySidebar && (
+			<CreateCompanySidebar
+				onClose={() => setShowCreateCompanySidebar(false)}
+				onSave={async (data: CompanyFormPayload) => {
+					await createCompany(data);
+					setShowCreateCompanySidebar(false);
+				}}
+			/>
+		)}
 		</>
 	);
 };

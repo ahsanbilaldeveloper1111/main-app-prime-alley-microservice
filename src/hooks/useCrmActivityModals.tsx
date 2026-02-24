@@ -5,7 +5,7 @@
  */
 import React, { useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { createCrmNote, createMeeting } from "@utils/crm";
+import { createCrmNote, createMeeting, createTask } from "@utils/crm";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import NotesModal from "@components/NotesModal";
 import EmailModal from "@components/EmailModal";
@@ -15,7 +15,7 @@ import LogSmsModal from "@components/LogSms";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import { toast } from "react-toastify";
 
-export type CrmRecordType = "prospect" | "lead" | "deal" | "order";
+export type CrmRecordType = "prospect" | "lead" | "deal" | "order" | "company";
 
 export interface UseCrmActivityModalsParams {
   recordType: CrmRecordType;
@@ -24,6 +24,8 @@ export interface UseCrmActivityModalsParams {
   recordEmail?: string;
   /** Phone number for SMS / WhatsApp (e.g. prospect.data.phone). */
   recordPhone?: string;
+  /** Called after a task is created (e.g. from sidebar modal) so the Activities panel can refetch tasks. */
+  onTaskCreated?: () => void;
   /** Called after a note is created so CrmActivitiesPanel can refetch notes. */
   onNoteCreated?: () => void;
   /** Called after an email is sent so CrmActivitiesPanel can refetch emails. */
@@ -56,6 +58,7 @@ export function useCrmActivityModals({
   recordName,
   recordEmail = "",
   recordPhone = "",
+  onTaskCreated,
   onNoteCreated,
   onEmailSent,
   onMeetingScheduled,
@@ -191,9 +194,80 @@ export function useCrmActivityModals({
     [recordType, recordId, onEmailSent],
   );
 
-  const refreshAndCloseTask = useCallback(() => {
-    setShowTaskModal(false);
-  }, []);
+  const parseTaskDueDate = useCallback(
+    (activityDate: string, _activityTime: string): string => {
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, "0");
+      const d = String(today.getDate()).padStart(2, "0");
+      const base = `${y}-${m}-${d}`;
+      if (activityDate === "Today") return base;
+      const addDays = (n: number) => {
+        const t = new Date(today);
+        t.setDate(t.getDate() + n);
+        return t.toISOString().slice(0, 10);
+      };
+      if (activityDate === "Tomorrow") return addDays(1);
+      if (activityDate?.includes("3 business") || activityDate?.includes("Friday"))
+        return addDays(3);
+      if (activityDate === "In 1 week") return addDays(7);
+      if (activityDate === "In 2 weeks") return addDays(14);
+      if (activityDate === "In 1 month") return addDays(30);
+      return addDays(3);
+    },
+    [],
+  );
+
+  const handleTaskSave = useCallback(
+    async (taskForm: {
+      title: string;
+      activityDate: string;
+      activityTime: string;
+      priority: string;
+      notes: string;
+    }) => {
+      const due_date = parseTaskDueDate(
+        taskForm.activityDate,
+        taskForm.activityTime,
+      );
+      const urgency =
+        taskForm.priority === "High"
+          ? "high"
+          : taskForm.priority === "Medium"
+            ? "med"
+            : "low";
+      try {
+        await createTask({
+          name: taskForm.title.trim(),
+          user_extension: extension,
+          created_by: extension,
+          urgency,
+          due_date,
+          time:
+            taskForm.activityTime?.length >= 5
+              ? taskForm.activityTime.slice(0, 5)
+              : undefined,
+          status: "pending",
+          notes: taskForm.notes?.trim()
+            ? [{ note: taskForm.notes.trim() }]
+            : undefined,
+          record_type: recordType,
+          record_id: recordId,
+        });
+        setShowTaskModal(false);
+        onTaskCreated?.();
+      } catch {
+        // createTask shows toast
+      }
+    },
+    [
+      recordType,
+      recordId,
+      extension,
+      parseTaskDueDate,
+      onTaskCreated,
+    ],
+  );
 
   const handleSmsLog = useCallback(
     async (smsData: {
@@ -279,7 +353,7 @@ export function useCrmActivityModals({
         isOpen={showTaskModal}
         onClose={() => setShowTaskModal(false)}
         assignedToName="Unassigned"
-        onSave={refreshAndCloseTask}
+        onSave={handleTaskSave}
       />
       <MeetingModal
         isOpen={showMeetingModal}
