@@ -1157,7 +1157,7 @@ const Layout = ({ children }: LayoutProps) => {
                       </button>
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false); /* Add Task handler */
-                          router.push('/planning/tasks');
+                          router.push('/planner/tasks');
                         }}>
                         Task
                       </button>
