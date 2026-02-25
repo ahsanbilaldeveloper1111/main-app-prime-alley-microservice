@@ -4,6 +4,7 @@ on:
     branches:
       - develop
       - qa
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
 jobs:
