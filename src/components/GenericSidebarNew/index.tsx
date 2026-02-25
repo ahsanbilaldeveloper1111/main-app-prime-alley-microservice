@@ -30,6 +30,7 @@ import {
   Repeat,
   MessageCircle,
   Search,
+  FileText,
 } from "lucide-react";
 import WhatsAppMessageModal from '@components/WhatsAppMessageModalNew';
 import LogSmsModal from '@components/LogSms';
@@ -37,7 +38,8 @@ import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import { useSession } from "next-auth/react";
-import { createMeeting, createCrmNote, getCrmNotes, createTask, type CrmNoteItem } from "@utils/crm";
+import { useRouter } from "next/router";
+import { createMeeting, createCrmNote, getCrmNotes, createTask, getAllCrmDataById, type CrmNoteItem, type CrmDataItem } from "@utils/crm";
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
@@ -176,6 +178,9 @@ export interface GenericSidebarProps {
   
   recordType?: 'prospect' | 'lead' | 'deal' | 'order';
   recordId?: number;
+
+  /** Resolve user extension/id to display name (e.g. for Owner / contact_owner). When provided, prospect sidebar uses it for the Owner field. */
+  resolveUserLabel?: (extensionOrId: string) => string;
   
   onNoteCreate?: (note: string, createTask: boolean, taskDueDate?: string) => void;
   
@@ -5373,6 +5378,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   contextPayload,
   recordType,
   recordId,
+  resolveUserLabel,
   onNoteCreate,
   onEmailSend,
   senderEmail,
@@ -5388,6 +5394,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onWhatsAppLog,
   onSmsLog,
 }) => {
+  const router = useRouter();
   const { data: session } = useSession();
   const {
     dialNumber: ctiDialNumber,
@@ -5405,6 +5412,40 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
     ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
     ?? '';
+
+  // Fetched prospect when sidebar is opened for a prospect (by recordId)
+  const [prospectData, setProspectData] = useState<CrmDataItem | null>(null);
+  const [prospectLoading, setProspectLoading] = useState(false);
+  const [prospectError, setProspectError] = useState<string | null>(null);
+
+  // When sidebar is opened for a prospect, fetch prospect by ID
+  useEffect(() => {
+    if (!isOpen || recordType !== 'prospect' || recordId == null) {
+      setProspectData(null);
+      setProspectError(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setProspectError('Invalid prospect ID');
+      setProspectData(null);
+      return;
+    }
+    setProspectLoading(true);
+    setProspectError(null);
+    getAllCrmDataById(id)
+      .then((data) => {
+        setProspectData(data);
+        setProspectError(null);
+      })
+      .catch(() => {
+        setProspectData(null);
+        setProspectError('Failed to load prospect');
+      })
+      .finally(() => {
+        setProspectLoading(false);
+      });
+  }, [isOpen, recordType, recordId]);
 
   // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
   const recordSummary: RecordSummaryDisplay | undefined =
@@ -6092,7 +6133,24 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         },
       ];
 
-  // Process sections to override note-related actions
+  // Humanize data key for display (e.g. "contact_owner" -> "Contact Owner")
+  const humanizeDataKey = (key: string) =>
+    key
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Format a value from prospect data.data for display
+  const formatDataFieldValue = (value: unknown): string | string[] | undefined => {
+    if (value == null || value === "") return undefined;
+    if (Array.isArray(value)) {
+      const strings = value.map((v) => (typeof v === "object" && v != null && "name" in v ? (v as { name: string }).name : String(v)));
+      return strings.length ? strings : undefined;
+    }
+    if (typeof value === "object") return undefined;
+    return String(value);
+  };
+
+  // Process sections to override note-related actions and enrich "About this prospect" when we have API data
   const processedSections = sections.map((section) => {
     // If this is a notes section with an empty state action, override it to open modal
     if (section.id === "notes" && section.emptyState?.action) {
@@ -6110,6 +6168,127 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         },
       };
     }
+
+    // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status
+    if (section.id === "about-prospect") {
+      const existingFields = (section.fields ?? []).filter((f) => f.label !== "Status");
+      if (recordType === "prospect" && prospectData) {
+        const raw = prospectData as unknown as Record<string, unknown>;
+        const prospectRecord = (raw.data as Record<string, unknown>) ?? raw;
+        const nestedData = (prospectRecord.data as Record<string, unknown>) ?? {};
+        const campaign = prospectRecord.campaign as { name?: string } | undefined;
+        const formatDateOnly = (v: string | null | undefined) =>
+          v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "N/A";
+        const formatDateTime = (v: string | null | undefined) =>
+          v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) + " " + new Date(v).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "N/A";
+
+        const baseFields: SidebarField[] = [
+          { label: "Name", value: (prospectRecord.name as string) ?? "N/A", copyable: true },
+          {
+            label: "Phone",
+            value: (prospectRecord.phone as string) ?? "N/A",
+            type: "phone",
+            copyable: true,
+            externalLink: prospectRecord.phone ? `tel:${prospectRecord.phone}` : undefined,
+          },
+          {
+            label: "Email",
+            value: (nestedData.email as string) ?? "N/A",
+            type: "email",
+            copyable: true,
+            show: !!nestedData.email,
+            externalLink: nestedData.email ? `mailto:${nestedData.email}` : undefined,
+          },
+          {
+            label: "Owner",
+            value: (() => {
+              const raw = (nestedData.contact_owner as string) ?? "";
+              if (!raw) return "—";
+              return resolveUserLabel ? resolveUserLabel(raw) : raw;
+            })(),
+            hasDetails: true,
+            onDetailsClick: () => {},
+          },
+          ...(campaign?.name
+            ? [
+                {
+                  label: "Campaign",
+                  value: campaign.name,
+                  show: true,
+                  hasDetails: true,
+                  onDetailsClick: () => {},
+                } as SidebarField,
+              ]
+            : []),
+          {
+            label: "Company Domain",
+            value: (prospectRecord.company_domain as string) ?? "—",
+            copyable: true,
+          },
+          {
+            label: "Created Date",
+            value: formatDateOnly(prospectRecord.created_at as string),
+            type: "date",
+          },
+          {
+            label: "Last Updated",
+            value: formatDateOnly(prospectRecord.updated_at as string),
+            type: "date",
+          },
+          ...(prospectRecord.scheduled_call_at
+            ? [
+                {
+                  label: "Scheduled Call At",
+                  value: formatDateTime(prospectRecord.scheduled_call_at as string),
+                  type: "datetime" as const,
+                } as SidebarField,
+              ]
+            : []),
+        ];
+        const excludeFromDataFields = new Set([
+          "email",
+          "is_viewed",
+          "id",
+          "phone",
+          "created_at",
+          "updated_at",
+          "user_extension",
+          "name",
+          "company_id",
+          "assigned_to",
+          "contact_owner",
+          "uploaded_by",
+        ]);
+        const dataDataFields: SidebarField[] = [];
+        for (const [key, value] of Object.entries(nestedData)) {
+          if (excludeFromDataFields.has(key)) continue;
+          if (key === "campaign_id") continue;
+          if (key === "scheduled_call_at" && value) {
+            dataDataFields.push({
+              label: "Scheduled Call At",
+              value: formatDateTime(value as string),
+              type: "datetime",
+            });
+            continue;
+          }
+          const formatted = formatDataFieldValue(value);
+          if (formatted === undefined) continue;
+          const label = humanizeDataKey(key);
+          dataDataFields.push(
+            Array.isArray(formatted)
+              ? { label, value: formatted, type: "tags" as const }
+              : { label, value: formatted, copyable: true }
+          );
+        }
+        return {
+          ...section,
+          fields: [...baseFields, ...dataDataFields],
+          isLoading: prospectLoading,
+        };
+      }
+      return { ...section, fields: existingFields };
+    }
+
     return section;
   });
 
@@ -6530,6 +6709,114 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   )}
                 </div>
               ) : null
+            ) : section.id === "recent-activities" && recordType === "prospect" ? (
+              prospectLoading ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
+                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                  Loading...
+                </div>
+              ) : prospectData ? (
+                (() => {
+                  const auditTrail = ((prospectData as unknown as Record<string, unknown>).audit_trail as Array<{
+                    id?: number;
+                    event?: string;
+                    description?: string | null;
+                    created_at?: string;
+                    changes?: Record<string, { old?: unknown; new?: unknown }>;
+                  }>) ?? [];
+                  const raw = prospectData as unknown as Record<string, unknown>;
+                  const prospectRecord = (raw.data as Record<string, unknown>) ?? raw;
+                  const campaign = prospectRecord.campaign as { id?: number; name?: string } | undefined;
+                  const fmt = (v: unknown): string => (v == null ? "—" : typeof v === "string" ? v : typeof v === "object" ? JSON.stringify(v) : String(v));
+                  const resolveFieldVal = (field: string, val: unknown): string => {
+                    if (field === "assigned_to" || field === "contact_owner") return resolveUserLabel ? resolveUserLabel(String(val ?? "")) : fmt(val);
+                    if (field === "campaign_id" && campaign?.name && val != null && Number(val) === Number(campaign?.id)) return campaign.name;
+                    if (field === "scheduled_call_at" && val) {
+                      try { return new Date(String(val)).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return fmt(val); }
+                    }
+                    return fmt(val);
+                  };
+                  const buildAuditLines = (entry: typeof auditTrail[0]): string => {
+                    const event = entry.event === "created" ? "created" : "updated";
+                    if (event === "created") return (entry.description?.trim() || "Record created");
+                    const changes = entry.changes && typeof entry.changes === "object" && !Array.isArray(entry.changes) ? (entry.changes as Record<string, { old?: unknown; new?: unknown }>) : null;
+                    if (!changes) return (entry.description?.trim() || "Record updated");
+                    const lines: string[] = [];
+                    Object.entries(changes).forEach(([field, val]) => {
+                      if (!val || typeof val !== "object" || (!("old" in val) && !("new" in val))) return;
+                      const rawOld = (val as { old?: unknown }).old;
+                      const rawNew = (val as { new?: unknown }).new;
+                      if (field === "data") {
+                        const oldObj = rawOld && typeof rawOld === "object" && !Array.isArray(rawOld) ? (rawOld as Record<string, unknown>) : {};
+                        let newObj: Record<string, unknown> = {};
+                        if (typeof rawNew === "string") { try { newObj = JSON.parse(rawNew) as Record<string, unknown>; } catch { newObj = {}; } } else if (rawNew && typeof rawNew === "object" && !Array.isArray(rawNew)) newObj = rawNew as Record<string, unknown>;
+                        const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+                        allKeys.forEach((key) => {
+                          const o = resolveFieldVal(key, oldObj[key]);
+                          const n = resolveFieldVal(key, newObj[key]);
+                          if (o !== n) lines.push(`${humanizeDataKey(key)}: ${o} → ${n}`);
+                        });
+                      } else {
+                        const o = resolveFieldVal(field, rawOld);
+                        const n = resolveFieldVal(field, rawNew);
+                        if (o !== n) lines.push(`${humanizeDataKey(field)}: ${o} → ${n}`);
+                      }
+                    });
+                    return lines.length > 0 ? lines.join("\n") : (entry.description?.trim() || "Record updated");
+                  };
+                  if (auditTrail.length > 0) {
+                    const displayTrail = auditTrail.slice(0, 5);
+                    const hasMore = auditTrail.length > 5;
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0", minWidth: 0 }}>
+                        <div style={{ maxHeight: "280px", overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: "0", minWidth: 0 }}>
+                        {displayTrail.map((entry, index) => {
+                          const timestamp = entry.created_at
+                            ? new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                            : "—";
+                          const description = buildAuditLines(entry);
+                          return (
+                            <div key={entry.id ?? index} style={{ padding: "10px 0", marginBottom: index < displayTrail.length - 1 ? "10px" : 0, minWidth: 0 }}>
+                              <p style={{ fontSize: "14px", color: "#141414", margin: "0 0 8px 0", lineHeight: "1.6", whiteSpace: "pre-wrap", overflowWrap: "break-word", wordBreak: "break-word" }}>{description}</p>
+                              <span style={{ fontSize: "12px", color: "#718096" }}>{timestamp}</span>
+                            </div>
+                          );
+                        })}
+                        </div>
+                        {recordId != null && hasMore && (
+                          <button
+                            onClick={() => router.push(`/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`)}
+                            style={{ marginTop: "8px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer", width: "100%" }}
+                          >
+                            View more
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                      {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
+                      <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState?.message}</p>
+                      {section.emptyState?.action && (
+                        <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                          {section.emptyState?.action.label}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : section.emptyState ? (
+                <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
+                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {section.emptyState.action && (
+                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                      {section.emptyState.action.label}
+                    </button>
+                  )}
+                </div>
+              ) : null
             ) : (section.id === "calls" || section.id === "call-recordings") ? (
               sidebarCallRecordingsLoading ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
@@ -6537,8 +6824,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   Loading...
                 </div>
               ) : sidebarCallRecordings.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "280px", overflowY: "auto" }}>
-                  {sidebarCallRecordings.map((rec: any, index: number) => {
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ maxHeight: "280px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {sidebarCallRecordings.slice(0, 5).map((rec: any, index: number) => {
                     const dateStr = rec.DateTime ?? rec.start_time ?? rec.created_at ?? "";
                     const timestamp = dateStr ? (dateStr.length > 10 ? new Date(dateStr).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : dateStr) : "—";
                     const dir = rec.Direction ?? rec.direction ?? rec.CallDirection ?? "";
@@ -6570,6 +6858,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       </div>
                     );
                   })}
+                  </div>
+                  {recordType === "prospect" && recordId != null && sidebarCallRecordings.length > 5 && (
+                    <button
+                      onClick={() => router.push(`/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`)}
+                      style={{ marginTop: "8px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer", width: "100%" }}
+                    >
+                      View more
+                    </button>
+                  )}
                 </div>
               ) : section.emptyState ? (
                 <div style={{ padding: "24px 16px", textAlign: "center" }}>
@@ -7434,6 +7731,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       border: "1px solid #ff9fcc",
                       padding: "18px 20px",
                       borderRadius: "5px",
+                      overflowWrap: "break-word",
+                      wordBreak: "break-word",
+                      minWidth: 0,
                     }}
                   >
                     {recordSummary.content || 'No summary available'}
@@ -7448,9 +7748,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       borderTop: "1px solid #fee",
                     }}
                   >
-                    {recordSummary.onThumbsUp && (
-                      <button
-                        onClick={recordSummary.onThumbsUp}
+                    <button
+                        onClick={() => recordSummary.onThumbsUp?.()}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7473,10 +7772,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       >
                         <ThumbsUp size={16} />
                       </button>
-                    )}
-                    {recordSummary.onThumbsDown && (
-                      <button
-                        onClick={recordSummary.onThumbsDown}
+                    <button
+                        onClick={() => recordSummary.onThumbsDown?.()}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7499,10 +7796,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       >
                         <ThumbsDown size={16} />
                       </button>
-                    )}
-                    {recordSummary.onCopy && (
-                      <button
-                        onClick={recordSummary.onCopy}
+                    <button
+                        onClick={() => recordSummary.onCopy?.()}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7525,12 +7820,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       >
                         <Copy size={16} />
                       </button>
-                    )}
                   </div>
 
-                  {recordSummary.onAskQuestion && (
-                    <button
-                      onClick={recordSummary.onAskQuestion}
+                  <button
+                      onClick={() => recordSummary.onAskQuestion?.()}
                       style={{
                         marginTop: "16px",
                         width: "36%",
@@ -7558,7 +7851,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       <Sparkles size={16} />
                       Ask a question
                     </button>
-                  )}
                 </div>
               )}
             </div>

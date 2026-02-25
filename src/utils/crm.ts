@@ -938,6 +938,11 @@ export const createCrmData = async (payload: {
   campaign_id: number | null;
   data: Record<string, any>;
   scheduled_call_at?: string;
+  company_domain?: string;
+  company_name?: string;
+  source?: string;
+  tag_ids?: number[];
+  directory?: string;
 }): Promise<any> => {
   try {
     const response = await axiosInstance.post("/crm/crm-data", payload);
@@ -995,6 +1000,11 @@ export const updateCrmData = async (
     phone: string;
     campaign_id: number | null;
     data: Record<string, any>;
+    scheduled_call_at?: string;
+    company_domain?: string;
+    company_name?: string;
+    source?: string;
+    tag_ids?: number[];
   },
 ): Promise<any> => {
   try {

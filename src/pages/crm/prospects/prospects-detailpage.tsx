@@ -268,6 +268,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
@@ -313,14 +325,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
         "--",
     },
     {
-      label: "Lead Status",
-      value: firstTicket?.status ?? prospect?.data?.disposition ?? "--",
-    },
-    {
       label: "Lifecycle Stage",
       value: prospect?.data?.lifecycle_stage ?? "--",
     },
-    { label: "Buying Role", value: prospect?.data?.buying_role ?? "--" },
     { label: "Contact owner", value: prospect?.data?.contact_owner ?? "--" },
   ];
 

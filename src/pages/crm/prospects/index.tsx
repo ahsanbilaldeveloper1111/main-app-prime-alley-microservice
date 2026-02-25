@@ -1087,8 +1087,11 @@ const CrmProspectsManagement = () => {
       if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
       if (memoizedFilters.assignment_status)
         params.assignment_status = memoizedFilters.assignment_status;
-      if (memoizedFilters.user_extension?.length)
-        params.user_extensions = memoizedFilters.user_extension;
+      if (memoizedFilters.user_extension?.length) {
+        params.user_extensions = Array.isArray(memoizedFilters.user_extension)
+          ? memoizedFilters.user_extension
+          : [memoizedFilters.user_extension];
+      }
       if (
         memoizedFilters.is_viewed !== undefined &&
         memoizedFilters.is_viewed !== ""
@@ -1111,6 +1114,19 @@ const CrmProspectsManagement = () => {
         params.source_file = memoizedFilters.source_file;
       if (memoizedFilters.tag_ids?.length)
         params.tag_ids = memoizedFilters.tag_ids;
+      // Create date filter (from filter pill)
+      if (memoizedFilters.created_at_from)
+        params.created_at_from = memoizedFilters.created_at_from;
+      if (memoizedFilters.created_at_to)
+        params.created_at_to = memoizedFilters.created_at_to;
+      // Last activity / last called filter (from filter pill)
+      if (memoizedFilters.last_called_at_from)
+        params.last_called_at_from = memoizedFilters.last_called_at_from;
+      if (memoizedFilters.last_called_at_to)
+        params.last_called_at_to = memoizedFilters.last_called_at_to;
+      // Lead status / disposition filter (from filter pill)
+      if (memoizedFilters.disposition)
+        params.disposition = memoizedFilters.disposition;
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
       return params;
     },
@@ -3105,18 +3121,18 @@ const CrmProspectsManagement = () => {
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          company_domain: contactForm.company_domain?.trim() || undefined,
+          source: contactForm.source?.trim() || undefined,
           data: {
             email: contactForm.email.trim(),
             assigned_to: assignedTo,
             uploaded_by: uploadedBy,
-            company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
             tags: contactForm.tags?.length
               ? contactForm.tags.map((t) => t.value || t.label)
               : undefined,
             note: contactForm.note || undefined,
             contact_owner: contactForm.contact_owner ?? undefined,
-            source: contactForm.source?.trim() || undefined,
             lifecycle_stage: contactForm.lifecycle_stage || undefined,
             legal_basis: contactForm.legal_basis?.length
               ? contactForm.legal_basis
@@ -3176,15 +3192,15 @@ const CrmProspectsManagement = () => {
         name,
         phone: contactForm.phoneNumber.trim(),
         campaign_id: contactForm.campaign_id ?? null,
+        company_domain: contactForm.company_domain?.trim() || undefined,
+        source: contactForm.source?.trim() || undefined,
+        scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: {
           email: contactForm.email.trim(),
-          company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
           tags: contactForm.tags?.length
             ? contactForm.tags.map((t) => t.value || t.label)
             : undefined,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          source: contactForm.source?.trim() || undefined,
           note: contactForm.note || undefined,
           contact_owner: contactForm.contact_owner ?? undefined,
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -4580,7 +4596,7 @@ const CrmProspectsManagement = () => {
                       </Col>
                       <Col md={4}>
                         <Form.Label className="small fw-bold mb-2">
-                          Assigned To
+                          Owner
                         </Form.Label>
                         <Select
                           options={extensions.map((ext: any) => ({
@@ -5130,12 +5146,26 @@ const CrmProspectsManagement = () => {
                   showSaveButton: true,
                   onSaveClick: () => console.log("Save view"),
 
-                  // Filter Pills
+                  // Filter Pills (active/activeLabel from currentFilters so applied filters are visible)
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Contact Owner",
+                      label: "Owner",
                       showDropdown: true,
+                      searchable: true,
+                      active: !!(currentFilters.user_extension && (Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension.length > 0 : true)),
+                      activeLabel: (() => {
+                        const extId = Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension[0] : currentFilters.user_extension;
+                        if (!extId) return undefined;
+                        const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
+                        return ext ? (ext.display_name || ext.name || ext.extension) : String(extId);
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.user_extension;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Owners",
@@ -5148,12 +5178,12 @@ const CrmProspectsManagement = () => {
                           },
                         },
                         ...extensions.map((ext) => ({
-                          label: ext.name || ext.extension,
+                          label: ext.display_name || ext.name || ext.extension,
                           value: ext.extension,
                           onClick: () => {
                             handleFiltersChange({
                               ...currentFilters,
-                              user_extension: ext.extension,
+                              user_extension: [ext.id || ext.extension],
                             });
                             setRefreshKey((prev) => prev + 1);
                           },
@@ -5164,6 +5194,26 @@ const CrmProspectsManagement = () => {
                       id: "create_date",
                       label: "Create date",
                       showDropdown: true,
+                      active: !!(currentFilters.created_at_from || currentFilters.created_at_to),
+                      activeLabel: (() => {
+                        if (!currentFilters.created_at_from && !currentFilters.created_at_to) return undefined;
+                        const from = currentFilters.created_at_from;
+                        const to = currentFilters.created_at_to;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (from === today && to === today) return "Today";
+                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+                        if (from === weekStart && to === today) return "Last 7 Days";
+                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
+                        if (from === monthStart && to === today) return "Last 30 Days";
+                        return "Custom";
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.created_at_from;
+                        delete newFilters.created_at_to;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Time",
@@ -5227,6 +5277,26 @@ const CrmProspectsManagement = () => {
                       id: "last_activity",
                       label: "Last activity date",
                       showDropdown: true,
+                      active: !!(currentFilters.last_called_at_from || currentFilters.last_called_at_to),
+                      activeLabel: (() => {
+                        if (!currentFilters.last_called_at_from && !currentFilters.last_called_at_to) return undefined;
+                        const from = currentFilters.last_called_at_from;
+                        const to = currentFilters.last_called_at_to;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (from === today && to === today) return "Today";
+                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+                        if (from === weekStart && to === today) return "Last 7 Days";
+                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
+                        if (from === monthStart && to === today) return "Last 30 Days";
+                        return "Custom";
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.last_called_at_from;
+                        delete newFilters.last_called_at_to;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Time",
@@ -5290,6 +5360,19 @@ const CrmProspectsManagement = () => {
                       id: "lead_status",
                       label: "Lead Status",
                       showDropdown: true,
+                      active: !!currentFilters.disposition,
+                      activeLabel: currentFilters.disposition
+                        ? (() => {
+                            const map: Record<string, string> = { hot_lead: "Hot Lead", warm_lead: "Warm Lead", cold_lead: "Cold Lead", qualified: "Qualified", not_interested: "Not Interested" };
+                            return map[String(currentFilters.disposition)] || String(currentFilters.disposition);
+                          })()
+                        : undefined,
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.disposition;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Status",
@@ -8069,6 +8152,7 @@ const CrmProspectsManagement = () => {
             recordId={
               selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
             }
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
             crmSummary={selectedProspect?.data?.crm_summary ?? selectedProspect?.crm_summary ?? undefined}
             recordLink={{
@@ -8178,10 +8262,10 @@ const CrmProspectsManagement = () => {
                     show: !!selectedProspect?.data?.email,
                   },
                   {
-                    label: "Assigned To",
-                    value: selectedProspect?.user_extension
-                      ? getNameByExtension(selectedProspect.user_extension)
-                      : "Unassigned",
+                    label: "Owner",
+                    value: selectedProspect?.data?.contact_owner
+                      ? getNameByExtension(selectedProspect.data.contact_owner)
+                      : "—",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
                   },
@@ -8191,11 +8275,6 @@ const CrmProspectsManagement = () => {
                     show: !!selectedProspect?.campaign,
                     hasDetails: !!selectedProspect?.campaign,
                     onDetailsClick: () => console.log("Show campaign details"),
-                  },
-                  {
-                    label: "Status",
-                    value: selectedProspect?.status || "Active",
-                    type: "text",
                   },
                   {
                     label: "Created Date",
@@ -8229,7 +8308,13 @@ const CrmProspectsManagement = () => {
                   message: "No recent activities for this prospect.",
                   action: {
                     label: "Log activity",
-                    onClick: () => console.log("Log activity"),
+                    onClick: () => {
+                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
+                      if (id) {
+                        router.push(`/crm/prospects/prospects-detailpage?id=${id}`);
+                        handleCloseProspectSidebar();
+                      }
+                    },
                   },
                 },
               },
@@ -8287,7 +8372,7 @@ const CrmProspectsManagement = () => {
             },
             {
               id: "assignedTo",
-              label: "Assigned To",
+              label: "Owner",
               type: "select",
               value: prospectsFilters.assignedTo
                 ? (() => {
@@ -8315,7 +8400,7 @@ const CrmProspectsManagement = () => {
                 value: ext.id || ext.extension,
                 label: ext.display_name || ext.name || ext.id || ext.extension,
               })),
-              placeholder: "Select user...",
+              placeholder: "Search and select owner...",
               isClearable: true,
               styles: customSelectStyles,
             },
