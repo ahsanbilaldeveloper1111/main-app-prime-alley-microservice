@@ -3344,9 +3344,10 @@ const CrmCompanyManagement = () => {
             height: "100vh",
             backgroundColor: "#ffffff",
             boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-            zIndex: 1001,
+            zIndex: 999999,
             display: "flex",
             flexDirection: "column",
+
           }}
         >
           {/* Header */}
