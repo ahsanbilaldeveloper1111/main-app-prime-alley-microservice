@@ -2880,21 +2880,7 @@ const CrmOrders = () => {
             recordId={
               selectedOrder?.id ?? selectedOrder?.rawData?.id ?? undefined
             }
-            breezeRecordSummary={{
-              content: `This order was created on ${selectedOrder?.created_at ? moment(selectedOrder.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedOrder?.stage?.name ? `Currently in ${selectedOrder.stage.name} stage.` : ""} ${selectedOrder?.final_amount || selectedOrder?.total_amount ? `Order value: ${selectedOrder.currency || "AED"} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}.` : ""} ${selectedOrder?.customer_name ? `Customer: ${selectedOrder.customer_name}.` : ""}`,
-              timestamp: selectedOrder?.updated_at
-                ? `Generated on ${moment(selectedOrder.updated_at).format("MMM DD, YYYY [at] h:mm A")}`
-                : "Generated recently",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                const summaryText = `This order was created on ${selectedOrder?.created_at ? moment(selectedOrder.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedOrder?.stage?.name ? `Currently in ${selectedOrder.stage.name} stage.` : ""} ${selectedOrder?.final_amount || selectedOrder?.total_amount ? `Order value: ${selectedOrder.currency || "AED"} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}.` : ""} ${selectedOrder?.customer_name ? `Customer: ${selectedOrder.customer_name}.` : ""}`;
-                navigator.clipboard.writeText(summaryText);
-                toast.success("Summary copied to clipboard");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
+            crmSummary={selectedOrder?.rawData?.crm_summary ?? selectedOrder?.crm_summary ?? undefined}
             record={{
               id: selectedOrder?.id || selectedOrder?.rawData?.id,
               type: RECORD_TYPES.ORDER,

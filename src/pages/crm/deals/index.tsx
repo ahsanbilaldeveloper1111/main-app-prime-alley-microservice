@@ -2900,21 +2900,7 @@ const CrmDeals = () => {
               selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
             }
             onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ""} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ""} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ""}`,
-              timestamp: selectedDeal?.updated_at
-                ? `Generated on ${moment(selectedDeal.updated_at).format("MMM DD, YYYY [at] h:mm A")}`
-                : "Generated recently",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                const summaryText = `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ""} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ""} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ""}`;
-                navigator.clipboard.writeText(summaryText);
-                toast.success("Summary copied to clipboard");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
+            crmSummary={selectedDeal?.rawData?.crm_summary ?? selectedDeal?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
               onClick: () => {

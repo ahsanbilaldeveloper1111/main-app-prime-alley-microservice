@@ -130,19 +130,31 @@ export function useCrmActivityModals({
         meetingData.startTime.length === 5
           ? meetingData.startTime
           : meetingData.startTime.slice(0, 5);
-      const extensions = [meetingData.hostEmail?.slice(0, 15) || "0"];
+      const end_time =
+        meetingData.endTime.length === 5
+          ? meetingData.endTime
+          : meetingData.endTime.slice(0, 5);
+      const extensions = [extension.slice(0, 15) || meetingData.hostEmail?.slice(0, 15) || "0"];
+      const start_date_time = `${meeting_date}T${meeting_time}:00`;
+      const end_date_time = `${meeting_date}T${end_time}:00`;
       try {
         await createMeeting({
           name: meetingData.title.trim(),
           meeting_type: "Video",
           meeting_date,
           meeting_time,
-          extensions,
-          record_id: recordId,
           record_type: recordType,
-          ...(meetingData.attendees?.length
-            ? { attendees: meetingData.attendees }
-            : {}),
+          record_id: recordId,
+          extensions,
+          tenant_id: tenantId,
+          extension_user: extension,
+          start_date_time,
+          end_date_time,
+          ...(meetingData.attendees?.length > 0 && {
+            emails: meetingData.attendees,
+            attendees: meetingData.attendees,
+          }),
+          ...(meetingData.reminders?.length > 0 && { reminders: meetingData.reminders }),
           ...([meetingData.description, meetingData.internalNote].filter(
             Boolean,
           ).length

@@ -19,7 +19,6 @@ import GenericTable, {
 import GenericSidebar, {
   SidebarSection,
   QuickAction,
-  BreezeRecordSummary,
   SidebarField,
 } from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -4014,21 +4013,7 @@ const CrmLeads = () => {
               selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined
             }
             onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ""} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ""} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ""}`,
-              timestamp: selectedLead?.updated_at
-                ? `Generated on ${moment(selectedLead.updated_at).format("MMM DD, YYYY [at] h:mm A")}`
-                : "Generated recently",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                const summaryText = `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ""} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ""} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ""}`;
-                navigator.clipboard.writeText(summaryText);
-                toast.success("Summary copied to clipboard");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
+            crmSummary={selectedLead?.rawData?.crm_summary ?? selectedLead?.crm_summary ?? undefined}
             record={{
               id: selectedLead?.id || selectedLead?.rawData?.id,
               type: RECORD_TYPES.LEAD,
