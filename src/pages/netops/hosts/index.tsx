@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
-import { getHosts, getItemsByHostName, ZebbixHost, ZebbixItem } from '@utils/zebbix';
+import { getHosts, getItemsByHostName, ZabbixHost, ZabbixItem } from '@utils/zabbix';
 import { Button, Row, Col, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
@@ -15,7 +15,7 @@ import { List } from 'lucide-react';
 
 const Hosts = () => {
   const router = useRouter();
-  const [hosts, setHosts] = useState<ZebbixHost[]>([]);
+  const [hosts, setHosts] = useState<ZabbixHost[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchValue, setSearchValue] = useState('');
@@ -26,11 +26,11 @@ const Hosts = () => {
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
   const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedHost, setSelectedHost] = useState<ZebbixHost | null>(null);
-  const [viewItems, setViewItems] = useState<ZebbixItem[]>([]);
+  const [selectedHost, setSelectedHost] = useState<ZabbixHost | null>(null);
+  const [viewItems, setViewItems] = useState<ZabbixItem[]>([]);
   const [viewLoading, setViewLoading] = useState(false);
 
-  const handleViewClick = useCallback(async (row: ZebbixHost) => {
+  const handleViewClick = useCallback(async (row: ZabbixHost) => {
     setSelectedHost(row);
     setShowViewModal(true);
     setViewItems([]);
@@ -42,12 +42,12 @@ const Hosts = () => {
         return;
       }
       const response = await getItemsByHostName([hostName]);
-      if (response.error) {
+      if (response?.error) {
         toast.error(response.error.message || 'Failed to fetch items');
         setViewItems([]);
         return;
       }
-      const list = response.result ?? [];
+      const list = response?.result ?? [];
       setViewItems(Array.isArray(list) ? list : []);
     } catch (error) {
       console.error('Error fetching items:', error);
@@ -59,7 +59,7 @@ const Hosts = () => {
   }, []);
 
   const handleViewItemsClick = useCallback(
-    (row: ZebbixHost) => {
+    (row: ZabbixHost) => {
       if (row.hostid) {
         router.push(`/netops/hosts/${row.hostid}`);
       } else {
@@ -69,7 +69,7 @@ const Hosts = () => {
     [router]
   );
 
-  const tableColumns: TableColumn<ZebbixHost>[] = [
+  const tableColumns: TableColumn<ZabbixHost>[] = [
     { key: 'hostid', label: 'Host ID', sortable: true },
     { key: 'host', label: 'Host', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
@@ -81,7 +81,7 @@ const Hosts = () => {
     },
   ];
 
-  const tableActions: TableAction<ZebbixHost>[] = [
+  const tableActions: TableAction<ZabbixHost>[] = [
     {
           label: 'View',
       icon: <FiEye size={16} />,
@@ -97,14 +97,19 @@ const Hosts = () => {
   const fetchHosts = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getHosts();
+      const response = await getHosts({
+        output: 'extend',
+        selectInterfaces: 'extend',
+        selectGroups: 'extend',
+        selectParentTemplates: ['templateid', 'name'],
+      });
       if (response.error) {
         toast.error(response.error.message || 'Failed to fetch hosts');
         setHosts([]);
         return;
       }
       const list = response.result ?? [];
-      const data = Array.isArray(list) ? list : [];
+      const data = Array.isArray(list) ? (list as ZabbixHost[]) : [];
       setHosts(data);
       setTablePagination((prev) => ({
         ...prev,
@@ -113,7 +118,7 @@ const Hosts = () => {
       }));
     } catch (error) {
       console.error('Error fetching hosts:', error);
-      toast.error('Failed to fetch hosts');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch hosts');
       setHosts([]);
     } finally {
       setLoading(false);
@@ -190,7 +195,7 @@ const Hosts = () => {
 
       {/* <PageSummaryGrid cards={summaryCards} /> */}
 
-      <GenericTable<ZebbixHost>
+      <GenericTable<ZabbixHost>
         data={paginatedData}
         columns={tableColumns}
         actions={tableActions}

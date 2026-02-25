@@ -10,8 +10,6 @@ import {
   AlignCenter,
   AlignRight,
   Palette,
-  Heading1,
-  Heading2,
   Strikethrough,
   Link,
   Undo,
@@ -25,6 +23,8 @@ interface RichTextEditorProps {
   minHeight?: string;
   maxHeight?: string;
   maxLength?: number;
+  /** 'sm' reduces toolbar button padding and icon size */
+  buttonSize?: 'sm' | 'md';
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
@@ -33,11 +33,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder = "Describe your issue in detail...",
   minHeight = '150px',
   maxHeight = '300px',
-  maxLength = 500
+  maxLength = 500,
+  buttonSize = 'md'
 }) => {
+  const isSm = buttonSize === 'sm';
+  const toolbarPadding = isSm ? '6px 8px' : '8px 12px';
+  const buttonPadding = isSm ? '4px 6px' : '6px 8px';
+  const iconSize = isSm ? 14 : 16;
+  const dividerHeight = isSm ? '20px' : '24px';
   const editorRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLInputElement>(null);
-  const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
+  const [activeFormats, setActiveFormats] = useState<Record<string, boolean | string>>({});
 
   // Check if a format command is currently active
   const isFormatActive = (command: string): boolean => {
@@ -124,6 +130,26 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     return false;
   };
 
+  // Get the block-level tag containing the current selection (p, h1, h2, ...)
+  const getCurrentBlockTag = (): string => {
+    if (!editorRef.current) return 'p';
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const node = selection.anchorNode;
+      if (node) {
+        let element: Element | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
+        while (element && element !== editorRef.current) {
+          const tagName = element.tagName?.toLowerCase();
+          if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div'].includes(tagName)) {
+            return tagName === 'div' ? 'p' : tagName;
+          }
+          element = element.parentElement;
+        }
+      }
+    }
+    return 'p';
+  };
+
   // Update active formats based on current selection
   const updateActiveFormats = () => {
     if (!editorRef.current) return;
@@ -131,7 +157,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     // Get current alignment from computed styles
     const currentAlignment = getCurrentAlignment();
     
-    const formats: Record<string, boolean> = {
+    const currentBlock = getCurrentBlockTag();
+    const formats: Record<string, boolean | string> = {
       bold: isFormatActive('bold'),
       italic: isFormatActive('italic'),
       underline: isFormatActive('underline'),
@@ -143,6 +170,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       formatBlockH2: isHeadingActive(2),
       insertUnorderedList: isFormatActive('insertUnorderedList'),
       insertOrderedList: isFormatActive('insertOrderedList'),
+      currentBlockTag: currentBlock,
     };
 
     setActiveFormats(formats);
@@ -264,7 +292,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '2px',
-          padding: '8px 12px',
+          padding: toolbarPadding,
           background: '#f8f9fa',
           borderBottom: '1px solid #dee2e6',
           borderRadius: '6px 6px 0 0'
@@ -275,7 +303,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => applyFormat('bold')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.bold ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.bold ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -284,14 +312,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Bold (Ctrl+B)"
           >
-            <Bold size={16} />
+            <Bold size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('italic')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.italic ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.italic ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -300,14 +328,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Italic (Ctrl+I)"
           >
-            <Italic size={16} />
+            <Italic size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('underline')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.underline ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.underline ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -316,14 +344,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Underline (Ctrl+U)"
           >
-            <Underline size={16} />
+            <Underline size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('strikeThrough')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.strikeThrough ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.strikeThrough ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -332,53 +360,50 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Strikethrough"
           >
-            <Strikethrough size={16} />
+            <Strikethrough size={iconSize} />
           </Button>
           
           <div style={{
             width: '1px',
-            height: '24px',
+            height: dividerHeight,
             background: '#dee2e6',
             margin: '0 4px'
           }} />
 
-          {/* Headings */}
-          <Button
-            variant="link"
-            onClick={() => applyFormat('formatBlock', '<h1>')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: '6px 8px',
-              color: activeFormats.formatBlockH1 ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.formatBlockH1 ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
+          {/* Block format dropdown: Title, Paragraph, H1–H6 */}
+          <select
+            value={String(activeFormats.currentBlockTag || 'p')}
+            onChange={(e) => {
+              const value = e.target.value;
+              const tag = value === 'paragraph' ? '<p>' : `<${value}>`;
+              applyFormat('formatBlock', tag);
             }}
-            title="Heading 1"
-          >
-            <Heading1 size={16} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('formatBlock', '<h2>')}
-            onMouseDown={(e) => e.preventDefault()}
+            title="Block format"
             style={{
-              padding: '6px 8px',
-              color: activeFormats.formatBlockH2 ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.formatBlockH2 ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
+              padding: buttonPadding,
+              fontSize: iconSize,
+              minHeight: iconSize + 12,
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              background: '#fff',
+              color: '#495057',
+              cursor: 'pointer',
+              marginRight: '2px'
             }}
-            title="Heading 2"
           >
-            <Heading2 size={16} />
-          </Button>
+            <option value="h1">Title</option>
+            <option value="p">Paragraph</option>
+            <option value="h1">H1</option>
+            <option value="h2">H2</option>
+            <option value="h3">H3</option>
+            <option value="h4">H4</option>
+            <option value="h5">H5</option>
+            <option value="h6">H6</option>
+          </select>
           
           <div style={{
             width: '1px',
-            height: '24px',
+            height: dividerHeight,
             background: '#dee2e6',
             margin: '0 4px'
           }} />
@@ -389,7 +414,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => applyFormat('insertUnorderedList')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.insertUnorderedList ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.insertUnorderedList ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -398,14 +423,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Bullet List"
           >
-            <List size={16} />
+            <List size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('insertOrderedList')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.insertOrderedList ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.insertOrderedList ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -414,12 +439,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Numbered List"
           >
-            <ListOrdered size={16} />
+            <ListOrdered size={iconSize} />
           </Button>
           
           <div style={{
             width: '1px',
-            height: '24px',
+            height: dividerHeight,
             background: '#dee2e6',
             margin: '0 4px'
           }} />
@@ -430,7 +455,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => applyFormat('justifyLeft')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.justifyLeft ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.justifyLeft ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -439,14 +464,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Align Left"
           >
-            <AlignLeft size={16} />
+            <AlignLeft size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('justifyCenter')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.justifyCenter ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.justifyCenter ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -455,14 +480,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Align Center"
           >
-            <AlignCenter size={16} />
+            <AlignCenter size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('justifyRight')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: activeFormats.justifyRight ? '#0d6efd' : '#495057',
               backgroundColor: activeFormats.justifyRight ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
@@ -471,12 +496,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Align Right"
           >
-            <AlignRight size={16} />
+            <AlignRight size={iconSize} />
           </Button>
           
           <div style={{
             width: '1px',
-            height: '24px',
+            height: dividerHeight,
             background: '#dee2e6',
             margin: '0 4px'
           }} />
@@ -492,7 +517,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               }}
               onMouseDown={(e) => e.preventDefault()}
               style={{
-                padding: '6px 8px',
+                padding: buttonPadding,
                 color: '#495057',
                 minWidth: 'auto',
                 border: 'none',
@@ -500,7 +525,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               }}
               title="Text Color"
             >
-              <Palette size={16} />
+              <Palette size={iconSize} />
             </Button>
             <input
               ref={colorPickerRef}
@@ -522,7 +547,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={insertLink}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: '#495057',
               minWidth: 'auto',
               border: 'none',
@@ -530,12 +555,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Insert Link"
           >
-            <Link size={16} />
+            <Link size={iconSize} />
           </Button>
 
           <div style={{
             width: '1px',
-            height: '24px',
+            height: dividerHeight,
             background: '#dee2e6',
             margin: '0 4px'
           }} />
@@ -546,7 +571,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onClick={() => applyFormat('undo')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: '#495057',
               minWidth: 'auto',
               border: 'none',
@@ -554,14 +579,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Undo (Ctrl+Z)"
           >
-            <Undo size={16} />
+            <Undo size={iconSize} />
           </Button>
           <Button
             variant="link"
             onClick={() => applyFormat('redo')}
             onMouseDown={(e) => e.preventDefault()}
             style={{
-              padding: '6px 8px',
+              padding: buttonPadding,
               color: '#495057',
               minWidth: 'auto',
               border: 'none',
@@ -569,7 +594,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             }}
             title="Redo (Ctrl+Y)"
           >
-            <Redo size={16} />
+            <Redo size={iconSize} />
           </Button>
 
           {/* Character Count */}

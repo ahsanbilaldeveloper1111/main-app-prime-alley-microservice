@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getHostGroups, ZebbixHostGroup } from '@utils/zebbix';
+import { getHostGroups, ZabbixHostGroup } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
@@ -12,7 +12,7 @@ import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
 
 const HostGroups = () => {
-  const [groups, setGroups] = useState<ZebbixHostGroup[]>([]);
+  const [groups, setGroups] = useState<ZabbixHostGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchValue, setSearchValue] = useState('');
@@ -23,7 +23,7 @@ const HostGroups = () => {
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZebbixHostGroup>[] = [
+  const tableColumns: TableColumn<ZabbixHostGroup>[] = [
     { key: 'groupid', label: 'Group ID', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
   ];
@@ -38,7 +38,7 @@ const HostGroups = () => {
         return;
       }
       const list = response.result ?? [];
-      const data = Array.isArray(list) ? list : [];
+      const data = Array.isArray(list) ? (list as ZabbixHostGroup[]) : [];
       setGroups(data);
       setTablePagination((prev) => ({
         ...prev,
@@ -47,7 +47,7 @@ const HostGroups = () => {
       }));
     } catch (error) {
       console.error('Error fetching host groups:', error);
-      toast.error('Failed to fetch host groups');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch host groups');
       setGroups([]);
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ const HostGroups = () => {
 
       {/* <PageSummaryGrid cards={summaryCards} /> */}
 
-      <GenericTable<ZebbixHostGroup>
+      <GenericTable<ZabbixHostGroup>
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
