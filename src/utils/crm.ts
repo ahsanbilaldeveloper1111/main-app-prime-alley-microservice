@@ -520,7 +520,7 @@ export interface CrmNotesPaginatedResponse {
 export const getCrmNotes = async (
   recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
-  params?: { page?: number; per_page?: number }
+  params?: { page?: number; per_page?: number },
 ): Promise<CrmNotesPaginatedResponse> => {
   try {
     const response = await axiosInstance.get("/crm/notes", {
@@ -536,7 +536,7 @@ export const getCrmNotes = async (
 /** Update a CRM note. */
 export const updateCrmNote = async (
   noteId: number,
-  payload: { text: string }
+  payload: { text: string },
 ): Promise<any> => {
   try {
     const response = await axiosInstance.put(`/crm/notes/${noteId}`, payload);
@@ -726,7 +726,7 @@ export const getDealMeetings = async (
 export const getCrmMeetingsForRecord = async (
   recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
-  params?: { page?: number; per_page?: number }
+  params?: { page?: number; per_page?: number },
 ): Promise<CrmMeetingsPaginatedResponse> => {
   try {
     const response = await axiosInstance.get("/crm/meetings", {
@@ -937,6 +937,12 @@ export const createCrmData = async (payload: {
   user_extension: string;
   campaign_id: number | null;
   data: Record<string, any>;
+  scheduled_call_at?: string;
+  company_domain?: string;
+  company_name?: string;
+  source?: string;
+  tag_ids?: number[];
+  directory?: string;
 }): Promise<any> => {
   try {
     const response = await axiosInstance.post("/crm/crm-data", payload);
@@ -994,6 +1000,11 @@ export const updateCrmData = async (
     phone: string;
     campaign_id: number | null;
     data: Record<string, any>;
+    scheduled_call_at?: string;
+    company_domain?: string;
+    company_name?: string;
+    source?: string;
+    tag_ids?: number[];
   },
 ): Promise<any> => {
   try {
@@ -1097,11 +1108,22 @@ export interface EnrichmentData {
   } | null;
   structured_data?: {
     official_company_name?: string | null;
-    headquarters?: { address?: string | null; city?: string | null; country?: string | null } | null;
-    other_locations?: Array<{ address?: string | null; city?: string | null; country?: string | null }> | null;
+    headquarters?: {
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+    } | null;
+    other_locations?: Array<{
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+    }> | null;
     emails?: Array<{ email?: string | null; type?: string | null }> | null;
     phones?: Array<{ number?: string | null; type?: string | null }> | null;
-    social_links?: Array<{ platform?: string | null; url?: string | null }> | null;
+    social_links?: Array<{
+      platform?: string | null;
+      url?: string | null;
+    }> | null;
     llm_confidence?: number | null;
   } | null;
   validation_data?: {
@@ -1181,7 +1203,9 @@ export const getCompanies = async (
     };
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to fetch companies",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch companies",
     );
     throw error;
   }
@@ -1197,7 +1221,9 @@ export const getCompany = async (id: number): Promise<CompanyData> => {
     return data;
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to fetch company",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch company",
     );
     throw error;
   }
@@ -1278,7 +1304,9 @@ export const deleteCompany = async (id: number): Promise<void> => {
     );
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to delete company",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete company",
     );
     throw error;
   }
@@ -3069,18 +3097,20 @@ export interface CreateMeetingPayload {
   name: string;
   meeting_type: string;
   meeting_date: string; // Y-m-d
-  meeting_time: string; // H:i
+  meeting_time: string; // H:i (24h)
+  record_type: "prospect" | "lead" | "deal" | "order";
+  record_id: number;
   extensions: string[]; // at least one, max 15 chars each
   meeting_outcome?: string;
-  lead_id?: number | string;
-  deal_id?: number | string;
   status?: string; // default: scheduled
-  tenant_id?: string; // uuid for Google Meet
-  extension_user?: string; // extension of user creating meeting (max 64)
-  attendees?: string[]; // email addresses
+  start_date_time?: string; // full start (used for links/reminders)
+  end_date_time?: string; // must be >= start_date_time
+  emails?: string[];
+  attendees?: string[];
   summary?: string; // max 255
-  record_id?: number;
-  record_type?: string;
+  tenant_id?: string;
+  extension_user?: string; // caller extension for links & notifications
+  reminders?: string[]; // each item a date/time e.g. "2026-02-25 09:00:00"
 }
 
 export const createMeeting = async (
@@ -3096,23 +3126,31 @@ export const createMeeting = async (
       meeting_type: data.meeting_type,
       meeting_date: data.meeting_date,
       meeting_time: data.meeting_time,
+      record_type: data.record_type,
+      record_id: data.record_id,
       extensions: data.extensions,
-      ...(data.record_id != null && { record_id: data.record_id }),
-      ...(data.record_type != null && { record_type: data.record_type }),
       ...(data.meeting_outcome != null && {
         meeting_outcome: data.meeting_outcome,
       }),
-      ...(data.lead_id != null && { lead_id: Number(data.lead_id) }),
-      ...(data.deal_id != null && { deal_id: Number(data.deal_id) }),
       ...(data.status != null && { status: data.status }),
-      ...(data.tenant_id != null && { tenant_id: data.tenant_id }),
-      ...(data.extension_user != null && {
-        extension_user: data.extension_user,
+      ...(data.start_date_time != null && {
+        start_date_time: data.start_date_time,
       }),
+      ...(data.end_date_time != null && { end_date_time: data.end_date_time }),
+      ...(data.emails != null &&
+        data.emails.length > 0 && { emails: data.emails }),
       ...(data.attendees != null &&
         data.attendees.length > 0 && { attendees: data.attendees }),
       ...(data.summary != null &&
-        data.summary !== "" && { summary: data.summary }),
+        data.summary !== "" && {
+          summary: data.summary.slice(0, 255),
+        }),
+      ...(data.tenant_id != null && data.tenant_id !== "" && { tenant_id: data.tenant_id }),
+      ...(data.extension_user != null && {
+        extension_user: data.extension_user,
+      }),
+      ...(data.reminders != null &&
+        data.reminders.length > 0 && { reminders: data.reminders }),
     });
     const body = response.data;
     const responseData = body?.data;
@@ -3269,6 +3307,9 @@ export const updateTask = async (
     due_date?: string;
     time?: string;
     status?: "pending" | "completed" | "failed";
+    notes?: Array<{ note: string }>;
+    record_type?: "prospect" | "lead" | "deal" | "order" | "company";
+    record_id?: number;
   },
 ): Promise<TaskData> => {
   try {

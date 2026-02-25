@@ -97,7 +97,6 @@ import GenericTable, {
 import GenericSidebar, {
   SidebarSection,
   QuickAction,
-  BreezeRecordSummary,
   SidebarField,
 } from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
@@ -656,11 +655,10 @@ const CrmProspectsManagement = () => {
     disposition: "",
     legal_basis: [] as string[],
     company_domain: "",
-    next_call: "",
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
     note: "",
-    is_viewed: false,
+    source: "",
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -773,15 +771,13 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
           disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain:
-            d.company_domain ?? (item as any).company_domain ?? "",
-          next_call: toDatetimeLocal(d.next_call),
+          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
           ),
           tags: tagsArray,
           note: item.note ?? d.note ?? "",
-          is_viewed: item.is_viewed ?? d.is_viewed ?? false,
+          source: d.source ?? (item as any).source ?? "",
         });
         if (!cancelled) setContactFormLoading(false);
       })
@@ -1095,10 +1091,11 @@ const CrmProspectsManagement = () => {
       if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
       if (memoizedFilters.assignment_status)
         params.assignment_status = memoizedFilters.assignment_status;
-      if (memoizedFilters.user_extension?.length)
+      if (memoizedFilters.user_extension?.length) {
         params.user_extensions = Array.isArray(memoizedFilters.user_extension)
           ? memoizedFilters.user_extension
           : [memoizedFilters.user_extension];
+      }
       if (
         memoizedFilters.is_viewed !== undefined &&
         memoizedFilters.is_viewed !== ""
@@ -1129,6 +1126,17 @@ const CrmProspectsManagement = () => {
         params.source_file = memoizedFilters.source_file;
       if (memoizedFilters.tag_ids?.length)
         params.tag_ids = memoizedFilters.tag_ids;
+      // Create date filter (from filter pill)
+      if (memoizedFilters.created_at_from)
+        params.created_at_from = memoizedFilters.created_at_from;
+      if (memoizedFilters.created_at_to)
+        params.created_at_to = memoizedFilters.created_at_to;
+      // Last activity / last called filter (from filter pill)
+      if (memoizedFilters.last_called_at_from)
+        params.last_called_at_from = memoizedFilters.last_called_at_from;
+      if (memoizedFilters.last_called_at_to)
+        params.last_called_at_to = memoizedFilters.last_called_at_to;
+      // Lead status / disposition filter (from filter pill)
       if (memoizedFilters.disposition)
         params.disposition = memoizedFilters.disposition;
       if (pagination.sortColumn) {
@@ -3113,11 +3121,10 @@ const CrmProspectsManagement = () => {
                 disposition: "",
                 legal_basis: [],
                 company_domain: "",
-                next_call: "",
                 scheduled_call_at: "",
                 tags: [],
                 note: "",
-                is_viewed: false,
+                source: "",
               });
               setShowCreateContactSidebar(true);
             }}
@@ -3180,6 +3187,10 @@ const CrmProspectsManagement = () => {
         toast.error("Name, email and phone are required");
         return;
       }
+      if (contactForm.campaign_id == null) {
+        toast.error("Campaign is required");
+        return;
+      }
       const sessionUser = session?.user as any;
       const userExtension = String(sessionUser?.phone ?? "");
       const assignedTo = userExtension;
@@ -3192,18 +3203,17 @@ const CrmProspectsManagement = () => {
           phone: contactForm.phoneNumber.trim(),
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
+          scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          company_domain: contactForm.company_domain?.trim() || undefined,
+          source: contactForm.source?.trim() || undefined,
           data: {
             email: contactForm.email.trim(),
             assigned_to: assignedTo,
             uploaded_by: uploadedBy,
-            company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
-            next_call: contactForm.next_call || undefined,
             tags: contactForm.tags?.length
               ? contactForm.tags.map((t) => t.value || t.label)
               : undefined,
-            is_viewed: contactForm.is_viewed,
-            scheduled_call_at: contactForm.scheduled_call_at || undefined,
             note: contactForm.note || undefined,
             contact_owner: contactForm.contact_owner ?? undefined,
             lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -3224,11 +3234,10 @@ const CrmProspectsManagement = () => {
           disposition: "",
           legal_basis: [],
           company_domain: "",
-          next_call: "",
           scheduled_call_at: "",
           tags: [],
           note: "",
-          is_viewed: false,
+          source: "",
         });
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -3256,22 +3265,25 @@ const CrmProspectsManagement = () => {
       toast.error("Name, email and phone are required");
       return;
     }
+    if (contactForm.campaign_id == null) {
+      toast.error("Campaign is required");
+      return;
+    }
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
         name,
         phone: contactForm.phoneNumber.trim(),
         campaign_id: contactForm.campaign_id ?? null,
+        company_domain: contactForm.company_domain?.trim() || undefined,
+        source: contactForm.source?.trim() || undefined,
+        scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: {
           email: contactForm.email.trim(),
-          company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
-          next_call: contactForm.next_call || undefined,
           tags: contactForm.tags?.length
             ? contactForm.tags.map((t) => t.value || t.label)
             : undefined,
-          is_viewed: contactForm.is_viewed,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
           note: contactForm.note || undefined,
           contact_owner: contactForm.contact_owner ?? undefined,
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -3297,7 +3309,8 @@ const CrmProspectsManagement = () => {
     const isFormValid =
       contactForm.email?.trim() &&
       contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
+      (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
+      contactForm.campaign_id != null;
 
     return (
       <>
@@ -3613,7 +3626,7 @@ const CrmProspectsManagement = () => {
                     </div>
                   </div>
 
-                  {/* Optional: Campaign, Associate with, Lifecycle stage, Disposition, Legal basis */}
+                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
                   <div
                     className="contact-form-section"
                     style={{ marginTop: "24px" }}
@@ -3623,7 +3636,7 @@ const CrmProspectsManagement = () => {
                       style={{ marginBottom: "20px" }}
                     >
                       <label
-                        className="contact-form-label"
+                        className="contact-form-label contact-form-label-required"
                         style={{
                           display: "block",
                           fontSize: "14px",
@@ -3632,7 +3645,7 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Campaign
+                        Campaign <span style={{ color: "#f2545b" }}>*</span>
                       </label>
                       {(() => {
                         const campaignSelectOptions = availableCampaigns.map(
@@ -3691,7 +3704,7 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Associate with
+                        Owner
                       </label>
                       <Select
                         value={(() => {
@@ -3723,7 +3736,7 @@ const CrmProspectsManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select associate with"
+                        placeholder="Select owner"
                         isClearable
                         isSearchable
                         styles={{
@@ -3735,6 +3748,48 @@ const CrmProspectsManagement = () => {
                             fontSize: "14px",
                           }),
                         }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Source
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.source}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            source: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                        placeholder="Enter source"
                       />
                     </div>
                     <div
@@ -3993,41 +4048,6 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Next call
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={contactForm.next_call}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            next_call: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
                         Scheduled call at
                       </label>
                       <input
@@ -4132,29 +4152,6 @@ const CrmProspectsManagement = () => {
                         }
                         onBlur={(e) =>
                           (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div className="contact-form-field">
-                      <Form.Check
-                        type="checkbox"
-                        checked={contactForm.is_viewed}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            is_viewed: e.target.checked,
-                          })
-                        }
-                        label={
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#141414",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Is viewed
-                          </span>
                         }
                       />
                     </div>
@@ -4683,7 +4680,7 @@ const CrmProspectsManagement = () => {
                       </Col>
                       <Col md={4}>
                         <Form.Label className="small fw-bold mb-2">
-                          Assigned To
+                          Owner
                         </Form.Label>
                         <Select
                           options={extensions.map((ext: any) => ({
@@ -5235,12 +5232,26 @@ const CrmProspectsManagement = () => {
                   showSaveButton: true,
                   onSaveClick: () => console.log("Save view"),
 
-                  // Filter Pills
+                  // Filter Pills (active/activeLabel from currentFilters so applied filters are visible)
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Associate with",
+                      label: "Owner",
                       showDropdown: true,
+                      searchable: true,
+                      active: !!(currentFilters.user_extension && (Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension.length > 0 : true)),
+                      activeLabel: (() => {
+                        const extId = Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension[0] : currentFilters.user_extension;
+                        if (!extId) return undefined;
+                        const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
+                        return ext ? (ext.display_name || ext.name || ext.extension) : String(extId);
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.user_extension;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Owners",
@@ -5253,12 +5264,12 @@ const CrmProspectsManagement = () => {
                           },
                         },
                         ...extensions.map((ext) => ({
-                          label: ext.name || ext.extension,
+                          label: ext.display_name || ext.name || ext.extension,
                           value: ext.extension,
                           onClick: () => {
                             handleFiltersChange({
                               ...currentFilters,
-                              user_extension: ext.extension,
+                              user_extension: [ext.id || ext.extension],
                             });
                             setRefreshKey((prev) => prev + 1);
                           },
@@ -5269,6 +5280,26 @@ const CrmProspectsManagement = () => {
                       id: "create_date",
                       label: "Create date",
                       showDropdown: true,
+                      active: !!(currentFilters.created_at_from || currentFilters.created_at_to),
+                      activeLabel: (() => {
+                        if (!currentFilters.created_at_from && !currentFilters.created_at_to) return undefined;
+                        const from = currentFilters.created_at_from;
+                        const to = currentFilters.created_at_to;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (from === today && to === today) return "Today";
+                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+                        if (from === weekStart && to === today) return "Last 7 Days";
+                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
+                        if (from === monthStart && to === today) return "Last 30 Days";
+                        return "Custom";
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.created_at_from;
+                        delete newFilters.created_at_to;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Time",
@@ -5332,6 +5363,26 @@ const CrmProspectsManagement = () => {
                       id: "last_activity",
                       label: "Last activity date",
                       showDropdown: true,
+                      active: !!(currentFilters.last_called_at_from || currentFilters.last_called_at_to),
+                      activeLabel: (() => {
+                        if (!currentFilters.last_called_at_from && !currentFilters.last_called_at_to) return undefined;
+                        const from = currentFilters.last_called_at_from;
+                        const to = currentFilters.last_called_at_to;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (from === today && to === today) return "Today";
+                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
+                        if (from === weekStart && to === today) return "Last 7 Days";
+                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
+                        if (from === monthStart && to === today) return "Last 30 Days";
+                        return "Custom";
+                      })(),
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.last_called_at_from;
+                        delete newFilters.last_called_at_to;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Time",
@@ -5395,6 +5446,19 @@ const CrmProspectsManagement = () => {
                       id: "lead_status",
                       label: "Lead Status",
                       showDropdown: true,
+                      active: !!currentFilters.disposition,
+                      activeLabel: currentFilters.disposition
+                        ? (() => {
+                            const map: Record<string, string> = { hot_lead: "Hot Lead", warm_lead: "Warm Lead", cold_lead: "Cold Lead", qualified: "Qualified", not_interested: "Not Interested" };
+                            return map[String(currentFilters.disposition)] || String(currentFilters.disposition);
+                          })()
+                        : undefined,
+                      onClear: () => {
+                        const newFilters = { ...currentFilters };
+                        delete newFilters.disposition;
+                        handleFiltersChange(newFilters);
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Status",
@@ -8174,22 +8238,9 @@ const CrmProspectsManagement = () => {
             recordId={
               selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
             }
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content:
-                "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-              timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                navigator.clipboard.writeText(
-                  "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-                );
-                console.log("Summary copied");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
+            crmSummary={selectedProspect?.data?.crm_summary ?? selectedProspect?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
               onClick: () => console.log("View full prospect record"),
@@ -8297,10 +8348,10 @@ const CrmProspectsManagement = () => {
                     show: !!selectedProspect?.data?.email,
                   },
                   {
-                    label: "Assigned To",
-                    value: selectedProspect?.user_extension
-                      ? getNameByExtension(selectedProspect.user_extension)
-                      : "Unassigned",
+                    label: "Owner",
+                    value: selectedProspect?.data?.contact_owner
+                      ? getNameByExtension(selectedProspect.data.contact_owner)
+                      : "—",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
                   },
@@ -8310,11 +8361,6 @@ const CrmProspectsManagement = () => {
                     show: !!selectedProspect?.campaign,
                     hasDetails: !!selectedProspect?.campaign,
                     onDetailsClick: () => console.log("Show campaign details"),
-                  },
-                  {
-                    label: "Status",
-                    value: selectedProspect?.status || "Active",
-                    type: "text",
                   },
                   {
                     label: "Created Date",
@@ -8348,7 +8394,13 @@ const CrmProspectsManagement = () => {
                   message: "No recent activities for this prospect.",
                   action: {
                     label: "Log activity",
-                    onClick: () => console.log("Log activity"),
+                    onClick: () => {
+                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
+                      if (id) {
+                        router.push(`/crm/prospects/prospects-detailpage?id=${id}`);
+                        handleCloseProspectSidebar();
+                      }
+                    },
                   },
                 },
               },
@@ -8406,7 +8458,7 @@ const CrmProspectsManagement = () => {
             },
             {
               id: "assignedTo",
-              label: "Assigned To",
+              label: "Owner",
               type: "select",
               value: prospectsFilters.assignedTo
                 ? (() => {
@@ -8434,7 +8486,7 @@ const CrmProspectsManagement = () => {
                 value: ext.id || ext.extension,
                 label: ext.display_name || ext.name || ext.id || ext.extension,
               })),
-              placeholder: "Select user...",
+              placeholder: "Search and select owner...",
               isClearable: true,
               styles: customSelectStyles,
             },

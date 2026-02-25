@@ -278,6 +278,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
@@ -323,15 +335,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
         "--",
     },
     {
-      label: "Lead Status",
-      value: firstTicket?.status ?? prospect?.data?.disposition ?? "--",
-    },
-    {
       label: "Lifecycle Stage",
       value: prospect?.data?.lifecycle_stage ?? "--",
     },
-    { label: "Buying Role", value: prospect?.data?.buying_role ?? "--" },
-    { label: "Associate with", value: prospect?.data?.contact_owner ?? "--" },
+    { label: "Contact owner", value: prospect?.data?.contact_owner ?? "--" },
   ];
 
   const renderIntelligenceTab = () => {
@@ -1719,56 +1726,71 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   </div>
                 </div>
               </div>
-
+              
               {!collapsedSections.has("breeze") && (
                 <div style={{ padding: "20px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontSize: "13px",
-                      color: "#141414",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <span>Generated Feb 14, 2026</span>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "2px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Refresh"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
+                  {(prospect as any)?.data?.crm_summary?.summary != null && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "13px",
+                          color: "#141414",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        {prospect?.data?.updated_at && (
+                          <span>
+                            Updated{" "}
+                            {new Date(prospect.data.updated_at).toLocaleDateString(
+                              "en-US",
+                              {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              },
+                            )}
+                          </span>
+                        )}
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "2px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                          title="Refresh"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      </div>
 
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      color: "#141414",
-                      lineHeight: "1.6",
-                      marginBottom: "16px",
-                      border: "1px solid #ff9fcc",
-                      padding: "18px 20px",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    {prospect?.data?.name ?? "This prospect"} is a Director at{" "}
-                    {firstTicket?.company_name ??
-                      prospect?.data?.company_name ??
-                      "N/A"}
-                    , currently in the Opportunity stage. Recent activity shows
-                    strong engagement. The contact is revenue-generating.
-                    Recommended next steps: consider a follow-up call to discuss
-                    potential opportunities.
-                  </div>
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          color: "#141414",
+                          lineHeight: "1.6",
+                          marginBottom: "16px",
+                          border: "1px solid #ff9fcc",
+                          padding: "18px 20px",
+                          borderRadius: "10px",
+                        }}
+                      >
+                        {(prospect as any)?.crm_summary?.summary ??
+                          (prospect as any)?.data?.crm_summary?.summary}
+                      </div>
+                    </>
+                  )}
+                  {((prospect as any)?.crm_summary?.summary ?? (prospect as any)?.data?.crm_summary?.summary) == null && (
+                    <div style={{ fontSize: "14px", color: "#718096" }}>
+                      No summary available.
+                    </div>
+                  )}
 
                   <div
                     style={{

@@ -147,6 +147,12 @@ export interface FilterPill {
   onClick?: () => void;
   showDropdown?: boolean;
   searchable?: boolean;
+  /** When true, pill is shown as active (filter applied) */
+  active?: boolean;
+  /** When filter is applied, show this label (e.g. selected owner name, "Today", "Hot Lead") */
+  activeLabel?: string;
+  /** When filter is active, called when the clear (X) icon is clicked to remove the filter */
+  onClear?: () => void;
   dropdownOptions?: Array<{
     label: string;
     value: string;
@@ -990,12 +996,41 @@ const GenericTable = <T extends Record<string, any>>({
                   pill.showDropdown ? (
                     <Dropdown key={pill.id}>
                       <Dropdown.Toggle
-                        variant="outline-secondary"
+                        variant={pill.active ? "primary" : "outline-secondary"}
                         size="sm"
-                        className="gt-filter-pill"
+                        className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
                       >
                         {pill.icon && <span className="me-1">{pill.icon}</span>}
                         <span>{pill.label}</span>
+                        {pill.active && pill.activeLabel && (
+                          <span className="gt-filter-pill-value">: {pill.activeLabel}</span>
+                        )}
+                        {pill.active && !pill.activeLabel && (
+                          <span className="gt-filter-pill-dot" title="Filter applied" />
+                        )}
+                        {pill.active && pill.onClear && (
+                          <span
+                            className="gt-filter-pill-clear"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              pill.onClear?.();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                pill.onClear?.();
+                              }
+                            }}
+                            title="Clear filter"
+                            aria-label="Clear filter"
+                          >
+                            <X size={14} />
+                          </span>
+                        )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
                         style={{ maxHeight: "280px", overflowY: "auto" }}

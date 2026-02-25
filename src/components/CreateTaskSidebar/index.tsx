@@ -1,428 +1,739 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Form, Row, Col } from "react-bootstrap";
-import {
-  X,
-  Calendar,
-  FileText,
-  Tag,
-  Users,
-  Eye,
-  Flag,
-  ListTodo,
-  Plus,
-  Search,
-  Link as LinkIcon,
-  FolderOpen,
-  Check,
-} from "lucide-react";
-import { toast } from "react-toastify";
-import {
-  listProjects,
-  createTask,
-  updateTask,
-  listTasks,
-  createRecurringTask,
-  updateRecurringTask,
-} from "@utils/tasks";
-import { listStatuses } from "@utils/work-planner";
-import { getAutoTimezone } from "@utils/Helper";
-import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
+import React, { useState, useEffect, useRef } from "react";
 
-// ─── Types (from createtask-modal) ─────────────────────────────────────────────
+type Option = { value: string; label: string };
+type SelectOption = string | Option;
 
-interface Extension {
-  id: string;
-  name: string;
-}
+type LabelProps = {
+  children: React.ReactNode;
+  required?: boolean;
+};
 
-interface CreateTaskSidebarProps {
+type TextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  type?: string;
+};
+
+type NativeSelectProps = {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+};
+
+type MultiSelectProps = {
+  value?: Option[];
+  onChange: (value: Option[]) => void;
+  options?: Option[];
+  placeholder?: string;
+};
+
+type SearchableSelectProps = {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  options?: Option[];
+  placeholder?: string;
+  isClearable?: boolean;
+};
+
+type CreateTaskForm = {
+  taskTitle: string;
+  taskType: string;
+  priority: string;
+  associatedRecords: Option[];
+  assignedTo: string | null;
+  queue: string;
+  dueDateOption: string;
+  dueTime: string;
+  setToRepeat: boolean;
+  reminder: string;
+  notes: string;
+};
+
+type CreateTaskSidebarProps = {
   isOpen?: boolean;
   onClose?: () => void;
-  onCreate?: (data: CreateTaskFormData) => void;
-  onCreateAndOpen?: (data: CreateTaskFormData) => void;
-  extensions?: Extension[];
-  labels?: Label[];
-  project?: Project;
-  statuses?: Status[];
-  task?: any;
-  isEdit?: boolean;
-  selectedStatusForTask?: number | null;
-  taskType?: "regular" | "recurring" | "todo";
-}
+  onSubmit?: (formData: CreateTaskForm, addAnother: boolean) => void;
+  initialData?: Partial<CreateTaskForm> | null;
+  taskId?: string | number | null;
+  loading?: boolean;
+  assigneeOptions?: Option[];
+  queueOptions?: Option[];
+  recordOptions?: Option[];
+  settingsUrl?: string;
+};
 
-interface UserType {
-  id: number;
-  name: string;
-  avatar: string;
-  initials: string;
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-interface Project {
-  id: number;
-  name: string;
-  icon: string;
-  color: string;
-  statuses?: Array<{
-    id: number;
-    name: string;
-    color: string;
-    order: string;
-    is_default: boolean;
-    is_completed: boolean;
-  }>;
-  labels?: Array<{
-    id: number;
-    name: string;
-    color: string;
-    description?: string;
-  }>;
-}
+const TASK_TYPES = [
+  "To-do",
+  "Call",
+  "Email",
+  "Meeting",
+  "Task",
+  "SMS",
+  "WhatsApp",
+];
+const PRIORITIES = ["None", "Low", "Medium", "High"];
+const REMINDER_OPTIONS = [
+  "No reminder",
+  "At time of due date",
+  "5 minutes before",
+  "15 minutes before",
+  "30 minutes before",
+  "1 hour before",
+  "1 day before",
+];
+const DUE_DATE_OPTIONS = [
+  "Today",
+  "Tomorrow",
+  "In 3 business days (Friday)",
+  "In 1 week",
+  "Custom date",
+];
 
-interface Label {
-  id: number;
-  name: string;
-  color: string;
-}
+const INITIAL_FORM = {
+  taskTitle: "",
+  taskType: "To-do",
+  priority: "None",
+  associatedRecords: [],
+  assignedTo: null,
+  queue: "None",
+  dueDateOption: "In 3 business days (Friday)",
+  dueTime: "08:00",
+  setToRepeat: false,
+  reminder: "No reminder",
+  notes: "",
+};
 
-interface Status {
-  id: number;
-  name: string;
-  icon: string;
-  color: string;
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface Priority {
-  id: number;
-  name: string;
-  icon: string;
-  color: string;
-}
+const Label = ({ children, required }: LabelProps) => (
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 14,
+      fontWeight: 600,
+      color: "#141414",
+      marginBottom: 8,
+    }}
+  >
+    {children}
+    {required && <span style={{ color: "#f2545b" }}>*</span>}
+  </label>
+);
 
-interface LinkedRecord {
-  id: number;
-  type: "task" | "crm";
-  title: string;
-  reference: string;
-}
+const TextInput = ({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  ...rest
+}: TextInputProps) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        border: `1px solid ${focused ? "#0091ae" : "#8a8a8a"}`,
+        borderRadius: 4,
+        fontSize: 14,
+        outline: "none",
+        boxSizing: "border-box",
+        fontFamily: "inherit",
+        transition: "border-color 0.15s",
+      }}
+      {...rest}
+    />
+  );
+};
 
-interface CreateTaskFormData {
-  title: string;
-  description: string;
-  taskType: "todo" | "regular" | "recurring";
-  projectId: number | null;
-  statusId: number | null;
-  priorityId: number | null;
-  assigneeIds: number[];
-  watcherIds: number[];
-  dueDate: string;
-  startDate: string;
-  labelIds: number[];
-  linkedRecordIds: number[];
-  // Recurring-only
-  frequency: string;
-  repeatInterval: number;
-  repeatOn: string;
-  dueTime: string;
-}
+const NativeSelect = ({ value, onChange, options }: NativeSelectProps) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          width: "100%",
+          padding: "10px 36px 10px 12px",
+          border: `1px solid ${focused ? "#0091ae" : "#8a8a8a"}`,
+          borderRadius: 4,
+          fontSize: 14,
+          outline: "none",
+          appearance: "none",
+          backgroundColor: "#fff",
+          color: "#141414",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          transition: "border-color 0.15s",
+        }}
+      >
+        {options.map((opt) => (
+          <option
+            key={typeof opt === "string" ? opt : opt.value}
+            value={typeof opt === "string" ? opt : opt.value}
+          >
+            {typeof opt === "string" ? opt : opt.label}
+          </option>
+        ))}
+      </select>
+      <ChevronIcon />
+    </div>
+  );
+};
 
-// ─── Component ───────────────────────────────────────────────────────────────
+const ChevronIcon = () => (
+  <svg
+    style={{
+      position: "absolute",
+      right: 10,
+      top: "50%",
+      transform: "translateY(-50%)",
+      pointerEvents: "none",
+      color: "#718096",
+    }}
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M4 6l4 4 4-4"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
-const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
-  isOpen = false,
-  onClose,
-  onCreate,
-  onCreateAndOpen,
-  extensions = [],
-  labels: propLabels = [],
-  project: propProject,
-  statuses: propStatuses = [],
-  task: editTask,
-  isEdit = false,
-  selectedStatusForTask = null,
-  taskType = "regular",
-}) => {
-  const mapPriorityStringToId = (priority: string | null | undefined): number => {
-    const priorityMap: Record<string, number> = {
-      low: 1,
-      normal: 2,
-      medium: 2,
-      high: 3,
-      urgent: 4,
-    };
-    return priorityMap[priority?.toLowerCase() || "normal"] || 2;
-  };
+const XIcon = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
-  const formatDateForInput = (dateString: string | null | undefined): string => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "";
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch {
-      return "";
-    }
-  };
+const InfoIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+    <circle cx="8" cy="8" r="7" stroke="#8a8a8a" strokeWidth="1.2" />
+    <path d="M8 7v5" stroke="#8a8a8a" strokeWidth="1.2" strokeLinecap="round" />
+    <circle cx="8" cy="4.5" r="0.75" fill="#8a8a8a" />
+  </svg>
+);
 
-  const getInitialFormData = (): CreateTaskFormData => {
-    if (isEdit && editTask) {
-      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
-      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
-      const assigneeIds =
-        editTask.assignees?.map((assignee: any) => {
-          const extension = extensions.find(
-            (ext: any) =>
-              ext.id === assignee.extension_number ||
-              ext.extension_number === assignee.extension_number
-          );
-          return extension ? Number(extension.id) : Number(assignee.extension_number);
-        }) ||
-        editTask.extension_numbers?.map((extNum: string) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id === extNum || ext.extension_number === extNum
-          );
-          return extension ? Number(extension.id) : Number(extNum);
-        }) ||
-        [];
-      const watcherIds =
-        editTask.watchers?.map((watcher: any) => {
-          const extension = extensions.find(
-            (ext: any) =>
-              ext.id === watcher.extension_number ||
-              ext.extension_number === watcher.extension_number
-          );
-          return extension ? Number(extension.id) : Number(watcher.extension_number);
-        }) ||
-        editTask.watcher_numbers?.map((extNum: string) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id === extNum || ext.extension_number === extNum
-          );
-          return extension ? Number(extension.id) : Number(extNum);
-        }) ||
-        [];
-      const taskTypeVal =
-        editTask.type === "todo" || editTask.type === "recurring"
-          ? editTask.type
-          : "regular";
-      const frequency = (editTask.frequency || "weekly") as string;
-      const repeatInterval = Math.max(1, Number(editTask.repeat_interval) || 1);
-      const repeatOn = editTask.repeat_on != null ? String(editTask.repeat_on) : "";
-      const dueTime =
-        typeof editTask.due_time === "string" ? editTask.due_time : "";
-      return {
-        title: editTask.title || "",
-        description: editTask.description || "",
-        taskType: taskTypeVal,
-        projectId: projectIdRaw ? Number(projectIdRaw) : null,
-        statusId: statusIdRaw ? Number(statusIdRaw) : null,
-        priorityId: mapPriorityStringToId(editTask.priority),
-        assigneeIds,
-        watcherIds,
-        dueDate: formatDateForInput(editTask.due_date),
-        startDate: formatDateForInput(editTask.start_date),
-        labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
-        linkedRecordIds: [],
-        frequency,
-        repeatInterval,
-        repeatOn,
-        dueTime,
-      };
-    }
-    return {
-      title: "",
-      description: "",
-      taskType,
-      projectId: propProject?.id || null,
-      statusId:
-        selectedStatusForTask ||
-        (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 0,
-      assigneeIds: [],
-      watcherIds: [],
-      dueDate: "",
-      startDate: "",
-      labelIds: [],
-      linkedRecordIds: [],
-      frequency: "weekly",
-      repeatInterval: 1,
-      repeatOn: "",
-      dueTime: "",
-    };
-  };
-
-  const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
-  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
-  const [watcherSearchQuery, setWatcherSearchQuery] = useState("");
-  const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
-  const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
-  const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
-  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
+const MultiSelect = ({
+  value = [],
+  onChange,
+  options = [],
+  placeholder,
+}: MultiSelectProps) => {
+  const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const fetchProjects = async () => {
-      try {
-        setLoadingProjects(true);
-        const response = await listProjects({ page: 1, limit: 100 });
-        if (
-          response &&
-          response.success === true &&
-          response.data &&
-          Array.isArray(response.data)
-        ) {
-          const projectsList = response.data.map((project: any) => ({
-            id: project.id,
-            name: project.name,
-            icon: "",
-            color: project.color || "#3b82f6",
-            statuses: project.statuses || [],
-            labels: project.labels || [],
-          }));
-          setFetchedProjects(projectsList);
-        }
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-        setFetchedProjects([]);
-      } finally {
-        setLoadingProjects(false);
-      }
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
-    fetchProjects();
-  }, [isOpen]);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggleOption = (opt: Option) => {
+    const exists = value.find((v) => v.value === opt.value);
+    onChange(
+      exists ? value.filter((v) => v.value !== opt.value) : [...value, opt],
+    );
+  };
+
+  const removeTag = (e: React.MouseEvent, optValue: string) => {
+    e.stopPropagation();
+    onChange(value.filter((v) => v.value !== optValue));
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div
+        onClick={() => setOpen((o) => !o)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        tabIndex={0}
+        style={{
+          minHeight: 40,
+          padding: "6px 36px 6px 10px",
+          border: `1px solid ${open || focused ? "#0091ae" : "#8a8a8a"}`,
+          borderRadius: 4,
+          fontSize: 14,
+          backgroundColor: "#fff",
+          cursor: "pointer",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 4,
+          alignItems: "center",
+          boxSizing: "border-box",
+          transition: "border-color 0.15s",
+        }}
+      >
+        {value.length === 0 ? (
+          <span style={{ color: "#a0aec0" }}>
+            {placeholder || `Associated with 0 records`}
+          </span>
+        ) : (
+          value.map((v) => (
+            <span
+              key={v.value}
+              style={{
+                backgroundColor: "#e6f4f7",
+                color: "#0091ae",
+                borderRadius: 3,
+                padding: "2px 6px",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {v.label}
+              <span
+                onMouseDown={(e) => removeTag(e, v.value)}
+                style={{ cursor: "pointer", lineHeight: 1, fontWeight: "bold" }}
+              >
+                ×
+              </span>
+            </span>
+          ))
+        )}
+        <ChevronIcon />
+      </div>
+      {open && options.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            backgroundColor: "#fff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 4,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            zIndex: 10,
+            maxHeight: 200,
+            overflowY: "auto",
+          }}
+        >
+          {options.map((opt) => {
+            const selected = value.find((v) => v.value === opt.value);
+            return (
+              <div
+                key={opt.value}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  toggleOption(opt);
+                }}
+                style={{
+                  padding: "8px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  backgroundColor: selected ? "#f0f9fb" : "transparent",
+                  color: selected ? "#0091ae" : "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+                onMouseEnter={(e) => {
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                }}
+                onMouseLeave={(e) => {
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={!!selected}
+                  style={{ accentColor: "#0091ae" }}
+                />
+                {opt.label}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SearchableSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder,
+  isClearable,
+}: SearchableSelectProps) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [focused, setFocused] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const fetchGenericStatuses = async () => {
-      try {
-        setLoadingGenericStatuses(true);
-        const response = await listStatuses();
-        if (response && Array.isArray(response)) {
-          const statusesList = response.map((status: any) => ({
-            id: status.id,
-            name: status.name,
-            icon: "",
-            color: status.color || "#3b82f6",
-          }));
-          setGenericStatuses(statusesList);
-        } else if (response?.data && Array.isArray(response.data)) {
-          const statusesList = response.data.map((status: any) => ({
-            id: status.id,
-            name: status.name,
-            icon: "",
-            color: status.color || "#3b82f6",
-          }));
-          setGenericStatuses(statusesList);
-        } else {
-          setGenericStatuses([]);
-        }
-      } catch (error) {
-        console.error("Error fetching generic statuses:", error);
-        setGenericStatuses([]);
-      } finally {
-        setLoadingGenericStatuses(false);
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
       }
     };
-    fetchGenericStatuses();
-  }, [isOpen]);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  const fetchLinkRecordsForSearch = useCallback(
-    async (query: string, currentProjectId?: number | null) => {
-      setLoadingLinkedRecords(true);
-      try {
-        const projectId =
-          currentProjectId ??
-          (isEdit ? editTask?.project_id ?? editTask?.project?.id : null);
-        const response = await listTasks({
-          page: 1,
-          limit: 30,
-          type: "regular",
-          search: query.trim() || undefined,
-          ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
-        });
-        if (response?.data && Array.isArray(response.data)) {
-          const currentTaskId =
-            isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
-          const records: LinkedRecord[] = response.data
-            .filter(
-              (t: any) => currentTaskId == null || Number(t.id) !== currentTaskId
-            )
-            .map((t: any) => ({
-              id: Number(t.id),
-              type: "task" as const,
-              title: t.title || "",
-              reference: t.reference || `#${t.id}`,
-            }));
-          setLinkedRecordsFromApi(records);
-        } else {
-          setLinkedRecordsFromApi([]);
-        }
-      } catch (error) {
-        console.error("Error fetching link records:", error);
-        setLinkedRecordsFromApi([]);
-      } finally {
-        setLoadingLinkedRecords(false);
-      }
-    },
-    [isEdit, editTask?.rawData?.id, editTask?.project_id, editTask?.project?.id]
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
-    void fetchLinkRecordsForSearch(searchQuery, formData.projectId);
-  }, [isOpen, fetchLinkRecordsForSearch]);
+  const selectedLabel = value
+    ? options.find((o) => o.value === value)?.label
+    : null;
 
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div
+        style={{
+          minHeight: 40,
+          padding: "0 36px 0 12px",
+          border: `1px solid ${open || focused ? "#0091ae" : "#8a8a8a"}`,
+          borderRadius: 4,
+          fontSize: 14,
+          backgroundColor: "#fff",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          boxSizing: "border-box",
+          transition: "border-color 0.15s",
+        }}
+        onClick={() => {
+          setOpen((o) => !o);
+          setSearch("");
+        }}
+      >
+        {open ? (
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onClick={(e) => e.stopPropagation()}
+            placeholder={selectedLabel || placeholder || "Search..."}
+            style={{
+              border: "none",
+              outline: "none",
+              fontSize: 14,
+              width: "100%",
+              fontFamily: "inherit",
+              color: "#141414",
+              backgroundColor: "transparent",
+            }}
+          />
+        ) : (
+          <span
+            style={{ color: selectedLabel ? "#141414" : "#a0aec0", flex: 1 }}
+          >
+            {selectedLabel || placeholder}
+          </span>
+        )}
+        {isClearable && selectedLabel && !open && (
+          <span
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              onChange(null);
+            }}
+            style={{
+              position: "absolute",
+              right: 28,
+              color: "#718096",
+              fontSize: 16,
+              lineHeight: 1,
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </span>
+        )}
+        <ChevronIcon />
+      </div>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            backgroundColor: "#fff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 4,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            zIndex: 10,
+            maxHeight: 200,
+            overflowY: "auto",
+          }}
+        >
+          {filtered.length === 0 ? (
+            <div
+              style={{ padding: "10px 12px", fontSize: 14, color: "#a0aec0" }}
+            >
+              No results
+            </div>
+          ) : (
+            filtered.map((opt) => (
+              <div
+                key={opt.value}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(opt.value);
+                  setOpen(false);
+                  setSearch("");
+                }}
+                style={{
+                  padding: "8px 12px",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  color: opt.value === value ? "#0091ae" : "#141414",
+                  backgroundColor:
+                    opt.value === value ? "#f0f9fb" : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  if (opt.value !== value)
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                }}
+                onMouseLeave={(e) => {
+                  if (opt.value !== value)
+                    e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {opt.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const NotesToolbar = () => {
+  const tools = [
+    { label: "B", title: "Bold", style: { fontWeight: "bold" } },
+    { label: "I", title: "Italic", style: { fontStyle: "italic" } },
+    { label: "U", title: "Underline", style: { textDecoration: "underline" } },
+    { label: "S̶", title: "Strikethrough", style: {} },
+  ];
+  const icons = [
+    {
+      title: "Insert link",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      ),
+    },
+    {
+      title: "Insert email",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <polyline points="22,6 12,13 2,6" />
+        </svg>
+      ),
+    },
+    {
+      title: "List",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      ),
+    },
+  ];
+
+  const btnStyle = {
+    background: "transparent",
+    border: "none",
+    padding: "3px 7px",
+    cursor: "pointer",
+    fontSize: 13,
+    color: "#4a5568",
+    borderRadius: 3,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        padding: "6px 10px",
+        borderTop: "1px solid #eaf0f6",
+        backgroundColor: "#fafafa",
+        flexWrap: "wrap",
+      }}
+    >
+      {tools.map((t) => (
+        <button
+          key={t.title}
+          type="button"
+          title={t.title}
+          style={{ ...btnStyle, ...t.style }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#edf2f7")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
+        >
+          {t.label}
+        </button>
+      ))}
+      <span style={{ color: "#cbd5e0", margin: "0 4px", fontSize: 16 }}>|</span>
+      <button
+        type="button"
+        style={btnStyle}
+        title="More formatting"
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor = "#edf2f7")
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.backgroundColor = "transparent")
+        }
+      >
+        More ▾
+      </button>
+      <span style={{ color: "#cbd5e0", margin: "0 4px", fontSize: 16 }}>|</span>
+      {icons.map((ic) => (
+        <button
+          key={ic.title}
+          type="button"
+          title={ic.title}
+          style={btnStyle}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#edf2f7")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
+        >
+          {ic.svg}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+/**
+ * CreateTaskSidebar
+ *
+ * Props:
+ *  - isOpen          {boolean}   Whether the sidebar is visible
+ *  - onClose         {function}  Called when sidebar is dismissed
+ *  - onSubmit        {function}  Called with (formData, addAnother). addAnother=true when "Create and add another" clicked
+ *  - initialData     {object}    Optional pre-filled form values (for edit mode)
+ *  - taskId          {string|null} If provided, sidebar runs in "edit" mode
+ *  - loading         {boolean}   Shows loading state on submit button
+ *  - assigneeOptions {Array}     [{ value, label }] for "Assigned to"
+ *  - queueOptions    {Array}     [{ value, label }] for "Queue"
+ *  - recordOptions   {Array}     [{ value, label }] for "Associate with records"
+ *  - settingsUrl     {string}    URL for "Go to settings" link (default "/settings/tasks")
+ */
+const CreateTaskSidebar = ({
+  isOpen = false,
+  onClose,
+  onSubmit,
+  initialData = null,
+  taskId = null,
+  loading = false,
+  assigneeOptions = [],
+  queueOptions = [],
+  recordOptions = [],
+  settingsUrl = "/settings/tasks",
+}: CreateTaskSidebarProps) => {
+  const isEditMode = Boolean(taskId);
+  const [form, setForm] = useState<CreateTaskForm>(INITIAL_FORM);
+  const [notesAreaFocused, setNotesAreaFocused] = useState(false);
+
+  // Sync initialData when sidebar opens
   useEffect(() => {
     if (isOpen) {
-      setSearchQuery("");
-      if (
-        isEdit &&
-        editTask &&
-        fetchedProjects.length === 0 &&
-        loadingProjects
-      ) {
-        return;
-      }
-      setFormData(getInitialFormData());
-    } else {
-      setSearchQuery("");
-      setFormData({
-        title: "",
-        description: "",
-        taskType,
-        projectId: propProject?.id || null,
-        statusId:
-          selectedStatusForTask ||
-          (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 0,
-        assigneeIds: [],
-        watcherIds: [],
-        dueDate: "",
-        startDate: "",
-        labelIds: [],
-        linkedRecordIds: [],
-        frequency: "weekly",
-        repeatInterval: 1,
-        repeatOn: "",
-        dueTime: "",
-      });
+      setForm(
+        initialData ? { ...INITIAL_FORM, ...initialData } : { ...INITIAL_FORM },
+      );
     }
-  }, [
-    isOpen,
-    editTask,
-    isEdit,
-    fetchedProjects.length,
-    loadingProjects,
-    selectedStatusForTask,
-  ]);
+  }, [isOpen, initialData]);
 
+  // Trap scroll on body while open
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => {
@@ -430,1367 +741,433 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     };
   }, [isOpen]);
 
-  const users: UserType[] = extensions.map((ext) => ({
-    id: Number(ext.id),
-    name: ext.name,
-    avatar: "",
-    initials: ext.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase(),
-  }));
-
-  const projects: Project[] =
-    fetchedProjects.length > 0 ? fetchedProjects : propProject ? [propProject] : [];
-
-  const getStatusesForSelectedProject = (): Status[] => {
-    if (formData.projectId) {
-      const selectedProject = fetchedProjects.find(
-        (p) => p.id === formData.projectId
-      );
-      if (
-        selectedProject?.statuses &&
-        Array.isArray(selectedProject.statuses)
-      ) {
-        return selectedProject.statuses.map((status: any) => ({
-          id: status.id,
-          name: status.name,
-          icon: "",
-          color: status.color || "#3b82f6",
-        }));
-      }
-      return [];
-    }
-    if (genericStatuses.length > 0) return genericStatuses;
-    return propStatuses;
-  };
-
-  const statuses: Status[] = getStatusesForSelectedProject();
-
-  useEffect(() => {
-    if (isEdit) return;
-    if (formData.projectId && fetchedProjects.length === 0) return;
-    if (!formData.projectId && loadingGenericStatuses) return;
-    const availableStatuses = getStatusesForSelectedProject();
-    if (!formData.statusId && availableStatuses.length > 0) {
-      setFormData((prev) => ({
-        ...prev,
-        statusId: selectedStatusForTask || availableStatuses[0].id,
-      }));
-    }
-  }, [
-    formData.projectId,
-    fetchedProjects,
-    genericStatuses,
-    loadingGenericStatuses,
-    isEdit,
-    selectedStatusForTask,
-  ]);
-
-  const priorities: Priority[] = [
-    { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
-    { id: 1, name: "Low", icon: "🟢", color: "#10b981" },
-    { id: 2, name: "Medium", icon: "🟡", color: "#eab308" },
-    { id: 3, name: "High", icon: "🟠", color: "#f97316" },
-    { id: 4, name: "Urgent", icon: "🔴", color: "#ef4444" },
-  ];
-
-  const getLabelsForSelectedProject = (): Label[] => {
-    if (!formData.projectId) return propLabels;
-    const selectedProject = fetchedProjects.find(
-      (p) => p.id === formData.projectId
-    );
-    if (selectedProject?.labels && Array.isArray(selectedProject.labels)) {
-      return selectedProject.labels.map((label: any) => ({
-        id: label.id,
-        name: label.name,
-        color: label.color || "#3b82f6",
-        description: label.description || "",
-      }));
-    }
-    return propLabels;
-  };
-
-  const labels: Label[] = getLabelsForSelectedProject();
-
-  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
-    if (!priorityId || priorityId === 0) return "";
-    const priorityMap: Record<number, string> = {
-      1: "low",
-      2: "normal",
-      3: "high",
-      4: "urgent",
-    };
-    return priorityMap[priorityId] || undefined;
-  };
-
-  const buildPayload = () => {
-    const payload: any = {
-      title: formData.title,
-      description: formData.description || "",
-      priority: mapPriorityIdToString(formData.priorityId) || undefined,
-      due_date: formData.dueDate || "",
-      start_date: formData.startDate || "",
-      extension_numbers:
-        formData.assigneeIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-      watchers:
-        formData.watcherIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-      type: formData.taskType,
-    };
-    if (formData.projectId) {
-      payload.project_id = formData.projectId;
-      payload.label_ids = formData.labelIds || [];
-    }
-    if (formData.statusId) payload.status_id = formData.statusId;
-    if (
-      formData.linkedRecordIds &&
-      formData.linkedRecordIds.length > 0
-    ) {
-      payload.parent_task_id = formData.linkedRecordIds[0];
-    }
-    if (formData.taskType === "recurring") {
-      payload.frequency = formData.frequency;
-      payload.repeat_interval = formData.repeatInterval;
-      if (formData.repeatOn) payload.repeat_on = formData.repeatOn;
-      if (formData.dueTime) payload.due_time = formData.dueTime;
-      payload.end_date = formData.dueDate || null;
-    }
-    return payload;
-  };
-
-  const handleCreate = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSubmitting) return;
-    if (!formData.title.trim()) {
-      toast.error("Please enter a task title");
-      return;
-    }
-    if (formData.taskType === "recurring") {
-      if (!formData.projectId) {
-        toast.error("Recurring tasks require a project");
-        return;
-      }
-      if (!formData.statusId) {
-        toast.error("Recurring tasks require a status");
-        return;
-      }
-      if (!formData.startDate) {
-        toast.error("Recurring tasks require a start date");
-        return;
-      }
-    }
-    setIsSubmitting(true);
-    try {
-      const payload = buildPayload();
-      if (isEdit && editTask?.id) {
-        if (formData.taskType === "recurring") {
-          const result = await updateRecurringTask(editTask.id, payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        } else {
-          const result = await updateTask(editTask.id, payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        }
-      } else {
-        if (formData.taskType === "recurring") {
-          const recurringPayload = {
-            ...payload,
-            project_id: formData.projectId!,
-            status_id: formData.statusId!,
-            start_date: formData.startDate,
-            end_date: formData.dueDate || null,
-            type: "recurring" as const,
-          };
-          const result = await createRecurringTask(recurringPayload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        } else {
-          payload.timezone = getAutoTimezone();
-          const result = await createTask(payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        }
-      }
-    } catch (error) {
-      console.error(
-        `Error ${isEdit ? "updating" : "creating"} task:`,
-        error
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCreateAndOpen = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSubmitting) return;
-    if (!formData.title.trim()) {
-      toast.error("Please enter a task title");
-      return;
-    }
-    if (formData.taskType === "recurring") {
-      if (!formData.projectId || !formData.statusId || !formData.startDate) {
-        toast.error("Recurring tasks require project, status, and start date");
-        return;
-      }
-    }
-    setIsSubmitting(true);
-    try {
-      const payload = buildPayload();
-      if (isEdit && editTask?.id) {
-        if (formData.taskType === "recurring") {
-          const result = await updateRecurringTask(editTask.id, payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        } else {
-          const result = await updateTask(editTask.id, payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        }
-      } else {
-        if (formData.taskType === "recurring") {
-          const recurringPayload = {
-            ...payload,
-            project_id: formData.projectId!,
-            status_id: formData.statusId!,
-            start_date: formData.startDate,
-            end_date: formData.dueDate || null,
-            type: "recurring" as const,
-          };
-          const result = await createRecurringTask(recurringPayload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        } else {
-          payload.timezone = getAutoTimezone();
-          const result = await createTask(payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        }
-      }
-    } catch (error) {
-      console.error(
-        `Error ${isEdit ? "updating" : "creating"} task:`,
-        error
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const toggleLabel = (labelId: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      labelIds: prev.labelIds.includes(labelId)
-        ? prev.labelIds.filter((id) => id !== labelId)
-        : [...prev.labelIds, labelId],
-    }));
-  };
-
-  const toggleAssignee = (userId: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      assigneeIds: prev.assigneeIds.includes(userId)
-        ? prev.assigneeIds.filter((id) => id !== userId)
-        : [...prev.assigneeIds, userId],
-    }));
-  };
-
-  const toggleWatcher = (userId: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      watcherIds: prev.watcherIds.includes(userId)
-        ? prev.watcherIds.filter((id) => id !== userId)
-        : [...prev.watcherIds, userId],
-    }));
-  };
-
-  const selectedAssignees = users.filter((u) =>
-    formData.assigneeIds.includes(u.id)
-  );
-  const selectedWatchers = users.filter((u) =>
-    formData.watcherIds.includes(u.id)
-  );
-  const selectedLabels = labels.filter((l) =>
-    formData.labelIds.includes(l.id)
-  );
-
   if (!isOpen) return null;
 
-  const labelStyle = {
-    fontSize: "14px",
-    color: "#2d3748",
-    fontWeight: 600,
-    marginBottom: 8,
+  const set =
+    <K extends keyof CreateTaskForm>(key: K) =>
+    (val: CreateTaskForm[K]) =>
+      setForm((prev) => ({ ...prev, [key]: val }));
+  const setVal =
+    <K extends keyof CreateTaskForm>(key: K) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((prev) => ({
+        ...prev,
+        [key]: e.target.value as CreateTaskForm[K],
+      }));
+  const setCheck =
+    <K extends keyof CreateTaskForm>(key: K) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({
+        ...prev,
+        [key]: e.target.checked as CreateTaskForm[K],
+      }));
+
+  const isFormValid = form.taskTitle.trim().length > 0;
+
+  const handleSubmit = (addAnother = false) => {
+    if (!isFormValid || loading) return;
+    onSubmit?.(form, addAnother);
+    if (addAnother) setForm({ ...INITIAL_FORM });
   };
-  const groupClass = "mb-3";
+
+  // Build queue options with "None" prepended
+  const fullQueueOptions: Option[] = [
+    { value: "None", label: "None" },
+    ...queueOptions,
+  ];
+
+  const btnBase = {
+    padding: "10px 20px",
+    borderRadius: 4,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    transition: "background-color 0.15s, color 0.15s",
+    fontFamily: "inherit",
+  };
 
   return (
     <>
+      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 1000,
-          backgroundColor: "rgba(0,0,0,0.2)",
+          backgroundColor: "transparent",
         }}
       />
+
+      {/* Sidebar panel */}
       <div
         style={{
           position: "fixed",
           top: 0,
           right: 0,
-          width: 520,
-          maxWidth: "100vw",
+          width: 500,
           height: "100vh",
-          backgroundColor: "#fff",
+          backgroundColor: "#ffffff",
           boxShadow: "-4px 0 20px rgba(0,0,0,0.12)",
           zIndex: 1001,
           display: "flex",
           flexDirection: "column",
-          overflow: "hidden",
+          fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
         }}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <div
           style={{
-            padding: "16px 24px",
-            borderBottom: "1px solid #e8eef5",
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
+            justifyContent: "space-between",
             flexShrink: 0,
           }}
         >
           <h2
             style={{
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: 600,
+              color: "#141414",
               margin: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
             }}
           >
-            <ListTodo size={20} color="#4e6fa5" />
-            {formData.taskType === "todo"
-              ? isEdit
-                ? "Edit Todo"
-                : "Create Todo"
-              : formData.taskType === "recurring"
-              ? isEdit
-                ? "Edit Recurring"
-                : "Create Recurring"
-              : isEdit
-              ? "Edit Task"
-              : "Create Task"}
+            {isEditMode ? "Edit task" : "Create task"}
           </h2>
           <button
             type="button"
             onClick={onClose}
             style={{
-              background: "none",
+              background: "transparent",
               border: "none",
               padding: 4,
               cursor: "pointer",
-              color: "#6c757d",
+              color: "#718096",
               display: "flex",
               alignItems: "center",
+              borderRadius: 4,
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f7fafc")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
+            aria-label="Close"
           >
-            <X size={20} />
+            <XIcon />
           </button>
         </div>
 
-        {/* Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "24px",
+        {/* ── Form Body ── */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(false);
           }}
-        >
-          <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
-            <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Title <span style={{ color: "#ef4444" }}>*</span>
-              </Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Enter task title"
-                value={formData.title}
-                onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
-                }
-                className="py-2"
-                style={{ fontSize: "14px" }}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Task Type
-              </Form.Label>
-              <Form.Select
-                value={formData.taskType}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    taskType: e.target.value as "todo" | "regular" | "recurring",
-                  })
-                }
-                className="py-2"
-                style={{ fontSize: "14px" }}
-              >
-                <option value="todo">Todo</option>
-                <option value="regular">Regular</option>
-                <option value="recurring">Recurring</option>
-              </Form.Select>
-            </Form.Group>
-
-            {formData.taskType === "recurring" && (
-              <>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Frequency
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.frequency}
-                    onChange={(e) =>
-                      setFormData({ ...formData, frequency: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </Form.Select>
-                </Form.Group>
-                <Row>
-                  <Col xs={12} md={6}>
-                    <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>
-                        Repeat every
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={formData.repeatInterval}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            repeatInterval: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                          })
-                        }
-                        className="py-2"
-                        style={{ fontSize: "14px" }}
-                      />
-                      <Form.Text className="text-muted">
-                        {formData.frequency === "daily" && "day(s)"}
-                        {formData.frequency === "weekly" && "week(s)"}
-                        {formData.frequency === "monthly" && "month(s)"}
-                        {formData.frequency === "yearly" && "year(s)"}
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
-                  {(formData.frequency === "weekly" || formData.frequency === "monthly") && (
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          {formData.frequency === "weekly" ? "Repeat on (days)" : "Day of month"}
-                        </Form.Label>
-                        {formData.frequency === "weekly" ? (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => {
-                              const dayNum = String(idx);
-                              const isChecked = formData.repeatOn.split(",").map((s) => s.trim()).includes(dayNum);
-                              return (
-                                <Form.Check
-                                  key={day}
-                                  type="checkbox"
-                                  id={`repeat-${day}`}
-                                  label={day}
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    const current = formData.repeatOn.split(",").map((s) => s.trim()).filter(Boolean);
-                                    const next = isChecked
-                                      ? current.filter((d) => d !== dayNum)
-                                      : [...current, dayNum].sort((a, b) => Number(a) - Number(b));
-                                    setFormData({ ...formData, repeatOn: next.join(",") });
-                                  }}
-                                  style={{ fontSize: "13px" }}
-                                />
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <Form.Control
-                            type="number"
-                            min={1}
-                            max={31}
-                            placeholder="e.g. 15"
-                            value={formData.repeatOn || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const num = v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
-                              setFormData({ ...formData, repeatOn: num });
-                            }}
-                            className="py-2"
-                            style={{ fontSize: "14px" }}
-                          />
-                        )}
-                      </Form.Group>
-                    </Col>
-                  )}
-                </Row>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Time (optional)
-                  </Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={formData.dueTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueTime: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-              </>
-            )}
-
-            <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Description
-              </Form.Label>
-              <RichTextEditor
-                buttonSize="sm"
-                value={formData.description || ""}
-                onChange={(html: string) => {
-                  setFormData({ ...formData, description: html });
-                }}
-                placeholder="Describe the task..."
-                minHeight="100px"
-                maxHeight="200px"
-                maxLength={5000}
-              />
-            </Form.Group>
-
-            <Row className="mb-3">
-              {formData.taskType !== "todo" && (
-                <Col xs={6} className="mb-3">
-                  <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <FolderOpen size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Project
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.projectId || ""}
-                      onChange={(e) => {
-                        const newProjectId = e.target.value
-                          ? Number(e.target.value)
-                          : null;
-                        setFormData((prev) => ({
-                          ...prev,
-                          projectId: newProjectId,
-                          statusId: null,
-                        }));
-                        fetchLinkRecordsForSearch(searchQuery, newProjectId);
-                      }}
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                      disabled={loadingProjects || projects.length === 0}
-                    >
-                      {loadingProjects ? (
-                        <option value="">Loading projects...</option>
-                      ) : projects.length === 0 ? (
-                        <option value="">No projects available</option>
-                      ) : (
-                        <>
-                          <option value="">Select project</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              )}
-
-              {formData.taskType !== "todo" && (
-                <Col xs={6} className="mb-3">
-                  <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Status
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.statusId ?? ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          statusId: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        })
-                      }
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                      disabled={
-                        (formData.projectId && loadingProjects) ||
-                        (!formData.projectId && loadingGenericStatuses) ||
-                        statuses.length === 0
-                      }
-                    >
-                      {(formData.projectId && loadingProjects) ||
-                      (!formData.projectId && loadingGenericStatuses) ? (
-                        <option value="">Loading statuses...</option>
-                      ) : statuses.length === 0 ? (
-                        isEdit && formData.statusId ? (
-                          <option value={formData.statusId}>
-                            {editTask?.status?.name ||
-                              editTask?.status_name ||
-                              `Status #${formData.statusId}`}
-                          </option>
-                        ) : (
-                          <option value="">No statuses available</option>
-                        )
-                      ) : (
-                        <>
-                          <option value="">Select status</option>
-                          {isEdit &&
-                            formData.statusId &&
-                            !statuses.some(
-                              (s) => String(s.id) === String(formData.statusId)
-                            ) && (
-                              <option value={formData.statusId}>
-                                {editTask?.status?.name ||
-                                  editTask?.status_name ||
-                                  `Status #${formData.statusId}`}
-                              </option>
-                            )}
-                          {statuses.map((status) => (
-                            <option key={status.id} value={status.id}>
-                              {status.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              )}
-
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Start Date
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    End Date
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDate: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Flag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Priority
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.priorityId || 0}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priorityId: Number(e.target.value),
-                      })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    {priorities.map((priority) => (
-                      <option key={priority.id} value={priority.id}>
-                        {priority.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-
-            {formData.taskType !== "todo" && (
-              <Form.Group className={groupClass}>
-                <Form.Label style={labelStyle}>
-                  <Users size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                  Assignees
-                </Form.Label>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedAssignees.map((user) => (
-                    <div
-                      key={user.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleAssignee(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleAssignee(user.id)
-                      }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#edf6ff",
-                        border: "1px solid #bfdbfe",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
-                        {user.name}
-                      </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAssigneeDropdown(!showAssigneeDropdown);
-                      if (!showAssigneeDropdown) setAssigneeSearchQuery("");
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Assignee
-                  </button>
-                </div>
-                {showAssigneeDropdown && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 300,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search assignees..."
-                        value={assigneeSearchQuery}
-                        onChange={(e) =>
-                          setAssigneeSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
-                      />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(assigneeSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <div
-                          key={user.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleAssignee(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleAssignee(user.id)
-                          }
-                          style={{
-                            padding: "12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.assigneeIds.includes(user.id)
-                              ? "#edf6ff"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {user.name}
-                          </span>
-                          {formData.assigneeIds.includes(user.id) && (
-                            <Check
-                              size={18}
-                              className="text-primary ms-2"
-                              style={{ flexShrink: 0, display: "inline", verticalAlign: "middle" }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    <div
-                      className="p-2 border-top"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAssigneeDropdown(false);
-                          setAssigneeSearchQuery("");
-                        }}
-                        className="btn btn-primary btn-sm w-100"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Form.Group>
-            )}
-
-            {formData.taskType !== "todo" && (
-              <Form.Group className={groupClass}>
-                <Form.Label style={labelStyle}>
-                  <Eye size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                  Watchers
-                </Form.Label>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedWatchers.map((user) => (
-                    <div
-                      key={user.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleWatcher(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleWatcher(user.id)
-                      }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#f0fdf4",
-                        border: "1px solid #bbf7d0",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
-                        {user.name}
-                      </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWatcherDropdown(!showWatcherDropdown);
-                      if (!showWatcherDropdown) setWatcherSearchQuery("");
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Watcher
-                  </button>
-                </div>
-                {showWatcherDropdown && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 300,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search watchers..."
-                        value={watcherSearchQuery}
-                        onChange={(e) =>
-                          setWatcherSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
-                      />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(watcherSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <div
-                          key={user.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleWatcher(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleWatcher(user.id)
-                          }
-                          style={{
-                            padding: "12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.watcherIds.includes(user.id)
-                              ? "#f0fdf4"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {user.name}
-                          </span>
-                          {formData.watcherIds.includes(user.id) && (
-                            <Check
-                              size={18}
-                              style={{
-                                flexShrink: 0,
-                                display: "inline",
-                                verticalAlign: "middle",
-                                color: "#22c55e",
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    <div
-                      className="p-2 border-top"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowWatcherDropdown(false);
-                          setWatcherSearchQuery("");
-                        }}
-                        className="btn btn-primary btn-sm w-100"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Form.Group>
-            )}
-
-            {formData.taskType !== "todo" && (
-              <>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Tag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Labels
-                  </Form.Label>
-                  {selectedLabels.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 12,
-                      }}
-                    >
-                      {selectedLabels.map((label) => (
-                        <div
-                          key={label.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleLabel(label.id)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 12px",
-                            backgroundColor: label.color,
-                            color: "#2d3748",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            borderRadius: 6,
-                          }}
-                        >
-                          <Tag size={12} />
-                          {label.name}
-                          <X size={12} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 140,
-                      overflowY: "auto",
-                      padding: 12,
-                      borderRadius: 4,
-                      border: "1px solid #e2e8f0",
-                    }}
-                  >
-                    {labels.length === 0 ? (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          color: "#718096",
-                          fontSize: "14px",
-                        }}
-                      >
-                        No labels available
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 6,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {labels.map((label) => (
-                          <div
-                            key={label.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => toggleLabel(label.id)}
-                            style={{
-                              backgroundColor: formData.labelIds.includes(
-                                label.id
-                              )
-                                ? label.color
-                                : "#ffffff",
-                              color: "#2d3748",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              padding: "6px 12px",
-                              cursor: "pointer",
-                              border: formData.labelIds.includes(label.id)
-                                ? "2px solid #3b82f6"
-                                : "1px solid #e2e8f0",
-                              borderRadius: 6,
-                            }}
-                          >
-                            {label.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Form.Group>
-
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <LinkIcon size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Link Records
-                  </Form.Label>
-                  <div style={{ marginBottom: 8 }}>
-                    <Form.Control
-                      type="text"
-                      placeholder="Search task..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSearchQuery(value);
-                        fetchLinkRecordsForSearch(value, formData.projectId);
-                      }}
-                      className="py-2"
-                      style={{ paddingLeft: 40, fontSize: "14px" }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      maxHeight: 200,
-                      overflowY: "auto",
-                      backgroundColor: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                    }}
-                  >
-                    {loadingLinkedRecords ? (
-                      <div
-                        className="p-3 text-center text-muted"
-                        style={{ fontSize: "0.9rem" }}
-                      >
-                        Loading tasks...
-                      </div>
-                    ) : linkedRecordsFromApi.length === 0 ? (
-                      <div
-                        className="p-3 text-center text-muted"
-                        style={{ fontSize: "0.9rem" }}
-                      >
-                        {searchQuery
-                          ? "No tasks found matching your search"
-                          : "No tasks available"}
-                      </div>
-                    ) : (
-                      linkedRecordsFromApi.map((record) => (
-                        <div
-                          key={record.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              linkedRecordIds: prev.linkedRecordIds.includes(
-                                record.id
-                              )
-                                ? []
-                                : [record.id],
-                            }));
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              setFormData((prev) => ({
-                                ...prev,
-                                linkedRecordIds: prev.linkedRecordIds.includes(
-                                  record.id
-                                )
-                                  ? []
-                                  : [record.id],
-                              }));
-                            }
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            padding: 12,
-                            cursor: "pointer",
-                            backgroundColor: formData.linkedRecordIds.includes(
-                              record.id
-                            )
-                              ? "#edf6ff"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 4,
-                              backgroundColor:
-                                record.type === "crm" ? "#4e6fa5" : "#6B7280",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: 12,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {record.type === "crm" ? (
-                              <FolderOpen size={18} color="#fff" />
-                            ) : (
-                              <ListTodo size={18} color="#fff" />
-                            )}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "0.9rem",
-                                color: "#2d3748",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {record.title}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.8rem",
-                                color: "#718096",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {record.reference}
-                            </div>
-                          </div>
-                          {formData.linkedRecordIds.includes(record.id) && (
-                            <Check
-                              size={18}
-                              style={{
-                                color: "#3b82f6",
-                                marginLeft: 8,
-                                flexShrink: 0,
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </Form.Group>
-              </>
-            )}
-          </Form>
-        </div>
-
-        {/* Footer */}
-        <div
           style={{
-            padding: "16px 24px",
-            borderTop: "1px solid #e8eef5",
             display: "flex",
-            gap: 8,
-            justifyContent: "flex-end",
-            flexShrink: 0,
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
           }}
         >
-          <button
-            type="button"
-            onClick={onClose}
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+            {/* Task Title */}
+            <div style={{ marginBottom: 20 }}>
+              <Label required>Task Title</Label>
+              <TextInput
+                value={form.taskTitle}
+                onChange={setVal("taskTitle")}
+                data-testid="task-title-input"
+              />
+            </div>
+
+            {/* Task Type + Priority */}
+            <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+              <div style={{ flex: 1 }}>
+                <Label required>Task Type</Label>
+                <NativeSelect
+                  value={form.taskType}
+                  onChange={set("taskType")}
+                  options={TASK_TYPES}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Label required>Priority</Label>
+                <NativeSelect
+                  value={form.priority}
+                  onChange={set("priority")}
+                  options={PRIORITIES}
+                />
+              </div>
+            </div>
+
+            {/* Associate with records */}
+            <div style={{ marginBottom: 20 }}>
+              <Label>
+                Associate with records
+                <span
+                  title="Link this task to contacts, companies, or deals"
+                  style={{ cursor: "help", display: "flex" }}
+                >
+                  <InfoIcon />
+                </span>
+              </Label>
+              <MultiSelect
+                value={form.associatedRecords}
+                onChange={set("associatedRecords")}
+                options={recordOptions}
+                placeholder={`Associated with ${form.associatedRecords.length} records`}
+              />
+            </div>
+
+            {/* Assigned to */}
+            <div style={{ marginBottom: 20 }}>
+              <Label>Assigned to</Label>
+              <SearchableSelect
+                value={form.assignedTo}
+                onChange={set("assignedTo")}
+                options={assigneeOptions}
+                placeholder="Select assignee"
+                isClearable
+              />
+            </div>
+
+            {/* Queue */}
+            <div style={{ marginBottom: 20 }}>
+              <Label>Queue</Label>
+              <NativeSelect
+                value={form.queue}
+                onChange={set("queue")}
+                options={fullQueueOptions}
+              />
+            </div>
+
+            {/* Due date + Time */}
+            <div style={{ marginBottom: 12 }}>
+              <Label>Due date</Label>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <NativeSelect
+                    value={form.dueDateOption}
+                    onChange={set("dueDateOption")}
+                    options={DUE_DATE_OPTIONS}
+                  />
+                </div>
+                <div style={{ width: 140 }}>
+                  <TextInput
+                    type="time"
+                    value={form.dueTime}
+                    onChange={setVal("dueTime")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Set to repeat */}
+            <div
+              style={{
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                id="task-set-to-repeat"
+                checked={form.setToRepeat}
+                onChange={setCheck("setToRepeat")}
+                style={{
+                  width: 16,
+                  height: 16,
+                  accentColor: "#0091ae",
+                  cursor: "pointer",
+                }}
+              />
+              <label
+                htmlFor="task-set-to-repeat"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "#141414",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                Set to repeat
+              </label>
+            </div>
+
+            {/* Reminder */}
+            <div style={{ marginBottom: 6 }}>
+              <Label>Reminder</Label>
+              <NativeSelect
+                value={form.reminder}
+                onChange={set("reminder")}
+                options={REMINDER_OPTIONS}
+              />
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "#718096",
+                  marginTop: 6,
+                  marginBottom: 0,
+                }}
+              >
+                You can customize your default settings.{" "}
+                <a
+                  href={settingsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: "#0091ae",
+                    fontWeight: 500,
+                    textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.textDecoration = "underline")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.textDecoration = "none")
+                  }
+                >
+                  Go to settings ↗
+                </a>
+              </p>
+            </div>
+
+            {/* Notes */}
+            <div style={{ marginTop: 20 }}>
+              <Label>Notes</Label>
+              <div
+                style={{
+                  border: `1px solid ${notesAreaFocused ? "#0091ae" : "#8a8a8a"}`,
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  transition: "border-color 0.15s",
+                }}
+              >
+                <textarea
+                  rows={5}
+                  value={form.notes}
+                  onChange={setVal("notes")}
+                  onFocus={() => setNotesAreaFocused(true)}
+                  onBlur={() => setNotesAreaFocused(false)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "none",
+                    fontSize: 14,
+                    outline: "none",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    display: "block",
+                    boxSizing: "border-box",
+                    color: "#141414",
+                  }}
+                />
+                <NotesToolbar />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Footer ── */}
+          <div
             style={{
-              padding: "8px 20px",
-              fontSize: 14,
-              fontWeight: 600,
-              border: "1px solid #e2e8f0",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: "pointer",
+              padding: "16px 24px",
+              borderTop: "1px solid #eaf0f6",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              flexShrink: 0,
             }}
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCreate()}
-            disabled={isSubmitting}
-            style={{
-              padding: "8px 20px",
-              fontSize: 14,
-              fontWeight: 600,
-              backgroundColor: "#4e6fa5",
-              border: "none",
-              borderRadius: 4,
-              color: "#fff",
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-            }}
-          >
-            {isSubmitting
-              ? "Processing..."
-              : isEdit
-              ? "Update"
-              : "Create"}
-          </button>
-        </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              {/* Primary: Create / Update */}
+              <button
+                type="submit"
+                disabled={!isFormValid || loading}
+                style={{
+                  ...btnBase,
+                  backgroundColor:
+                    isFormValid && !loading ? "#0091ae" : "#cbd5e0",
+                  color: "#fff",
+                  border: "none",
+                  cursor: isFormValid && !loading ? "pointer" : "not-allowed",
+                }}
+                onMouseEnter={(e) => {
+                  if (isFormValid && !loading)
+                    e.currentTarget.style.backgroundColor = "#007a94";
+                }}
+                onMouseLeave={(e) => {
+                  if (isFormValid && !loading)
+                    e.currentTarget.style.backgroundColor = "#0091ae";
+                }}
+              >
+                {loading
+                  ? isEditMode
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Update"
+                    : "Create"}
+              </button>
+
+              {/* Create and add another (only in create mode) */}
+              {!isEditMode && (
+                <button
+                  type="button"
+                  disabled={!isFormValid || loading}
+                  onClick={() => handleSubmit(true)}
+                  style={{
+                    ...btnBase,
+                    backgroundColor: "transparent",
+                    color: isFormValid && !loading ? "#141414" : "#a0aec0",
+                    border: "1px solid #8a8a8a",
+                    cursor: isFormValid && !loading ? "pointer" : "not-allowed",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isFormValid && !loading)
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isFormValid && !loading)
+                      e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Create and add another
+                </button>
+              )}
+            </div>
+
+            {/* Cancel */}
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onClose}
+              style={{
+                ...btnBase,
+                alignSelf: "flex-start",
+                backgroundColor: "transparent",
+                color: "#141414",
+                border: "1px solid #8a8a8a",
+                fontWeight: 600,
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f7fafc")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </>
   );
