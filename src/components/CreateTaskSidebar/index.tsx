@@ -65,7 +65,15 @@ type CreateTaskSidebarProps = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TASK_TYPES = ["To-do", "Call", "Email", "Meeting"];
+const TASK_TYPES = [
+  "To-do",
+  "Call",
+  "Email",
+  "Meeting",
+  "Task",
+  "SMS",
+  "WhatsApp",
+];
 const PRIORITIES = ["None", "Low", "Medium", "High"];
 const REMINDER_OPTIONS = [
   "No reminder",
@@ -117,7 +125,13 @@ const Label = ({ children, required }: LabelProps) => (
   </label>
 );
 
-const TextInput = ({ value, onChange, placeholder, type = "text", ...rest }: TextInputProps) => {
+const TextInput = ({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  ...rest
+}: TextInputProps) => {
   const [focused, setFocused] = useState(false);
   return (
     <input
@@ -197,12 +211,27 @@ const ChevronIcon = () => (
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path
+      d="M4 6l4 4 4-4"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
 const XIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
@@ -216,14 +245,20 @@ const InfoIcon = () => (
   </svg>
 );
 
-const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiSelectProps) => {
+const MultiSelect = ({
+  value = [],
+  onChange,
+  options = [],
+  placeholder,
+}: MultiSelectProps) => {
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -231,7 +266,9 @@ const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiS
 
   const toggleOption = (opt: Option) => {
     const exists = value.find((v) => v.value === opt.value);
-    onChange(exists ? value.filter((v) => v.value !== opt.value) : [...value, opt]);
+    onChange(
+      exists ? value.filter((v) => v.value !== opt.value) : [...value, opt],
+    );
   };
 
   const removeTag = (e: React.MouseEvent, optValue: string) => {
@@ -263,7 +300,9 @@ const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiS
         }}
       >
         {value.length === 0 ? (
-          <span style={{ color: "#a0aec0" }}>{placeholder || `Associated with 0 records`}</span>
+          <span style={{ color: "#a0aec0" }}>
+            {placeholder || `Associated with 0 records`}
+          </span>
         ) : (
           value.map((v) => (
             <span
@@ -312,7 +351,10 @@ const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiS
             return (
               <div
                 key={opt.value}
-                onMouseDown={(e) => { e.preventDefault(); toggleOption(opt); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  toggleOption(opt);
+                }}
                 style={{
                   padding: "8px 12px",
                   fontSize: 14,
@@ -323,10 +365,21 @@ const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiS
                   alignItems: "center",
                   gap: 8,
                 }}
-                onMouseEnter={(e) => { if (!selected) e.currentTarget.style.backgroundColor = "#f7fafc"; }}
-                onMouseLeave={(e) => { if (!selected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                onMouseEnter={(e) => {
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                }}
+                onMouseLeave={(e) => {
+                  if (!selected)
+                    e.currentTarget.style.backgroundColor = "transparent";
+                }}
               >
-                <input type="checkbox" readOnly checked={!!selected} style={{ accentColor: "#0091ae" }} />
+                <input
+                  type="checkbox"
+                  readOnly
+                  checked={!!selected}
+                  style={{ accentColor: "#0091ae" }}
+                />
                 {opt.label}
               </div>
             );
@@ -337,7 +390,13 @@ const MultiSelect = ({ value = [], onChange, options = [], placeholder }: MultiS
   );
 };
 
-const SearchableSelect = ({ value, onChange, options = [], placeholder, isClearable }: SearchableSelectProps) => {
+const SearchableSelect = ({
+  value,
+  onChange,
+  options = [],
+  placeholder,
+  isClearable,
+}: SearchableSelectProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focused, setFocused] = useState(false);
@@ -355,10 +414,12 @@ const SearchableSelect = ({ value, onChange, options = [], placeholder, isCleara
   }, []);
 
   const filtered = options.filter((o) =>
-    o.label.toLowerCase().includes(search.toLowerCase())
+    o.label.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const selectedLabel = value ? options.find((o) => o.value === value)?.label : null;
+  const selectedLabel = value
+    ? options.find((o) => o.value === value)?.label
+    : null;
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -376,7 +437,10 @@ const SearchableSelect = ({ value, onChange, options = [], placeholder, isCleara
           boxSizing: "border-box",
           transition: "border-color 0.15s",
         }}
-        onClick={() => { setOpen((o) => !o); setSearch(""); }}
+        onClick={() => {
+          setOpen((o) => !o);
+          setSearch("");
+        }}
       >
         {open ? (
           <input
@@ -398,13 +462,18 @@ const SearchableSelect = ({ value, onChange, options = [], placeholder, isCleara
             }}
           />
         ) : (
-          <span style={{ color: selectedLabel ? "#141414" : "#a0aec0", flex: 1 }}>
+          <span
+            style={{ color: selectedLabel ? "#141414" : "#a0aec0", flex: 1 }}
+          >
             {selectedLabel || placeholder}
           </span>
         )}
         {isClearable && selectedLabel && !open && (
           <span
-            onMouseDown={(e) => { e.stopPropagation(); onChange(null); }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              onChange(null);
+            }}
             style={{
               position: "absolute",
               right: 28,
@@ -436,7 +505,11 @@ const SearchableSelect = ({ value, onChange, options = [], placeholder, isCleara
           }}
         >
           {filtered.length === 0 ? (
-            <div style={{ padding: "10px 12px", fontSize: 14, color: "#a0aec0" }}>No results</div>
+            <div
+              style={{ padding: "10px 12px", fontSize: 14, color: "#a0aec0" }}
+            >
+              No results
+            </div>
           ) : (
             filtered.map((opt) => (
               <div
@@ -452,10 +525,17 @@ const SearchableSelect = ({ value, onChange, options = [], placeholder, isCleara
                   fontSize: 14,
                   cursor: "pointer",
                   color: opt.value === value ? "#0091ae" : "#141414",
-                  backgroundColor: opt.value === value ? "#f0f9fb" : "transparent",
+                  backgroundColor:
+                    opt.value === value ? "#f0f9fb" : "transparent",
                 }}
-                onMouseEnter={(e) => { if (opt.value !== value) e.currentTarget.style.backgroundColor = "#f7fafc"; }}
-                onMouseLeave={(e) => { if (opt.value !== value) e.currentTarget.style.backgroundColor = "transparent"; }}
+                onMouseEnter={(e) => {
+                  if (opt.value !== value)
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                }}
+                onMouseLeave={(e) => {
+                  if (opt.value !== value)
+                    e.currentTarget.style.backgroundColor = "transparent";
+                }}
               >
                 {opt.label}
               </div>
@@ -475,9 +555,64 @@ const NotesToolbar = () => {
     { label: "S̶", title: "Strikethrough", style: {} },
   ];
   const icons = [
-    { title: "Insert link", svg: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-    { title: "Insert email", svg: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> },
-    { title: "List", svg: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> },
+    {
+      title: "Insert link",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      ),
+    },
+    {
+      title: "Insert email",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <polyline points="22,6 12,13 2,6" />
+        </svg>
+      ),
+    },
+    {
+      title: "List",
+      svg: (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      ),
+    },
   ];
 
   const btnStyle = {
@@ -511,8 +646,12 @@ const NotesToolbar = () => {
           type="button"
           title={t.title}
           style={{ ...btnStyle, ...t.style }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#edf2f7")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#edf2f7")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
         >
           {t.label}
         </button>
@@ -522,8 +661,12 @@ const NotesToolbar = () => {
         type="button"
         style={btnStyle}
         title="More formatting"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#edf2f7")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundColor = "#edf2f7")
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.backgroundColor = "transparent")
+        }
       >
         More ▾
       </button>
@@ -534,8 +677,12 @@ const NotesToolbar = () => {
           type="button"
           title={ic.title}
           style={btnStyle}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#edf2f7")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = "#edf2f7")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = "transparent")
+          }
         >
           {ic.svg}
         </button>
@@ -580,26 +727,40 @@ const CreateTaskSidebar = ({
   // Sync initialData when sidebar opens
   useEffect(() => {
     if (isOpen) {
-      setForm(initialData ? { ...INITIAL_FORM, ...initialData } : { ...INITIAL_FORM });
+      setForm(
+        initialData ? { ...INITIAL_FORM, ...initialData } : { ...INITIAL_FORM },
+      );
     }
   }, [isOpen, initialData]);
 
   // Trap scroll on body while open
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const set = <K extends keyof CreateTaskForm>(key: K) => (val: CreateTaskForm[K]) =>
-    setForm((prev) => ({ ...prev, [key]: val }));
-  const setVal = <K extends keyof CreateTaskForm>(key: K) =>
+  const set =
+    <K extends keyof CreateTaskForm>(key: K) =>
+    (val: CreateTaskForm[K]) =>
+      setForm((prev) => ({ ...prev, [key]: val }));
+  const setVal =
+    <K extends keyof CreateTaskForm>(key: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((prev) => ({ ...prev, [key]: e.target.value as CreateTaskForm[K] }));
-  const setCheck = <K extends keyof CreateTaskForm>(key: K) =>
+      setForm((prev) => ({
+        ...prev,
+        [key]: e.target.value as CreateTaskForm[K],
+      }));
+  const setCheck =
+    <K extends keyof CreateTaskForm>(key: K) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [key]: e.target.checked as CreateTaskForm[K] }));
+      setForm((prev) => ({
+        ...prev,
+        [key]: e.target.checked as CreateTaskForm[K],
+      }));
 
   const isFormValid = form.taskTitle.trim().length > 0;
 
@@ -665,7 +826,14 @@ const CreateTaskSidebar = ({
             flexShrink: 0,
           }}
         >
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: "#141414", margin: 0 }}>
+          <h2
+            style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: "#141414",
+              margin: 0,
+            }}
+          >
             {isEditMode ? "Edit task" : "Create task"}
           </h2>
           <button
@@ -681,8 +849,12 @@ const CreateTaskSidebar = ({
               alignItems: "center",
               borderRadius: 4,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7fafc")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f7fafc")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
             aria-label="Close"
           >
             <XIcon />
@@ -691,11 +863,18 @@ const CreateTaskSidebar = ({
 
         {/* ── Form Body ── */}
         <form
-          onSubmit={(e) => { e.preventDefault(); handleSubmit(false); }}
-          style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit(false);
+          }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
         >
           <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
-
             {/* Task Title */}
             <div style={{ marginBottom: 20 }}>
               <Label required>Task Title</Label>
@@ -730,7 +909,10 @@ const CreateTaskSidebar = ({
             <div style={{ marginBottom: 20 }}>
               <Label>
                 Associate with records
-                <span title="Link this task to contacts, companies, or deals" style={{ cursor: "help", display: "flex" }}>
+                <span
+                  title="Link this task to contacts, companies, or deals"
+                  style={{ cursor: "help", display: "flex" }}
+                >
                   <InfoIcon />
                 </span>
               </Label>
@@ -786,17 +968,35 @@ const CreateTaskSidebar = ({
             </div>
 
             {/* Set to repeat */}
-            <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <input
                 type="checkbox"
                 id="task-set-to-repeat"
                 checked={form.setToRepeat}
                 onChange={setCheck("setToRepeat")}
-                style={{ width: 16, height: 16, accentColor: "#0091ae", cursor: "pointer" }}
+                style={{
+                  width: 16,
+                  height: 16,
+                  accentColor: "#0091ae",
+                  cursor: "pointer",
+                }}
               />
               <label
                 htmlFor="task-set-to-repeat"
-                style={{ fontSize: 14, fontWeight: 500, color: "#141414", cursor: "pointer", userSelect: "none" }}
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "#141414",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
               >
                 Set to repeat
               </label>
@@ -810,15 +1010,30 @@ const CreateTaskSidebar = ({
                 onChange={set("reminder")}
                 options={REMINDER_OPTIONS}
               />
-              <p style={{ fontSize: 12, color: "#718096", marginTop: 6, marginBottom: 0 }}>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "#718096",
+                  marginTop: 6,
+                  marginBottom: 0,
+                }}
+              >
                 You can customize your default settings.{" "}
                 <a
                   href={settingsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "#0091ae", fontWeight: 500, textDecoration: "none" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                  onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                  style={{
+                    color: "#0091ae",
+                    fontWeight: 500,
+                    textDecoration: "none",
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.textDecoration = "underline")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.textDecoration = "none")
+                  }
                 >
                   Go to settings ↗
                 </a>
@@ -878,21 +1093,28 @@ const CreateTaskSidebar = ({
                 disabled={!isFormValid || loading}
                 style={{
                   ...btnBase,
-                  backgroundColor: isFormValid && !loading ? "#0091ae" : "#cbd5e0",
+                  backgroundColor:
+                    isFormValid && !loading ? "#0091ae" : "#cbd5e0",
                   color: "#fff",
                   border: "none",
                   cursor: isFormValid && !loading ? "pointer" : "not-allowed",
                 }}
                 onMouseEnter={(e) => {
-                  if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#007a94";
+                  if (isFormValid && !loading)
+                    e.currentTarget.style.backgroundColor = "#007a94";
                 }}
                 onMouseLeave={(e) => {
-                  if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#0091ae";
+                  if (isFormValid && !loading)
+                    e.currentTarget.style.backgroundColor = "#0091ae";
                 }}
               >
                 {loading
-                  ? isEditMode ? "Updating..." : "Creating..."
-                  : isEditMode ? "Update" : "Create"}
+                  ? isEditMode
+                    ? "Updating..."
+                    : "Creating..."
+                  : isEditMode
+                    ? "Update"
+                    : "Create"}
               </button>
 
               {/* Create and add another (only in create mode) */}
@@ -909,10 +1131,12 @@ const CreateTaskSidebar = ({
                     cursor: isFormValid && !loading ? "pointer" : "not-allowed",
                   }}
                   onMouseEnter={(e) => {
-                    if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "#f7fafc";
+                    if (isFormValid && !loading)
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
                   }}
                   onMouseLeave={(e) => {
-                    if (isFormValid && !loading) e.currentTarget.style.backgroundColor = "transparent";
+                    if (isFormValid && !loading)
+                      e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
                   Create and add another
@@ -933,8 +1157,12 @@ const CreateTaskSidebar = ({
                 border: "1px solid #8a8a8a",
                 fontWeight: 600,
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f7fafc")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f7fafc")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
             >
               Cancel
             </button>

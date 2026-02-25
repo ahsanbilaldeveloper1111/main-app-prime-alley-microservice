@@ -520,7 +520,7 @@ export interface CrmNotesPaginatedResponse {
 export const getCrmNotes = async (
   recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
-  params?: { page?: number; per_page?: number }
+  params?: { page?: number; per_page?: number },
 ): Promise<CrmNotesPaginatedResponse> => {
   try {
     const response = await axiosInstance.get("/crm/notes", {
@@ -536,7 +536,7 @@ export const getCrmNotes = async (
 /** Update a CRM note. */
 export const updateCrmNote = async (
   noteId: number,
-  payload: { text: string }
+  payload: { text: string },
 ): Promise<any> => {
   try {
     const response = await axiosInstance.put(`/crm/notes/${noteId}`, payload);
@@ -726,7 +726,7 @@ export const getDealMeetings = async (
 export const getCrmMeetingsForRecord = async (
   recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
-  params?: { page?: number; per_page?: number }
+  params?: { page?: number; per_page?: number },
 ): Promise<CrmMeetingsPaginatedResponse> => {
   try {
     const response = await axiosInstance.get("/crm/meetings", {
@@ -1108,11 +1108,22 @@ export interface EnrichmentData {
   } | null;
   structured_data?: {
     official_company_name?: string | null;
-    headquarters?: { address?: string | null; city?: string | null; country?: string | null } | null;
-    other_locations?: Array<{ address?: string | null; city?: string | null; country?: string | null }> | null;
+    headquarters?: {
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+    } | null;
+    other_locations?: Array<{
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+    }> | null;
     emails?: Array<{ email?: string | null; type?: string | null }> | null;
     phones?: Array<{ number?: string | null; type?: string | null }> | null;
-    social_links?: Array<{ platform?: string | null; url?: string | null }> | null;
+    social_links?: Array<{
+      platform?: string | null;
+      url?: string | null;
+    }> | null;
     llm_confidence?: number | null;
   } | null;
   validation_data?: {
@@ -1192,7 +1203,9 @@ export const getCompanies = async (
     };
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to fetch companies",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch companies",
     );
     throw error;
   }
@@ -1208,7 +1221,9 @@ export const getCompany = async (id: number): Promise<CompanyData> => {
     return data;
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to fetch company",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch company",
     );
     throw error;
   }
@@ -1289,7 +1304,9 @@ export const deleteCompany = async (id: number): Promise<void> => {
     );
   } catch (error: any) {
     toast.error(
-      error?.response?.data?.message || error?.message || "Failed to delete company",
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to delete company",
     );
     throw error;
   }
@@ -3290,6 +3307,9 @@ export const updateTask = async (
     due_date?: string;
     time?: string;
     status?: "pending" | "completed" | "failed";
+    notes?: Array<{ note: string }>;
+    record_type?: "prospect" | "lead" | "deal" | "order" | "company";
+    record_id?: number;
   },
 ): Promise<TaskData> => {
   try {

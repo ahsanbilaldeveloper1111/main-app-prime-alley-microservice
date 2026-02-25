@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import {
   X,
   ChevronDown,
@@ -32,18 +38,29 @@ import {
   Search,
   FileText,
 } from "lucide-react";
-import WhatsAppMessageModal from '@components/WhatsAppMessageModalNew';
-import LogSmsModal from '@components/LogSms';
+import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
+import LogSmsModal from "@components/LogSms";
 import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import { createMeeting, createCrmNote, getCrmNotes, createTask, getAllCrmDataById, type CrmNoteItem, type CrmDataItem } from "@utils/crm";
+import {
+  createMeeting,
+  createCrmNote,
+  getCrmNotes,
+  createTask,
+  getAllCrmDataById,
+  type CrmNoteItem,
+  type CrmDataItem,
+} from "@utils/crm";
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
+import EmailModal from "@components/EmailModal";
+import Select from "react-select";
+import { GetHierarchyData } from "@utils/users";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -175,15 +192,19 @@ export interface GenericSidebarProps {
 
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
-  
-  recordType?: 'prospect' | 'lead' | 'deal' | 'order';
+
+  recordType?: "prospect" | "lead" | "deal" | "order";
   recordId?: number;
 
   /** Resolve user extension/id to display name (e.g. for Owner / contact_owner). When provided, prospect sidebar uses it for the Owner field. */
   resolveUserLabel?: (extensionOrId: string) => string;
-  
-  onNoteCreate?: (note: string, createTask: boolean, taskDueDate?: string) => void;
-  
+
+  onNoteCreate?: (
+    note: string,
+    createTask: boolean,
+    taskDueDate?: string,
+  ) => void;
+
   // Email modal callbacks
   onEmailSend?: (emailData: {
     to: string[];
@@ -235,7 +256,7 @@ export interface GenericSidebarProps {
   dealId?: number;
   /** Current user extension for meeting participants (required by CRM meetings API) */
   userExtension?: string;
-  
+
   // WhatsApp message modal callback
   onWhatsAppLog?: (whatsappData: {
     message: string;
@@ -245,7 +266,7 @@ export interface GenericSidebarProps {
     taskDueDate?: string;
     attachments: File[];
   }) => void;
-  
+
   // SMS message modal callback
   onSmsLog?: (smsData: {
     message: string;
@@ -382,7 +403,11 @@ export const CallModal: React.FC<CallModalProps> = ({
               <span style={{ fontWeight: "500" }}>Call {phoneNumber}</span>
               {phoneNumbers.length > 1 && (
                 <span
-                  style={{ color: "#718096", fontSize: "13px", marginLeft: "4px" }}
+                  style={{
+                    color: "#718096",
+                    fontSize: "13px",
+                    marginLeft: "4px",
+                  }}
                 >
                   (Phone {idx + 1})
                 </span>
@@ -1324,1111 +1349,6 @@ const NotesModal: React.FC<NotesModalProps> = ({
 };
 
 // ============================================================================
-// EMAIL MODAL COMPONENT
-// ============================================================================
-interface EmailModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  /** Single email, comma-separated string, or array of emails */
-  recipientEmail?: string | string[];
-  recipientName?: string;
-  senderEmail?: string;
-  senderName?: string;
-  onSend: (emailData: {
-    to: string[];
-    cc: string[];
-    bcc: string[];
-    subject: string;
-    body: string;
-    createTask: boolean;
-    taskDueDate?: string;
-    attachments?: File[];
-  }) => void | Promise<void>;
-  record?: {
-    id: number;
-    type: RECORD_TYPES;
-  };
-}
-
-const normalizeRecipientEmails = (v?: string | string[]): string[] => {
-  if (!v) return [];
-  if (Array.isArray(v)) return v.map((e) => e.trim()).filter(Boolean);
-  return v
-    .split(",")
-    .map((e) => e.trim())
-    .filter(Boolean);
-};
-
-const EmailModal: React.FC<EmailModalProps> = ({
-  isOpen,
-  onClose,
-  recipientEmail,
-  recipientName,
-  senderEmail = "user@example.com",
-  senderName = "Your Name",
-  onSend,
-}) => {
-  const initialTo = normalizeRecipientEmails(recipientEmail);
-  const [toEmails, setToEmails] = useState<string[]>(initialTo);
-  const [ccEmails, setCcEmails] = useState<string[]>([]);
-  const [bccEmails, setBccEmails] = useState<string[]>([]);
-  const [showCc, setShowCc] = useState(false);
-  const [showBcc, setShowBcc] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [emailBody, setEmailBody] = useState("");
-  const [isMaximized, setIsMaximized] = useState(false);
-  const [currentToInput, setCurrentToInput] = useState("");
-  const [currentCcInput, setCurrentCcInput] = useState("");
-  const [currentBccInput, setCurrentBccInput] = useState("");
-  const [activeTab, setActiveTab] = useState<
-    "templates" | "sequences" | "documents" | "meetings" | "quotes"
-  >("templates");
-  const [createTask, setCreateTask] = useState(false);
-  const [showSendDropdown, setShowSendDropdown] = useState(false);
-  const [sendLoading, setSendLoading] = useState(false);
-  const emailBodyRef = useRef<HTMLTextAreaElement>(null);
-  const sendDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const next = normalizeRecipientEmails(recipientEmail);
-    if (next.length > 0) {
-      setToEmails((prev) =>
-        next.some((e) => !prev.includes(e)) ? next : prev,
-      );
-    }
-  }, [recipientEmail]);
-
-  useEffect(() => {
-    if (isOpen) {
-      const next = normalizeRecipientEmails(recipientEmail);
-      if (next.length > 0) setToEmails(next);
-      if (emailBodyRef.current) emailBodyRef.current.focus();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sendDropdownRef.current &&
-        !sendDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowSendDropdown(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  if (!isOpen) return null;
-
-  const handleMaximize = () => {
-    setIsMaximized(!isMaximized);
-  };
-
-  const addEmail = (email: string, type: "to" | "cc" | "bcc") => {
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) return;
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      alert("Please enter a valid email address");
-      return;
-    }
-
-    if (type === "to") {
-      if (!toEmails.includes(trimmedEmail)) {
-        setToEmails([...toEmails, trimmedEmail]);
-      }
-      setCurrentToInput("");
-    } else if (type === "cc") {
-      if (!ccEmails.includes(trimmedEmail)) {
-        setCcEmails([...ccEmails, trimmedEmail]);
-      }
-      setCurrentCcInput("");
-    } else if (type === "bcc") {
-      if (!bccEmails.includes(trimmedEmail)) {
-        setBccEmails([...bccEmails, trimmedEmail]);
-      }
-      setCurrentBccInput("");
-    }
-  };
-
-  const removeEmail = (email: string, type: "to" | "cc" | "bcc") => {
-    if (type === "to") {
-      setToEmails(toEmails.filter((e) => e !== email));
-    } else if (type === "cc") {
-      setCcEmails(ccEmails.filter((e) => e !== email));
-    } else if (type === "bcc") {
-      setBccEmails(bccEmails.filter((e) => e !== email));
-    }
-  };
-
-  const handleKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    type: "to" | "cc" | "bcc",
-  ) => {
-    if (e.key === "Enter" || e.key === "," || e.key === " ") {
-      e.preventDefault();
-      const value =
-        type === "to"
-          ? currentToInput
-          : type === "cc"
-            ? currentCcInput
-            : currentBccInput;
-      addEmail(value, type);
-    }
-  };
-
-  const handleSend = async () => {
-    if (toEmails.length === 0) {
-      alert("Please add at least one recipient");
-      return;
-    }
-
-    if (!subject.trim()) {
-      const confirmSend = window.confirm("Send email without a subject?");
-      if (!confirmSend) return;
-    }
-    setSendLoading(true);
-    try {
-      await onSend({
-        to: toEmails,
-        cc: ccEmails,
-        bcc: bccEmails,
-        subject,
-        body: emailBody,
-        createTask,
-        taskDueDate: createTask ? "In 3 business days (Friday)" : undefined,
-      });
-      setToEmails([]);
-      setCcEmails([]);
-      setBccEmails([]);
-      setSubject("");
-      setEmailBody("");
-      setShowCc(false);
-      setShowBcc(false);
-      setCreateTask(false);
-      setIsMaximized(false);
-      onClose();
-    } finally {
-      setSendLoading(false);
-    }
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
-        height: isMaximized ? "auto" : "550px",
-        width: isMaximized ? "auto" : "650px",
-        backgroundColor: "#ffffff",
-        zIndex: 1000,
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-        border: "1px solid #cbd5e0",
-        overflow: "hidden",
-        animation: "slideInUp 0.3s ease-out",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          borderBottom: "1px solid #e2e8f0",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              color: "#141414",
-              padding: "4px",
-            }}
-          >
-            <ChevronDown size={20} style={{ transform: "rotate(90deg)" }} />
-          </button>
-          <h2
-            style={{
-              fontSize: "16px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
-            Email
-          </h2>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            onClick={handleMaximize}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "6px",
-              color: "#141414",
-            }}
-            title={isMaximized ? "Restore" : "Maximize"}
-          >
-            <Maximize2 size={18} />
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: "6px",
-              color: "#141414",
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "24px",
-          padding: "12px 20px",
-          borderBottom: "1px solid #e2e8f0",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        {["Templates", "Sequences", "Documents", "Meetings", "Quotes"].map(
-          (tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab.toLowerCase() as any)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px 0",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: activeTab === tab.toLowerCase() ? "600" : "400",
-                color: "#141414",
-                borderBottom:
-                  activeTab === tab.toLowerCase()
-                    ? "2px solid #ff7a59"
-                    : "2px solid transparent",
-                transition: "all 0.2s",
-              }}
-            >
-              {tab}
-            </button>
-          ),
-        )}
-      </div>
-
-      {/* Email Form */}
-      <div style={{ flex: 1, overflowY: "auto", backgroundColor: "#ffffff" }}>
-        {/* To Field */}
-        <div
-          style={{ padding: "12px 20px", borderBottom: "1px solid #e2e8f0" }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}
-          >
-            <label
-              style={{
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                minWidth: "60px",
-                paddingTop: "8px",
-              }}
-            >
-              To
-            </label>
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "6px",
-                alignItems: "center",
-              }}
-            >
-              {toEmails.map((email) => (
-                <span
-                  key={email}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "4px 10px",
-                    backgroundColor: "#f7fafc",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "16px",
-                    fontSize: "13px",
-                    color: "#141414",
-                  }}
-                >
-                  {email}
-                  <button
-                    onClick={() => removeEmail(email, "to")}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "0",
-                      display: "flex",
-                      alignItems: "center",
-                      color: "#718096",
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                </span>
-              ))}
-              <input
-                type="email"
-                value={currentToInput}
-                onChange={(e) => setCurrentToInput(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, "to")}
-                onBlur={() => currentToInput && addEmail(currentToInput, "to")}
-                placeholder={toEmails.length === 0 ? "Enter email address" : ""}
-                style={{
-                  flex: 1,
-                  minWidth: "200px",
-                  border: "none",
-                  outline: "none",
-                  fontSize: "14px",
-                  color: "#141414",
-                  padding: "6px 0",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* From Field */}
-        <div
-          style={{
-            padding: "12px 20px",
-            borderBottom: "1px solid #e2e8f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "12px" }}
-          ></div>
-          <div style={{ display: "flex", gap: "12px" }}>
-            {!showCc && (
-              <button
-                onClick={() => setShowCc(true)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  color: "#0091ae",
-                  textDecoration: "underline",
-                  padding: "0",
-                }}
-              >
-                Cc
-              </button>
-            )}
-            {!showBcc && (
-              <button
-                onClick={() => setShowBcc(true)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  color: "#0091ae",
-                  textDecoration: "underline",
-                  padding: "0",
-                }}
-              >
-                Bcc
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* CC Field */}
-        {showCc && (
-          <div
-            style={{ padding: "12px 20px", borderBottom: "1px solid #e2e8f0" }}
-          >
-            <div
-              style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}
-            >
-              <label
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#141414",
-                  minWidth: "60px",
-                  paddingTop: "8px",
-                }}
-              >
-                Cc
-              </label>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                  alignItems: "center",
-                }}
-              >
-                {ccEmails.map((email) => (
-                  <span
-                    key={email}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "4px 10px",
-                      backgroundColor: "#f7fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "16px",
-                      fontSize: "13px",
-                      color: "#141414",
-                    }}
-                  >
-                    {email}
-                    <button
-                      onClick={() => removeEmail(email, "cc")}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: "0",
-                        display: "flex",
-                        alignItems: "center",
-                        color: "#718096",
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  type="email"
-                  value={currentCcInput}
-                  onChange={(e) => setCurrentCcInput(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, "cc")}
-                  onBlur={() =>
-                    currentCcInput && addEmail(currentCcInput, "cc")
-                  }
-                  placeholder="Enter email address"
-                  style={{
-                    flex: 1,
-                    minWidth: "200px",
-                    border: "none",
-                    outline: "none",
-                    fontSize: "14px",
-                    color: "#141414",
-                    padding: "6px 0",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* BCC Field */}
-        {showBcc && (
-          <div
-            style={{ padding: "12px 20px", borderBottom: "1px solid #e2e8f0" }}
-          >
-            <div
-              style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}
-            >
-              <label
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#141414",
-                  minWidth: "60px",
-                  paddingTop: "8px",
-                }}
-              >
-                Bcc
-              </label>
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "6px",
-                  alignItems: "center",
-                }}
-              >
-                {bccEmails.map((email) => (
-                  <span
-                    key={email}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "4px 10px",
-                      backgroundColor: "#f7fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "16px",
-                      fontSize: "13px",
-                      color: "#141414",
-                    }}
-                  >
-                    {email}
-                    <button
-                      onClick={() => removeEmail(email, "bcc")}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: "0",
-                        display: "flex",
-                        alignItems: "center",
-                        color: "#718096",
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  type="email"
-                  value={currentBccInput}
-                  onChange={(e) => setCurrentBccInput(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, "bcc")}
-                  onBlur={() =>
-                    currentBccInput && addEmail(currentBccInput, "bcc")
-                  }
-                  placeholder="Enter email address"
-                  style={{
-                    flex: 1,
-                    minWidth: "200px",
-                    border: "none",
-                    outline: "none",
-                    fontSize: "14px",
-                    color: "#141414",
-                    padding: "6px 0",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Subject Field */}
-        <div
-          style={{ padding: "12px 20px", borderBottom: "1px solid #e2e8f0" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <label
-              style={{
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                minWidth: "60px",
-              }}
-            >
-              Subject
-            </label>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder=""
-              style={{
-                flex: 1,
-                border: "none",
-                fontSize: "14px",
-                color: "#141414",
-                padding: "8px 12px",
-                borderRadius: "3px",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Email Body */}
-        <div style={{ padding: "20px" }}>
-          <textarea
-            ref={emailBodyRef}
-            value={emailBody}
-            onChange={(e) => setEmailBody(e.target.value)}
-            placeholder="Type your email message here..."
-            style={{
-              width: "100%",
-              height: isMaximized ? "400px" : "200px",
-              border: "none",
-              outline: "none",
-              fontSize: "14px",
-              color: "#141414",
-              fontFamily: "inherit",
-              resize: "none",
-              lineHeight: "1.6",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Formatting Toolbar and Associated Records */}
-      <div
-        style={{
-          padding: "12px 20px",
-          borderTop: "1px solid #e2e8f0",
-          borderBottom: "1px solid #e2e8f0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "14px",
-              fontWeight: "600",
-            }}
-            title="Bold"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            B
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "14px",
-              fontWeight: "600",
-              fontStyle: "italic",
-            }}
-            title="Italic"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            I
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "14px",
-              fontWeight: "600",
-              textDecoration: "underline",
-            }}
-            title="Underline"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            U
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
-              fontWeight: "500",
-              gap: "4px",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            More
-            <ChevronDown size={14} />
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-            }}
-            title="Link"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            <Link size={16} />
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-            }}
-            title="Image"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            <Image size={16} aria-label="Insert Image" />
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
-              fontWeight: "500",
-              gap: "4px",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            Insert
-            <ChevronDown size={14} />
-          </button>
-          <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-            }}
-            title="Attach file"
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            <Paperclip size={16} />
-          </button>
-        </div>
-        <button
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "6px 10px",
-            cursor: "pointer",
-            color: "#141414",
-            display: "flex",
-            alignItems: "center",
-            borderRadius: "3px",
-            fontSize: "13px",
-            fontWeight: "500",
-            gap: "4px",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f5f8fa")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-        >
-          Associated with 1 record
-          <ChevronDown size={14} />
-        </button>
-      </div>
-
-      {/* Footer - Task Creation and Send */}
-      <div
-        style={{
-          padding: "16px 20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ position: "relative" }} ref={sendDropdownRef}>
-            <div style={{ display: "flex", alignItems: "stretch" }}>
-              <button
-                onClick={handleSend}
-                disabled={toEmails.length === 0 || sendLoading}
-                style={{
-                  padding: "8px 16px",
-                  paddingRight: "12px",
-                  backgroundColor:
-                    toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
-                  color: "#141414",
-                  border: "none",
-                  borderRadius: "4px 0 0 4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor:
-                    toEmails.length > 0 && !sendLoading
-                      ? "pointer"
-                      : "not-allowed",
-                  transition: "background-color 0.2s",
-                  borderRight: "1px solid #a0aec0",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-                onMouseEnter={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#b8c5d0";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#cbd5e0";
-                  }
-                }}
-              >
-                {sendLoading ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm"
-                      role="status"
-                      aria-hidden="true"
-                      style={{
-                        width: "14px",
-                        height: "14px",
-                        borderWidth: "2px",
-                      }}
-                    />
-                    Sending...
-                  </>
-                ) : (
-                  "Send"
-                )}
-              </button>
-              <button
-                onClick={() => setShowSendDropdown(!showSendDropdown)}
-                disabled={toEmails.length === 0 || sendLoading}
-                style={{
-                  padding: "8px 8px",
-                  backgroundColor:
-                    toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
-                  color: "#141414",
-                  border: "none",
-                  borderRadius: "0 4px 4px 0",
-                  fontSize: "14px",
-                  cursor:
-                    toEmails.length > 0 && !sendLoading
-                      ? "pointer"
-                      : "not-allowed",
-                  transition: "background-color 0.2s",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                onMouseEnter={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#b8c5d0";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#cbd5e0";
-                  }
-                }}
-              >
-                <ChevronDown size={16} />
-              </button>
-            </div>
-            {showSendDropdown && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "100%",
-                  left: 0,
-                  marginBottom: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "180px",
-                  zIndex: 1000,
-                  overflow: "hidden",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    handleSend();
-                    setShowSendDropdown(false);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    fontSize: "14px",
-                    color: "#33475b",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Send now
-                </button>
-                <button
-                  onClick={() => {
-                    console.log("Schedule send");
-                    setShowSendDropdown(false);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    fontSize: "14px",
-                    color: "#33475b",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Schedule send
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            cursor: "pointer",
-            fontSize: "13px",
-            color: "#141414",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={createTask}
-            onChange={(e) => setCreateTask(e.target.checked)}
-            style={{
-              width: "16px",
-              height: "16px",
-              cursor: "pointer",
-            }}
-          />
-          <span>
-            Create a <strong>To-do</strong> task to follow up{" "}
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#141414",
-                textDecoration: "underline",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "13px",
-                fontWeight: "600",
-              }}
-            >
-              In 3 business days (Friday)
-            </button>
-            <ChevronDown
-              size={14}
-              style={{ marginLeft: "4px", verticalAlign: "middle" }}
-            />
-          </span>
-        </label>
-      </div>
-    </div>
-  );
-};
-
-// ============================================================================
 // MORE ACTIONS MODAL COMPONENT
 // Add this after CallModal component
 // ============================================================================
@@ -2715,6 +1635,198 @@ const MoreActionsModal: React.FC<MoreActionsModalProps> = ({
 };
 
 // ============================================================================
+// URL INPUT MODAL (for link/image URL entry - same style as app modals)
+// ============================================================================
+
+interface UrlInputModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  defaultValue: string;
+  placeholder?: string;
+  submitLabel?: string;
+  onSubmit: (value: string) => void;
+}
+
+const UrlInputModal: React.FC<UrlInputModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  defaultValue,
+  placeholder = "https://",
+  submitLabel = "Insert",
+  onSubmit,
+}) => {
+  const [value, setValue] = useState(defaultValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setValue(defaultValue);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [isOpen, defaultValue]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = () => {
+    const url = (value || "").trim() || defaultValue;
+    onSubmit(url);
+    onClose();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
+    if (e.key === "Escape") onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "400px",
+        backgroundColor: "#ffffff",
+        zIndex: 1002,
+        boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
+        borderRadius: "8px",
+        border: "1px solid #cbd5e0",
+        overflow: "hidden",
+        animation: "fadeIn 0.2s ease-out",
+      }}
+    >
+      <div
+        style={{
+          padding: "16px 20px",
+          borderBottom: "1px solid #e2e8f0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <h3
+          style={{
+            fontSize: "16px",
+            fontWeight: "600",
+            color: "#141414",
+            margin: 0,
+          }}
+        >
+          {title}
+        </h3>
+        <button
+          onClick={onClose}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "4px",
+            color: "#718096",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#f5f8fa";
+            e.currentTarget.style.color = "#141414";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "#718096";
+          }}
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div style={{ padding: "20px" }}>
+        <input
+          ref={inputRef}
+          type="url"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            border: "1px solid #cbd5e0",
+            borderRadius: "6px",
+            fontSize: "14px",
+            color: "#141414",
+            outline: "none",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "#0091ae";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "#cbd5e0";
+          }}
+        />
+      </div>
+      <div
+        style={{
+          padding: "12px 20px",
+          borderTop: "1px solid #e2e8f0",
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: "8px",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "transparent",
+            color: "#141414",
+            border: "1px solid #cbd5e0",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#f7fafc";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#0091ae",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#007a8c";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#0091ae";
+          }}
+        >
+          {submitLabel}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
 // TASK MODAL COMPONENT
 // ============================================================================
 
@@ -2748,13 +1860,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [activityDate, setActivityDate] = useState(
     "In 3 business days (Friday)",
   );
-  const [activityTime, setActivityTime] = useState("08:00");
+  const [activityTime, setActivityTime] = useState(() =>
+    new Date().toTimeString().slice(0, 5),
+  );
   const [reminder, setReminder] = useState("No reminder");
   const [repeat, setRepeat] = useState(false);
   const [taskType, setTaskType] = useState("To-do");
   const [priority, setPriority] = useState("None");
   const [queue, setQueue] = useState("None");
-  const [assignedToState, setAssignedToState] = useState(assignedToName);
   const [notes, setNotes] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -2763,181 +1876,158 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [showTaskTypeDropdown, setShowTaskTypeDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [showQueueDropdown, setShowQueueDropdown] = useState(false);
-  const [showAssignedToDropdown, setShowAssignedToDropdown] = useState(false);
+  const [showMoreFormattingDropdown, setShowMoreFormattingDropdown] =
+    useState(false);
+  const [activityAssignedExtensions, setActivityAssignedExtensions] = useState<
+    any[]
+  >([]);
+  const [selectedUserExtension, setSelectedUserExtension] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [customDate, setCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [customTime, setCustomTime] = useState("08:00");
+  const [customDate, setCustomDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [customTime, setCustomTime] = useState(() =>
+    new Date().toTimeString().slice(0, 5),
+  );
+  const [urlModalType, setUrlModalType] = useState<"link" | "image" | null>(
+    null,
+  );
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const notesRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const moreFormattingRef = useRef<HTMLDivElement>(null);
+  const taskPropertiesRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isOpen && titleInputRef.current) {
       titleInputRef.current.focus();
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    const anyOpen =
+      showTaskTypeDropdown || showPriorityDropdown || showQueueDropdown;
+    if (!anyOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        taskPropertiesRef.current &&
+        !taskPropertiesRef.current.contains(e.target as Node)
+      ) {
+        setShowTaskTypeDropdown(false);
+        setShowPriorityDropdown(false);
+        setShowQueueDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showTaskTypeDropdown, showPriorityDropdown, showQueueDropdown]);
+
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(
+          ModuleSlug.CRM_DATA_MANAGEMENT,
+        );
+        const exts = hierarchyData?.extensions || [];
+        setActivityAssignedExtensions(exts);
+        if (assignedTo && exts.length > 0) {
+          const id = assignedTo.split(",")[0]?.trim() || "";
+          const ext = exts.find(
+            (e: any) =>
+              e.id?.toString() === id || e.extension?.toString() === id,
+          );
+          if (ext)
+            setSelectedUserExtension({
+              value: ext.id?.toString() || ext.extension?.toString() || "",
+              label:
+                ext.display_name ||
+                ext.name ||
+                `Extension ${ext.id || ext.extension}`,
+            });
+        }
+      } catch (error) {
+        console.error("Failed to fetch activity assigned extensions:", error);
+      }
+    };
+    if (isOpen) fetchExtensions();
+  }, [isOpen, assignedTo]);
+
+  useEffect(() => {
+    if (!showMoreFormattingDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        moreFormattingRef.current &&
+        !moreFormattingRef.current.contains(e.target as Node)
+      ) {
+        setShowMoreFormattingDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMoreFormattingDropdown]);
+
+  // Sync contentEditable content to state when modal opens (e.g. initial or after reset)
+  useEffect(() => {
+    if (isOpen && notesRef.current) {
+      notesRef.current.innerHTML = notes || "";
+    }
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- only set initial content when modal opens
+
   if (!isOpen) return null;
 
-  // Text formatting functions with toggle support
-  const toggleFormatting = (prefix: string, suffix: string = prefix) => {
-    const textarea = notesRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = notes.substring(start, end);
-
-    if (selectedText) {
-      // Check if text is already formatted
-      const beforeText = notes.substring(
-        Math.max(0, start - prefix.length),
-        start,
-      );
-      const afterText = notes.substring(end, end + suffix.length);
-
-      if (beforeText === prefix && afterText === suffix) {
-        // Remove formatting
-        const newText =
-          notes.substring(0, start - prefix.length) +
-          selectedText +
-          notes.substring(end + suffix.length);
-        setNotes(newText);
-
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(
-            start - prefix.length,
-            end - prefix.length,
-          );
-        }, 0);
-      } else {
-        // Add formatting
-        const newText =
-          notes.substring(0, start) +
-          prefix +
-          selectedText +
-          suffix +
-          notes.substring(end);
-        setNotes(newText);
-
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(
-            start + prefix.length,
-            end + prefix.length,
-          );
-        }, 0);
-      }
-    } else {
-      // No selection, insert at cursor with placeholder
-      const placeholder = "text";
-      const newText =
-        notes.substring(0, start) +
-        prefix +
-        placeholder +
-        suffix +
-        notes.substring(end);
-      setNotes(newText);
-
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(
-          start + prefix.length,
-          start + prefix.length + placeholder.length,
-        );
-      }, 0);
-    }
-  };
-
-  const insertText = (text: string) => {
-    const textarea = notesRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    const newText = notes.substring(0, start) + text + notes.substring(end);
-    setNotes(newText);
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + text.length, start + text.length);
-    }, 0);
+  const syncNotesFromEditor = () => {
+    if (notesRef.current) setNotes(notesRef.current.innerHTML || "");
   };
 
   const handleBold = () => {
-    toggleFormatting("**");
+    notesRef.current?.focus();
+    document.execCommand("bold", false);
+    syncNotesFromEditor();
   };
 
   const handleItalic = () => {
-    toggleFormatting("*");
+    notesRef.current?.focus();
+    document.execCommand("italic", false);
+    syncNotesFromEditor();
   };
 
   const handleUnderline = () => {
-    toggleFormatting("__");
+    notesRef.current?.focus();
+    document.execCommand("underline", false);
+    syncNotesFromEditor();
   };
 
   const handleLink = () => {
-    const textarea = notesRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = notes.substring(start, end);
-
-    const linkText = selectedText || "link text";
-    const linkUrl = "https://";
-    const markdown = `[${linkText}](${linkUrl})`;
-
-    const newText = notes.substring(0, start) + markdown + notes.substring(end);
-    setNotes(newText);
-
-    setTimeout(() => {
-      textarea.focus();
-      const urlStart = start + linkText.length + 3;
-      textarea.setSelectionRange(urlStart, urlStart + linkUrl.length);
-    }, 0);
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    setUrlModalType("link");
   };
 
   const handleList = () => {
-    const textarea = notesRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const lines = notes.substring(0, start).split("\n");
-    const isAtLineStart = lines[lines.length - 1].trim() === "";
-
-    if (isAtLineStart) {
-      insertText("- ");
-    } else {
-      insertText("\n- ");
-    }
+    notesRef.current?.focus();
+    document.execCommand("insertUnorderedList", false);
+    syncNotesFromEditor();
   };
 
   const handleCode = () => {
-    toggleFormatting("`");
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+    const selectedText = range?.toString() || "code";
+    document.execCommand("insertHTML", false, `<code>${selectedText}</code>`);
+    syncNotesFromEditor();
   };
 
   const handleImage = () => {
-    const textarea = notesRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = notes.substring(start, end);
-
-    const altText = selectedText || "image description";
-    const imageUrl = "https://";
-    const markdown = `![${altText}](${imageUrl})`;
-
-    const newText = notes.substring(0, start) + markdown + notes.substring(end);
-    setNotes(newText);
-
-    setTimeout(() => {
-      textarea.focus();
-      const urlStart = start + altText.length + 4;
-      textarea.setSelectionRange(urlStart, urlStart + imageUrl.length);
-    }, 0);
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    setUrlModalType("image");
   };
 
   const handleAttachment = () => {
@@ -2954,8 +2044,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Keyboard shortcuts handler
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  // Keyboard shortcuts handler (Ctrl/Cmd+B, I, U, K)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
         case "b":
@@ -2996,29 +2086,93 @@ const TaskModal: React.FC<TaskModalProps> = ({
       taskType,
       priority,
       queue,
-      assignedTo: assignedToState,
+      assignedTo: selectedUserExtension?.value ?? "",
       notes,
     });
 
     // Reset form
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5);
     setTitle("");
     setActivityDate("In 3 business days (Friday)");
-    setActivityTime("08:00");
+    setActivityTime(timeStr);
     setCustomDate(today);
-    setCustomTime("08:00");
+    setCustomTime(timeStr);
     setReminder("No reminder");
     setRepeat(false);
     setTaskType("To-do");
     setPriority("None");
     setQueue("None");
+    setSelectedUserExtension(null);
     setNotes("");
     setAttachments([]);
     setIsMaximized(false);
     onClose();
   };
 
-  const taskTypes = ["To-do", "Call", "Email", "Meeting"];
+  const taskModalSelectStyles = {
+    control: (provided: any, state: any) => ({
+      ...provided,
+      minHeight: "36px",
+      fontSize: "14px",
+      fontWeight: "600",
+      borderColor: state.isFocused ? "#0091ae" : "#e2e8f0",
+      borderRadius: "6px",
+      boxShadow: state.isFocused ? "0 0 0 2px rgba(0, 145, 174, 0.2)" : "none",
+      "&:hover": { borderColor: state.isFocused ? "#0091ae" : "#cbd5e0" },
+    }),
+    placeholder: (provided: any) => ({
+      ...provided,
+      color: "#718096",
+      fontWeight: "400",
+    }),
+    singleValue: (provided: any) => ({
+      ...provided,
+      color: "#141414",
+      fontWeight: "600",
+    }),
+    multiValue: (provided: any) => ({
+      ...provided,
+      backgroundColor: "#33475b",
+      color: "white",
+      fontSize: "13px",
+    }),
+    multiValueLabel: (provided: any) => ({
+      ...provided,
+      color: "white",
+    }),
+    multiValueRemove: (provided: any) => ({
+      ...provided,
+      color: "white",
+      "&:hover": { backgroundColor: "#1e3a5f" },
+    }),
+    menu: (provided: any) => ({ ...provided, fontSize: "14px" }),
+  };
+
+  const taskPropertyFieldStyle = {
+    padding: "8px 12px",
+    minHeight: "36px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "6px",
+    backgroundColor: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    cursor: "pointer",
+    transition: "border-color 0.2s, box-shadow 0.2s",
+  } as const;
+
+  const taskTypes = [
+    "To-do",
+    "Call",
+    "Email",
+    "Meeting",
+    "Task",
+    "SMS",
+    "WhatsApp",
+  ];
   const priorities = ["None", "Low", "Medium", "High"];
   const queues = ["None", "Sales Queue", "Support Queue", "Marketing Queue"];
   const dateOptions = [
@@ -3041,130 +2195,347 @@ const TaskModal: React.FC<TaskModalProps> = ({
   ];
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
-        height: isMaximized ? "auto" : "650px",
-        width: isMaximized ? "auto" : "650px",
-        backgroundColor: "#ffffff",
-        zIndex: 1000,
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-        border: "1px solid #cbd5e0",
-        overflow: "hidden",
-        animation: "slideInUp 0.3s ease-out",
-      }}
-    >
-      {/* Header */}
+    <>
+      <UrlInputModal
+        isOpen={urlModalType === "link"}
+        onClose={() => setUrlModalType(null)}
+        title="Enter URL"
+        defaultValue="https://"
+        placeholder="https://"
+        submitLabel="Insert link"
+        onSubmit={(url) => {
+          notesRef.current?.focus();
+          document.execCommand("createLink", false, url);
+          syncNotesFromEditor();
+          setUrlModalType(null);
+        }}
+      />
+      <UrlInputModal
+        isOpen={urlModalType === "image"}
+        onClose={() => setUrlModalType(null)}
+        title="Enter image URL"
+        defaultValue="https://"
+        placeholder="https://"
+        submitLabel="Insert image"
+        onSubmit={(url) => {
+          notesRef.current?.focus();
+          document.execCommand("insertImage", false, url);
+          syncNotesFromEditor();
+          setUrlModalType(null);
+        }}
+      />
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 16px",
-          borderBottom: "1px solid #e2e8f0",
+          position: "fixed",
+          inset: isMaximized ? "60px 20px 20px 20px" : "auto 15vh 7.5vh auto",
+          height: isMaximized ? "auto" : "650px",
+          width: isMaximized ? "auto" : "650px",
           backgroundColor: "#ffffff",
+          zIndex: 1000,
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
+          borderRadius: "8px",
+          border: "1px solid #cbd5e0",
+          overflow: "hidden",
+          animation: "slideInUp 0.3s ease-out",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 16px",
+            borderBottom: "1px solid #e2e8f0",
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                color: "#141414",
+                padding: "4px",
+              }}
+            >
+              <ChevronDown size={20} style={{ transform: "rotate(90deg)" }} />
+            </button>
+            <h2
+              style={{
+                fontSize: "16px",
+                fontWeight: "600",
+                color: "#141414",
+                margin: 0,
+              }}
+            >
+              Task
+            </h2>
+          </div>
           <button
             onClick={onClose}
             style={{
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
+              padding: "6px",
               color: "#141414",
-              padding: "4px",
             }}
           >
-            <ChevronDown size={20} style={{ transform: "rotate(90deg)" }} />
+            <X size={20} />
           </button>
-          <h2
-            style={{
-              fontSize: "16px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
-            Task
-          </h2>
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            padding: "6px",
-            color: "#141414",
-          }}
-        >
-          <X size={20} />
-        </button>
-      </div>
-
-      {/* Task Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          backgroundColor: "#ffffff",
-          padding: "20px",
-        }}
-      >
-        {/* Task Title Input */}
-        <div style={{ marginBottom: "20px" }}>
-          <input
-            ref={titleInputRef}
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter your task"
-            style={{
-              width: "100%",
-              border: "none",
-              outline: "none",
-              fontSize: "14px",
-              color: "#141414",
-              padding: "12px 16px",
-              borderRadius: "4px",
-            }}
-          />
         </div>
 
-        {/* Activity Date and Reminder Row */}
+        {/* Task Content */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "20px",
-            marginBottom: "20px",
+            flex: 1,
+            overflowY: "auto",
+            backgroundColor: "#ffffff",
+            padding: "20px",
           }}
         >
-          {/* Activity Date */}
-          <div style={{ position: "relative" }}>
-            <label
+          {/* Task Title Input */}
+          <div style={{ marginBottom: "20px" }}>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter your task"
               style={{
-                fontSize: "13px",
+                width: "100%",
+                border: "none",
+                outline: "none",
+                fontSize: "14px",
                 color: "#141414",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
+                padding: "12px 16px",
+                borderRadius: "4px",
               }}
-            >
-              Activity date
-            </label>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <button
-                onClick={() => setShowDatePicker(!showDatePicker)}
+            />
+          </div>
+
+          {/* Activity Date and Reminder Row */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "20px",
+              marginBottom: "20px",
+            }}
+          >
+            {/* Activity Date */}
+            <div style={{ position: "relative" }}>
+              <label
                 style={{
-                  padding: "8px 2px",
+                  fontSize: "13px",
+                  color: "#141414",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
+              >
+                Activity date
+              </label>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
+                <div style={{ position: "relative" }}>
+                  <button
+                    onClick={() => {
+                      setShowDatePicker(!showDatePicker);
+                      setShowTimePicker(false);
+                    }}
+                    style={{
+                      padding: "8px 2px",
+                      backgroundColor: "#ffffff",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    {activityDate === "Custom..." ? customDate : activityDate}
+                  </button>
+                  {/* Date Picker Dropdown */}
+                  {showDatePicker && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "100%",
+                        marginTop: "4px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "5px",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                        minWidth: "200px",
+                        zIndex: 1001,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {dateOptions.map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => {
+                            if (option === "Custom...") {
+                              setActivityDate("Custom...");
+                              setActivityTime(customTime);
+                              setShowDatePicker(false);
+                            } else {
+                              setActivityDate(option);
+                              setShowDatePicker(false);
+                            }
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "10px 16px",
+                            backgroundColor: "transparent",
+                            border: "none",
+                            textAlign: "left",
+                            fontSize: "14px",
+                            color: "#33475b",
+                            cursor: "pointer",
+                            transition: "background-color 0.2s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                          }}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTimePicker(true);
+                      setShowDatePicker(false);
+                    }}
+                    style={{
+                      padding: "8px 2px",
+                      backgroundColor: "#ffffff",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      color: "#141414",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontWeight: "300",
+                    }}
+                  >
+                    <Clock size={16} />
+                    {activityDate === "Custom..." ? customTime : activityTime}
+                  </button>
+                  {/* Time Picker Dropdown - opens when clicking the clock/time button */}
+                  {showTimePicker && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: "100%",
+                        marginTop: "4px",
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "5px",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                        padding: "12px",
+                        zIndex: 1001,
+                      }}
+                    >
+                      <input
+                        type="time"
+                        value={
+                          activityDate === "Custom..."
+                            ? customTime
+                            : activityTime
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setActivityTime(v);
+                          if (activityDate === "Custom...") {
+                            setCustomTime(v);
+                          }
+                          setShowTimePicker(false);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "5px",
+                          fontSize: "14px",
+                          color: "#141414",
+                          backgroundColor: "#ffffff",
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Custom date input when Custom is selected; time is set via the time button picker above */}
+              {activityDate === "Custom..." && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    alignItems: "center",
+                    marginTop: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <input
+                    type="date"
+                    value={customDate}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "5px",
+                      fontSize: "14px",
+                      color: "#141414",
+                      backgroundColor: "#ffffff",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Send Reminder */}
+            <div>
+              <label
+                style={{
+                  fontSize: "13px",
+                  color: "#141414",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
+              >
+                Send reminder
+              </label>
+              <button
+                onClick={() => setShowReminderPicker(!showReminderPicker)}
+                style={{
+                  width: "100%",
+                  padding: "8px 3px",
                   backgroundColor: "#ffffff",
                   border: "none",
                   borderRadius: "4px",
@@ -3175,610 +2546,674 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   textAlign: "left",
                 }}
               >
-                {activityDate === "Custom..." ? customDate : activityDate}
+                {reminder}
               </button>
-              <button
-                onClick={() => setShowTimePicker(!showTimePicker)}
-                style={{
-                  padding: "8px 2px",
-                  backgroundColor: "#ffffff",
-                  border: "none",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  color: "#141414",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  fontWeight: "300",
-                }}
-              >
-                <Clock size={16} />
-                {activityDate === "Custom..." ? customTime : activityTime}
-              </button>
+
+              {/* Reminder Picker Dropdown */}
+              {showReminderPicker && (
+                <div
+                  style={{
+                    position: "absolute",
+                    marginTop: "4px",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "5px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    minWidth: "200px",
+                    zIndex: 1001,
+                    overflow: "hidden",
+                  }}
+                >
+                  {reminderOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setReminder(option);
+                        setShowReminderPicker(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 16px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: "14px",
+                        color: "#33475b",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-
-            {/* Date Picker Dropdown */}
-            {showDatePicker && (
-              <div
-                style={{
-                  position: "absolute",
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "200px",
-                  zIndex: 1001,
-                  overflow: "hidden",
-                }}
-              >
-                {dateOptions.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => {
-                      if (option === "Custom...") {
-                        setActivityDate("Custom...");
-                        setActivityTime(customTime);
-                        setShowDatePicker(false);
-                      } else {
-                        setActivityDate(option);
-                        setShowDatePicker(false);
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#33475b",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Custom date/time inputs when Custom is selected */}
-            {activityDate === "Custom..." && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "12px",
-                  alignItems: "center",
-                  marginTop: "10px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <input
-                  type="date"
-                  value={customDate}
-                  onChange={(e) => setCustomDate(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "5px",
-                    fontSize: "14px",
-                    color: "#141414",
-                    backgroundColor: "#ffffff",
-                  }}
-                />
-                <input
-                  type="time"
-                  value={customTime}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setCustomTime(v);
-                    setActivityTime(v);
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "5px",
-                    fontSize: "14px",
-                    color: "#141414",
-                    backgroundColor: "#ffffff",
-                  }}
-                />
-              </div>
-            )}
           </div>
 
-          {/* Send Reminder */}
-          <div>
+          {/* Set to Repeat Checkbox */}
+          <div style={{ marginBottom: "20px" }}>
             <label
               style={{
-                fontSize: "13px",
-                color: "#141414",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
-              }}
-            >
-              Send reminder
-            </label>
-            <button
-              onClick={() => setShowReminderPicker(!showReminderPicker)}
-              style={{
-                width: "100%",
-                padding: "8px 3px",
-                backgroundColor: "#ffffff",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
                 cursor: "pointer",
-                textAlign: "left",
+                fontSize: "14px",
+                color: "#141414",
               }}
             >
-              {reminder}
-            </button>
-
-            {/* Reminder Picker Dropdown */}
-            {showReminderPicker && (
-              <div
+              <input
+                type="checkbox"
+                checked={repeat}
+                onChange={(e) => setRepeat(e.target.checked)}
                 style={{
-                  position: "absolute",
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "200px",
-                  zIndex: 1001,
-                  overflow: "hidden",
+                  width: "16px",
+                  height: "16px",
+                  cursor: "pointer",
+                }}
+              />
+              Set to repeat
+            </label>
+          </div>
+
+          {/* Task Properties Grid */}
+          <div
+            ref={taskPropertiesRef}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: "20px",
+              marginBottom: "20px",
+              paddingBottom: "20px",
+              borderBottom: "1px solid #e2e8f0",
+            }}
+          >
+            {/* Task Type */}
+            <div style={{ position: "relative" }}>
+              <label
+                style={{
+                  fontSize: "13px",
+                  color: "#718096",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
                 }}
               >
-                {reminderOptions.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => {
-                      setReminder(option);
-                      setShowReminderPicker(false);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#33475b",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+                Task Type
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTaskTypeDropdown(!showTaskTypeDropdown);
+                  setShowPriorityDropdown(false);
+                  setShowQueueDropdown(false);
+                }}
+                style={{
+                  ...taskPropertyFieldStyle,
+                  width: "100%",
+                  textAlign: "left",
+                  font: "inherit",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#cbd5e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#e2e8f0";
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#141414",
+                  }}
+                >
+                  {taskType}
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: "#718096",
+                    flexShrink: 0,
+                    transform: showTaskTypeDropdown ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
+                  }}
+                />
+              </button>
+              {showTaskTypeDropdown && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    marginTop: "6px",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+                    minWidth: "150px",
+                    zIndex: 1001,
+                    overflow: "hidden",
+                  }}
+                >
+                  {taskTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setTaskType(type);
+                        setShowTaskTypeDropdown(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 16px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: "14px",
+                        color: "#33475b",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        {/* Set to Repeat Checkbox */}
-        <div style={{ marginBottom: "20px" }}>
-          <label
+            {/* Priority */}
+            <div style={{ position: "relative" }}>
+              <label
+                style={{
+                  fontSize: "13px",
+                  color: "#718096",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
+              >
+                Priority
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPriorityDropdown(!showPriorityDropdown);
+                  setShowTaskTypeDropdown(false);
+                  setShowQueueDropdown(false);
+                }}
+                style={{
+                  ...taskPropertyFieldStyle,
+                  width: "100%",
+                  textAlign: "left",
+                  font: "inherit",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#cbd5e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#e2e8f0";
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#141414",
+                  }}
+                >
+                  {priority}
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: "#718096",
+                    flexShrink: 0,
+                    transform: showPriorityDropdown ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
+                  }}
+                />
+              </button>
+              {showPriorityDropdown && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    marginTop: "6px",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+                    minWidth: "150px",
+                    zIndex: 1001,
+                    overflow: "hidden",
+                  }}
+                >
+                  {priorities.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setPriority(p);
+                        setShowPriorityDropdown(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 16px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: "14px",
+                        color: "#33475b",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Queue */}
+            <div style={{ position: "relative" }}>
+              <label
+                style={{
+                  fontSize: "13px",
+                  color: "#718096",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
+              >
+                Queue
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQueueDropdown(!showQueueDropdown);
+                  setShowTaskTypeDropdown(false);
+                  setShowPriorityDropdown(false);
+                }}
+                style={{
+                  ...taskPropertyFieldStyle,
+                  width: "100%",
+                  textAlign: "left",
+                  font: "inherit",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#cbd5e0";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#e2e8f0";
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#141414",
+                  }}
+                >
+                  {queue}
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color: "#718096",
+                    flexShrink: 0,
+                    transform: showQueueDropdown ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s",
+                  }}
+                />
+              </button>
+              {showQueueDropdown && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    marginTop: "6px",
+                    backgroundColor: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "6px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)",
+                    minWidth: "180px",
+                    zIndex: 1001,
+                    overflow: "hidden",
+                  }}
+                >
+                  {queues.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => {
+                        setQueue(q);
+                        setShowQueueDropdown(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 16px",
+                        backgroundColor: "transparent",
+                        border: "none",
+                        textAlign: "left",
+                        fontSize: "14px",
+                        color: "#33475b",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Activity Assigned To */}
+            <div style={{ position: "relative" }}>
+              <label
+                style={{
+                  fontSize: "13px",
+                  color: "#718096",
+                  fontWeight: "400",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
+              >
+                Activity assigned to
+              </label>
+              <Select
+                options={activityAssignedExtensions.map((ext: any) => ({
+                  value: ext.id?.toString() || ext.extension?.toString() || "",
+                  label:
+                    ext.display_name ||
+                    ext.name ||
+                    `Extension ${ext.id || ext.extension}`,
+                }))}
+                value={selectedUserExtension}
+                onChange={(selected) =>
+                  setSelectedUserExtension(selected || null)
+                }
+                placeholder="Select user"
+                styles={taskModalSelectStyles}
+              />
+            </div>
+          </div>
+
+          {/* Notes Section - contentEditable for rich text (bold, italic, underline) */}
+          <div style={{ marginBottom: "20px" }}>
+            <style>{`.notes-content-editable:empty::before { content: attr(data-placeholder); color: #a0aec0; }`}</style>
+            <div
+              ref={notesRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={syncNotesFromEditor}
+              onKeyDown={handleKeyDown}
+              data-placeholder="Notes..."
+              style={{
+                width: "100%",
+                minHeight: isMaximized ? "300px" : "75px",
+                border: "none",
+                outline: "none",
+                fontSize: "14px",
+                color: "#141414",
+                fontFamily: "inherit",
+                lineHeight: "1.6",
+                padding: "0",
+              }}
+              className="notes-content-editable"
+            />
+          </div>
+
+          {/* Formatting Toolbar */}
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
-              color: "#141414",
+              justifyContent: "space-between",
+              paddingTop: "12px",
+              borderTop: "1px solid #e2e8f0",
             }}
           >
-            <input
-              type="checkbox"
-              checked={repeat}
-              onChange={(e) => setRepeat(e.target.checked)}
-              style={{
-                width: "16px",
-                height: "16px",
-                cursor: "pointer",
-              }}
-            />
-            Set to repeat
-          </label>
-        </div>
-
-        {/* Task Properties Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "20px",
-            marginBottom: "20px",
-            paddingBottom: "20px",
-            borderBottom: "1px solid #e2e8f0",
-          }}
-        >
-          {/* Task Type */}
-          <div style={{ position: "relative" }}>
-            <label
-              style={{
-                fontSize: "13px",
-                color: "#718096",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
-              }}
-            >
-              Task Type
-            </label>
-            <button
-              onClick={() => setShowTaskTypeDropdown(!showTaskTypeDropdown)}
-              style={{
-                width: "100%",
-                padding: "4px 0",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              {taskType}
-            </button>
-            {showTaskTypeDropdown && (
-              <div
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                type="button"
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "150px",
-                  zIndex: 1001,
-                  overflow: "hidden",
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
+                  fontSize: "14px",
+                  fontWeight: "600",
                 }}
+                title="Bold"
+                onClick={handleBold}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
               >
-                {taskTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setTaskType(type);
-                      setShowTaskTypeDropdown(false);
-                    }}
+                B
+              </button>
+              <button
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  fontStyle: "italic",
+                }}
+                title="Italic"
+                onClick={handleItalic}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                I
+              </button>
+              <button
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  textDecoration: "underline",
+                }}
+                title="Underline"
+                onClick={handleUnderline}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                U
+              </button>
+              <div style={{ position: "relative" }} ref={moreFormattingRef}>
+                <button
+                  type="button"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "6px 10px",
+                    cursor: "pointer",
+                    color: "#141414",
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: "3px",
+                    fontSize: "13px",
+                    fontWeight: "500",
+                    gap: "4px",
+                  }}
+                  title="More formatting"
+                  onClick={() => setShowMoreFormattingDropdown((v) => !v)}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = "transparent")
+                  }
+                >
+                  More
+                  <ChevronDown size={14} />
+                </button>
+                {showMoreFormattingDropdown && (
+                  <div
                     style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#33475b",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
+                      position: "absolute",
+                      left: 0,
+                      top: "100%",
+                      marginTop: "4px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "5px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                      zIndex: 1001,
+                      minWidth: "120px",
                     }}
                   >
-                    {type}
-                  </button>
-                ))}
+                    <button
+                      type="button"
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        border: "none",
+                        background: "transparent",
+                        fontSize: "14px",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontFamily: "monospace",
+                      }}
+                      onClick={() => {
+                        handleCode();
+                        setShowMoreFormattingDropdown(false);
+                      }}
+                    >
+                      Code
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-
-          {/* Priority */}
-          <div style={{ position: "relative" }}>
-            <label
-              style={{
-                fontSize: "13px",
-                color: "#718096",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
-              }}
-            >
-              Priority
-            </label>
-            <button
-              onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-              style={{
-                width: "100%",
-                padding: "4px 0",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              {priority}
-            </button>
-            {showPriorityDropdown && (
-              <div
+              <button
+                type="button"
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "150px",
-                  zIndex: 1001,
-                  overflow: "hidden",
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
                 }}
+                title="Link"
+                onClick={handleLink}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
               >
-                {priorities.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      setPriority(p);
-                      setShowPriorityDropdown(false);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#33475b",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Queue */}
-          <div style={{ position: "relative" }}>
-            <label
-              style={{
-                fontSize: "13px",
-                color: "#718096",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
-              }}
-            >
-              Queue
-            </label>
-            <button
-              onClick={() => setShowQueueDropdown(!showQueueDropdown)}
-              style={{
-                width: "100%",
-                padding: "4px 0",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              {queue}
-            </button>
-            {showQueueDropdown && (
-              <div
+                <Link size={16} />
+              </button>
+              <button
+                type="button"
                 style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "180px",
-                  zIndex: 1001,
-                  overflow: "hidden",
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
                 }}
+                title="Image"
+                onClick={handleImage}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
               >
-                {queues.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      setQueue(q);
-                      setShowQueueDropdown(false);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#33475b",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Activity Assigned To */}
-          <div style={{ position: "relative" }}>
-            <label
-              style={{
-                fontSize: "13px",
-                color: "#718096",
-                fontWeight: "400",
-                display: "block",
-                marginBottom: "8px",
-              }}
-            >
-              Activity assigned to
-            </label>
-            <button
-              onClick={() => setShowAssignedToDropdown(!showAssignedToDropdown)}
-              style={{
-                width: "100%",
-                padding: "4px 0",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#141414",
-                cursor: "pointer",
-                textAlign: "left",
-              }}
-            >
-              {assignedToState}
-            </button>
-          </div>
-        </div>
-
-        {/* Notes Section */}
-        <div style={{ marginBottom: "20px" }}>
-          <textarea
-            ref={notesRef}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Notes..."
-            style={{
-              width: "100%",
-              height: isMaximized ? "300px" : "75px",
-              border: "none",
-              outline: "none",
-              fontSize: "14px",
-              color: "#141414",
-              fontFamily: "inherit",
-              resize: "none",
-              lineHeight: "1.6",
-              padding: "0",
-            }}
-          />
-        </div>
-
-        {/* Formatting Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingTop: "12px",
-            borderTop: "1px solid #e2e8f0",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-                fontSize: "14px",
-                fontWeight: "600",
-              }}
-              title="Bold"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              B
-            </button>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-                fontSize: "14px",
-                fontWeight: "600",
-                fontStyle: "italic",
-              }}
-              title="Italic"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              I
-            </button>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-                fontSize: "14px",
-                fontWeight: "600",
-                textDecoration: "underline",
-              }}
-              title="Underline"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              U
-            </button>
+                <Image size={16} aria-label="Insert Image" />
+              </button>
+              <button
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "6px",
+                  cursor: "pointer",
+                  color: "#141414",
+                  display: "flex",
+                  alignItems: "center",
+                  borderRadius: "3px",
+                }}
+                title="List"
+                onClick={handleList}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f5f8fa")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                <List size={16} />
+              </button>
+            </div>
             <button
               style={{
                 background: "transparent",
@@ -3800,140 +3235,53 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 (e.currentTarget.style.backgroundColor = "transparent")
               }
             >
-              More
+              Associated with 1 record
               <ChevronDown size={14} />
             </button>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-              }}
-              title="Link"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <Link size={16} />
-            </button>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-              }}
-              title="Image"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <Image size={16} aria-label="Insert Image" />
-            </button>
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "6px",
-                cursor: "pointer",
-                color: "#141414",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: "3px",
-              }}
-              title="List"
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.backgroundColor = "#f5f8fa")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.backgroundColor = "transparent")
-              }
-            >
-              <List size={16} />
-            </button>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "16px 20px",
+            borderTop: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            backgroundColor: "#ffffff",
+          }}
+        >
           <button
+            onClick={handleSave}
+            disabled={!title.trim()}
             style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
+              padding: "8px 24px",
+              backgroundColor: title.trim() ? "#cbd5e0" : "#e2e8f0",
               color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
               fontWeight: "500",
-              gap: "4px",
+              cursor: title.trim() ? "pointer" : "not-allowed",
+              transition: "background-color 0.2s",
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
+            onMouseEnter={(e) => {
+              if (title.trim()) {
+                e.currentTarget.style.backgroundColor = "#b8c5d0";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (title.trim()) {
+                e.currentTarget.style.backgroundColor = "#cbd5e0";
+              }
+            }}
           >
-            Associated with 1 record
-            <ChevronDown size={14} />
+            Create
           </button>
         </div>
       </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          padding: "16px 20px",
-          borderTop: "1px solid #e2e8f0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <button
-          onClick={handleSave}
-          disabled={!title.trim()}
-          style={{
-            padding: "8px 24px",
-            backgroundColor: title.trim() ? "#cbd5e0" : "#e2e8f0",
-            color: "#141414",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "14px",
-            fontWeight: "500",
-            cursor: title.trim() ? "pointer" : "not-allowed",
-            transition: "background-color 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            if (title.trim()) {
-              e.currentTarget.style.backgroundColor = "#b8c5d0";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (title.trim()) {
-              e.currentTarget.style.backgroundColor = "#cbd5e0";
-            }
-          }}
-        >
-          Create
-        </button>
-      </div>
-    </div>
+    </>
   );
 };
 
@@ -5402,16 +4750,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     makeCall,
     userAddress: ctiUserAddress,
   } = useCti();
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState("");
   const [isDialing, setIsDialing] = useState(false);
-  const extension = (session?.user as { extension?: string; phone?: string } | undefined)?.extension
-    ?? (session?.user as { extension?: string; phone?: string } | undefined)?.phone
-    ?? 'unknown';
-  const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
-    ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
-    ?? '';
+  const extension =
+    (session?.user as { extension?: string; phone?: string } | undefined)
+      ?.extension ??
+    (session?.user as { extension?: string; phone?: string } | undefined)
+      ?.phone ??
+    "unknown";
+  const tenantId =
+    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
+      ?.tenant_id ??
+    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
+      ?.tenant ??
+    "";
 
   // Fetched prospect when sidebar is opened for a prospect (by recordId)
   const [prospectData, setProspectData] = useState<CrmDataItem | null>(null);
@@ -5420,14 +4775,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // When sidebar is opened for a prospect, fetch prospect by ID
   useEffect(() => {
-    if (!isOpen || recordType !== 'prospect' || recordId == null) {
+    if (!isOpen || recordType !== "prospect" || recordId == null) {
       setProspectData(null);
       setProspectError(null);
       return;
     }
     const id = Number(recordId);
     if (Number.isNaN(id)) {
-      setProspectError('Invalid prospect ID');
+      setProspectError("Invalid prospect ID");
       setProspectData(null);
       return;
     }
@@ -5440,7 +4795,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       })
       .catch(() => {
         setProspectData(null);
-        setProspectError('Failed to load prospect');
+        setProspectError("Failed to load prospect");
       })
       .finally(() => {
         setProspectLoading(false);
@@ -5450,76 +4805,77 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
   const recordSummary: RecordSummaryDisplay | undefined =
     crmSummary !== undefined
-      ? { content: (crmSummary?.summary ?? '').trim(), timestamp: '' }
+      ? { content: (crmSummary?.summary ?? "").trim(), timestamp: "" }
       : undefined;
 
   const handleCall = useCallback(
-      async (phoneNumber: string) => {
-        const numberToDial = (phoneNumber || "").trim();
-        if (!numberToDial) {
-          toast.error("No phone number available to call");
-          return;
-        }
-        const userDevices = getAllUserDevices?.();
-        if (userDevices && userDevices.length > 1) {
-          setAvailableDevices(userDevices);
-          setPendingDialedNumber(numberToDial);
-          setShowDeviceSelectionModal(true);
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        setShowCallModal(false);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.success) {
           setShowCallModal(false);
-          return;
+          onCall?.(numberToDial);
+        } else if (result?.error) {
+          toast.error(result.error);
         }
-        setIsDialing(true);
-        try {
-          const result = await ctiDialNumber(numberToDial);
-          if (result?.success) {
-            setShowCallModal(false);
-            onCall?.(numberToDial);
-          } else if (result?.error) {
-            toast.error(result.error);
-          }
-        } catch {
-          toast.error("Failed to make call");
-        } finally {
-          setIsDialing(false);
-        }
-      },
-      [ctiDialNumber, getAllUserDevices, onCall],
-    );
-    const handleDeviceSelect = useCallback(
-      async (device: { deviceType: string; deviceName: string }) => {
-        const numberToDial = pendingDialedNumber;
-        setShowDeviceSelectionModal(false);
-        setAvailableDevices([]);
-        setPendingDialedNumber("");
-        const callerInfo = {
-          callingAddress: ctiUserAddress,
-          callingDeviceName: device.deviceName,
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices, onCall],
+  );
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
           callingDeviceType: device.deviceType,
-          selectedAt: new Date().toISOString(),
-        };
-        localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-        setIsDialing(true);
-        try {
-          const result = await makeCall({
-            callingAddress: ctiUserAddress ?? "",
-            calledAddress: numberToDial,
-            callingDeviceType: device.deviceType,
-            callingDeviceName: device.deviceName,
-          });
-          if (result?.success) {
-            setShowCallModal(false);
-            onCall?.(numberToDial);
-          } else if (result?.error) {
-            toast.error(result.error);
-          }
-        } catch {
-          toast.error("Failed to make call");
-        } finally {
-          setIsDialing(false);
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.success) {
+          setShowCallModal(false);
+          onCall?.(numberToDial);
+        } else if (result?.error) {
+          toast.error(result.error);
         }
-      },
-      [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
-    );  
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
+  );
+
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
     if (!email || typeof email !== "string") return [];
@@ -5553,11 +4909,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
-  const [moreModalPosition, setMoreModalPosition] = useState({ top: 0, left: 0 });
+  const [moreModalPosition, setMoreModalPosition] = useState({
+    top: 0,
+    left: 0,
+  });
   const [sidebarNotesList, setSidebarNotesList] = useState<CrmNoteItem[]>([]);
   const [sidebarNotesLoading, setSidebarNotesLoading] = useState(false);
   const [sidebarCallRecordings, setSidebarCallRecordings] = useState<any[]>([]);
-  const [sidebarCallRecordingsLoading, setSidebarCallRecordingsLoading] = useState(false);
+  const [sidebarCallRecordingsLoading, setSidebarCallRecordingsLoading] =
+    useState(false);
   const callRecordingsFetchKeyRef = useRef<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
@@ -5580,7 +4940,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Fetch notes when sidebar is open and we have a CRM record
   useEffect(() => {
-    if (!isOpen || !recordType || recordId == null || Number.isNaN(Number(recordId))) {
+    if (
+      !isOpen ||
+      !recordType ||
+      recordId == null ||
+      Number.isNaN(Number(recordId))
+    ) {
       return;
     }
     const rType = recordType as "prospect" | "lead" | "deal" | "order";
@@ -5621,7 +4986,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     )
       .then((response: any) => {
         const data = response ?? {};
-        setSidebarCallRecordings(Array.isArray(data.dataList) ? data.dataList : []);
+        setSidebarCallRecordings(
+          Array.isArray(data.dataList) ? data.dataList : [],
+        );
       })
       .catch(() => setSidebarCallRecordings([]))
       .finally(() => setSidebarCallRecordingsLoading(false));
@@ -5674,18 +5041,28 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowNotesModal(false);
   };
 
-  const handleNoteSave = async (note: string, createTask: boolean, taskDueDate?: string) => {
+  const handleNoteSave = async (
+    note: string,
+    createTask: boolean,
+    taskDueDate?: string,
+  ) => {
     const text = note.trim();
     if (!text) return;
     if (recordType && recordId != null) {
       try {
-        await createCrmNote({ record_type: recordType, record_id: Number(recordId), text });
+        await createCrmNote({
+          record_type: recordType,
+          record_id: Number(recordId),
+          text,
+        });
         setShowNotesModal(false);
-        toast.success('Note created successfully');
+        toast.success("Note created successfully");
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
         const rType = recordType as "prospect" | "lead" | "deal" | "order";
-        getCrmNotes(rType, Number(recordId)).then((res) => setSidebarNotesList(res?.data ?? [])).catch(() => {});
+        getCrmNotes(rType, Number(recordId))
+          .then((res) => setSidebarNotesList(res?.data ?? []))
+          .catch(() => {});
       } catch {
         // createCrmNote already shows toast on error
       }
@@ -5755,7 +5132,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowTaskModal(false);
   };
 
-  const parseTaskDueDate = (activityDate: string, activityTime: string): string => {
+  const parseTaskDueDate = (
+    activityDate: string,
+    activityTime: string,
+  ): string => {
     // Custom date is sent as YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) return activityDate;
     const today = new Date();
@@ -5770,7 +5150,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       return t.toISOString().slice(0, 10);
     };
     if (activityDate === "Tomorrow") return addDays(1);
-    if (activityDate?.includes("3 business") || activityDate?.includes("Friday")) return addDays(3);
+    if (
+      activityDate?.includes("3 business") ||
+      activityDate?.includes("Friday")
+    )
+      return addDays(3);
     if (activityDate === "In 1 week") return addDays(7);
     if (activityDate === "In 2 weeks") return addDays(14);
     if (activityDate === "In 1 month") return addDays(30);
@@ -5790,8 +5174,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     notes: string;
   }) => {
     if (recordType && recordId != null && !Number.isNaN(Number(recordId))) {
-      const due_date = parseTaskDueDate(taskData.activityDate, taskData.activityTime);
-      const urgency = taskData.priority === "High" ? "high" : taskData.priority === "Medium" ? "med" : "low";
+      const due_date = parseTaskDueDate(
+        taskData.activityDate,
+        taskData.activityTime,
+      );
+      const urgency =
+        taskData.priority === "High"
+          ? "high"
+          : taskData.priority === "Medium"
+            ? "med"
+            : "low";
       try {
         await createTask({
           name: taskData.title.trim() || "Task",
@@ -5799,9 +5191,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           created_by: extension,
           urgency,
           due_date,
-          time: taskData.activityTime?.length >= 5 ? taskData.activityTime.slice(0, 5) : undefined,
+          time:
+            taskData.activityTime?.length >= 5
+              ? taskData.activityTime.slice(0, 5)
+              : undefined,
           status: "pending",
-          notes: taskData.notes?.trim() ? [{ note: taskData.notes.trim() }] : undefined,
+          notes: taskData.notes?.trim()
+            ? [{ note: taskData.notes.trim() }]
+            : undefined,
           record_type: recordType as "prospect" | "lead" | "deal" | "order",
           record_id: Number(recordId),
         });
@@ -5827,8 +5224,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
-
-
 
   const handleMeetingClick = () => {
     setShowMeetingModal(true);
@@ -5858,7 +5253,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     },
   ) => {
     if (!record || record.id == null || record.type == null) {
-      toast.error("No record linked. Schedule the meeting from a prospect, lead, deal, or order.");
+      toast.error(
+        "No record linked. Schedule the meeting from a prospect, lead, deal, or order.",
+      );
       return;
     }
     const meeting_date = meetingData.startDate.slice(0, 10);
@@ -5926,19 +5323,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     content_sid: string;
     content_variables: Record<string, string>;
   }) => {
-    const rawNumber = (phoneList && phoneList[0]) || (typeof phone === 'string' ? phone.trim() : '') || '';
-    const number = rawNumber.replace(/\s/g, '');
+    const rawNumber =
+      (phoneList && phoneList[0]) ||
+      (typeof phone === "string" ? phone.trim() : "") ||
+      "";
+    const number = rawNumber.replace(/\s/g, "");
     if (!number) {
-      toast.error('No phone number available for this record.');
+      toast.error("No phone number available for this record.");
       return;
     }
     try {
       await sendWhatsApp({
         number,
         content_sid: whatsappData.content_sid,
-        content_variables: Object.keys(whatsappData.content_variables || {}).length > 0
-          ? whatsappData.content_variables
-          : undefined,
+        content_variables:
+          Object.keys(whatsappData.content_variables || {}).length > 0
+            ? whatsappData.content_variables
+            : undefined,
       });
       setShowWhatsAppModal(false);
       // if (onWhatsAppLog) onWhatsAppLog(whatsappData);
@@ -5963,19 +5364,22 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     taskDueDate?: string;
     attachments: File[];
   }) => {
-    const rawTo = (phoneList && phoneList[0]) || (typeof phone === 'string' ? phone.trim() : '') || '';
-    const to = rawTo.replace(/\s/g, '');
-    const body = smsData.message?.trim() || '';
+    const rawTo =
+      (phoneList && phoneList[0]) ||
+      (typeof phone === "string" ? phone.trim() : "") ||
+      "";
+    const to = rawTo.replace(/\s/g, "");
+    const body = smsData.message?.trim() || "";
     if (!to || !body) {
-      if (!to) toast.error('No phone number available for this record.');
-      if (!body) toast.error('Please enter a message.');
+      if (!to) toast.error("No phone number available for this record.");
+      if (!body) toast.error("Please enter a message.");
       return;
     }
     try {
       await sendSms({
         to,
         message: body,
-        tenant_id: tenantId || 'default',
+        tenant_id: tenantId || "default",
         extension,
         ...(recordType && { record_type: recordType }),
         ...(recordId != null && { record_id: Number(recordId) }),
@@ -6012,13 +5416,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       case "engage-linkedin":
         console.log("Engage on LinkedIn");
         break;
-      case 'log-sms':
+      case "log-sms":
         setShowSmsModal(true);
         break;
       case "log-linkedin":
         console.log("Log LinkedIn message");
         break;
-      case 'log-whatsapp':
+      case "log-whatsapp":
         setShowWhatsAppModal(true);
         break;
       case "log-call":
@@ -6135,15 +5539,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Humanize data key for display (e.g. "contact_owner" -> "Contact Owner")
   const humanizeDataKey = (key: string) =>
-    key
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
+    key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   // Format a value from prospect data.data for display
-  const formatDataFieldValue = (value: unknown): string | string[] | undefined => {
+  const formatDataFieldValue = (
+    value: unknown,
+  ): string | string[] | undefined => {
     if (value == null || value === "") return undefined;
     if (Array.isArray(value)) {
-      const strings = value.map((v) => (typeof v === "object" && v != null && "name" in v ? (v as { name: string }).name : String(v)));
+      const strings = value.map((v) =>
+        typeof v === "object" && v != null && "name" in v
+          ? (v as { name: string }).name
+          : String(v),
+      );
       return strings.length ? strings : undefined;
     }
     if (typeof value === "object") return undefined;
@@ -6171,25 +5579,54 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status
     if (section.id === "about-prospect") {
-      const existingFields = (section.fields ?? []).filter((f) => f.label !== "Status");
+      const existingFields = (section.fields ?? []).filter(
+        (f) => f.label !== "Status",
+      );
       if (recordType === "prospect" && prospectData) {
         const raw = prospectData as unknown as Record<string, unknown>;
         const prospectRecord = (raw.data as Record<string, unknown>) ?? raw;
-        const nestedData = (prospectRecord.data as Record<string, unknown>) ?? {};
-        const campaign = prospectRecord.campaign as { name?: string } | undefined;
+        const nestedData =
+          (prospectRecord.data as Record<string, unknown>) ?? {};
+        const campaign = prospectRecord.campaign as
+          | { name?: string }
+          | undefined;
         const formatDateOnly = (v: string | null | undefined) =>
-          v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "N/A";
+          v
+            ? new Date(v).toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+              })
+            : "N/A";
         const formatDateTime = (v: string | null | undefined) =>
-          v ? new Date(v).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) + " " + new Date(v).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "N/A";
+          v
+            ? new Date(v).toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+              }) +
+              " " +
+              new Date(v).toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })
+            : "N/A";
 
         const baseFields: SidebarField[] = [
-          { label: "Name", value: (prospectRecord.name as string) ?? "N/A", copyable: true },
+          {
+            label: "Name",
+            value: (prospectRecord.name as string) ?? "N/A",
+            copyable: true,
+          },
           {
             label: "Phone",
             value: (prospectRecord.phone as string) ?? "N/A",
             type: "phone",
             copyable: true,
-            externalLink: prospectRecord.phone ? `tel:${prospectRecord.phone}` : undefined,
+            externalLink: prospectRecord.phone
+              ? `tel:${prospectRecord.phone}`
+              : undefined,
           },
           {
             label: "Email",
@@ -6197,7 +5634,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             type: "email",
             copyable: true,
             show: !!nestedData.email,
-            externalLink: nestedData.email ? `mailto:${nestedData.email}` : undefined,
+            externalLink: nestedData.email
+              ? `mailto:${nestedData.email}`
+              : undefined,
           },
           {
             label: "Owner",
@@ -6239,7 +5678,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             ? [
                 {
                   label: "Scheduled Call At",
-                  value: formatDateTime(prospectRecord.scheduled_call_at as string),
+                  value: formatDateTime(
+                    prospectRecord.scheduled_call_at as string,
+                  ),
                   type: "datetime" as const,
                 } as SidebarField,
               ]
@@ -6277,7 +5718,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           dataDataFields.push(
             Array.isArray(formatted)
               ? { label, value: formatted, type: "tags" as const }
-              : { label, value: formatted, copyable: true }
+              : { label, value: formatted, copyable: true },
           );
         }
         return {
@@ -6682,111 +6123,346 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           <div style={{ padding: "20px" }}>
             {section.id === "notes" ? (
               sidebarNotesLoading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
-                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "24px",
+                    color: "#141414",
+                  }}
+                >
+                  <RefreshCw
+                    size={16}
+                    className="spin"
+                    style={{ marginRight: "8px" }}
+                  />
                   Loading...
                 </div>
               ) : sidebarNotesList.length > 0 ? (
                 <div>
                   {sidebarNotesList.map((note) => {
-                    const updatedAt = new Date(note.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+                    const updatedAt = new Date(
+                      note.updated_at,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
                     return (
-                      <div key={note.id} style={{ backgroundColor: "#fff", border: "1px solid #eaf0f6", borderRadius: "5px", padding: "12px 16px", marginBottom: "10px" }}>
-                        <p style={{ fontSize: "14px", color: "#141414", margin: "0 0 8px 0", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>{note.text}</p>
-                        <span style={{ fontSize: "12px", color: "#718096" }}>{updatedAt}</span>
+                      <div
+                        key={note.id}
+                        style={{
+                          backgroundColor: "#fff",
+                          border: "1px solid #eaf0f6",
+                          borderRadius: "5px",
+                          padding: "12px 16px",
+                          marginBottom: "10px",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: "14px",
+                            color: "#141414",
+                            margin: "0 0 8px 0",
+                            lineHeight: "1.6",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {note.text}
+                        </p>
+                        <span style={{ fontSize: "12px", color: "#718096" }}>
+                          {updatedAt}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
               ) : section.emptyState ? (
                 <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
-                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {EmptyIcon && (
+                    <EmptyIcon
+                      size={40}
+                      style={{ color: "#cbd5e0", marginBottom: "12px" }}
+                    />
+                  )}
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#718096",
+                      margin: 0,
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {section.emptyState.message}
+                  </p>
                   {section.emptyState.action && (
-                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        section.emptyState?.action?.onClick();
+                      }}
+                      style={{
+                        marginTop: "12px",
+                        padding: "8px 16px",
+                        backgroundColor: "#0091ae",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        cursor: "pointer",
+                      }}
+                    >
                       {section.emptyState.action.label}
                     </button>
                   )}
                 </div>
               ) : null
-            ) : section.id === "recent-activities" && recordType === "prospect" ? (
+            ) : section.id === "recent-activities" &&
+              recordType === "prospect" ? (
               prospectLoading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
-                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "24px",
+                    color: "#141414",
+                  }}
+                >
+                  <RefreshCw
+                    size={16}
+                    className="spin"
+                    style={{ marginRight: "8px" }}
+                  />
                   Loading...
                 </div>
               ) : prospectData ? (
                 (() => {
-                  const auditTrail = ((prospectData as unknown as Record<string, unknown>).audit_trail as Array<{
-                    id?: number;
-                    event?: string;
-                    description?: string | null;
-                    created_at?: string;
-                    changes?: Record<string, { old?: unknown; new?: unknown }>;
-                  }>) ?? [];
-                  const raw = prospectData as unknown as Record<string, unknown>;
-                  const prospectRecord = (raw.data as Record<string, unknown>) ?? raw;
-                  const campaign = prospectRecord.campaign as { id?: number; name?: string } | undefined;
-                  const fmt = (v: unknown): string => (v == null ? "—" : typeof v === "string" ? v : typeof v === "object" ? JSON.stringify(v) : String(v));
-                  const resolveFieldVal = (field: string, val: unknown): string => {
-                    if (field === "assigned_to" || field === "contact_owner") return resolveUserLabel ? resolveUserLabel(String(val ?? "")) : fmt(val);
-                    if (field === "campaign_id" && campaign?.name && val != null && Number(val) === Number(campaign?.id)) return campaign.name;
+                  const auditTrail =
+                    ((prospectData as unknown as Record<string, unknown>)
+                      .audit_trail as Array<{
+                      id?: number;
+                      event?: string;
+                      description?: string | null;
+                      created_at?: string;
+                      changes?: Record<
+                        string,
+                        { old?: unknown; new?: unknown }
+                      >;
+                    }>) ?? [];
+                  const raw = prospectData as unknown as Record<
+                    string,
+                    unknown
+                  >;
+                  const prospectRecord =
+                    (raw.data as Record<string, unknown>) ?? raw;
+                  const campaign = prospectRecord.campaign as
+                    | { id?: number; name?: string }
+                    | undefined;
+                  const fmt = (v: unknown): string =>
+                    v == null
+                      ? "—"
+                      : typeof v === "string"
+                        ? v
+                        : typeof v === "object"
+                          ? JSON.stringify(v)
+                          : String(v);
+                  const resolveFieldVal = (
+                    field: string,
+                    val: unknown,
+                  ): string => {
+                    if (field === "assigned_to" || field === "contact_owner")
+                      return resolveUserLabel
+                        ? resolveUserLabel(String(val ?? ""))
+                        : fmt(val);
+                    if (
+                      field === "campaign_id" &&
+                      campaign?.name &&
+                      val != null &&
+                      Number(val) === Number(campaign?.id)
+                    )
+                      return campaign.name;
                     if (field === "scheduled_call_at" && val) {
-                      try { return new Date(String(val)).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }); } catch { return fmt(val); }
+                      try {
+                        return new Date(String(val)).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                      } catch {
+                        return fmt(val);
+                      }
                     }
                     return fmt(val);
                   };
-                  const buildAuditLines = (entry: typeof auditTrail[0]): string => {
-                    const event = entry.event === "created" ? "created" : "updated";
-                    if (event === "created") return (entry.description?.trim() || "Record created");
-                    const changes = entry.changes && typeof entry.changes === "object" && !Array.isArray(entry.changes) ? (entry.changes as Record<string, { old?: unknown; new?: unknown }>) : null;
-                    if (!changes) return (entry.description?.trim() || "Record updated");
+                  const buildAuditLines = (
+                    entry: (typeof auditTrail)[0],
+                  ): string => {
+                    const event =
+                      entry.event === "created" ? "created" : "updated";
+                    if (event === "created")
+                      return entry.description?.trim() || "Record created";
+                    const changes =
+                      entry.changes &&
+                      typeof entry.changes === "object" &&
+                      !Array.isArray(entry.changes)
+                        ? (entry.changes as Record<
+                            string,
+                            { old?: unknown; new?: unknown }
+                          >)
+                        : null;
+                    if (!changes)
+                      return entry.description?.trim() || "Record updated";
                     const lines: string[] = [];
                     Object.entries(changes).forEach(([field, val]) => {
-                      if (!val || typeof val !== "object" || (!("old" in val) && !("new" in val))) return;
+                      if (
+                        !val ||
+                        typeof val !== "object" ||
+                        (!("old" in val) && !("new" in val))
+                      )
+                        return;
                       const rawOld = (val as { old?: unknown }).old;
                       const rawNew = (val as { new?: unknown }).new;
                       if (field === "data") {
-                        const oldObj = rawOld && typeof rawOld === "object" && !Array.isArray(rawOld) ? (rawOld as Record<string, unknown>) : {};
+                        const oldObj =
+                          rawOld &&
+                          typeof rawOld === "object" &&
+                          !Array.isArray(rawOld)
+                            ? (rawOld as Record<string, unknown>)
+                            : {};
                         let newObj: Record<string, unknown> = {};
-                        if (typeof rawNew === "string") { try { newObj = JSON.parse(rawNew) as Record<string, unknown>; } catch { newObj = {}; } } else if (rawNew && typeof rawNew === "object" && !Array.isArray(rawNew)) newObj = rawNew as Record<string, unknown>;
-                        const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+                        if (typeof rawNew === "string") {
+                          try {
+                            newObj = JSON.parse(rawNew) as Record<
+                              string,
+                              unknown
+                            >;
+                          } catch {
+                            newObj = {};
+                          }
+                        } else if (
+                          rawNew &&
+                          typeof rawNew === "object" &&
+                          !Array.isArray(rawNew)
+                        )
+                          newObj = rawNew as Record<string, unknown>;
+                        const allKeys = new Set([
+                          ...Object.keys(oldObj),
+                          ...Object.keys(newObj),
+                        ]);
                         allKeys.forEach((key) => {
                           const o = resolveFieldVal(key, oldObj[key]);
                           const n = resolveFieldVal(key, newObj[key]);
-                          if (o !== n) lines.push(`${humanizeDataKey(key)}: ${o} → ${n}`);
+                          if (o !== n)
+                            lines.push(`${humanizeDataKey(key)}: ${o} → ${n}`);
                         });
                       } else {
                         const o = resolveFieldVal(field, rawOld);
                         const n = resolveFieldVal(field, rawNew);
-                        if (o !== n) lines.push(`${humanizeDataKey(field)}: ${o} → ${n}`);
+                        if (o !== n)
+                          lines.push(`${humanizeDataKey(field)}: ${o} → ${n}`);
                       }
                     });
-                    return lines.length > 0 ? lines.join("\n") : (entry.description?.trim() || "Record updated");
+                    return lines.length > 0
+                      ? lines.join("\n")
+                      : entry.description?.trim() || "Record updated";
                   };
                   if (auditTrail.length > 0) {
                     const displayTrail = auditTrail.slice(0, 5);
                     const hasMore = auditTrail.length > 5;
                     return (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0", minWidth: 0 }}>
-                        <div style={{ maxHeight: "280px", overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column", gap: "0", minWidth: 0 }}>
-                        {displayTrail.map((entry, index) => {
-                          const timestamp = entry.created_at
-                            ? new Date(entry.created_at).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                            : "—";
-                          const description = buildAuditLines(entry);
-                          return (
-                            <div key={entry.id ?? index} style={{ padding: "10px 0", marginBottom: index < displayTrail.length - 1 ? "10px" : 0, minWidth: 0 }}>
-                              <p style={{ fontSize: "14px", color: "#141414", margin: "0 0 8px 0", lineHeight: "1.6", whiteSpace: "pre-wrap", overflowWrap: "break-word", wordBreak: "break-word" }}>{description}</p>
-                              <span style={{ fontSize: "12px", color: "#718096" }}>{timestamp}</span>
-                            </div>
-                          );
-                        })}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0",
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            maxHeight: "280px",
+                            overflowY: "auto",
+                            overflowX: "hidden",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0",
+                            minWidth: 0,
+                          }}
+                        >
+                          {displayTrail.map((entry, index) => {
+                            const timestamp = entry.created_at
+                              ? new Date(entry.created_at).toLocaleString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )
+                              : "—";
+                            const description = buildAuditLines(entry);
+                            return (
+                              <div
+                                key={entry.id ?? index}
+                                style={{
+                                  padding: "10px 0",
+                                  marginBottom:
+                                    index < displayTrail.length - 1
+                                      ? "10px"
+                                      : 0,
+                                  minWidth: 0,
+                                }}
+                              >
+                                <p
+                                  style={{
+                                    fontSize: "14px",
+                                    color: "#141414",
+                                    margin: "0 0 8px 0",
+                                    lineHeight: "1.6",
+                                    whiteSpace: "pre-wrap",
+                                    overflowWrap: "break-word",
+                                    wordBreak: "break-word",
+                                  }}
+                                >
+                                  {description}
+                                </p>
+                                <span
+                                  style={{ fontSize: "12px", color: "#718096" }}
+                                >
+                                  {timestamp}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                         {recordId != null && hasMore && (
                           <button
-                            onClick={() => router.push(`/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`)}
-                            style={{ marginTop: "8px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer", width: "100%" }}
+                            onClick={() =>
+                              router.push(
+                                `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                              )
+                            }
+                            style={{
+                              marginTop: "8px",
+                              padding: "8px 16px",
+                              backgroundColor: "#0091ae",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              fontSize: "14px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              width: "100%",
+                            }}
                           >
                             View more
                           </button>
@@ -6796,10 +6472,40 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   }
                   return (
                     <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                      {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
-                      <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState?.message}</p>
+                      {EmptyIcon && (
+                        <EmptyIcon
+                          size={40}
+                          style={{ color: "#cbd5e0", marginBottom: "12px" }}
+                        />
+                      )}
+                      <p
+                        style={{
+                          fontSize: "14px",
+                          color: "#718096",
+                          margin: 0,
+                          lineHeight: "1.6",
+                        }}
+                      >
+                        {section.emptyState?.message}
+                      </p>
                       {section.emptyState?.action && (
-                        <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            section.emptyState?.action?.onClick();
+                          }}
+                          style={{
+                            marginTop: "12px",
+                            padding: "8px 16px",
+                            backgroundColor: "#0091ae",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            cursor: "pointer",
+                          }}
+                        >
                           {section.emptyState?.action.label}
                         </button>
                       )}
@@ -6808,72 +6514,225 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 })()
               ) : section.emptyState ? (
                 <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
-                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {EmptyIcon && (
+                    <EmptyIcon
+                      size={40}
+                      style={{ color: "#cbd5e0", marginBottom: "12px" }}
+                    />
+                  )}
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#718096",
+                      margin: 0,
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {section.emptyState.message}
+                  </p>
                   {section.emptyState.action && (
-                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        section.emptyState?.action?.onClick();
+                      }}
+                      style={{
+                        marginTop: "12px",
+                        padding: "8px 16px",
+                        backgroundColor: "#0091ae",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        cursor: "pointer",
+                      }}
+                    >
                       {section.emptyState.action.label}
                     </button>
                   )}
                 </div>
               ) : null
-            ) : (section.id === "calls" || section.id === "call-recordings") ? (
+            ) : section.id === "calls" || section.id === "call-recordings" ? (
               sidebarCallRecordingsLoading ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", color: "#141414" }}>
-                  <RefreshCw size={16} className="spin" style={{ marginRight: "8px" }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "24px",
+                    color: "#141414",
+                  }}
+                >
+                  <RefreshCw
+                    size={16}
+                    className="spin"
+                    style={{ marginRight: "8px" }}
+                  />
                   Loading...
                 </div>
               ) : sidebarCallRecordings.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={{ maxHeight: "280px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {sidebarCallRecordings.slice(0, 5).map((rec: any, index: number) => {
-                    const dateStr = rec.DateTime ?? rec.start_time ?? rec.created_at ?? "";
-                    const timestamp = dateStr ? (dateStr.length > 10 ? new Date(dateStr).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : dateStr) : "—";
-                    const dir = rec.Direction ?? rec.direction ?? rec.CallDirection ?? "";
-                    const direction = dir.includes("INBOUND") || dir === "Inbound" || dir === "CALL_INCOMING" ? "Incoming" : "Outgoing";
-                    const rawDuration = rec.Duration ?? rec.duration ?? rec.CallDuration ?? 0;
-                    const durationSec = parseInt(String(rawDuration), 10) / 10000000 || 0;
-                    const roundedSec = Math.round(durationSec * 10) / 10;
-                    const durationStr = durationSec >= 60 ? `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}` : roundedSec > 0 ? `${roundedSec}s` : "";
-                    return (
-                      <div
-                        key={rec.Id ?? rec.id ?? index}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      maxHeight: "280px",
+                      overflowY: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                    }}
+                  >
+                    {sidebarCallRecordings
+                      .slice(0, 5)
+                      .map((rec: any, index: number) => {
+                        const dateStr =
+                          rec.DateTime ??
+                          rec.start_time ??
+                          rec.created_at ??
+                          "";
+                        const timestamp = dateStr
+                          ? dateStr.length > 10
+                            ? new Date(dateStr).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : dateStr
+                          : "—";
+                        const dir =
+                          rec.Direction ??
+                          rec.direction ??
+                          rec.CallDirection ??
+                          "";
+                        const direction =
+                          dir.includes("INBOUND") ||
+                          dir === "Inbound" ||
+                          dir === "CALL_INCOMING"
+                            ? "Incoming"
+                            : "Outgoing";
+                        const rawDuration =
+                          rec.Duration ?? rec.duration ?? rec.CallDuration ?? 0;
+                        const durationSec =
+                          parseInt(String(rawDuration), 10) / 10000000 || 0;
+                        const roundedSec = Math.round(durationSec * 10) / 10;
+                        const durationStr =
+                          durationSec >= 60
+                            ? `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}`
+                            : roundedSec > 0
+                              ? `${roundedSec}s`
+                              : "";
+                        return (
+                          <div
+                            key={rec.Id ?? rec.id ?? index}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 12px",
+                              background: "#f9fafb",
+                              borderRadius: "8px",
+                              border: "1px solid #e5e7eb",
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: "13px",
+                                  fontWeight: 500,
+                                  color: "#1f2937",
+                                }}
+                              >
+                                {timestamp}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                {durationStr ? `${durationStr} · ` : ""}
+                                {direction}
+                              </div>
+                            </div>
+                            <Phone
+                              size={16}
+                              style={{ color: "#718096", flexShrink: 0 }}
+                            />
+                          </div>
+                        );
+                      })}
+                  </div>
+                  {recordType === "prospect" &&
+                    recordId != null &&
+                    sidebarCallRecordings.length > 5 && (
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                          )
+                        }
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "10px 12px",
-                          background: "#f9fafb",
-                          borderRadius: "8px",
-                          border: "1px solid #e5e7eb",
+                          marginTop: "8px",
+                          padding: "8px 16px",
+                          backgroundColor: "#0091ae",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          fontWeight: "500",
+                          cursor: "pointer",
+                          width: "100%",
                         }}
                       >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 500, color: "#1f2937" }}>{timestamp}</div>
-                          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                            {durationStr ? `${durationStr} · ` : ""}{direction}
-                          </div>
-                        </div>
-                        <Phone size={16} style={{ color: "#718096", flexShrink: 0 }} />
-                      </div>
-                    );
-                  })}
-                  </div>
-                  {recordType === "prospect" && recordId != null && sidebarCallRecordings.length > 5 && (
-                    <button
-                      onClick={() => router.push(`/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`)}
-                      style={{ marginTop: "8px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer", width: "100%" }}
-                    >
-                      View more
-                    </button>
-                  )}
+                        View more
+                      </button>
+                    )}
                 </div>
               ) : section.emptyState ? (
                 <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                  {EmptyIcon && <EmptyIcon size={40} style={{ color: "#cbd5e0", marginBottom: "12px" }} />}
-                  <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>{section.emptyState.message}</p>
+                  {EmptyIcon && (
+                    <EmptyIcon
+                      size={40}
+                      style={{ color: "#cbd5e0", marginBottom: "12px" }}
+                    />
+                  )}
+                  <p
+                    style={{
+                      fontSize: "14px",
+                      color: "#718096",
+                      margin: 0,
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {section.emptyState.message}
+                  </p>
                   {section.emptyState.action && (
-                    <button onClick={(e) => { e.stopPropagation(); section.emptyState?.action?.onClick(); }} style={{ marginTop: "12px", padding: "8px 16px", backgroundColor: "#0091ae", color: "white", border: "none", borderRadius: "4px", fontSize: "14px", fontWeight: "500", cursor: "pointer" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        section.emptyState?.action?.onClick();
+                      }}
+                      style={{
+                        marginTop: "12px",
+                        padding: "8px 16px",
+                        backgroundColor: "#0091ae",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        cursor: "pointer",
+                      }}
+                    >
                       {section.emptyState.action.label}
                     </button>
                   )}
@@ -7095,6 +6954,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         recipientName={title}
         senderEmail={senderEmail}
         senderName={senderName}
+        contextPayload={
+          contextPayload
+            ? {
+                lead: contextPayload.lead,
+                deal: contextPayload.deal,
+                order: contextPayload.order,
+              }
+            : undefined
+        }
         onSend={(emailData) => handleEmailSend(emailData, record)}
       />
 
@@ -7539,7 +7407,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           marginBottom: "1px",
                         }}
                       >
-                        {phoneList.length > 1 ? `Phone ${idx + 1}` : "Phone Number"}
+                        {phoneList.length > 1
+                          ? `Phone ${idx + 1}`
+                          : "Phone Number"}
                       </p>
                       <p
                         style={{
@@ -7577,9 +7447,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     </button>
                   </div>
                 ))}
-              {phoneList.length > 0 && (
-                <div style={{ marginBottom: "16px" }} />
-              )}
+              {phoneList.length > 0 && <div style={{ marginBottom: "16px" }} />}
             </div>
 
             {/* Quick Actions */}
@@ -7691,35 +7559,37 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   }}
                 >
                   {(recordSummary.timestamp || recordSummary.onRefresh) && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontSize: "13px",
-                      color: "#141414",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    {recordSummary.timestamp && <span>{recordSummary.timestamp}</span>}
-                    {recordSummary.onRefresh && (
-                      <button
-                        onClick={recordSummary.onRefresh}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "2px",
-                          cursor: "pointer",
-                          color: "#141414",
-                          display: "flex",
-                          alignItems: "center",
-                        }}
-                        title="Refresh"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    )}
-                  </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "13px",
+                        color: "#141414",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      {recordSummary.timestamp && (
+                        <span>{recordSummary.timestamp}</span>
+                      )}
+                      {recordSummary.onRefresh && (
+                        <button
+                          onClick={recordSummary.onRefresh}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "2px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                          title="Refresh"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   <div
@@ -7736,7 +7606,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       minWidth: 0,
                     }}
                   >
-                    {recordSummary.content || 'No summary available'}
+                    {recordSummary.content || "No summary available"}
                   </div>
 
                   <div
@@ -7749,108 +7619,108 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     }}
                   >
                     <button
-                        onClick={() => recordSummary.onThumbsUp?.()}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "6px",
-                          cursor: "pointer",
-                          color: "#141414",
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: "3px",
-                        }}
-                        title="Good summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f7fafc";
-                          e.currentTarget.style.color = "#2d3748";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                          e.currentTarget.style.color = "#718096";
-                        }}
-                      >
-                        <ThumbsUp size={16} />
-                      </button>
-                    <button
-                        onClick={() => recordSummary.onThumbsDown?.()}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "6px",
-                          cursor: "pointer",
-                          color: "#141414",
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: "3px",
-                        }}
-                        title="Bad summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f7fafc";
-                          e.currentTarget.style.color = "#2d3748";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                          e.currentTarget.style.color = "#718096";
-                        }}
-                      >
-                        <ThumbsDown size={16} />
-                      </button>
-                    <button
-                        onClick={() => recordSummary.onCopy?.()}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: "6px",
-                          cursor: "pointer",
-                          color: "#141414",
-                          display: "flex",
-                          alignItems: "center",
-                          borderRadius: "3px",
-                        }}
-                        title="Copy"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f7fafc";
-                          e.currentTarget.style.color = "#2d3748";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                          e.currentTarget.style.color = "#718096";
-                        }}
-                      >
-                        <Copy size={16} />
-                      </button>
-                  </div>
-
-                  <button
-                      onClick={() => recordSummary.onAskQuestion?.()}
+                      onClick={() => recordSummary.onThumbsUp?.()}
                       style={{
-                        marginTop: "16px",
-                        width: "36%",
-                        padding: "6px 0",
-                        backgroundColor: "transparent",
-                        border: "1px solid #d20688",
-                        borderRadius: "20px",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        color: "#d20688",
+                        background: "transparent",
+                        border: "none",
+                        padding: "6px",
                         cursor: "pointer",
-                        transition: "all 0.2s",
+                        color: "#141414",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        gap: "5px",
+                        borderRadius: "3px",
                       }}
+                      title="Good summary"
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#fff5f7";
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                        e.currentTarget.style.color = "#2d3748";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "#718096";
                       }}
                     >
-                      <Sparkles size={16} />
-                      Ask a question
+                      <ThumbsUp size={16} />
                     </button>
+                    <button
+                      onClick={() => recordSummary.onThumbsDown?.()}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "6px",
+                        cursor: "pointer",
+                        color: "#141414",
+                        display: "flex",
+                        alignItems: "center",
+                        borderRadius: "3px",
+                      }}
+                      title="Bad summary"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                        e.currentTarget.style.color = "#2d3748";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "#718096";
+                      }}
+                    >
+                      <ThumbsDown size={16} />
+                    </button>
+                    <button
+                      onClick={() => recordSummary.onCopy?.()}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "6px",
+                        cursor: "pointer",
+                        color: "#141414",
+                        display: "flex",
+                        alignItems: "center",
+                        borderRadius: "3px",
+                      }}
+                      title="Copy"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f7fafc";
+                        e.currentTarget.style.color = "#2d3748";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = "#718096";
+                      }}
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => recordSummary.onAskQuestion?.()}
+                    style={{
+                      marginTop: "16px",
+                      width: "36%",
+                      padding: "6px 0",
+                      backgroundColor: "transparent",
+                      border: "1px solid #d20688",
+                      borderRadius: "20px",
+                      fontSize: "12px",
+                      fontWeight: "500",
+                      color: "#d20688",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "5px",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#fff5f7";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <Sparkles size={16} />
+                    Ask a question
+                  </button>
                 </div>
               )}
             </div>
