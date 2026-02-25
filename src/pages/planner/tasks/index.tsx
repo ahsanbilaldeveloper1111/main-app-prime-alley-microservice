@@ -10,7 +10,7 @@ import { Plus, X, ChevronDown, ExternalLink, Save, Filter } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import CreateTaskSidebar from "@components/CreateTaskSidebar";
+import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
   listTasks,
   listProjects,
