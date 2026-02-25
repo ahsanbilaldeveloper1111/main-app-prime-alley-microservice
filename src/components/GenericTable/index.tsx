@@ -110,6 +110,10 @@ export interface TableAction<T = any> {
   className?: string;
   show?: (row: T) => boolean;
   disabled?: (row: T) => boolean;
+  /** Tooltip text when the action is disabled */
+  disabledTitle?: string;
+  /** Class name applied when the action is disabled */
+  disabledClassName?: string;
   render?: (row: T) => React.ReactNode; // For custom action rendering like dropdowns
 
   // Dropdown configuration
@@ -317,11 +321,15 @@ const GenericTable = <T extends Record<string, any>>({
   statsCards,
 }: GenericTableProps<T>) => {
   const router = useRouter();
-  // Sorting state
+  // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortColumn, setSortColumn] = useState(defaultSortColumn);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
     defaultSortDirection,
   );
+  useEffect(() => {
+    setSortColumn(defaultSortColumn);
+    setSortDirection(defaultSortDirection);
+  }, [defaultSortColumn, defaultSortDirection]);
 
   // Column selection state
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
@@ -378,6 +386,8 @@ const GenericTable = <T extends Record<string, any>>({
     divider?: boolean;
     className?: string;
     disabled?: boolean;
+    disabledTitle?: string;
+    disabledClassName?: string;
   };
   const getContextMenuItems = useMemo(() => {
     return (row: T): ContextMenuItem[] => {
@@ -399,13 +409,18 @@ const GenericTable = <T extends Record<string, any>>({
             });
           }
         } else if (action.onClick && !action.render) {
+          const isDisabled = action.disabled?.(row);
           items.push({
             label: action.label,
             icon: action.icon,
             onClick: action.onClick,
             divider: false,
-            className: action.className,
-            disabled: action.disabled?.(row),
+            className: isDisabled
+              ? action.disabledClassName || "text-muted"
+              : action.className,
+            disabled: isDisabled,
+            disabledTitle: action.disabledTitle,
+            disabledClassName: action.disabledClassName,
           });
         }
       }
@@ -470,6 +485,15 @@ const GenericTable = <T extends Record<string, any>>({
     if (!customizableColumns) return columns;
     return columns.filter((col) => selectedColumns.includes(col.key));
   }, [columns, selectedColumns, customizableColumns]);
+
+  // Sortable columns for toolbar Sort dropdown
+  const sortableColumns = useMemo(
+    () =>
+      visibleColumns.filter(
+        (col) => sortable && col.sortable !== false && col.key,
+      ),
+    [visibleColumns, sortable],
+  );
 
   // Truncate text utility
   const truncateText = (
@@ -857,16 +881,43 @@ const GenericTable = <T extends Record<string, any>>({
             )}
 
             {/* Sort */}
-            {toolbar.showSortButton && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={toolbar.onSortClick}
-              >
-                Sort
-              </Button>
-            )}
+            {toolbar.showSortButton &&
+              (toolbar.onSortClick ? (
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  className="gt-toolbar-btn"
+                  onClick={toolbar.onSortClick}
+                >
+                  Sort
+                </Button>
+              ) : (
+                <Dropdown align="end">
+                  <Dropdown.Toggle
+                    variant="outline-secondary"
+                    size="sm"
+                    className="gt-toolbar-btn"
+                  >
+                    Sort
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu>
+                    {sortableColumns.length === 0 ? (
+                      <Dropdown.Item disabled>No sortable columns</Dropdown.Item>
+                    ) : (
+                      sortableColumns.map((col) => (
+                        <Dropdown.Item
+                          key={col.key}
+                          onClick={() => handleSort(col.key)}
+                        >
+                          {col.label}
+                          {sortColumn === col.key &&
+                            (sortDirection === "asc" ? " ↑" : " ↓")}
+                        </Dropdown.Item>
+                      ))
+                    )}
+                  </Dropdown.Menu>
+                </Dropdown>
+              ))}
 
             {statsCards && statsCards.length > 0 && (
               <Button
@@ -1189,24 +1240,45 @@ const GenericTable = <T extends Record<string, any>>({
         >
           {getContextMenuItems(contextMenu.row).map((item, idx) => (
             <React.Fragment key={idx}>
-              <button
-                type="button"
-                className={`gt-context-menu-item ${item.className || ""}`}
-                disabled={item.disabled}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!item.disabled) {
-                    item.onClick(contextMenu.row);
-                    setContextMenu(null);
-                  }
-                }}
-                role="menuitem"
-              >
-                {item.icon && (
-                  <span className="gt-context-menu-icon">{item.icon}</span>
-                )}
-                {item.label}
-              </button>
+              {item.disabled && item.disabledTitle ? (
+                <span
+                  className="gt-context-menu-disabled-wrapper"
+                  title={item.disabledTitle}
+                >
+                  <button
+                    type="button"
+                    className={`gt-context-menu-item ${item.className || ""}`}
+                    disabled
+                    onClick={(e) => e.stopPropagation()}
+                    role="menuitem"
+                  >
+                    {item.icon && (
+                      <span className="gt-context-menu-icon">{item.icon}</span>
+                    )}
+                    {item.label}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={`gt-context-menu-item ${item.className || ""}`}
+                  disabled={item.disabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!item.disabled) {
+                      item.onClick(contextMenu.row);
+                      setContextMenu(null);
+                    }
+                  }}
+                  role="menuitem"
+                  title={item.disabled ? item.disabledTitle : undefined}
+                >
+                  {item.icon && (
+                    <span className="gt-context-menu-icon">{item.icon}</span>
+                  )}
+                  {item.label}
+                </button>
+              )}
               {item.divider && <div className="gt-context-menu-divider" />}
             </React.Fragment>
           ))}
@@ -1629,7 +1701,7 @@ const GenericTable = <T extends Record<string, any>>({
                               }
 
                               const isDisabled = action.disabled?.(row);
-                              return (
+                              const buttonEl = (
                                 <Button
                                   key={actionIndex}
                                   variant={action.variant || "link"}
@@ -1639,12 +1711,31 @@ const GenericTable = <T extends Record<string, any>>({
                                     e.stopPropagation();
                                     if (!isDisabled) action.onClick?.(row);
                                   }}
-                                  className={`p-1 ${action.className || ""}`}
-                                  title={action.label}
+                                  className={`p-1 ${
+                                    isDisabled
+                                      ? `gt-action-disabled ${action.disabledClassName ?? ""}`
+                                      : action.className || ""
+                                  }`}
+                                  title={!isDisabled ? action.label : undefined}
                                 >
                                   {action.icon || action.label}
                                 </Button>
                               );
+                              if (
+                                isDisabled &&
+                                action.disabledTitle
+                              ) {
+                                return (
+                                  <span
+                                    key={actionIndex}
+                                    className="gt-action-disabled-wrapper"
+                                    title={action.disabledTitle}
+                                  >
+                                    {buttonEl}
+                                  </span>
+                                );
+                              }
+                              return buttonEl;
                             })}
                           </div>
                         </td>
