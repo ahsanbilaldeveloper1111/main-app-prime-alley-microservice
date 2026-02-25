@@ -402,7 +402,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'planner-tasks',
           title: 'Tasks',
           icon: <Clock size={16} />,
-          url: '/crm/crm-tasks',
+          url: '/planner/tasks',
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
         },
 

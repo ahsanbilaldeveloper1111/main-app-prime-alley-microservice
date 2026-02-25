@@ -1851,10 +1851,6 @@ const Layout = ({ children }: LayoutProps) => {
        isMaximized={breezeMaximized}
        onMaximizeChange={(v) => setBreezeMaximized(v)}
        width={breezeMaximized ? '100%' : '400px'}
-      onSendMessage={async (message: string) => {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        return "I'm here to help! This is a demo response.";
-      }}
     />
 			)}
 		</div>
