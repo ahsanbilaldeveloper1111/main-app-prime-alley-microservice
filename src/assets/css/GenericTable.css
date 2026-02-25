@@ -135,7 +135,7 @@ th.generic-table-th:not(:last-child) {
 
 /* Table Body */
 .generic-table-td {
-  padding: 0.6rem 0.75rem !important;
+  padding: 0.4rem 0.75rem !important;
   vertical-align: middle;
   border-bottom: 1px solid #f0f0f0;
   font-size: 14px;
@@ -144,7 +144,7 @@ th.generic-table-th:not(:last-child) {
 
 .generic-table-td span,
 .generic-table-td span * {
-  font-size: 15px !important;
+  font-size: 13px !important;
 }
 
 /* Table Rows */
@@ -316,6 +316,26 @@ button.preview-button:hover, button.preview-button:focus {
 
 .generic-table-actions .btn-link.text-success:hover {
   color: #146c43;
+}
+
+/* Disabled action button: no hover, not-allowed cursor, tooltip on wrapper */
+.gt-action-disabled-wrapper {
+  display: inline-block;
+  cursor: not-allowed;
+}
+
+.generic-table-actions .btn-link.gt-action-disabled,
+.generic-table-actions .btn-link:disabled {
+  opacity: 0.65;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  text-decoration: none !important;
+}
+
+.generic-table-actions .btn-link.gt-action-disabled:hover,
+.generic-table-actions .btn-link:disabled:hover {
+  color: inherit !important;
+  background-color: transparent !important;
 }
 
 /* Dropdown in actions */
@@ -657,6 +677,24 @@ button.preview-button:hover, button.preview-button:focus {
   background-color: #f8d7da;
 }
 
+/* Disabled context menu item: tooltip on wrapper, not-allowed cursor */
+.gt-context-menu-disabled-wrapper {
+  display: block;
+  cursor: not-allowed;
+}
+
+.gt-context-menu-disabled-wrapper .gt-context-menu-item,
+.gt-context-menu-item:disabled {
+  opacity: 0.65;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.gt-context-menu-disabled-wrapper .gt-context-menu-item:hover,
+.gt-context-menu-item:disabled:hover {
+  background-color: transparent;
+}
+
 .gt-context-menu-icon {
   display: inline-flex;
   flex-shrink: 0;
@@ -690,7 +728,7 @@ button.preview-button:hover, button.preview-button:focus {
   background: transparent;
   border: none;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   color: #000000 !important;
   cursor: pointer;
@@ -815,11 +853,12 @@ button.preview-button:hover, button.preview-button:focus {
 .gt-search-input {
   border-left: none;
   font-size: 14px !important;
-  color: #33475b;
+  color: #141414;
   border-radius: 0 50px 50px 0 !important;
   border-top: 1px solid #8a8a8a !important ;
   border-bottom: 1px solid #8a8a8a !important ;
   border-right: 1px solid #8a8a8a !important ;
+  font-weight: 300 !important;
 }
 
 .gt-search-input::placeholder {
@@ -843,7 +882,7 @@ button.preview-button:hover, button.preview-button:focus {
   align-items: center;
   gap: 6px;
   padding: 6px 15px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 300;
   color: #000;
   background: #fff;
@@ -876,6 +915,7 @@ background: #fff !important;
   margin-bottom: 3px;
   color: #000 !important;
   font-weight: 300 !important;
+  font-size: 12px !important;
 }
 .gt-toolbar-dropdown:hover {
   color: #000 !important;
@@ -905,7 +945,7 @@ background: #fff !important;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  font-size: 15px;
+  font-size: 13px;
   color: #000000;
   background: #fff;
   border: none;
@@ -976,7 +1016,7 @@ background: #fff !important;
   align-items: center;
   gap: 4px;
   padding: 6px 12px;
-  font-size: 15px;
+  font-size: 13px;
   color: #000000;
   font-weight: 600;
   background: transparent;
@@ -996,7 +1036,7 @@ background: #fff !important;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  font-size: 14px;
+  font-size: 13px;
   color: #516f90;
   background: transparent;
   border: none;

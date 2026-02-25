@@ -74,14 +74,42 @@ const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Overdue" | "C
   completed: "Completed",
 };
 
+const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
+const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
+
+function hierarchyLabel(item: unknown): string {
+  if (item == null) return "—";
+  if (typeof item === "string") return item;
+  if (typeof item === "object" && item !== null) {
+    const o = item as { name?: string; id?: string | number; [key: string]: unknown };
+    return String(o.name ?? o.id ?? "—");
+  }
+  return String(item);
+}
+
 const EmployeesOnboarding = () => {
   const { data: session } = useSession();
   const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
   const [activeTab, setActiveTab] = useState<"Onboarding" | "Audit & Risk Center">("Onboarding");
   const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
+  const [selectedContract, setSelectedContract] = useState("");
+  const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
+  const [appliedContract, setAppliedContract] = useState("");
+  const [openDropdown, setOpenDropdown] = useState<"employment" | "contract" | "users" | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const toggleDropdown = (key: "employment" | "contract" | "users" | null) => {
+    setOpenDropdown((prev) => (prev === key ? null : key));
+  };
+
+  const managers = mainAppUsers ?? [];
 
   const itemsPerPage = 15;
   const [journeysData, setJourneysData] = useState<JourneyRecord[]>([]);
@@ -97,7 +125,15 @@ const EmployeesOnboarding = () => {
     const fetchJourneys = async () => {
       setLoadingJourneys(true);
       try {
-        const journeysResult = await getJourneys({ page: currentPage, limit: itemsPerPage });
+        const params: { page: number; limit: number; search?: string; employment_type?: string; contract_type?: string; user_ids?: string[] } = {
+          page: currentPage,
+          limit: itemsPerPage,
+        };
+        if (appliedSearch?.trim()) params.search = appliedSearch.trim();
+        if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
+        if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
+        if (appliedUserIds.length > 0) params.user_ids = appliedUserIds;
+        const journeysResult = await getJourneys(params);
         console.log("[Onboarding] getJourneys response (page " + currentPage + "):", journeysResult);
         const data = Array.isArray(journeysResult?.data) ? (journeysResult.data as JourneyRecord[]) : [];
         setJourneysData(data);
@@ -111,7 +147,7 @@ const EmployeesOnboarding = () => {
       }
     };
     fetchJourneys();
-  }, [companyIdentifier, currentPage, refreshJourneysKey]);
+  }, [companyIdentifier, currentPage, refreshJourneysKey, appliedSearch, appliedEmploymentType, appliedContract, appliedUserIds]);
 
   const employees: OnboardingEmployee[] = useMemo(() => {
     return journeysData.map((j) => {
@@ -146,14 +182,7 @@ const EmployeesOnboarding = () => {
     });
   }, [journeysData, mainAppUsers]);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      const matchesSearch =
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.startDate.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  }, [searchTerm, employees]);
+  const filteredEmployees = employees;
 
   const totalPages = Math.max(1, journeysPagination?.last_page ?? 1);
   const paginatedEmployees = filteredEmployees;
@@ -193,9 +222,31 @@ const EmployeesOnboarding = () => {
       }
     };
 
+  const handleApply = () => {
+    setAppliedSearch(searchTerm);
+    setAppliedEmploymentType(selectedEmploymentType);
+    setAppliedContract(selectedContract);
+    setAppliedUserIds(selectedUserIds);
+    setCurrentPage(1);
+    setOpenDropdown(null);
+  };
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setAppliedSearch("");
+    setSelectedEmploymentType("");
+    setAppliedEmploymentType("");
+    setSelectedContract("");
+    setAppliedContract("");
+    setSelectedUserIds([]);
+    setAppliedUserIds([]);
+    setCurrentPage(1);
+    setOpenDropdown(null);
+  };
+
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Onboarding" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
       <div >
         
         <div >
@@ -212,63 +263,36 @@ const EmployeesOnboarding = () => {
               fontWeight: '600',
               color: '#111827',
               margin: 0
-            }}>Employees Onboarding</h1>
-          
+            }}>Employees Journey</h1>
           </div>
-          {/* Tabs */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '8px', 
-            // marginBottom: '24px',
-            // borderBottom: '2px solid #e5e7eb',
-            justifyContent: 'space-between',
+
+          {/* Filters: Search, Employment Type, Contract Type */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+            marginBottom: '24px',
             alignItems: 'center'
           }}>
-            {/* <div style={{ display: 'flex', gap: '8px' }}>
-              {(['Onboarding', 'Audit & Risk Center'] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => {
-                    setActiveTab(tab);
-                    setCurrentPage(1);
-                  }}
-                  style={{
-                    padding: '12px 24px',
-                    background: activeTab === tab ? '#6366f1' : '#e5e7eb',
-                    color: activeTab === tab ? 'white' : '#6b7280',
-                    border: 'none',
-                    borderRadius: '8px 8px 0 0',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '500',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div> */}
-  
-            {/* Search Bar */}
-            {/* <div style={{ position: 'relative', width: '350px', marginBottom: '-2px' }}>
-              <Search 
-                size={20} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '16px', 
-                  top: '50%', 
+            <div style={{ position: 'relative', flex: '1 1 300px', minWidth: '250px' }}>
+              <Search
+                size={20}
+                style={{
+                  position: 'absolute',
+                  left: '16px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
                   color: '#9ca3af'
-                }} 
+                }}
               />
               <input
                 type="text"
-                placeholder="Search employees, documents, au..."
+                placeholder="Search employee (extension/designation/department)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px 40px 10px 48px',
+                  padding: '10px 16px 10px 48px',
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                   fontSize: '14px',
@@ -276,19 +300,382 @@ const EmployeesOnboarding = () => {
                   backgroundColor: 'white',
                 }}
               />
-              <ChevronDown 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  right: '16px', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af'
-                }} 
-              />
-            </div> */}
+            </div>
+
+            {/* Employment Type Filter */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDropdown('employment');
+                }}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                <span>{selectedEmploymentType || 'Employment'}</span>
+                <ChevronDown size={16} />
+              </button>
+              {openDropdown === 'employment' && (
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: '150px'
+                }}>
+                  <div
+                    onClick={() => {
+                      setSelectedEmploymentType("");
+                      setOpenDropdown(null);
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      backgroundColor: !selectedEmploymentType ? '#f3f4f6' : 'white',
+                      borderBottom: '1px solid #e5e7eb'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedEmploymentType ? '#f3f4f6' : 'white'}
+                  >
+                    All employment types
+                  </div>
+                  {EMPLOYMENT_TYPES.map(type => (
+                    <div
+                      key={type}
+                      onClick={() => {
+                        setSelectedEmploymentType(type);
+                        setOpenDropdown(null);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedEmploymentType === type ? '#f3f4f6' : 'white'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedEmploymentType === type ? '#f3f4f6' : 'white'}
+                    >
+                      {type}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Contract Type Filter */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDropdown('contract');
+                }}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                <span>{selectedContract || 'Contract'}</span>
+                <ChevronDown size={16} />
+              </button>
+              {openDropdown === 'contract' && (
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: '150px'
+                }}>
+                  <div
+                    onClick={() => {
+                      setSelectedContract("");
+                      setOpenDropdown(null);
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      backgroundColor: !selectedContract ? '#f3f4f6' : 'white',
+                      borderBottom: '1px solid #e5e7eb'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedContract ? '#f3f4f6' : 'white'}
+                  >
+                    All contract types
+                  </div>
+                  {CONTRACT_TYPES.map(type => (
+                    <div
+                      key={type}
+                      onClick={() => {
+                        setSelectedContract(type);
+                        setOpenDropdown(null);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedContract === type ? '#f3f4f6' : 'white'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedContract === type ? '#f3f4f6' : 'white'}
+                    >
+                      {type}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Users Filter (multi-select); API receives user_ids */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDropdown('users');
+                }}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                <span>{selectedUserIds.length > 0 ? `Users (${selectedUserIds.length})` : 'Users'}</span>
+                <ChevronDown size={16} />
+              </button>
+              {openDropdown === 'users' && (
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                  zIndex: 10,
+                  minWidth: '200px',
+                  maxHeight: '280px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                  <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                    <input
+                      type="text"
+                      placeholder="Search user..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    <div
+                      onClick={() => {
+                        setSelectedUserIds([]);
+                        setOpenDropdown(null);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedUserIds.length === 0 ? '#f3f4f6' : 'white',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedUserIds.length === 0 ? '#f3f4f6' : 'white'}
+                    >
+                      All users
+                    </div>
+                    {managers
+                      .filter((mgr) => {
+                        const label = hierarchyLabel(mgr);
+                        return !userSearchTerm.trim() || label.toLowerCase().includes(userSearchTerm.trim().toLowerCase());
+                      })
+                      .map((mgr, idx) => {
+                        const label = hierarchyLabel(mgr);
+                        const idStr = String((mgr as { id?: number }).id ?? idx);
+                        const isSelected = selectedUserIds.includes(idStr);
+                        return (
+                          <div
+                            key={idStr}
+                            onClick={() => {
+                              setSelectedUserIds((prev) =>
+                                isSelected ? prev.filter((id) => id !== idStr) : [...prev, idStr]
+                              );
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#e0e7ff' : 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#c7d2fe' : '#f3f4f6'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#e0e7ff' : 'white'}
+                          >
+                            {isSelected && <span style={{ color: '#6366f1', fontWeight: 600 }}>✓</span>}
+                            {label}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleApply}
+              style={{
+                padding: '10px 32px',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: '#6366f1',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              Apply
+            </button>
           </div>
-  
+
+          {/* Active Filters - show when any applied filter is set */}
+          {(appliedSearch.trim() || appliedEmploymentType || appliedContract || appliedUserIds.length > 0) && (
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', color: '#6b7280' }}>Active filters:</span>
+              {appliedSearch.trim() && (
+                <span style={{
+                  padding: '4px 12px',
+                  backgroundColor: '#e0e7ff',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  Search: {appliedSearch}
+                  <button
+                    onClick={() => { setSearchTerm(''); setAppliedSearch(''); setCurrentPage(1); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {appliedEmploymentType && (
+                <span style={{
+                  padding: '4px 12px',
+                  backgroundColor: '#e0e7ff',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  {appliedEmploymentType}
+                  <button
+                    onClick={() => { setSelectedEmploymentType(''); setAppliedEmploymentType(''); setCurrentPage(1); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {appliedContract && (
+                <span style={{
+                  padding: '4px 12px',
+                  backgroundColor: '#e0e7ff',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  {appliedContract}
+                  <button
+                    onClick={() => { setSelectedContract(''); setAppliedContract(''); setCurrentPage(1); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {appliedUserIds.length > 0 && (
+                <span
+                  title={appliedUserIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                  style={{
+                    padding: '4px 12px',
+                    backgroundColor: '#e0e7ff',
+                    borderRadius: '16px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  Users: {appliedUserIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                  <button
+                    onClick={() => { setSelectedUserIds([]); setAppliedUserIds([]); setCurrentPage(1); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={resetFilters}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#6366f1',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  textDecoration: 'underline'
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           {/* Onboarding Table */}
           <div style={{
             backgroundColor: "white",

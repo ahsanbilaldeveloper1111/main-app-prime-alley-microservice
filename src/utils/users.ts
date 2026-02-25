@@ -762,6 +762,28 @@ export const GetCompanies = async () => {
   }
 }
 
+export const GetDepartments = async () => {
+  try {
+    const response = await axiosInstance.get(`users/departments`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData?.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to get companies');
+      return false;
+    }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
 export const SyncBillingCompanies = async () => {
   try {
     const response = await axiosInstance.get(`users/syncBillingCompanies`);

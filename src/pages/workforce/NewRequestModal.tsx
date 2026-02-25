@@ -20,10 +20,17 @@ export interface NewRequestModalProps {
   submitLabel?: string;
 }
 
+/** Category with optional children (sub-categories) from API */
+type CategoryWithChildren = UserRequestCategory & {
+  children?: Array<{ id: number; name?: string | null; code?: string | null }>;
+};
+
 type CreateFormState = {
   user_request_category_id: number | "";
   subject: string;
   reason: string;
+  start_date: string;
+  end_date: string;
   dynamic_fields: Record<string, unknown>;
   dynamic_files: Record<string, File | null>;
   attachments: File[];
@@ -33,6 +40,8 @@ const defaultForm: CreateFormState = {
   user_request_category_id: "",
   subject: "",
   reason: "",
+  start_date: "",
+  end_date: "",
   dynamic_fields: {},
   dynamic_files: {},
   attachments: [],
@@ -45,35 +54,22 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   title = "New Request",
   submitLabel = "Create Request",
 }) => {
-  const [categories, setCategories] = useState<UserRequestCategory[]>([]);
+  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
   const [categoryFields, setCategoryFields] = useState<Record<number, UserRequestCategoryField[]>>({});
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingFields, setLoadingFields] = useState(false);
   const [form, setForm] = useState<CreateFormState>(defaultForm);
   const [submitting, setSubmitting] = useState(false);
+  /** Selected parent category id (for showing sub-category dropdown) */
+  const [selectedParentId, setSelectedParentId] = useState<number | "">("");
 
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true);
     try {
       const { data } = await getUserRequestCategories({ limit: 1000 });
-      setCategories(data ?? []);
+      const list = (data ?? []) as CategoryWithChildren[];
+      setCategories(list);
       setCategoryFields({});
-      if (data?.length) {
-        const fieldsByCategory = await Promise.all(
-          data.map(async (cat) => {
-            try {
-              const fields = await getUserRequestCategoryFields(cat.id);
-              return { id: cat.id, fields };
-            } catch {
-              return { id: cat.id, fields: [] };
-            }
-          })
-        );
-        const map: Record<number, UserRequestCategoryField[]> = {};
-        fieldsByCategory.forEach(({ id, fields }) => {
-          map[id] = fields ?? [];
-        });
-        setCategoryFields(map);
-      }
     } catch {
       setCategories([]);
       setCategoryFields({});
@@ -86,14 +82,91 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     if (show) {
       loadCategories();
       setForm(defaultForm);
+      setSelectedParentId("");
     }
   }, [show, loadCategories]);
 
+  // When parent category is selected and has children, also fetch parent's fields (effective category will fetch child's when selected)
+  const selectedParent = selectedParentId === "" ? null : categories.find((c) => c.id === selectedParentId) ?? null;
+  const parentHasChildren = (selectedParent as CategoryWithChildren)?.children?.length;
+  useEffect(() => {
+    if (selectedParentId === "" || !parentHasChildren) return;
+    const id = Number(selectedParentId);
+    let cancelled = false;
+    getUserRequestCategoryFields(id)
+      .then((data) => {
+        if (!cancelled) {
+          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedParentId, parentHasChildren]);
+
+  const effectiveCategoryId = form.user_request_category_id;
+  useEffect(() => {
+    if (effectiveCategoryId === "") {
+      return;
+    }
+    const id = Number(effectiveCategoryId);
+    let cancelled = false;
+    setLoadingFields(true);
+    getUserRequestCategoryFields(id)
+      .then((data) => {
+        if (!cancelled) {
+          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFields(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveCategoryId]);
+
+  const topLevelCategories = categories.filter((c) => c.parent_id == null);
+  const subCategories = selectedParent?.children ?? [];
+  const hasSubCategories = subCategories.length > 0;
+  /** Category id whose fields to show: effective (child/parent) when set, else selected parent when it has children */
+  const displayFieldsCategoryId =
+    effectiveCategoryId !== ""
+      ? Number(effectiveCategoryId)
+      : hasSubCategories && selectedParentId !== ""
+        ? Number(selectedParentId)
+        : null;
+  const displayFields = displayFieldsCategoryId != null ? (categoryFields[displayFieldsCategoryId] ?? []) : [];
+  const isLoadingDisplayFields =
+    displayFieldsCategoryId != null &&
+    (displayFieldsCategoryId === Number(effectiveCategoryId) ? loadingFields : categoryFields[displayFieldsCategoryId] === undefined);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const categoryId = form.user_request_category_id;
+    const categoryId =
+      form.user_request_category_id !== ""
+        ? form.user_request_category_id
+        : hasSubCategories
+          ? selectedParentId
+          : "";
     if (categoryId === "" || !form.subject.trim()) {
       toast.error("Category and subject are required");
+      return;
+    }
+    const start = form.start_date.trim() || null;
+    const end = form.end_date.trim() || null;
+    if (start && end && end < start) {
+      toast.error("End date must be on or after start date");
       return;
     }
     setSubmitting(true);
@@ -106,6 +179,8 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
         user_request_category_id: Number(categoryId),
         subject: form.subject.trim(),
         reason: form.reason.trim() || null,
+        ...(start ? { start_date: start } : {}),
+        ...(end ? { end_date: end } : {}),
         dynamic_fields: Object.keys(form.dynamic_fields).length > 0 ? form.dynamic_fields : undefined,
         ...(Object.keys(dynamic_files).length > 0 ? { dynamic_files } : {}),
         ...(form.attachments.length > 0 ? { files: form.attachments } : {}),
@@ -130,12 +205,16 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
           <Form.Group className="mb-3">
             <Form.Label>Category *</Form.Label>
             <Form.Select
-              value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
+              value={selectedParentId === "" ? "" : String(selectedParentId)}
               onChange={(e) => {
                 const val = e.target.value;
+                const parentId = val === "" ? "" : Number(val);
+                setSelectedParentId(parentId);
+                const parent = parentId === "" ? null : categories.find((c) => c.id === parentId);
+                const hasChildren = (parent as CategoryWithChildren)?.children?.length;
                 setForm((f) => ({
                   ...f,
-                  user_request_category_id: val === "" ? "" : Number(val),
+                  user_request_category_id: hasChildren ? "" : parentId,
                   dynamic_fields: {},
                   dynamic_files: {},
                 }));
@@ -144,13 +223,37 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               disabled={loadingCategories}
             >
               <option value="">{loadingCategories ? "Loading…" : "Select category"}</option>
-              {categories.map((c) => (
+              {topLevelCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name ?? c.code ?? `Category ${c.id}`}
                 </option>
               ))}
             </Form.Select>
           </Form.Group>
+          {hasSubCategories && (
+            <Form.Group className="mb-3">
+              <Form.Label>Sub-category</Form.Label>
+              <Form.Select
+                value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    user_request_category_id: val === "" ? "" : Number(val),
+                    dynamic_fields: {},
+                    dynamic_files: {},
+                  }));
+                }}
+              >
+                <option value="">Select sub-category (optional)</option>
+                {subCategories.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name ?? ch.code ?? `Sub-category ${ch.id}`}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          )}
           <Form.Group className="mb-3">
             <Form.Label>Subject *</Form.Label>
             <Form.Control
@@ -171,6 +274,27 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               placeholder="Optional reason or description"
             />
           </Form.Group>
+          <div className="d-flex gap-3 flex-wrap">
+            <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
+              <Form.Label>Start date</Form.Label>
+              <Form.Control
+                type="date"
+                value={form.start_date}
+                onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+              />
+              <Form.Text className="text-muted">Optional (YYYY-MM-DD)</Form.Text>
+            </Form.Group>
+            <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
+              <Form.Label>End date</Form.Label>
+              <Form.Control
+                type="date"
+                value={form.end_date}
+                min={form.start_date || undefined}
+                onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+              />
+              <Form.Text className="text-muted">Optional, must be on or after start date</Form.Text>
+            </Form.Group>
+          </div>
           <Form.Group className="mb-3">
             <Form.Label>Attachments</Form.Label>
             <Form.Control
@@ -190,12 +314,15 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               </Form.Text>
             )}
           </Form.Group>
-          {form.user_request_category_id !== "" &&
-            (categoryFields[Number(form.user_request_category_id)] ?? []).length > 0 && (
+          {displayFieldsCategoryId != null &&
+            (isLoadingDisplayFields || displayFields.length > 0) && (
             <Form.Group className="mb-3">
               <Form.Label>Additional fields</Form.Label>
               <div className="border rounded p-3 bg-light">
-                {(categoryFields[Number(form.user_request_category_id)] ?? []).map((field) => (
+                {isLoadingDisplayFields ? (
+                  <p className="text-muted mb-0 small">Loading fields…</p>
+                ) : (
+                displayFields.map((field) => (
                   <div key={field.id} className="mb-2">
                     <Form.Label className="small mb-1">
                       {field.label ?? field.key}
@@ -325,7 +452,8 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       />
                     )}
                   </div>
-                ))}
+                ))
+                )}
               </div>
             </Form.Group>
           )}

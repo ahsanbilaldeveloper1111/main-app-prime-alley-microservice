@@ -91,6 +91,7 @@ const defaultForm: Partial<UserProfilePayload> = {
   employee_code: "",
   identification_number: "",
   job_title: "",
+  designation: "",
   department_id: null,
   location_id: null,
   employment_type: "",
@@ -186,6 +187,18 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       toast.error("User ID is required");
       return;
     }
+    if (!form.department_id) {
+      toast.error("Department is required");
+      return;
+    }
+    if (!form.employment_type?.toString().trim()) {
+      toast.error("Employment type is required");
+      return;
+    }
+    if (!form.designation?.toString().trim()) {
+      toast.error("Designation is required");
+      return;
+    }
     setSubmitting(true);
     try {
       await createUserProfile({
@@ -197,6 +210,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         department_id: form.department_id ?? null,
         location_id: form.location_id ?? null,
         employment_type: form.employment_type?.toString().trim() || null,
+        designation: form.designation?.toString().trim() || null,
         contract_type: form.contract_type?.toString().trim() || null,
         phone: form.phone?.toString().trim() || null,
         status: form.status?.toString().trim() || null,
@@ -229,7 +243,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Department</Form.Label>
+            <Form.Label>Department <span className="text-danger">*</span> </Form.Label>
             <Select<{ value: string; label: string }>
               className="basic-single"
               classNamePrefix="select"
@@ -253,7 +267,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             {loadingDepartments && <Form.Text className="text-muted">Loading…</Form.Text>}
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>User *</Form.Label>
+            <Form.Label>User <span className="text-danger">*</span> </Form.Label>
             <Select<{ value: string; label: string }>
               className="basic-single"
               classNamePrefix="select"
@@ -292,19 +306,22 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               placeholder="CNIC / ID"
             />
           </Form.Group>
+          
           <Form.Group className="mb-3">
-            <Form.Label>Job Title</Form.Label>
+            <Form.Label>Designation <span className="text-danger">*</span> </Form.Label>
             <Form.Control
-              value={form.job_title ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
-              placeholder="Job title"
+              value={form.designation ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))}
+              placeholder="Designation"
+              required
             />
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>Employment Type</Form.Label>
+            <Form.Label>Employment Type <span className="text-danger">*</span> </Form.Label>
             <Form.Select
               value={form.employment_type ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, employment_type: e.target.value }))}
+              required
             >
               <option value="">Select employment type</option>
               {EMPLOYMENT_TYPES.map((opt) => (

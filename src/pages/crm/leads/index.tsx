@@ -3758,7 +3758,7 @@ const CrmLeads = () => {
                   tableViewLabel: "Table view",
                   showViewSwitcher: true,
                   showEditColumns: true,
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -3770,7 +3770,7 @@ const CrmLeads = () => {
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Contact Owner",
+                      label: "Associate with",
                       showDropdown: true,
                       dropdownOptions: [
                         {

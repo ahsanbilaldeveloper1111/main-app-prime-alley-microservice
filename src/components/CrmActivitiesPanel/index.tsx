@@ -162,7 +162,7 @@ export type AuditTrailExtension = { id?: number; extension?: string; display_nam
 export type AuditTrailCampaign = { id: number; name: string };
 
 export interface CrmActivitiesPanelProps {
-  recordType: 'prospect' | 'lead' | 'deal' | 'order';
+  recordType: 'prospect' | 'lead' | 'deal' | 'order' | 'company';
   recordId: number;
   record: CrmActivitiesRecord | null;
   recordLoading?: boolean;

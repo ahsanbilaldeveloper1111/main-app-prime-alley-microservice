@@ -587,12 +587,19 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                   </div>
                 </div>
               )}
+              {profile?.designation != null && profile.designation !== '' && (
+                <div>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Designation</span>
+                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.designation)}</div>
+                </div>
+              )}
               {profile?.employment_type != null && profile.employment_type !== '' && (
                 <div>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>Employment type</span>
                   <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.employment_type)}</div>
                 </div>
               )}
+              
               {profile?.contract_type != null && profile.contract_type !== '' && (
                 <div>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>Contract type</span>
@@ -780,18 +787,7 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
             {tab}
           </button>
         ))}
-        <button
-          style={{
-            padding: '16px 0',
-            background: 'none',
-            border: 'none',
-            color: '#6b7280',
-            fontSize: '14px',
-            cursor: 'pointer'
-          }}
-        >
-          •••
-        </button>
+        
       </div>
 
       {/* Scrollable Content */}

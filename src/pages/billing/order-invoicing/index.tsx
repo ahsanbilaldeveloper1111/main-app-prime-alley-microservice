@@ -13,14 +13,11 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   TableColumn,
   TableAction,
-  ToolbarConfig,
-  FilterPill,
-  TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
+import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import { EditOrderSidebar } from "@components/EditOrderSidebar";
+import OrderEditModal from "@components/OrderEditModal";
 import {
   FiUpload,
   FiDatabase,
@@ -74,7 +71,6 @@ import Select from "react-select";
 import {
   GlobalDateFormat,
   ModuleSlug,
-  RECORD_TYPES,
   formatDateForTable,
 } from "@utils/Helper";
 import {
@@ -144,7 +140,7 @@ import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "../../partial/FormModal";
+import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
@@ -446,28 +442,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmOrders = () => {
   const { data: session } = useSession();
   const router = useRouter();
-  const [isOrderEditModeAccount, setIsOrderEditModeAccount] = useState(false);
-  const [isOrderEditModeDelivery, setIsOrderEditModeDelivery] = useState(false);
-
-  const [isAccountRole, setIsAccountRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "account") {
-  //     setIsAccountRole(true);
-  //   } else {
-  //     setIsAccountRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
-
-  const [isDeliveryRole, setIsDeliveryRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "delivery") {
-  //     setIsDeliveryRole(true);
-  //   } else {
-  //     setIsDeliveryRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
-
-  // Which edit mode to show: root (full), account, or delivery — three separate modals
 
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
@@ -500,10 +474,6 @@ const CrmOrders = () => {
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showTabModal, setShowTabModal] = useState(false);
-  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -525,14 +495,8 @@ const CrmOrders = () => {
     null,
   );
 
-  // Edit Order Sidebar (replaces modal: Edit as Account / Edit as Delivery)
-  const [showEditOrderSidebar, setShowEditOrderSidebar] = useState(false);
-  const [editingOrderIdInSidebar, setEditingOrderIdInSidebar] = useState<
-    number | null
-  >(null);
-  const [editOrderModeInSidebar, setEditOrderModeInSidebar] = useState<
-    "account" | "delivery"
-  >("account");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   // Mark Order Lost Modal
   const [showMarkLostModal, setShowMarkLostModal] = useState(false);
   const [orderToMarkLost, setOrderToMarkLost] = useState<any>(null);
@@ -1133,84 +1097,18 @@ const CrmOrders = () => {
     }
   }, []);
 
-  // Handle view order - open GenericSidebar only (no modal)
-  const handleViewOrder = useCallback(
-    async (orderId: number) => {
-      try {
-        const orderData: any = await getOrder(orderId);
-        setSelectedOrder(orderData);
-        setShowOrderSidebar(true);
-        await fetchOrderDetails(orderId);
-      } catch (error) {
-        console.error("Failed to fetch order:", error);
-        toast.error("Failed to load order details");
-      } finally {
-        setLoadingOrder(false);
-        setLoadingDeal(false);
-        setLoadingLead(false);
-      }
-    },
-    [fetchOrderDetails],
-  );
-
-  const handleRowClicked = useCallback(async (orderId: number) => {
+  const handleViewOrder = useCallback(async (orderId: number) => {
+    await fetchOrderDetails(orderId);
     try {
-      const orderData: any = await getOrder(orderId);
-      setSelectedOrder(orderData);
-      setShowOrderSidebar(true);
-      await fetchOrderDetails(orderId);
+      setShowOrderViewModal(true);
     } catch (error) {
       console.error("Failed to fetch order:", error);
       toast.error("Failed to load order details");
+    } finally {
+      setLoadingOrder(false);
+      setLoadingDeal(false);
+      setLoadingLead(false);
     }
-  }, []);
-
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback(
-    async (order: any) => {
-      const orderId = order.rawData?.id || order.id;
-      // Set the order immediately to show sidebar
-      setSelectedOrder(order.rawData || order);
-      setShowOrderSidebar(true);
-
-      // Fetch additional data in the background
-      if (orderId) {
-        try {
-          await fetchOrderDetails(orderId);
-          // Optionally refresh the order data to get latest info
-          const orderData: any = await getOrder(orderId);
-          setSelectedOrder(orderData);
-        } catch (error) {
-          console.error("Failed to fetch order details:", error);
-          // Don't show error toast as sidebar is already open with basic data
-        }
-      }
-    },
-    [fetchOrderDetails],
-  );
-
-  // Handle close order sidebar
-  const handleCloseOrderSidebar = useCallback(() => {
-    setShowOrderSidebar(false);
-    setSelectedOrder(null);
-    setViewingOrder(null);
-    setRelatedDeal(null);
-    setRelatedLead(null);
-  }, []);
-
-  // Handle first column click - navigates to detail page
-  const handleFirstColumnClick = useCallback(
-    (order: any) => {
-      const orderId = order.rawData?.id || order.id;
-      if (orderId) {
-        router.push(`/crm/orders/${orderId}/order-detailpage`);
-      }
-    },
-    [router],
-  );
-
-  const handleOpenFiltersSidebar = useCallback(() => {
-    setShowFiltersSidebar(true);
   }, []);
 
   const handleDeleteOrder = useCallback(
@@ -1614,8 +1512,8 @@ const CrmOrders = () => {
       deleted: summaryTiles?.deleted_orders || 0,
     };
 
-    // Add counts for all stages (not just first 5, for custom tabs)
-    stages.forEach((stage: any) => {
+    // Add counts for first 5 stages
+    stages.slice(0, 5).forEach((stage: any) => {
       const stageOrders = transformed.filter(
         (o) => o.stage === stage.name || o.rawData?.order_stage_id === stage.id,
       );
@@ -1624,82 +1522,6 @@ const CrmOrders = () => {
 
     return counts;
   }, [ordersData, extensions, stages, summaryTiles, totalOrders]);
-
-  // Update custom tabs counts when filterCounts change
-  useEffect(() => {
-    setCustomTabs((prevTabs) =>
-      prevTabs.map((tab) => {
-        const count = filterCounts[tab.id] || 0;
-        return { ...tab, count };
-      }),
-    );
-  }, [filterCounts]);
-
-  // Define stats cards for GenericTable
-  const ordersStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Orders",
-        value: summaryTiles?.total_orders || totalOrders || 0,
-        icon: ShoppingBag,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in pipeline",
-      },
-      {
-        title: "New",
-        value:
-          summaryTiles?.new_orders || analyticsData.stageCounts["New"] || 0,
-        icon: PlusCircle,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh orders",
-          dotColor: "#2563EB",
-        },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_orders ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "In Progress",
-        value: analyticsData.inProgress || 0,
-        icon: Activity,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "Being processed",
-      },
-      {
-        title: "Delivered",
-        value: analyticsData.delivered || 0,
-        icon: Package,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Completed",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
-        },
-      },
-      {
-        title: "Pending Approval",
-        value: analyticsData.pendingApproval || 0,
-        icon: AlertCircle,
-        iconColor: "#EF4444",
-        iconBgColor: "#FEE2E2",
-        subtitle: "Requires review",
-      },
-    ],
-    [summaryTiles, totalOrders, analyticsData],
-  );
 
   // Custom select styles
   const customSelectStyles = {
@@ -1928,7 +1750,7 @@ const CrmOrders = () => {
         {
           label: "View",
           icon: <Eye size={16} />,
-          onClick: (row: any) => handlePreviewClick(row),
+          onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
           variant: "link" as const,
         },
         {
@@ -1945,43 +1767,20 @@ const CrmOrders = () => {
       {
         label: "View",
         icon: <Eye size={16} />,
-        onClick: (row: any) => handlePreviewClick(row),
+        onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
         variant: "link" as const,
       },
 
-      ...(session?.user?.is_admin === "1" || isAccountRole
+      ...(session?.user?.permissions?.includes("edit-crm-orders")
         ? [
             {
-              label: "Edit as Account",
+              label: "Edit",
               icon: <Edit size={16} />,
               onClick: (row: any) => {
-                const id = row.rawData?.id ?? row.id;
-                if (id) {
-                  setEditingOrderIdInSidebar(id);
-                  setEditOrderModeInSidebar("account");
-                  setShowEditOrderSidebar(true);
-                }
+                setEditingOrderId(row.rawData?.id || row.id);
+                setShowEditModal(true);
               },
               variant: "link" as const,
-            },
-          ]
-        : []),
-
-      ...(session?.user?.is_admin === "1" || isDeliveryRole
-        ? [
-            {
-              label: "Edit as Delivery",
-              icon: <Edit size={16} />,
-              onClick: (row: any) => {
-                const id = row.rawData?.id ?? row.id;
-                if (id) {
-                  setEditingOrderIdInSidebar(id);
-                  setEditOrderModeInSidebar("delivery");
-                  setShowEditOrderSidebar(true);
-                }
-              },
-              variant: "link" as const,
-              className: "text-warning",
             },
           ]
         : []),
@@ -2019,15 +1818,15 @@ const CrmOrders = () => {
           align: "end" as const,
           options: [
             {
-              label: "Withdraw (with lost reason)",
+              label: "Mark as Lost",
               icon: <X size={14} />,
               onClick: (row: any) => handleMarkLost(row.rawData || row),
               className: "text-danger",
             },
             {
-              label: "Withdraw (For Further Changes)",
+              label: "Withdraw",
               icon: <X size={14} />,
-              onClick: (row: any) => handleDeleteOrder(row.rawData || row),
+              onClick: (row: any) => handleMarkLost(row.rawData || row),
               className: "text-danger",
             },
           ],
@@ -2037,7 +1836,6 @@ const CrmOrders = () => {
   }, [
     session,
     activeFilter,
-    handlePreviewClick,
     handleViewOrder,
     handleRestoreOrder,
     handleDeleteOrder,
@@ -2074,1081 +1872,724 @@ const CrmOrders = () => {
           padding: 12px 16px;
           vertical-align: middle;
         }
-        
-        /* Page layout for full height */
-        .orders-page-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 100px);
-          overflow: hidden;
-        }
-        
-        .orders-content-area {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .orders-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
       `,
         }}
       />
       <BreadcrumbItem
         mainTitle="CRM"
-        mainLink="/crm/dashboard"
+        mainLink="/accounting/customer/dashboard"
         subTitle="Orders"
       />
-
-      {/* Main flex container for content and sidebar */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0",
-          height: "calc(100vh)",
-          overflow: "hidden",
-        }}
-      >
-        {/* Main content area */}
-        <div className="orders-scrollable-content" style={{ flex: 1 }}>
-          <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showOrdersAnalytics && (
-              <>
-                {/* Summary Stats using KPICard */}
-                <Row className="mb-4">
-                  <Col lg={3} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Orders"
-                      value={analyticsData.total.toString()}
-                      icon={<ShoppingBag size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                  <Col lg={3} md={6} className="mb-3">
-                    <KPICard
-                      title="Delivered"
-                      value={analyticsData.delivered.toString()}
-                      icon={<CheckCircle size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col lg={3} md={6} className="mb-3">
-                    <KPICard
-                      title="In Progress"
-                      value={analyticsData.inProgress.toString()}
-                      icon={<Activity size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  <Col lg={3} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Value"
-                      value={`${analyticsData.totalValue.toLocaleString(
-                        undefined,
-                        {
-                          maximumFractionDigits: 0,
-                        },
-                      )}`}
-                      icon={<DollarSign size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                </Row>
-
-                {/* Analytics Charts */}
-                <Row className="mb-4">
-                  <Col md={6} className="mb-3">
-                    <Card className="border-0 shadow-sm h-100">
-                      <Card.Body>
-                        <h6 className="fw-bold mb-3">Orders by Stage</h6>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <PieChart>
-                            <Pie
-                              data={Object.entries(
-                                analyticsData.stageCounts,
-                              ).map(([stage, count]) => ({
-                                name: stage,
-                                value: count,
-                              }))}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }: any) =>
-                                `${name}: ${(percent * 100).toFixed(0)}%`
-                              }
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {Object.entries(analyticsData.stageCounts).map(
-                                ([stage, count], index) => {
-                                  const colors = [
-                                    "#0dcaf0",
-                                    "#0d6efd",
-                                    "#ffc107",
-                                    "#fd7e14",
-                                    "#198754",
-                                    "#6c757d",
-                                  ];
-                                  return (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={colors[index % colors.length]}
-                                    />
-                                  );
-                                },
-                              )}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={6} className="mb-3">
-                    <Card className="border-0 shadow-sm h-100">
-                      <Card.Body>
-                        <h6 className="fw-bold mb-3">
-                          Fulfillment Status Distribution
-                        </h6>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart
-                            data={Object.entries(
-                              analyticsData.statusCounts,
-                            ).map(([status, count]) => ({ status, count }))}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="status" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#0d6efd" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              </>
-            )}
-
-            {/* Filter Bar */}
-            {showFilterBar && (
-              <FilterBar
-                quickFilters={[
-                  {
-                    id: "all",
-                    label: "All Orders",
-                    count: filterCounts.all,
-                    color: "#0d6efd",
-                    icon: <ShoppingCart size={16} />,
-                  },
-                  ...stages.slice(0, 5).map((stage: any) => ({
-                    id: stage.id.toString(),
-                    label: stage.name,
-                    count: filterCounts[stage.id] || 0,
-                    color: stage.color || "#6c757d",
-                    icon: <Layers size={16} />,
-                  })),
-                  {
-                    id: "lost",
-                    label: "Lost",
-                    count: filterCounts.lost || 0,
-                    color: "#fd7e14",
-                    icon: <X size={16} />,
-                  },
-                  {
-                    id: "deleted",
-                    label: "Deleted",
-                    count: filterCounts.deleted || 0,
-                    color: "#dc3545",
-                    icon: <Trash2 size={16} />,
-                  },
-                ]}
-                activeFilter={activeFilter}
-                onFilterChange={handleFilterChange}
-                // searchValue={ordersSearch}
-
-                // onSearch={() => {
-                //   if (ordersSearch.trim()) {
-                //     handleFiltersChange({ search: ordersSearch.trim() });
-                //   } else {
-                //     handleFiltersChange({ search: null });
-                //   }
-                //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-                // }}
-                // searchPlaceholder="Search orders by number, customer, deal..."
-                // onSearchChange={(value) => setOrdersSearch(value)}
-                // showAdvancedFilters={showAdvancedFilters}
-                // onToggleAdvancedFilters={() =>
-                //   setShowAdvancedFilters(!showAdvancedFilters)
-                // }
-                // advancedFilterCount={
-                //   (ordersFilters.assignedTo !== null ? 1 : 0) +
-                //   (ordersFilters.stage !== null ? 1 : 0) +
-                //   (ordersFilters.industry !== null ? 1 : 0) +
-                //   (ordersFilters.orderValueMin !== null ||
-                //   ordersFilters.orderValueMax !== null
-                //     ? 1
-                //     : 0) +
-                //   (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
-                //   (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
-                //   (ordersFilters.paymentStatus !== null ? 1 : 0) +
-                //   (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
-                //     ? 1
-                //     : 0)
-                // }
-              />
-            )}
-
-            {/* Advanced Filters */}
-            {showAdvancedFilters && (
-              <Card className="border-0 shadow-sm mb-4">
-                <Card.Body>
-                  <Row className="g-3 align-items-end">
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Search
-                      </Form.Label>
-                      <Form.Control
-                        type="text"
-                        value={ordersSearch}
-                        onChange={(e) => setOrdersSearch(e.target.value)}
-                        placeholder="Search orders by number, customer, deal..."
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Assigned To
-                      </Form.Label>
-                      <Select
-                        options={extensions.map((ext: any) => ({
-                          value: ext.id || ext.extension,
-                          label:
-                            ext.display_name ||
-                            ext.name ||
-                            ext.id ||
-                            ext.extension,
-                        }))}
-                        value={
-                          ordersFilters.assignedTo
-                            ? (() => {
-                                const assignedToId = ordersFilters.assignedTo;
-                                const ext = extensions.find(
-                                  (e: any) =>
-                                    (e.id || e.extension) === assignedToId,
-                                );
-                                return ext
-                                  ? {
-                                      value: assignedToId,
-                                      label:
-                                        ext.display_name ||
-                                        ext.name ||
-                                        assignedToId,
-                                    }
-                                  : {
-                                      value: assignedToId,
-                                      label: assignedToId,
-                                    };
-                              })()
-                            : null
-                        }
-                        onChange={(selected) => {
-                          const assignedToValue = selected
-                            ? selected.value
-                            : null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            assignedTo: assignedToValue,
-                          }));
-                          // Reset to all when assigned filter changes
-                          setActiveFilter("all");
-                        }}
-                        placeholder="Select user..."
-                        styles={customSelectStyles}
-                        isClearable
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Order Stage
-                      </Form.Label>
-                      <Select
-                        options={stages.map((s) => ({
-                          value: s.id.toString(),
-                          label: s.name,
-                        }))}
-                        value={
-                          ordersFilters.stage
-                            ? (() => {
-                                const stageId = ordersFilters.stage;
-                                const stage = stages.find(
-                                  (st: any) => st.id.toString() === stageId,
-                                );
-                                return stage
-                                  ? { value: stageId, label: stage.name }
-                                  : { value: stageId, label: stageId };
-                              })()
-                            : null
-                        }
-                        onChange={(selected) => {
-                          const stageValue = selected ? selected.value : null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            stage: stageValue,
-                          }));
-                          // Update activeFilter to match selected stage
-                          if (stageValue) {
-                            setActiveFilter(stageValue);
-                          } else {
-                            setActiveFilter("all");
-                          }
-                        }}
-                        placeholder="Select stage..."
-                        styles={customSelectStyles}
-                        isClearable
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Industry
-                      </Form.Label>
-                      <Form.Select
-                        value={ordersFilters.industry || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            industry: value,
-                          }));
-                        }}
-                      >
-                        <option value="">Select Industry</option>
-                        <option value="Technology">Technology</option>
-                        <option value="Healthcare">Healthcare</option>
-                        <option value="Finance">Finance</option>
-                        <option value="Banking & Financial Services">
-                          Banking & Financial Services
-                        </option>
-                        <option value="Manufacturing">Manufacturing</option>
-                        <option value="Retail">Retail</option>
-                        <option value="Education">Education</option>
-                        <option value="Real Estate">Real Estate</option>
-                        <option value="Telecommunications">
-                          Telecommunications
-                        </option>
-                        <option value="Construction">Construction</option>
-                        <option value="Other">Other</option>
-                      </Form.Select>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Order Value Min
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={ordersFilters.orderValueMin || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            orderValueMin: value,
-                          }));
-                        }}
-                        placeholder="0.00"
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Order Value Max
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={ordersFilters.orderValueMax || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            orderValueMax: value,
-                          }));
-                        }}
-                        placeholder="0.00"
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Order Approval Status
-                      </Form.Label>
-                      <Form.Select
-                        value={ordersFilters.orderApprovalStatus || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            orderApprovalStatus: value,
-                          }));
-                        }}
-                      >
-                        <option value="">Select Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </Form.Select>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Fulfillment Status
-                      </Form.Label>
-                      <Form.Select
-                        value={ordersFilters.fulfillmentStatus || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            fulfillmentStatus: value,
-                          }));
-                        }}
-                      >
-                        <option value="">Select Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="delivered">Delivered</option>
-                        <option value="cancelled">Cancelled</option>
-                      </Form.Select>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Payment Status
-                      </Form.Label>
-                      <Form.Select
-                        value={ordersFilters.paymentStatus || ""}
-                        onChange={(e) => {
-                          const value = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            paymentStatus: value,
-                          }));
-                        }}
-                      >
-                        <option value="">Select Status</option>
-                        <option value="unpaid">Unpaid</option>
-                        <option value="partial">Partial</option>
-                        <option value="paid">Paid</option>
-                        <option value="refunded">Refunded</option>
-                      </Form.Select>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Date From
-                      </Form.Label>
-                      <Form.Control
-                        type="date"
-                        value={ordersFilters.dateFrom || ""}
-                        onChange={(e) => {
-                          const dateValue = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            dateFrom: dateValue,
-                          }));
-                        }}
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <Form.Label className="small fw-bold mb-2">
-                        Date To
-                      </Form.Label>
-                      <Form.Control
-                        type="date"
-                        value={ordersFilters.dateTo || ""}
-                        onChange={(e) => {
-                          const dateValue = e.target.value || null;
-                          setOrdersFilters((prev) => ({
-                            ...prev,
-                            dateTo: dateValue,
-                          }));
-                        }}
-                      />
-                    </Col>
-                    <Col md={4}>
-                      <div className="d-flex gap-2">
-                        <Button
-                          variant="outline-secondary"
-                          className="d-flex align-items-center justify-content-center"
-                          onClick={() => {
-                            // Map ordersFilters to the format expected by handleFiltersChange
-                            const filtersToApply: Record<string, any> = {};
-
-                            if (ordersSearch) {
-                              filtersToApply.search = ordersSearch;
-                            }
-                            if (ordersFilters.assignedTo) {
-                              filtersToApply.assigned_to =
-                                ordersFilters.assignedTo;
-                            }
-                            if (ordersFilters.stage) {
-                              filtersToApply.order_stage_id =
-                                ordersFilters.stage;
-                            }
-                            if (ordersFilters.industry) {
-                              filtersToApply.industry = ordersFilters.industry;
-                            }
-                            if (ordersFilters.orderValueMin) {
-                              filtersToApply.order_value_min =
-                                ordersFilters.orderValueMin;
-                            }
-                            if (ordersFilters.orderValueMax) {
-                              filtersToApply.order_value_max =
-                                ordersFilters.orderValueMax;
-                            }
-                            if (ordersFilters.orderApprovalStatus) {
-                              filtersToApply.order_approval_status =
-                                ordersFilters.orderApprovalStatus;
-                            }
-                            if (ordersFilters.fulfillmentStatus) {
-                              filtersToApply.fulfillment_status =
-                                ordersFilters.fulfillmentStatus;
-                            }
-                            if (ordersFilters.paymentStatus) {
-                              filtersToApply.payment_status =
-                                ordersFilters.paymentStatus;
-                            }
-                            if (ordersFilters.dateFrom) {
-                              filtersToApply.date_from = ordersFilters.dateFrom;
-                            }
-                            if (ordersFilters.dateTo) {
-                              filtersToApply.date_to = ordersFilters.dateTo;
-                            }
-
-                            handleFiltersChange(filtersToApply);
-                            setOrdersPagination({
-                              ...ordersPagination,
-                              currentPage: 1,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          }}
-                        >
-                          Submit Filters
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          className="d-flex align-items-center justify-content-center"
-                          onClick={() => {
-                            setOrdersSearch("");
-                            setOrdersFilters({
-                              assignedTo: null,
-                              stage: null,
-                              industry: null,
-                              orderValueMin: null,
-                              orderValueMax: null,
-                              orderApprovalStatus: null,
-                              fulfillmentStatus: null,
-                              paymentStatus: null,
-                              dateFrom: null,
-                              dateTo: null,
-                            });
-                            handleFiltersChange({});
-                            setCurrentFilters({});
-                            setActiveFilter("all");
-                            setOrdersPagination({
-                              ...ordersPagination,
-                              currentPage: 1,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          }}
-                        >
-                          Reset
-                        </Button>
-                      </div>
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            )}
-
-            {/* Orders Table with GenericTable */}
-            <div
-              className="orders-table-wrapper"
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-              }}
+      <div>
+        {/* Page Header */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+          <div className="mb-3 mb-md-0">
+            <nav aria-label="breadcrumb">
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item">
+                  <a href="/dashboard" className="text-decoration-none">
+                    Accounts
+                  </a>
+                </li>
+                <li
+                  className="breadcrumb-item active fw-bold"
+                  aria-current="page"
+                >
+                  Order Management
+                </li>
+              </ol>
+            </nav>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            {/* <Button
+              variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
             >
-              <GenericTable
-                data={filteredOrders}
-                columns={ordersColumns}
-                actions={ordersActions}
-                showActions={false}
-                // customizableColumns={true}
-                defaultSelectedColumns={[
-                  "orderNumber",
-                  "customer",
-                  "deal",
-                  "stage",
-                  "value",
-                  "approvalStatus",
-                  "fulfillmentStatus",
-                  "assignedUser",
-                  "orderDate",
-                  "owner",
-                ]}
-                columnStorageKey="ordersSelectedColumns"
-                onColumnChange={(cols) => setSelectedOrdersColumns(cols)}
-                pagination={{
-                  currentPage: ordersPagination.currentPage,
-                  rowsPerPage: ordersPagination.rowsPerPage,
-                  totalRows: totalOrders,
-                  pageSizeOptions: [10, 15, 25, 50, 100],
-                }}
-                onPaginationChange={(page, rowsPerPage) => {
-                  setOrdersPagination({
-                    ...ordersPagination,
-                    currentPage: page,
-                    rowsPerPage,
-                  });
-                }}
-                sortable={true}
-                defaultSortColumn={ordersPagination.sortColumn}
-                defaultSortDirection={ordersPagination.sortDirection}
-                onSort={(column, direction) => {
-                  setOrdersPagination({
-                    ...ordersPagination,
-                    sortColumn: column,
-                    sortDirection: direction,
-                  });
-                }}
-                onPreviewClick={(order) => handlePreviewClick(order)}
-                onFirstColumnClick={(order) => handleFirstColumnClick(order)}
-                onRowDoubleClick={(row) => {
-                  if (session?.user?.permissions?.includes("list-crm-orders")) {
-                    handleViewOrder(row.rawData?.id || row.id);
-                  }
-                }}
-                loading={loading}
-                emptyMessage="No orders found matching your criteria"
-                loadingMessage="Loading orders..."
-                hover={true}
-                uniqueKey="id"
-                // Fixed height mode
-                fixedHeight={true}
-                maxHeight="calc(100vh - 380px)"
-                // Toolbar
-                showToolbar={true}
-                toolbar={{
-                  // Tabs
-                  showTabs: true,
-                  showImport: false,
-                  onImportClick: () => {
-                    console.log("Import prospects");
-                  },
-                  tabsDropdownLabel: "Orders",
-                  tabs: [
-                    {
-                      id: "all",
-                      label: "All orders",
-                      count: filterCounts.all,
-                      removable: false,
-                    },
-                    ...customTabs,
-                  ],
-                  activeTab: activeFilter,
-                  onTabChange: handleFilterChange,
-                  onTabAdd: () => setShowTabModal(true),
-                  onTabRemove: (tabId) => {
-                    setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
-                    if (activeFilter === tabId) {
-                      handleFilterChange("all");
-                    }
-                  },
-
-                  // Search
-                  showSearch: true,
-                  searchValue: ordersSearch,
-                  searchPlaceholder:
-                    "Search orders by number, customer, deal...",
-                  onSearchChange: (value) => {
-                    setOrdersSearch(value);
-                    // Clear search on empty value
-                    if (!value) {
-                      const newFilters = { ...currentFilters };
-                      delete newFilters.search;
-                      handleFiltersChange(newFilters);
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-                  onSearch: () => {
-                    if (ordersSearch) {
-                      handleFiltersChange({
-                        ...currentFilters,
-                        search: ordersSearch,
-                      });
-                      setOrdersPagination({
-                        ...ordersPagination,
-                        currentPage: 1,
-                      });
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-
-                  // Actions
-                  showTableViewDropdown: true,
-                  tableViewLabel: "Table view",
-                  showViewSwitcher: true,
-                  showEditColumns: true,
-                  onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: false,
-                  pipelineLabel: "All Pipelines",
-                  showFiltersButton: true,
-                  onFiltersClick: handleOpenFiltersSidebar,
-                  showSortButton: true,
-                  showExportButton: true,
-                  onExportClick: () => setShowExportModal(true),
-                  showSaveButton: true,
-                  onSaveClick: () => console.log("Save view"),
-
-                  // Filter Pills
-                  filterPills: [
-                    {
-                      id: "contact_owner",
-                      label: "Associate with",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Owners",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.assigned_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        ...extensions.map((ext) => ({
-                          label: ext.display_name || ext.name || ext.extension,
-                          value: ext.id || ext.extension,
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              assigned_to: ext.id || ext.extension,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        })),
-                      ],
-                    },
-                  ],
-                  showAdvancedFilters: true,
-                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
-                }}
-                // Stats cards for metrics
-                statsCards={ordersStatsCards}
-              />
-            </div>
+              <BarChart3 size={16} className="me-2" />
+              {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
+            </Button> */}
+            <Button
+              variant={showFilterBar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+            >
+              <Layers size={16} className="me-2" />
+              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+            </Button>
+            <Button
+              variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
+            >
+              <FiFilter size={16} className="me-2" />
+              {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
+            </Button>
           </div>
         </div>
 
-        {/* Order Details Sidebar */}
-        {showOrderSidebar && (
-          <GenericSidebar
-            isOpen={showOrderSidebar}
-            onClose={handleCloseOrderSidebar}
-            title={
-              selectedOrder?.order_number ||
-              `Order #${selectedOrder?.id}` ||
-              "Order Details"
-            }
-            subtitle={
-              selectedOrder?.customer_name ||
-              selectedOrder?.customer_phone ||
-              ""
-            }
-            email={selectedOrder?.customer_email}
-            phone={selectedOrder?.customer_phone}
-            avatar={{
-              initials: getInitials(selectedOrder?.customer_name || "NA"),
-              name: selectedOrder?.customer_name || "NA",
-              gradient: getRandomColor(selectedOrder?.customer_name || ""),
-            }}
-            recordType="order"
-            recordId={
-              selectedOrder?.id ?? selectedOrder?.rawData?.id ?? undefined
-            }
-            crmSummary={selectedOrder?.rawData?.crm_summary ?? selectedOrder?.crm_summary ?? undefined}
-            record={{
-              id: selectedOrder?.id || selectedOrder?.rawData?.id,
-              type: RECORD_TYPES.ORDER,
-            }}
-            recordLink={{
-              label: "View record",
-              onClick: () => {
-                const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
-                if (orderId) {
-                  router.push(`/crm/orders/${orderId}/edit`);
-                }
+        {/* Stats Cards */}
+        <StatsCards
+          data={[
+            {
+              title: "All Orders",
+              value: summaryTiles?.total_orders || totalOrders || 0,
+              icon: ShoppingBag,
+              iconColor: "#6366F1",
+              iconBgColor: "#EEF2FF",
+              subtitle: "Total orders",
+            },
+            {
+              title: "New",
+              value:
+                summaryTiles?.new_orders ||
+                analyticsData.stageCounts["New"] ||
+                0,
+              icon: PlusCircle,
+              iconColor: "#3B82F6",
+              iconBgColor: "#DBEAFE",
+              metric: {
+                text: "Fresh orders",
+                dotColor: "#2563EB",
               },
-            }}
-            actionsDropdown={{
-              label: "Actions",
-              items: [
-                {
-                  label: "Edit Order",
-                  onClick: () => {
-                    const orderId =
-                      selectedOrder?.id || selectedOrder?.rawData?.id;
-                    if (orderId) {
-                      router.push(`/crm/orders/${orderId}/edit`);
-                    }
-                  },
-                },
-                {
-                  label: "View History",
-                  onClick: () => {
-                    setShowOrderSidebar(false);
-                    const orderId =
-                      selectedOrder?.id || selectedOrder?.rawData?.id;
-                    if (orderId) {
-                      handleViewOrder(orderId);
-                    }
-                  },
-                },
-                {
-                  label: "Delete",
-                  onClick: () => {
-                    const orderId =
-                      selectedOrder?.id || selectedOrder?.rawData?.id;
-                    if (orderId) {
-                      handleDeleteOrder(orderId, selectedOrder?.order_number);
-                    }
-                  },
-                },
-              ],
-            }}
-            quickActions={[
+            },
+            {
+              title: "Qualified",
+              value:
+                summaryTiles?.qualified_orders ||
+                analyticsData.stageCounts["Qualified"] ||
+                0,
+              icon: CheckCircle,
+              iconColor: "#10B981",
+              iconBgColor: "#D1FAE5",
+              subtitle: "Verified & ready",
+            },
+            {
+              title: "Proposal",
+              value: analyticsData.stageCounts["Proposal"] || 0,
+              icon: FileText,
+              iconColor: "#8B5CF6",
+              iconBgColor: "#EDE9FE",
+              metric: {
+                text: "Under review",
+                dotColor: "#7C3AED",
+              },
+            },
+            {
+              title: "Negotiation",
+              value: analyticsData.stageCounts["Negotiation"] || 0,
+              icon: Users,
+              iconColor: "#F59E0B",
+              iconBgColor: "#FEF3C7",
+              subtitle: "In discussion",
+            },
+            {
+              title: "Lost",
+              value: summaryTiles?.lost_orders || filterCounts.lost || 0,
+              icon: AlertCircle,
+              iconColor: "#EF4444",
+              iconBgColor: "#FEE2E2",
+              subtitle: "Requires review",
+            },
+            // {
+            //   title: 'Deleted',
+            //   value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
+            //   icon: Trash2,
+            //   iconColor: '#6B7280',
+            //   iconBgColor: '#F3F4F6',
+            //   metric: {
+            //     text: 'Archived',
+            //     dotColor: '#9CA3AF'
+            //   }
+            // }
+          ]}
+          gridMinWidth="180px"
+        />
+
+        {/* Analytics Section - Collapsible */}
+        {showOrdersAnalytics && (
+          <>
+            {/* Summary Stats using KPICard */}
+            <Row className="mb-4">
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard
+                  title="Total Orders"
+                  value={analyticsData.total.toString()}
+                  icon={<ShoppingBag size={24} />}
+                  color="primary"
+                />
+              </Col>
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard
+                  title="Delivered"
+                  value={analyticsData.delivered.toString()}
+                  icon={<CheckCircle size={24} />}
+                  color="success"
+                />
+              </Col>
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard
+                  title="In Progress"
+                  value={analyticsData.inProgress.toString()}
+                  icon={<Activity size={24} />}
+                  color="info"
+                />
+              </Col>
+              <Col lg={3} md={6} className="mb-3">
+                <KPICard
+                  title="Total Value"
+                  value={`${analyticsData.totalValue.toLocaleString(undefined, {
+                    maximumFractionDigits: 0,
+                  })}`}
+                  icon={<DollarSign size={24} />}
+                  color="success"
+                />
+              </Col>
+            </Row>
+
+            {/* Analytics Charts */}
+            <Row className="mb-4">
+              <Col md={6} className="mb-3">
+                <Card className="border-0 shadow-sm h-100">
+                  <Card.Body>
+                    <h6 className="fw-bold mb-3">Orders by Stage</h6>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(analyticsData.stageCounts).map(
+                            ([stage, count]) => ({ name: stage, value: count }),
+                          )}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }: any) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {Object.entries(analyticsData.stageCounts).map(
+                            ([stage, count], index) => {
+                              const colors = [
+                                "#0dcaf0",
+                                "#0d6efd",
+                                "#ffc107",
+                                "#fd7e14",
+                                "#198754",
+                                "#6c757d",
+                              ];
+                              return (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={colors[index % colors.length]}
+                                />
+                              );
+                            },
+                          )}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+              <Col md={6} className="mb-3">
+                <Card className="border-0 shadow-sm h-100">
+                  <Card.Body>
+                    <h6 className="fw-bold mb-3">
+                      Fulfillment Status Distribution
+                    </h6>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart
+                        data={Object.entries(analyticsData.statusCounts).map(
+                          ([status, count]) => ({ status, count }),
+                        )}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="status" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0d6efd" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+
+        {/* Filter Bar */}
+        {showFilterBar && (
+          <FilterBar
+            quickFilters={[
               {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {},
-                disabled: false,
+                id: "all",
+                label: "All Orders",
+                count: filterCounts.all,
+                color: "#0d6efd",
+                icon: <ShoppingCart size={16} />,
+              },
+              ...stages.slice(0, 5).map((stage: any) => ({
+                id: stage.id.toString(),
+                label: stage.name,
+                count: filterCounts[stage.id] || 0,
+                color: stage.color || "#6c757d",
+                icon: <Layers size={16} />,
+              })),
+              {
+                id: "lost",
+                label: "Lost",
+                count: filterCounts.lost || 0,
+                color: "#fd7e14",
+                icon: <X size={16} />,
               },
               {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {
-                  const phone = selectedOrder?.customer_phone;
-                  if (phone) {
-                    // Handle call action
-                  }
-                },
-                disabled: !selectedOrder?.customer_phone,
-              },
-              {
-                id: "email",
-                label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                disabled: !selectedOrder?.customer_email,
-              },
-              {
-                id: "task",
-                label: "Task",
-                icon: FileText,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
+                id: "deleted",
+                label: "Deleted",
+                count: filterCounts.deleted || 0,
+                color: "#dc3545",
+                icon: <Trash2 size={16} />,
               },
             ]}
-            sections={[
-              {
-                id: "about-order",
-                title: "About this order",
-                icon: ShoppingBag,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [
-                  ...(session?.user?.is_admin === "1" || isAccountRole
-                    ? [
-                        {
-                          label: "Edit as Account",
-                          onClick: () => {
-                            const orderId =
-                              selectedOrder?.id || selectedOrder?.rawData?.id;
-                            if (orderId) {
-                              setEditingOrderIdInSidebar(orderId);
-                              setEditOrderModeInSidebar("account");
-                              setShowEditOrderSidebar(true);
-                            }
-                          },
-                        },
-                      ]
-                    : []),
-                  ...(session?.user?.is_admin === "1" || isDeliveryRole
-                    ? [
-                        {
-                          label: "Edit as Delivery",
-                          onClick: () => {
-                            const orderId =
-                              selectedOrder?.id || selectedOrder?.rawData?.id;
-                            if (orderId) {
-                              setEditingOrderIdInSidebar(orderId);
-                              setEditOrderModeInSidebar("delivery");
-                              setShowEditOrderSidebar(true);
-                            }
-                          },
-                        },
-                      ]
-                    : []),
-                  {
-                    label: "Edit all properties (full page)",
-                    onClick: () => {
-                      const orderId =
-                        selectedOrder?.id || selectedOrder?.rawData?.id;
-                      if (orderId) router.push(`/crm/orders/${orderId}/edit`);
-                    },
-                  },
-                ],
-                fields: [
-                  {
-                    label: "Order Number",
-                    value:
-                      selectedOrder?.order_number ||
-                      `ORD-${selectedOrder?.id}` ||
-                      "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Customer",
-                    value: selectedOrder?.customer_name || "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Phone",
-                    value: selectedOrder?.customer_phone || "N/A",
-                    type: "phone",
-                    copyable: true,
-                    externalLink: selectedOrder?.customer_phone
-                      ? `tel:${selectedOrder.customer_phone}`
-                      : undefined,
-                  },
-                  {
-                    label: "Email",
-                    value: selectedOrder?.customer_email || "N/A",
-                    type: "email",
-                    copyable: true,
-                    externalLink: selectedOrder?.customer_email
-                      ? `mailto:${selectedOrder.customer_email}`
-                      : undefined,
-                    show: !!selectedOrder?.customer_email,
-                  },
-                  {
-                    label: "Stage",
-                    value:
-                      selectedOrder?.stage?.name ||
-                      selectedOrder?.stage ||
-                      "N/A",
-                    type: "badge",
-                    badgeVariant: "primary",
-                  },
-                  {
-                    label: "Order Value",
-                    value:
-                      selectedOrder?.final_amount || selectedOrder?.total_amount
-                        ? `${selectedOrder?.currency || "AED"} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}`
-                        : "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Order Date",
-                    value:
-                      selectedOrder?.order_date ||
-                      selectedOrder?.created_at ||
-                      "N/A",
-                    type: "date",
-                    show: !!(
-                      selectedOrder?.order_date || selectedOrder?.created_at
-                    ),
-                  },
-                  {
-                    label: "Expected Delivery",
-                    value: selectedOrder?.expected_delivery_date || "N/A",
-                    type: "date",
-                    show: !!selectedOrder?.expected_delivery_date,
-                  },
-                  {
-                    label: "Approval Status",
-                    value: selectedOrder?.order_approval_status || "N/A",
-                    type: "badge",
-                    badgeVariant:
-                      selectedOrder?.order_approval_status?.toLowerCase() ===
-                      "approved"
-                        ? "success"
-                        : selectedOrder?.order_approval_status?.toLowerCase() ===
-                            "rejected"
-                          ? "danger"
-                          : "warning",
-                    show: !!selectedOrder?.order_approval_status,
-                  },
-                  {
-                    label: "Fulfillment Status",
-                    value: selectedOrder?.fulfillment_status || "N/A",
-                    type: "badge",
-                    badgeVariant:
-                      selectedOrder?.fulfillment_status
-                        ?.toLowerCase()
-                        ?.includes("completed") ||
-                      selectedOrder?.fulfillment_status
-                        ?.toLowerCase()
-                        ?.includes("delivered")
-                        ? "success"
-                        : selectedOrder?.fulfillment_status
-                              ?.toLowerCase()
-                              ?.includes("progress")
-                          ? "primary"
-                          : "secondary",
-                    show: !!selectedOrder?.fulfillment_status,
-                  },
-                  {
-                    label: "Payment Status",
-                    value: selectedOrder?.payment_status || "N/A",
-                    type: "badge",
-                    badgeVariant:
-                      selectedOrder?.payment_status?.toLowerCase() === "paid"
-                        ? "success"
-                        : selectedOrder?.payment_status?.toLowerCase() ===
-                            "partial"
-                          ? "warning"
-                          : "danger",
-                    show: !!selectedOrder?.payment_status,
-                  },
-                ],
-              },
-            ]}
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+            // searchValue={ordersSearch}
+
+            // onSearch={() => {
+            //   if (ordersSearch.trim()) {
+            //     handleFiltersChange({ search: ordersSearch.trim() });
+            //   } else {
+            //     handleFiltersChange({ search: null });
+            //   }
+            //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+            // }}
+            // searchPlaceholder="Search orders by number, customer, deal..."
+            // onSearchChange={(value) => setOrdersSearch(value)}
+            // showAdvancedFilters={showAdvancedFilters}
+            // onToggleAdvancedFilters={() =>
+            //   setShowAdvancedFilters(!showAdvancedFilters)
+            // }
+            // advancedFilterCount={
+            //   (ordersFilters.assignedTo !== null ? 1 : 0) +
+            //   (ordersFilters.stage !== null ? 1 : 0) +
+            //   (ordersFilters.industry !== null ? 1 : 0) +
+            //   (ordersFilters.orderValueMin !== null ||
+            //   ordersFilters.orderValueMax !== null
+            //     ? 1
+            //     : 0) +
+            //   (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
+            //   (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
+            //   (ordersFilters.paymentStatus !== null ? 1 : 0) +
+            //   (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
+            //     ? 1
+            //     : 0)
+            // }
           />
         )}
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <Card className="border-0 shadow-sm mb-4">
+            <Card.Body>
+              <Row className="g-3 align-items-end">
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Search</Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={ordersSearch}
+                    onChange={(e) => setOrdersSearch(e.target.value)}
+                    placeholder="Search orders by number, customer, deal..."
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Assigned To
+                  </Form.Label>
+                  <Select
+                    options={extensions.map((ext: any) => ({
+                      value: ext.id || ext.extension,
+                      label:
+                        ext.display_name || ext.name || ext.id || ext.extension,
+                    }))}
+                    value={
+                      ordersFilters.assignedTo
+                        ? (() => {
+                            const assignedToId = ordersFilters.assignedTo;
+                            const ext = extensions.find(
+                              (e: any) =>
+                                (e.id || e.extension) === assignedToId,
+                            );
+                            return ext
+                              ? {
+                                  value: assignedToId,
+                                  label:
+                                    ext.display_name ||
+                                    ext.name ||
+                                    assignedToId,
+                                }
+                              : { value: assignedToId, label: assignedToId };
+                          })()
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const assignedToValue = selected ? selected.value : null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        assignedTo: assignedToValue,
+                      }));
+                      // Reset to all when assigned filter changes
+                      setActiveFilter("all");
+                    }}
+                    placeholder="Select user..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Order Stage
+                  </Form.Label>
+                  <Select
+                    options={stages.map((s) => ({
+                      value: s.id.toString(),
+                      label: s.name,
+                    }))}
+                    value={
+                      ordersFilters.stage
+                        ? (() => {
+                            const stageId = ordersFilters.stage;
+                            const stage = stages.find(
+                              (st: any) => st.id.toString() === stageId,
+                            );
+                            return stage
+                              ? { value: stageId, label: stage.name }
+                              : { value: stageId, label: stageId };
+                          })()
+                        : null
+                    }
+                    onChange={(selected) => {
+                      const stageValue = selected ? selected.value : null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        stage: stageValue,
+                      }));
+                      // Update activeFilter to match selected stage
+                      if (stageValue) {
+                        setActiveFilter(stageValue);
+                      } else {
+                        setActiveFilter("all");
+                      }
+                    }}
+                    placeholder="Select stage..."
+                    styles={customSelectStyles}
+                    isClearable
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Industry
+                  </Form.Label>
+                  <Form.Select
+                    value={ordersFilters.industry || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        industry: value,
+                      }));
+                    }}
+                  >
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Banking & Financial Services">
+                      Banking & Financial Services
+                    </option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Telecommunications">
+                      Telecommunications
+                    </option>
+                    <option value="Construction">Construction</option>
+                    <option value="Other">Other</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Order Value Min
+                  </Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ordersFilters.orderValueMin || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        orderValueMin: value,
+                      }));
+                    }}
+                    placeholder="0.00"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Order Value Max
+                  </Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ordersFilters.orderValueMax || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        orderValueMax: value,
+                      }));
+                    }}
+                    placeholder="0.00"
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Order Approval Status
+                  </Form.Label>
+                  <Form.Select
+                    value={ordersFilters.orderApprovalStatus || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        orderApprovalStatus: value,
+                      }));
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Fulfillment Status
+                  </Form.Label>
+                  <Form.Select
+                    value={ordersFilters.fulfillmentStatus || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        fulfillmentStatus: value,
+                      }));
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Payment Status
+                  </Form.Label>
+                  <Form.Select
+                    value={ordersFilters.paymentStatus || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        paymentStatus: value,
+                      }));
+                    }}
+                  >
+                    <option value="">Select Status</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="partial">Partial</option>
+                    <option value="paid">Paid</option>
+                    <option value="refunded">Refunded</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Date From
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={ordersFilters.dateFrom || ""}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        dateFrom: dateValue,
+                      }));
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Date To
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={ordersFilters.dateTo || ""}
+                    onChange={(e) => {
+                      const dateValue = e.target.value || null;
+                      setOrdersFilters((prev) => ({
+                        ...prev,
+                        dateTo: dateValue,
+                      }));
+                    }}
+                  />
+                </Col>
+                <Col md={4}>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        // Map ordersFilters to the format expected by handleFiltersChange
+                        const filtersToApply: Record<string, any> = {};
+
+                        if (ordersSearch) {
+                          filtersToApply.search = ordersSearch;
+                        }
+                        if (ordersFilters.assignedTo) {
+                          filtersToApply.assigned_to = ordersFilters.assignedTo;
+                        }
+                        if (ordersFilters.stage) {
+                          filtersToApply.order_stage_id = ordersFilters.stage;
+                        }
+                        if (ordersFilters.industry) {
+                          filtersToApply.industry = ordersFilters.industry;
+                        }
+                        if (ordersFilters.orderValueMin) {
+                          filtersToApply.order_value_min =
+                            ordersFilters.orderValueMin;
+                        }
+                        if (ordersFilters.orderValueMax) {
+                          filtersToApply.order_value_max =
+                            ordersFilters.orderValueMax;
+                        }
+                        if (ordersFilters.orderApprovalStatus) {
+                          filtersToApply.order_approval_status =
+                            ordersFilters.orderApprovalStatus;
+                        }
+                        if (ordersFilters.fulfillmentStatus) {
+                          filtersToApply.fulfillment_status =
+                            ordersFilters.fulfillmentStatus;
+                        }
+                        if (ordersFilters.paymentStatus) {
+                          filtersToApply.payment_status =
+                            ordersFilters.paymentStatus;
+                        }
+                        if (ordersFilters.dateFrom) {
+                          filtersToApply.date_from = ordersFilters.dateFrom;
+                        }
+                        if (ordersFilters.dateTo) {
+                          filtersToApply.date_to = ordersFilters.dateTo;
+                        }
+
+                        handleFiltersChange(filtersToApply);
+                        setOrdersPagination({
+                          ...ordersPagination,
+                          currentPage: 1,
+                        });
+                        setRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Submit Filters
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setOrdersSearch("");
+                        setOrdersFilters({
+                          assignedTo: null,
+                          stage: null,
+                          industry: null,
+                          orderValueMin: null,
+                          orderValueMax: null,
+                          orderApprovalStatus: null,
+                          fulfillmentStatus: null,
+                          paymentStatus: null,
+                          dateFrom: null,
+                          dateTo: null,
+                        });
+                        handleFiltersChange({});
+                        setCurrentFilters({});
+                        setActiveFilter("all");
+                        setOrdersPagination({
+                          ...ordersPagination,
+                          currentPage: 1,
+                        });
+                        setRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
+
+        {/* Orders Table with GenericTable */}
+        <GenericTable
+          data={filteredOrders}
+          columns={ordersColumns}
+          actions={ordersActions}
+          customizableColumns={true}
+          defaultSelectedColumns={[
+            "orderNumber",
+            "customer",
+            "deal",
+            "stage",
+            "value",
+            "approvalStatus",
+            "fulfillmentStatus",
+            "assignedUser",
+            "orderDate",
+            "owner",
+          ]}
+          columnStorageKey="ordersSelectedColumns"
+          pagination={{
+            currentPage: ordersPagination.currentPage,
+            rowsPerPage: ordersPagination.rowsPerPage,
+            totalRows: totalOrders,
+            pageSizeOptions: [10, 15, 25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setOrdersPagination({
+              ...ordersPagination,
+              currentPage: page,
+              rowsPerPage,
+            });
+          }}
+          sortable={true}
+          onRowClick={async (row) => {
+            if (session?.user?.permissions?.includes("list-crm-orders")) {
+              setSelectedOrder(row.rawData || row);
+              setShowOrderSidebar(true);
+              // Fetch full order details including related deal and lead
+              await fetchOrderDetails(row.rawData?.id || row.id);
+            }
+          }}
+          loading={loading}
+          emptyMessage="No orders found matching your criteria"
+          loadingMessage="Loading orders..."
+          hover={true}
+          uniqueKey="id"
+        />
       </div>
 
       {/* Delete Order Modal */}
@@ -3182,6 +2623,604 @@ const CrmOrders = () => {
         itemType="attachment"
       />
 
+      {/* Order Sidebar */}
+      <GenericSidebar
+        isOpen={showOrderSidebar}
+        onClose={() => {
+          setShowOrderSidebar(false);
+          setSelectedOrder(null);
+          setViewingOrder(null);
+          setRelatedDeal(null);
+          setRelatedLead(null);
+        }}
+        moduleSlug={ModuleSlug.BILLING}
+        title={
+          viewingOrder?.order_number ||
+          `Order #${viewingOrder?.id}` ||
+          "Order Details"
+        }
+        subtitle={viewingOrder?.customer_name || ""}
+        metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ""}
+        email={viewingOrder?.customer_email || ""}
+        phone={viewingOrder?.customer_phone || ""}
+        avatar={{
+          name: viewingOrder?.customer_name || "Order",
+          useIcon: true,
+        }}
+        width="420px"
+        tabs={[
+          {
+            id: "general",
+            label: "General Information",
+            sections: [
+              {
+                id: "order-info",
+                title: "Order Information",
+                icon: ShoppingBag,
+                fields: [
+                  {
+                    label: "Order Number",
+                    value:
+                      viewingOrder?.order_number ||
+                      `ORD-${viewingOrder?.id}` ||
+                      "N/A",
+                    type: "text" as const,
+                  },
+                  {
+                    label: "Stage",
+                    value: viewingOrder?.stage?.name || "Not assigned",
+                    type: "badge" as const,
+                    badgeVariant: "secondary",
+                    show: !!viewingOrder?.stage,
+                  },
+                  {
+                    label: "Status",
+                    value: viewingOrder?.status || "N/A",
+                    type: "badge" as const,
+                    badgeVariant:
+                      viewingOrder?.status?.toLowerCase() === "completed"
+                        ? "success"
+                        : viewingOrder?.status?.toLowerCase() === "pending"
+                          ? "warning"
+                          : "secondary",
+                  },
+                  {
+                    label: "Final Amount",
+                    value:
+                      viewingOrder?.final_amount || viewingOrder?.total_amount
+                        ? `${viewingOrder?.currency || "AED"} ${parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : "N/A",
+                    type: "text" as const,
+                    icon: DollarSign,
+                  },
+                  {
+                    label: "Order Date",
+                    value: viewingOrder?.order_date,
+                    type: "date" as const,
+                    icon: Calendar,
+                    show: !!viewingOrder?.order_date,
+                  },
+                  {
+                    label: "Expected Delivery",
+                    value: viewingOrder?.expected_delivery_date,
+                    type: "date" as const,
+                    icon: Calendar,
+                    show: !!viewingOrder?.expected_delivery_date,
+                  },
+                  {
+                    label: "Industry",
+                    value: viewingOrder?.industry || "N/A",
+                    type: "text" as const,
+                    show: !!viewingOrder?.industry,
+                  },
+                ],
+              },
+              {
+                id: "customer-info",
+                title: "Company Information",
+                icon: User,
+                fields: [
+                  {
+                    label: "Company Name",
+                    value: viewingOrder?.customer_name || "N/A",
+                    type: "text" as const,
+                    icon: Building2,
+                  },
+                  {
+                    label: "Email",
+                    value: viewingOrder?.customer_email || "N/A",
+                    type: "text" as const,
+                    icon: Mail,
+                    show: !!viewingOrder?.customer_email,
+                  },
+                  {
+                    label: "Phone",
+                    value: viewingOrder?.customer_phone || "N/A",
+                    type: "text" as const,
+                    icon: Phone,
+                    show: !!viewingOrder?.customer_phone,
+                  },
+                  {
+                    label: "Address",
+                    value: viewingOrder?.customer_address || "N/A",
+                    type: "text" as const,
+                    show: !!viewingOrder?.customer_address,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "lead-deal",
+            label: "Lead/Deal Information",
+            sections: [
+              // Deal Information Section
+              ...(relatedDeal
+                ? [
+                    {
+                      id: "deal-info",
+                      title: "Deal Information",
+                      icon: Link2,
+                      fields: [
+                        {
+                          label: "Deal Name",
+                          value: relatedDeal?.name || "N/A",
+                          type: "text" as const,
+                        },
+                        {
+                          label: "Stage",
+                          value: relatedDeal?.stage?.name || "Not assigned",
+                          type: "badge" as const,
+                          badgeVariant: "primary",
+                          show: !!relatedDeal?.stage,
+                        },
+                        {
+                          label: "Deal Value",
+                          value:
+                            relatedDeal?.net_value || relatedDeal?.grand_total
+                              ? `${relatedDeal?.currency || "AED"} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
+                              : "N/A",
+                          type: "text" as const,
+                          icon: DollarSign,
+                          show: !!(
+                            relatedDeal?.net_value || relatedDeal?.grand_total
+                          ),
+                        },
+                        {
+                          label: "Assigned To",
+                          value:
+                            extensions.find(
+                              (ext: any) =>
+                                ext?.id == relatedDeal?.assigned_to ||
+                                ext?.extension == relatedDeal?.assigned_to,
+                            )?.display_name ||
+                            extensions.find(
+                              (ext: any) =>
+                                ext?.id == relatedDeal?.assigned_to ||
+                                ext?.extension == relatedDeal?.assigned_to,
+                            )?.name ||
+                            relatedDeal?.assigned_to ||
+                            "Not assigned",
+                          type: "text" as const,
+                          icon: User,
+                          show: !!relatedDeal?.assigned_to,
+                        },
+                        {
+                          label: "Created Date",
+                          value: relatedDeal?.created_at,
+                          type: "date" as const,
+                          icon: Calendar,
+                          show: !!relatedDeal?.created_at,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              // Deal Company Information Section
+              ...(relatedDeal?.company_name
+                ? [
+                    {
+                      id: "deal-company-info",
+                      title: "Deal Company Information",
+                      icon: Building2,
+                      fields: [
+                        {
+                          label: "Company Name",
+                          value: relatedDeal?.company_name || "N/A",
+                          type: "text" as const,
+                          icon: Building2,
+                        },
+                        {
+                          label: "Industry",
+                          value: relatedDeal?.industry || "N/A",
+                          type: "text" as const,
+                          show: !!relatedDeal?.industry,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              // Lead Information Section
+              ...(relatedLead
+                ? [
+                    {
+                      id: "lead-info",
+                      title: "Lead Information",
+                      icon: Target,
+                      fields: [
+                        {
+                          label: "Lead Name",
+                          value: relatedLead?.name || "N/A",
+                          type: "text" as const,
+                        },
+                        {
+                          label: "Stage",
+                          value: relatedLead?.stage?.name || "Not assigned",
+                          type: "badge" as const,
+                          badgeVariant: "primary",
+                          show: !!relatedLead?.stage,
+                        },
+                        {
+                          label: "Lead Potential",
+                          value: relatedLead?.lead_potential || "N/A",
+                          type: "badge" as const,
+                          badgeVariant:
+                            relatedLead?.lead_potential === "Hot"
+                              ? "danger"
+                              : relatedLead?.lead_potential === "Warm"
+                                ? "warning"
+                                : "secondary",
+                          show: !!relatedLead?.lead_potential,
+                        },
+                        {
+                          label: "Status",
+                          value: relatedLead?.status || "N/A",
+                          type: "text" as const,
+                          show: !!relatedLead?.status,
+                        },
+                        {
+                          label: "Assigned To",
+                          value:
+                            extensions.find(
+                              (ext: any) =>
+                                ext?.id == relatedLead?.assigned_to ||
+                                ext?.extension == relatedLead?.assigned_to,
+                            )?.display_name ||
+                            extensions.find(
+                              (ext: any) =>
+                                ext?.id == relatedLead?.assigned_to ||
+                                ext?.extension == relatedLead?.assigned_to,
+                            )?.name ||
+                            relatedLead?.assigned_to ||
+                            "Not assigned",
+                          type: "text" as const,
+                          icon: User,
+                          show: !!relatedLead?.assigned_to,
+                        },
+                        {
+                          label: "Created Date",
+                          value: relatedLead?.created_at,
+                          type: "date" as const,
+                          icon: Calendar,
+                          show: !!relatedLead?.created_at,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              // Campaign Information Section - only if campaign exists
+              ...(relatedLead?.campaign
+                ? [
+                    {
+                      id: "campaign-info",
+                      title: "Campaign Information",
+                      icon: FileText,
+                      fields: [
+                        {
+                          label: "Campaign Name",
+                          value: relatedLead?.campaign?.name || "N/A",
+                          type: "text" as const,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              // Prospect Information Section - only if crm_data exists
+              ...(relatedLead?.crm_data
+                ? [
+                    {
+                      id: "prospect-info",
+                      title: "Prospect Information",
+                      icon: User,
+                      fields: [
+                        {
+                          label: "CRM Data ID",
+                          value: relatedLead?.crm_data?.id
+                            ? `#${relatedLead.crm_data.id}`
+                            : "N/A",
+                          type: "text" as const,
+                          show: !!relatedLead?.crm_data?.id,
+                        },
+                        {
+                          label: "Name",
+                          value:
+                            relatedLead?.crm_data?.name ||
+                            relatedLead?.crm_data?.data?.name ||
+                            "N/A",
+                          type: "text" as const,
+                        },
+                        {
+                          label: "Phone",
+                          value:
+                            relatedLead?.crm_data?.phone ||
+                            relatedLead?.crm_data?.data?.phone ||
+                            "N/A",
+                          type: "text" as const,
+                          icon: Phone,
+                        },
+                        {
+                          label: "Source File",
+                          value: relatedLead?.crm_data?.source_file || "N/A",
+                          type: "text" as const,
+                          show: !!relatedLead?.crm_data?.source_file,
+                        },
+                        {
+                          label: "Uploaded By",
+                          value: relatedLead?.crm_data?.uploaded_by || "N/A",
+                          type: "text" as const,
+                          icon: User,
+                          show: !!relatedLead?.crm_data?.uploaded_by,
+                        },
+                        {
+                          label: "Created At",
+                          value: relatedLead?.crm_data?.created_at,
+                          type: "date" as const,
+                          icon: Calendar,
+                          show: !!relatedLead?.crm_data?.created_at,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              // Empty state if no deal or lead information at all
+              ...(!relatedDeal && !relatedLead
+                ? [
+                    {
+                      id: "no-info",
+                      title: "No Information Available",
+                      icon: AlertCircle,
+                      emptyState: {
+                        icon: AlertCircle,
+                        message:
+                          "No deal or lead information available for this order",
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          },
+          {
+            id: "additional-info",
+            label: "Additional Information",
+            sections: [
+              {
+                id: "additional-details",
+                title: "Additional Information",
+                icon: FileText,
+                fields: [
+                  {
+                    label: "Approval Status",
+                    value: viewingOrder?.order_approval_status || "Not Set",
+                    type: "badge" as const,
+                    badgeVariant:
+                      viewingOrder?.order_approval_status?.toLowerCase() ===
+                      "approved"
+                        ? "success"
+                        : viewingOrder?.order_approval_status?.toLowerCase() ===
+                            "rejected"
+                          ? "danger"
+                          : "warning",
+                  },
+                  {
+                    label: "Fulfillment Status",
+                    value: viewingOrder?.fulfillment_status || "Not Set",
+                    type: "badge" as const,
+                    badgeVariant:
+                      viewingOrder?.fulfillment_status
+                        ?.toLowerCase()
+                        .includes("completed") ||
+                      viewingOrder?.fulfillment_status
+                        ?.toLowerCase()
+                        .includes("delivered")
+                        ? "success"
+                        : viewingOrder?.fulfillment_status
+                              ?.toLowerCase()
+                              .includes("progress")
+                          ? "primary"
+                          : "secondary",
+                  },
+                  {
+                    label: "Payment Status",
+                    value: viewingOrder?.payment_status || "Not Set",
+                    type: "badge" as const,
+                    badgeVariant:
+                      viewingOrder?.payment_status?.toLowerCase() === "paid"
+                        ? "success"
+                        : viewingOrder?.payment_status?.toLowerCase() ===
+                            "partial"
+                          ? "warning"
+                          : "danger",
+                  },
+                  {
+                    label: "Assigned To",
+                    value:
+                      extensions.find(
+                        (ext: any) =>
+                          ext?.id == viewingOrder?.assigned_to ||
+                          ext?.extension == viewingOrder?.assigned_to,
+                      )?.display_name ||
+                      extensions.find(
+                        (ext: any) =>
+                          ext?.id == viewingOrder?.assigned_to ||
+                          ext?.extension == viewingOrder?.assigned_to,
+                      )?.name ||
+                      viewingOrder?.assigned_to ||
+                      "Not assigned",
+                    type: "text" as const,
+                    icon: User,
+                    show: !!viewingOrder?.assigned_to,
+                  },
+                  {
+                    label: "Contract Length",
+                    value: viewingOrder?.contract_length || "N/A",
+                    type: "text" as const,
+                    show: !!viewingOrder?.contract_length,
+                  },
+                ],
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                fields: viewingOrder?.notes
+                  ? [
+                      {
+                        label: "Notes",
+                        value: viewingOrder?.notes,
+                        type: "text" as const,
+                      },
+                    ]
+                  : [],
+                emptyState: !viewingOrder?.notes
+                  ? {
+                      icon: FileText,
+                      message: "No notes available",
+                    }
+                  : undefined,
+              },
+            ],
+          },
+          {
+            id: "history",
+            label: "History",
+            sections: [
+              {
+                id: "activity-history",
+                title: "Activity History",
+                icon: History,
+                badge: {
+                  value: viewingOrder?.histories?.length || 0,
+                  variant: "secondary",
+                },
+                emptyState:
+                  !viewingOrder?.histories ||
+                  viewingOrder.histories.length === 0
+                    ? {
+                        icon: History,
+                        message: "No activity history yet",
+                      }
+                    : undefined,
+                customContent:
+                  viewingOrder?.histories &&
+                  viewingOrder.histories.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "16px",
+                      }}
+                    >
+                      {viewingOrder.histories.map(
+                        (history: any, idx: number) => (
+                          <div
+                            key={history.id || idx}
+                            style={{
+                              padding: "16px",
+                              backgroundColor: "#f9fafb",
+                              borderRadius: "10px",
+                              border: "1px solid #f3f4f6",
+                              position: "relative",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "13px",
+                                fontWeight: "600",
+                                color: "#111827",
+                                marginBottom: "6px",
+                              }}
+                            >
+                              {history.action || "Activity"}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#6b7280",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              by{" "}
+                              {history.user?.name ||
+                                history.created_by ||
+                                "System"}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "#9ca3af",
+                              }}
+                            >
+                              {history.created_at
+                                ? formatDateForTable(history.created_at)
+                                : "N/A"}
+                            </div>
+                            {history.description && (
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  fontSize: "12px",
+                                  color: "#4b5563",
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                {history.description}
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : undefined,
+              },
+            ],
+          },
+        ]}
+        actions={[
+          {
+            label: "Edit Order",
+            icon: Edit,
+            onClick: () => {
+              setShowOrderSidebar(false);
+              setEditingOrderId(viewingOrder?.id);
+              setShowEditModal(true);
+            },
+            variant: "primary",
+            show:
+              session?.user?.permissions?.includes("edit-crm-orders") &&
+              activeFilter !== "lost",
+          },
+          {
+            label: "View Details",
+            icon: Eye,
+            onClick: () => {
+              setShowOrderSidebar(false);
+              handleViewOrder(viewingOrder?.id);
+            },
+            variant: "outline-primary",
+          },
+        ]}
+      />
+
       {/* Filters Sidebar */}
       <GenericFilterSidebar
         isOpen={showFiltersSidebar}
@@ -3190,6 +3229,14 @@ const CrmOrders = () => {
         subtitle="Filter and refine your orders"
         width="400px"
         filters={[
+          {
+            id: "search",
+            label: "Search",
+            type: "text" as const,
+            value: ordersSearch,
+            onChange: (value) => setOrdersSearch(value),
+            placeholder: "Search orders by number, customer, deal...",
+          },
           {
             id: "assignedTo",
             label: "Assigned To",
@@ -6781,16 +6828,18 @@ const CrmOrders = () => {
         </Modal>
       )}
 
-      {/* Edit Order Sidebar (Edit as Account / Edit as Delivery) */}
-      {showEditOrderSidebar && editingOrderIdInSidebar != null && (
-        <EditOrderSidebar
-          onClose={() => {
-            setShowEditOrderSidebar(false);
-            setEditingOrderIdInSidebar(null);
+      {editingOrderId && (
+        <OrderEditModal
+          show={showEditModal}
+          onHide={() => {
+            setShowEditModal(false);
+            setEditingOrderId(null);
           }}
-          orderId={editingOrderIdInSidebar}
-          editMode={editOrderModeInSidebar}
-          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          orderId={editingOrderId}
+          onSuccess={() => {
+            setRefreshKey((prev) => prev + 1);
+            toast.success("Order updated successfully!");
+          }}
         />
       )}
     </React.Fragment>

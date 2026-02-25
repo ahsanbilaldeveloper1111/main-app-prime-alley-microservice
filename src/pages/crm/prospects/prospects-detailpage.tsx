@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, ReactElement } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactElement,
+} from "react";
 import { useRouter } from "next/router";
 import {
   X,
@@ -40,7 +47,9 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, {
+  type CrmActivitiesPanelRef,
+} from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
@@ -145,7 +154,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const hasPhone = phoneList.length > 0;
   const numberToCall = hasPhone ? phoneList[0] : "";
 
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState("");
   const [isDialing, setIsDialing] = useState(false);
@@ -1275,11 +1285,36 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           {[
-            { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
-            { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
-            { icon: Phone, label: "Call", disabled: !hasPhone, onClick: handleCallClick },
-            { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
-            { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
+            {
+              icon: ClipboardList,
+              label: "Note",
+              disabled: false,
+              onClick: activityModals.openNote,
+            },
+            {
+              icon: Mail,
+              label: "Email",
+              disabled: false,
+              onClick: activityModals.openEmail,
+            },
+            {
+              icon: Phone,
+              label: "Call",
+              disabled: !hasPhone,
+              onClick: handleCallClick,
+            },
+            {
+              icon: ClipboardList,
+              label: "Task",
+              disabled: false,
+              onClick: activityModals.openTask,
+            },
+            {
+              icon: Calendar,
+              label: "Meeting",
+              disabled: false,
+              onClick: activityModals.openMeeting,
+            },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -2112,7 +2147,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
               paddingBottom: "0",
             }}
           >
-
             {/* Deals - from prospect.data.tickets[].deals */}
             {(() => {
               const allDeals =
