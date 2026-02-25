@@ -252,7 +252,10 @@ const DealRecordPage: NextPageWithLayout = () => {
   const keyInfoFields: KeyInfoField[] = [
     {
       label: "Email",
-      value: deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--",
+      value:
+        deal?.decision_maker_email ??
+        (deal as any)?.main_decision_maker?.email ??
+        "--",
       copyable: true,
     },
     {
@@ -268,8 +271,11 @@ const DealRecordPage: NextPageWithLayout = () => {
     { label: "Company Name", value: deal?.company_name ?? "--" },
     { label: "Deal Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
     { label: "Deal Value", value: formatDealAmount(deal) },
-    { label: "Expected Close Date", value: formatDate(deal?.expected_close_date) },
-    { label: "Contact owner", value: deal?.assigned_to ?? "--" },
+    {
+      label: "Expected Close Date",
+      value: formatDate(deal?.expected_close_date),
+    },
+    { label: "Associate with", value: deal?.assigned_to ?? "--" },
   ];
 
   // Normalize deal for CrmActivitiesPanel
@@ -279,8 +285,7 @@ const DealRecordPage: NextPageWithLayout = () => {
         data: {
           id: deal.id,
           name: deal.name,
-          phone:
-            deal.decision_maker_phone ?? (deal as any).phone ?? null,
+          phone: deal.decision_maker_phone ?? (deal as any).phone ?? null,
           data: {},
         },
       }
@@ -642,7 +647,9 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontWeight: "400",
                 }}
               >
-                {deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--"}
+                {deal?.decision_maker_email ??
+                  (deal as any)?.main_decision_maker?.email ??
+                  "--"}
               </div>
             </div>
 
@@ -1164,7 +1171,8 @@ const DealRecordPage: NextPageWithLayout = () => {
                   gap: "8px",
                 }}
               >
-                {(deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email) ? (
+                {(deal?.decision_maker_email ??
+                (deal as any)?.main_decision_maker?.email) ? (
                   <>
                     <a
                       href={`mailto:${deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email}`}
@@ -1181,41 +1189,44 @@ const DealRecordPage: NextPageWithLayout = () => {
                         e.currentTarget.style.textDecoration = "none";
                       }}
                     >
-                      {deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email}
+                      {deal?.decision_maker_email ??
+                        (deal as any)?.main_decision_maker?.email}
                     </a>
                     <button
                       onClick={() =>
                         copyToClipboard(
-                          deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "",
+                          deal?.decision_maker_email ??
+                            (deal as any)?.main_decision_maker?.email ??
+                            "",
                         )
                       }
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: "4px",
-                    cursor: "pointer",
-                    color: "#718096",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  title="Copy email"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: "4px",
-                    cursor: "pointer",
-                    color: "#718096",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                  title="Link"
-                >
-                  <Link2 size={14} />
-                </button>
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        color: "#718096",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                      title="Copy email"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: "4px",
+                        cursor: "pointer",
+                        color: "#718096",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                      title="Link"
+                    >
+                      <Link2 size={14} />
+                    </button>
                   </>
                 ) : (
                   <span style={{ fontSize: "14px", color: "#718096" }}>
@@ -1689,10 +1700,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                       borderRadius: "10px",
                     }}
                   >
-                    {deal?.name ?? "This deal"} is a deal at {deal?.company_name ?? "N/A"}, currently in the{" "}
-                    {deal?.stage?.name ?? deal?.status ?? "N/A"} stage. Deal value: {formatDealAmount(deal)}. Expected close:{" "}
-                    {formatDate(deal?.expected_close_date)}. The deal owner is {deal?.assigned_to ?? "N/A"}. Recommended next
-                    steps: review for approval and consider a follow-up call to discuss next steps.
+                    {deal?.name ?? "This deal"} is a deal at{" "}
+                    {deal?.company_name ?? "N/A"}, currently in the{" "}
+                    {deal?.stage?.name ?? deal?.status ?? "N/A"} stage. Deal
+                    value: {formatDealAmount(deal)}. Expected close:{" "}
+                    {formatDate(deal?.expected_close_date)}. The deal owner is{" "}
+                    {deal?.assigned_to ?? "N/A"}. Recommended next steps: review
+                    for approval and consider a follow-up call to discuss next
+                    steps.
                   </div>
 
                   <div
@@ -1841,14 +1856,20 @@ const DealRecordPage: NextPageWithLayout = () => {
                   }}
                 >
                   {[
-                    { label: "Company name", value: deal?.company_name ?? "--" },
+                    {
+                      label: "Company name",
+                      value: deal?.company_name ?? "--",
+                    },
                     { label: "Street address", value: "--" },
                     { label: "City", value: "--" },
                     { label: "Postal code", value: "--" },
                     { label: "State/Region", value: "--" },
                     {
                       label: "Email",
-                      value: deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? "--",
+                      value:
+                        deal?.decision_maker_email ??
+                        (deal as any)?.main_decision_maker?.email ??
+                        "--",
                       link: true,
                     },
                   ].map((field, index) => (
@@ -2226,32 +2247,37 @@ const DealRecordPage: NextPageWithLayout = () => {
                           }}
                         >
                           Phone:{" "}
-                          {[deal.decision_maker_phone_country_code, deal.decision_maker_phone]
+                          {[
+                            deal.decision_maker_phone_country_code,
+                            deal.decision_maker_phone,
+                          ]
                             .filter(Boolean)
                             .join(" ") || "--"}
                         </p>
                       </div>
                       <a
-                    href="#"
-                    style={{
-                      fontSize: "12px",
-                      color: "#141414",
-                      textDecoration: "none",
-                      fontWeight: "300",
-                      display: "inline-flex", // ✅ change this
-                      alignItems: "center",
-                      gap: "4px",
-                      border: "1px solid #cccccc",
-                      borderRadius: "6px",
-                      padding: "6px 12px",
-                    }}
-                  >
-                    View all associated Companies
-                    <ExternalLink size={12} />
+                        href="#"
+                        style={{
+                          fontSize: "12px",
+                          color: "#141414",
+                          textDecoration: "none",
+                          fontWeight: "300",
+                          display: "inline-flex", // ✅ change this
+                          alignItems: "center",
+                          gap: "4px",
+                          border: "1px solid #cccccc",
+                          borderRadius: "6px",
+                          padding: "6px 12px",
+                        }}
+                      >
+                        View all associated Companies
+                        <ExternalLink size={12} />
                       </a>
                     </>
                   ) : (
-                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+                    <p
+                      style={{ fontSize: "13px", color: "#666666", margin: 0 }}
+                    >
                       No companies associated.
                     </p>
                   )}
@@ -2391,23 +2417,25 @@ const DealRecordPage: NextPageWithLayout = () => {
                         </p>
                       </div>
                       <a
-                    href="#"
-                    style={{
-                      fontSize: "13px",
-                      color: "#006162",
-                      textDecoration: "none",
-                      fontWeight: "500",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    View all associated Deals
-                    <ExternalLink size={12} />
+                        href="#"
+                        style={{
+                          fontSize: "13px",
+                          color: "#006162",
+                          textDecoration: "none",
+                          fontWeight: "500",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        View all associated Deals
+                        <ExternalLink size={12} />
                       </a>
                     </>
                   ) : (
-                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+                    <p
+                      style={{ fontSize: "13px", color: "#666666", margin: 0 }}
+                    >
                       No deals.
                     </p>
                   )}
@@ -2689,7 +2717,8 @@ const DealRecordPage: NextPageWithLayout = () => {
                               fontWeight: "500",
                             }}
                           >
-                            {att.file_path?.split("/").pop() ?? `Attachment ${att.id}`}
+                            {att.file_path?.split("/").pop() ??
+                              `Attachment ${att.id}`}
                           </a>
                         </div>
                       ))}
@@ -2748,9 +2777,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             size={32}
             style={{ color: "#006162", animation: "spin 1s linear infinite" }}
           />
-          <p style={{ fontSize: "14px", color: "#718096" }}>
-            Loading deal...
-          </p>
+          <p style={{ fontSize: "14px", color: "#718096" }}>Loading deal...</p>
         </div>
       </Layout>
     );

@@ -474,9 +474,9 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
   }
 };
 
-/** Create a CRM note for a record (prospect, lead, deal, or order). */
+/** Create a CRM note for a record (prospect, lead, deal, order, or company). */
 export const createCrmNote = async (payload: {
-  record_type: "prospect" | "lead" | "deal" | "order";
+  record_type: "prospect" | "lead" | "deal" | "order" | "company";
   record_id: number;
   text: string;
 }): Promise<any> => {
@@ -518,7 +518,7 @@ export interface CrmNotesPaginatedResponse {
 
 /** Fetch CRM notes for a record. */
 export const getCrmNotes = async (
-  recordType: "prospect" | "lead" | "deal" | "order",
+  recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
   params?: { page?: number; per_page?: number }
 ): Promise<CrmNotesPaginatedResponse> => {
@@ -722,9 +722,9 @@ export const getDealMeetings = async (
   }
 };
 
-/** Fetch meetings for a record (prospect, lead, deal, order). */
+/** Fetch meetings for a record (prospect, lead, deal, order, company). */
 export const getCrmMeetingsForRecord = async (
-  recordType: "prospect" | "lead" | "deal" | "order",
+  recordType: "prospect" | "lead" | "deal" | "order" | "company",
   recordId: number,
   params?: { page?: number; per_page?: number }
 ): Promise<CrmMeetingsPaginatedResponse> => {
@@ -3249,7 +3249,7 @@ export const createTask = async (data: {
   time?: string;
   status?: "pending" | "completed" | "failed";
   notes?: Array<{ note: string }>;
-  record_type?: "prospect" | "lead" | "deal" | "order";
+  record_type?: "prospect" | "lead" | "deal" | "order" | "company";
   record_id?: number;
 }): Promise<TaskData> => {
   try {

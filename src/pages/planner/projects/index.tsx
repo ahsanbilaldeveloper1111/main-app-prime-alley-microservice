@@ -1129,7 +1129,7 @@ const WorkPlannerProjects = () => {
                 className="p-0"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.open(`/work-planner/projects/${selectedProject.id}`, '_blank');
+                  window.open(`/planner/projects/${selectedProject.id}`, '_blank');
                 }}
                 style={{ 
                   color: '#6b7280',

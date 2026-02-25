@@ -659,6 +659,7 @@ const CrmProspectsManagement = () => {
     tags: [] as Array<{ value: string; label: string; id?: number }>,
     note: "",
     source: "",
+    next_call: "" as string | undefined,
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -705,7 +706,9 @@ const CrmProspectsManagement = () => {
     if (!router.isReady || router.query.createContact !== "1") return;
     setShowCreateContactSidebar(true);
     const { createContact: _, ...rest } = router.query;
-    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    router.replace({ pathname: router.pathname, query: rest }, undefined, {
+      shallow: true,
+    });
   }, [router.isReady, router.query.createContact]);
 
   // Close Add Contacts dropdown when clicking outside
@@ -769,7 +772,9 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
           disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
+          company_domain:
+            d.company_domain ?? (item as any).company_domain ?? "",
+          next_call: toDatetimeLocal(d.next_call),
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
           ),
@@ -817,6 +822,8 @@ const CrmProspectsManagement = () => {
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
+  const [exportFileName, setExportFileName] = useState("");
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [prospectsFilters, setProspectsFilters] = useState({
@@ -1088,7 +1095,9 @@ const CrmProspectsManagement = () => {
       if (memoizedFilters.assignment_status)
         params.assignment_status = memoizedFilters.assignment_status;
       if (memoizedFilters.user_extension?.length)
-        params.user_extensions = memoizedFilters.user_extension;
+        params.user_extensions = Array.isArray(memoizedFilters.user_extension)
+          ? memoizedFilters.user_extension
+          : [memoizedFilters.user_extension];
       if (
         memoizedFilters.is_viewed !== undefined &&
         memoizedFilters.is_viewed !== ""
@@ -1097,6 +1106,14 @@ const CrmProspectsManagement = () => {
       if (memoizedFilters.start_date)
         params.date_from = memoizedFilters.start_date;
       if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
+      if (memoizedFilters.created_at_from)
+        params.created_at_from = memoizedFilters.created_at_from;
+      if (memoizedFilters.created_at_to)
+        params.created_at_to = memoizedFilters.created_at_to;
+      if (memoizedFilters.last_called_at_from)
+        params.last_called_at_from = memoizedFilters.last_called_at_from;
+      if (memoizedFilters.last_called_at_to)
+        params.last_called_at_to = memoizedFilters.last_called_at_to;
       if (memoizedFilters.has_scheduled_calls !== undefined)
         params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
       if (memoizedFilters.has_tickets !== undefined)
@@ -1111,10 +1128,73 @@ const CrmProspectsManagement = () => {
         params.source_file = memoizedFilters.source_file;
       if (memoizedFilters.tag_ids?.length)
         params.tag_ids = memoizedFilters.tag_ids;
+      if (memoizedFilters.disposition)
+        params.disposition = memoizedFilters.disposition;
+      if (pagination.sortColumn) {
+        params.sort_column = pagination.sortColumn;
+        params.sort_direction = pagination.sortDirection;
+      }
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
       return params;
     },
-    [memoizedFilters, pagination.currentPage, pagination.rowsPerPage],
+    [
+      memoizedFilters,
+      pagination.currentPage,
+      pagination.rowsPerPage,
+      pagination.sortColumn,
+      pagination.sortDirection,
+    ],
+  );
+
+  // Build API params from arbitrary filters (for export with custom filters)
+  const buildExportParams = useCallback(
+    (
+      filters: Record<string, any>,
+      overrides: { page?: number; per_page?: number } = {},
+    ) => {
+      const params: any = {
+        page: overrides.page ?? 1,
+        per_page: overrides.per_page ?? 100,
+        ...overrides,
+      };
+      if (filters.search) params.search = filters.search;
+      if (filters.campaign_id?.length)
+        params.campaign_ids = filters.campaign_id;
+      if (filters.tags?.length) params.tags = filters.tags;
+      if (filters.assignment_status)
+        params.assignment_status = filters.assignment_status;
+      if (filters.user_extension?.length)
+        params.user_extensions = Array.isArray(filters.user_extension)
+          ? filters.user_extension
+          : [filters.user_extension];
+      if (filters.is_viewed !== undefined && filters.is_viewed !== "")
+        params.is_viewed = filters.is_viewed;
+      if (filters.start_date) params.date_from = filters.start_date;
+      if (filters.end_date) params.date_to = filters.end_date;
+      if (filters.created_at_from)
+        params.created_at_from = filters.created_at_from;
+      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
+      if (filters.last_called_at_from)
+        params.last_called_at_from = filters.last_called_at_from;
+      if (filters.last_called_at_to)
+        params.last_called_at_to = filters.last_called_at_to;
+      if (filters.has_scheduled_calls !== undefined)
+        params.has_scheduled_calls = filters.has_scheduled_calls;
+      if (filters.has_tickets !== undefined)
+        params.has_tickets = filters.has_tickets;
+      if (filters.scheduled_call_status)
+        params.scheduled_call_status = filters.scheduled_call_status;
+      if (filters.scheduled_call_from)
+        params.scheduled_call_from = filters.scheduled_call_from;
+      if (filters.scheduled_call_to)
+        params.scheduled_call_to = filters.scheduled_call_to;
+      if (filters.source_file) params.source_file = filters.source_file;
+      if (filters.tag_ids?.length) params.tag_ids = filters.tag_ids;
+      if (filters.disposition) params.disposition = filters.disposition;
+      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+      return params;
+    },
+    [],
   );
 
   // Extract unique source_file values from dataList for creatable select
@@ -1137,6 +1217,14 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
   }, [showColumnEditor]);
+
+  // Initialize export filters when export modal opens (default to current table filters)
+  useEffect(() => {
+    if (showExportModal) {
+      setExportFilters({ ...currentFilters });
+      setExportFileName(`prospects_${moment().format("YYYY-MM-DD")}`);
+    }
+  }, [showExportModal, currentFilters]);
 
   // Fetch extensions data
   useEffect(() => {
@@ -1204,7 +1292,7 @@ const CrmProspectsManagement = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-        
+
         // Also populate the campaignsById map
         const campaignsMap: Record<number, string> = {};
         campaignsResponse.data.forEach((campaign: any) => {
@@ -2246,7 +2334,9 @@ const CrmProspectsManagement = () => {
   // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
-      router.push(`/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`);
+      router.push(
+        `/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`,
+      );
     },
     [router],
   );
@@ -3026,6 +3116,7 @@ const CrmProspectsManagement = () => {
                 tags: [],
                 note: "",
                 source: "",
+                next_call: "",
               });
               setShowCreateContactSidebar(true);
             }}
@@ -3139,6 +3230,7 @@ const CrmProspectsManagement = () => {
           tags: [],
           note: "",
           source: "",
+          next_call: "",
         });
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -3240,7 +3332,7 @@ const CrmProspectsManagement = () => {
             height: "100vh",
             backgroundColor: "#ffffff",
             boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-            zIndex: 1001,
+            zIndex: 999999,
             display: "flex",
             flexDirection: "column",
           }}
@@ -3527,7 +3619,7 @@ const CrmProspectsManagement = () => {
                     </div>
                   </div>
 
-                  {/* Optional: Campaign (required), Owner, Source, Lifecycle stage, Disposition, Legal basis */}
+                  {/* Optional: Campaign, Associate with, Lifecycle stage, Disposition, Legal basis */}
                   <div
                     className="contact-form-section"
                     style={{ marginTop: "24px" }}
@@ -3549,20 +3641,21 @@ const CrmProspectsManagement = () => {
                         Campaign <span style={{ color: "#f2545b" }}>*</span>
                       </label>
                       {(() => {
-                        const campaignSelectOptions =
-                          availableCampaigns.map((c) => ({
+                        const campaignSelectOptions = availableCampaigns.map(
+                          (c) => ({
                             value: String(c.id),
                             label: c.label,
-                          }));
+                          }),
+                        );
                         return (
                           <Select
                             value={
                               contactForm.campaign_id != null
-                                ? campaignSelectOptions.find(
+                                ? (campaignSelectOptions.find(
                                     (o) =>
                                       o.value ===
                                       String(contactForm.campaign_id),
-                                  ) ?? null
+                                  ) ?? null)
                                 : null
                             }
                             onChange={(opt: any) =>
@@ -3604,7 +3697,7 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Owner
+                        Associate with
                       </label>
                       <Select
                         value={(() => {
@@ -3636,7 +3729,7 @@ const CrmProspectsManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select owner"
+                        placeholder="Select associate with"
                         isClearable
                         isSearchable
                         styles={{
@@ -5024,11 +5117,13 @@ const CrmProspectsManagement = () => {
                 defaultSortColumn={pagination.sortColumn}
                 defaultSortDirection={pagination.sortDirection}
                 onSort={(column, direction) => {
-                  setPagination({
-                    ...pagination,
+                  setPagination((prev) => ({
+                    ...prev,
                     sortColumn: column,
                     sortDirection: direction,
-                  });
+                    currentPage: 1,
+                  }));
+                  setRefreshKey((prev) => prev + 1);
                 }}
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
@@ -5120,7 +5215,7 @@ const CrmProspectsManagement = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -5134,7 +5229,7 @@ const CrmProspectsManagement = () => {
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Contact Owner",
+                      label: "Associate with",
                       showDropdown: true,
                       dropdownOptions: [
                         {
@@ -8630,18 +8725,202 @@ const CrmProspectsManagement = () => {
         </Modal.Footer>
       </Modal>
       {/* Export Modal */}
-      <Modal show={showExportModal} onHide={() => setShowExportModal(false)}>
+      <Modal
+        show={showExportModal}
+        onHide={() => setShowExportModal(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title>Export Prospects</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p>Export {totalRecords} prospects to CSV file?</p>
+          <p className="text-muted small mb-3">
+            Choose filters to define which prospects are exported. Defaults
+            match your current table view.
+          </p>
           <Form.Group className="mb-3">
-            <Form.Label>File Name</Form.Label>
+            <Form.Label>File name</Form.Label>
             <Form.Control
               type="text"
-              defaultValue={`prospects_${moment().format("YYYY-MM-DD")}`}
-              placeholder="Enter file name"
+              value={exportFileName}
+              onChange={(e) => setExportFileName(e.target.value)}
+              placeholder="prospects_2025-02-24"
+            />
+          </Form.Group>
+          <hr />
+          <h6 className="mb-3">Export filters</h6>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Associate with</Form.Label>
+                <Form.Select
+                  value={
+                    exportFilters.user_extension
+                      ? String(exportFilters.user_extension)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.user_extension = v;
+                      else delete next.user_extension;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All owners</option>
+                  {extensions.map((ext) => (
+                    <option key={ext.extension} value={ext.extension}>
+                      {ext.name || ext.extension}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Lead status</Form.Label>
+                <Form.Select
+                  value={exportFilters.disposition || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.disposition = v;
+                      else delete next.disposition;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All status</option>
+                  <option value="hot_lead">Hot Lead</option>
+                  <option value="warm_lead">Warm Lead</option>
+                  <option value="cold_lead">Cold Lead</option>
+                  <option value="interested">Interested</option>
+                  <option value="callback_requested">Callback Requested</option>
+                  <option value="no_answer">No Answer</option>
+                  <option value="not_interested">Not Interested</option>
+                  <option value="follow_up">Follow Up</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Create date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.created_at_from;
+                    const to = exportFilters.created_at_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.created_at_from;
+                        delete next.created_at_to;
+                      } else {
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.created_at_from = today;
+                          next.created_at_to = today;
+                        } else if (v === "week") {
+                          next.created_at_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.created_at_to = today;
+                        } else {
+                          next.created_at_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.created_at_to = today;
+                        }
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Last activity date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.last_called_at_from;
+                    const to = exportFilters.last_called_at_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.last_called_at_from;
+                        delete next.last_called_at_to;
+                      } else {
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.last_called_at_from = today;
+                          next.last_called_at_to = today;
+                        } else if (v === "week") {
+                          next.last_called_at_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.last_called_at_to = today;
+                        } else {
+                          next.last_called_at_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.last_called_at_to = today;
+                        }
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Form.Group className="mb-0">
+            <Form.Label>Search (optional)</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Filter by name, phone, etc."
+              value={exportFilters.search || ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                setExportFilters((prev) => {
+                  const next = { ...prev };
+                  if (v) next.search = v;
+                  else delete next.search;
+                  return next;
+                });
+              }}
             />
           </Form.Group>
         </Modal.Body>
@@ -8651,12 +8930,12 @@ const CrmProspectsManagement = () => {
           </Button>
           <Button
             variant="primary"
-            disabled={exporting || totalRecords === 0}
+            disabled={exporting}
             onClick={async () => {
-              if (totalRecords === 0) {
-                toast.info("No prospects to export");
-                return;
-              }
+              const name =
+                exportFileName.trim() ||
+                `prospects_${moment().format("YYYY-MM-DD")}`;
+              const ext = name.endsWith(".csv") ? "" : ".csv";
               setExporting(true);
               try {
                 const PER_PAGE = 100;
@@ -8664,13 +8943,19 @@ const CrmProspectsManagement = () => {
                 let page = 1;
                 for (;;) {
                   const response = await getCrmData(
-                    buildCrmDataParams({ page, per_page: PER_PAGE }),
+                    buildExportParams(exportFilters, {
+                      page,
+                      per_page: PER_PAGE,
+                    }),
                   );
                   const chunk = response?.data || [];
                   allData.push(...chunk);
-                  if (chunk.length < PER_PAGE || allData.length >= totalRecords)
-                    break;
+                  if (chunk.length < PER_PAGE) break;
                   page += 1;
+                }
+                if (allData.length === 0) {
+                  toast.info("No prospects match the selected filters.");
+                  return;
                 }
                 const exportColumns = prospectsColumns.filter((c) =>
                   selectedColumns.includes(c.key),
@@ -8702,7 +8987,7 @@ const CrmProspectsManagement = () => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `prospects_${moment().format("YYYY-MM-DD")}.csv`;
+                a.download = name + ext;
                 a.click();
                 window.URL.revokeObjectURL(url);
                 setShowExportModal(false);

@@ -13,13 +13,11 @@ import {
   updateUserProfile,
   deleteUserProfile,
   getEmployeeDashboardCounters,
-  getLocations,
   getEmployeeDashboardGraphDepartmentHeadcount,
   createJourney,
   type UserProfile,
   type UserProfileAddress,
   type UserProfilePayload,
-  type Location,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
@@ -277,7 +275,7 @@ const Employees = () => {
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department?: string; search?: string; user_ids?: string[] } = {
+      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department_id?: number; search?: string; user_ids?: string[] } = {
         page,
         limit: ITEMS_PER_PAGE,
       };
@@ -285,7 +283,7 @@ const Employees = () => {
       if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
       if (appliedStatus?.trim()) params.status = appliedStatus.trim().toLowerCase();
       if (appliedLocationId != null) params.location_id = appliedLocationId;
-      if (appliedDepartment?.trim()) params.department = appliedDepartment.trim();
+      if (appliedDepartment?.trim()) params.department_id = Number(appliedDepartment.trim());
       if (appliedSearch?.trim()) params.search = appliedSearch.trim();
       if (appliedManagerIds.length > 0) params.user_ids = appliedManagerIds;
       const { data, pagination: p } = await getUserProfiles(params);
@@ -330,22 +328,6 @@ const Employees = () => {
   const loadProfilesRef = useRef(loadProfiles);
   loadProfilesRef.current = loadProfiles;
 
-  const loadFilterLocations = useCallback(async () => {
-    setLoadingFilterLocations(true);
-    try {
-      const { data } = await getLocations({ limit: 500 });
-      setFilterLocations(Array.isArray(data) ? data : []);
-    } catch {
-      setFilterLocations([]);
-    } finally {
-      setLoadingFilterLocations(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFilterLocations();
-  }, [loadFilterLocations]);
-
   const toggleDropdown = (dropdown: string) => {
     setOpenDropdown(openDropdown === dropdown ? null : dropdown);
   };
@@ -369,17 +351,6 @@ const Employees = () => {
     setActiveTab("Personal");
   };
 
-  const loadLocationsForModal = useCallback(async () => {
-    setLoadingLocations(true);
-    try {
-      const { data } = await getLocations({ limit: 500 });
-      setLocationsList(Array.isArray(data) ? data : []);
-    } catch {
-      setLocationsList([]);
-    } finally {
-      setLoadingLocations(false);
-    }
-  }, []);
 
   const openCreateModal = () => {
     setShowCreateModal(true);
@@ -511,12 +482,20 @@ const Employees = () => {
   const totalCount = pagination?.total ?? filteredProfiles.length;
   const departments = mainAppDepartments ?? [];
   const statuses = ["Active", "Inactive"];
-  const selectedLocationName = selectedLocationId != null
-    ? (filterLocations.find((l) => l.id === selectedLocationId)?.name ?? String(selectedLocationId))
-    : "";
-  const appliedLocationName = appliedLocationId != null
-    ? (filterLocations.find((l) => l.id === appliedLocationId)?.name ?? String(appliedLocationId))
-    : "";
+  
+  /** Resolve department id to display label (for dropdown button and filter chip) */
+  const selectedDepartmentLabel = useMemo(() => {
+    if (!selectedDepartment) return "";
+    const d = departments.find((d) => String((d as { id?: number }).id) === selectedDepartment);
+    return d != null ? hierarchyLabel(d) : selectedDepartment;
+  }, [selectedDepartment, departments]);
+
+  const appliedDepartmentLabel = useMemo(() => {
+    if (!appliedDepartment) return "";
+    const d = departments.find((d) => String((d as { id?: number }).id) === appliedDepartment);
+    return d != null ? hierarchyLabel(d) : appliedDepartment;
+  }, [appliedDepartment, departments]);
+
   const managers = mainAppUsers ?? [];
 
   
@@ -640,7 +619,7 @@ const Employees = () => {
             />
             <input
               type="text"
-              placeholder="Search by phone, cnic/id, title, designation "
+              placeholder="Search by identification number,phone, extension, or designation "
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -675,7 +654,7 @@ const Employees = () => {
               }}
             >
               <span>📋</span>
-              <span>{selectedDepartment || 'Department'}</span>
+              <span>{selectedDepartmentLabel || 'Department'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'department' && (
@@ -738,21 +717,22 @@ const Employees = () => {
                     })
                     .map((dept, idx) => {
                       const label = hierarchyLabel(dept);
+                      const deptId = typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? "") : "";
                       return (
                         <div
-                          key={typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? idx) : label}
+                          key={deptId || String(idx)}
                           onClick={() => {
-                            setSelectedDepartment(label);
+                            setSelectedDepartment(deptId);
                             setOpenDropdown(null);
                             setDepartmentSearchTerm('');
                           }}
                           style={{
                             padding: '10px 16px',
                             cursor: 'pointer',
-                            backgroundColor: selectedDepartment === label ? '#f3f4f6' : 'white'
+                            backgroundColor: selectedDepartment === deptId ? '#f3f4f6' : 'white'
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === label ? '#f3f4f6' : 'white'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === deptId ? '#f3f4f6' : 'white'}
                         >
                           {label}
                         </div>
@@ -763,93 +743,7 @@ const Employees = () => {
             )}
           </div>
 
-          {/* Location Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('location');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>📍</span>
-              <span>{selectedLocationName || 'Location'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'location' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '200px'
-              }}>
-                {loadingFilterLocations ? (
-                  <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>Loading locations…</div>
-                ) : (
-                  <>
-                    <div
-                      onClick={() => {
-                        setSelectedLocationId(null);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedLocationId === null ? '#f3f4f6' : 'white',
-                        borderBottom: '1px solid #e5e7eb',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedLocationId === null ? '#f3f4f6' : 'white'}
-                    >
-                      All locations
-                    </div>
-                    {filterLocations.length === 0 ? (
-                      <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>No locations</div>
-                    ) : (
-                  filterLocations.map((loc) => {
-                    const label = loc.name ?? String(loc.id);
-                    const isSelected = selectedLocationId === loc.id;
-                    return (
-                      <div
-                        key={loc.id}
-                        onClick={() => {
-                          setSelectedLocationId(loc.id);
-                          setOpenDropdown(null);
-                        }}
-                        style={{
-                          padding: '10px 16px',
-                          cursor: 'pointer',
-                          backgroundColor: isSelected ? '#f3f4f6' : 'white'
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'; }}
-                      >
-                        {label}
-                      </div>
-                    );
-                  })
-                )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          
 
           {/* Status Filter */}
           <div style={{ position: 'relative' }}>
@@ -1251,7 +1145,7 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {appliedDepartment}
+                {appliedDepartmentLabel}
                 <button
                   onClick={() => { setSelectedDepartment(''); setAppliedDepartment(''); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
@@ -1260,25 +1154,7 @@ const Employees = () => {
                 </button>
               </span>
             )}
-            {appliedLocationId != null && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                {appliedLocationName}
-                <button
-                  onClick={() => { setSelectedLocationId(null); setAppliedLocationId(null); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
+            
             {appliedStatus && (
               <span style={{
                 padding: '4px 12px',
@@ -1388,7 +1264,7 @@ const Employees = () => {
                 <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                   <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Employee</th>
                   <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>CNIC/ID</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Title</th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Designation</th>
                   <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Dept</th>
                   <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Phone</th>
                   {/* <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Location</th> */}
@@ -1473,7 +1349,7 @@ const Employees = () => {
                         {profile.identification_number ?? "—"}
                       </td>
                       <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {profile.job_title ?? "—"}
+                        {profile.designation ?? "—"}
                       </td>
                       <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
                         {profile.department_id != null
@@ -1538,25 +1414,31 @@ const Employees = () => {
                           </button>
                           )}
 
-{session?.user?.permissions?.includes('update-employee-staff-management') && (
+{session?.user?.permissions?.includes('update-employee-staff-management') && (() => {
+                            const profileHasJourney = (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null;
+                            return (
                           <button
                             type="button"
-                            onClick={(e) => openJourneyModal(profile, e)}
+                            onClick={(e) => !profileHasJourney && openJourneyModal(profile, e)}
+                            disabled={profileHasJourney}
                             style={{
                               padding: "6px",
                               border: "1px solid #e5e7eb",
                               borderRadius: "6px",
-                              background: "white",
-                              cursor: "pointer",
+                              background: profileHasJourney ? "#f3f4f6" : "white",
+                              cursor: profileHasJourney ? "not-allowed" : "pointer",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
+                              opacity: profileHasJourney ? 0.8 : 1,
                             }}
-                            title="Create Journey"
+                            title={profileHasJourney ? "Journey started" : "Create Journey"}
                           >
-                            <Calendar size={16} color="#6366f1" />  Create Journey
+                            <Calendar size={16} color={profileHasJourney ? "#9ca3af" : "#6366f1"} />
+                            <span>{profileHasJourney ? " Journey started" : " Create Journey"}</span>
                           </button>
-                          )}
+                            );
+                          })()}
 
 
                           {session?.user?.permissions?.includes('delete-employee-staff-management') && (

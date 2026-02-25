@@ -86,7 +86,10 @@ import {
   Link as LinkIcon,
   Linkedin,
   ExternalLink,
+  ClipboardList,
+  MoreHorizontal,
 } from "lucide-react";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
@@ -909,6 +912,27 @@ const CrmCompanyManagement = () => {
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
+
+  // First phone: company + enrichment (structured_data.phones, raw_data.phones) for modals and Call button
+  const companySidebarPhone =
+    selectedCompany?.phone ??
+    selectedCompany?.data?.enrichment_data?.structured_data?.phones?.[0]?.number ??
+    selectedCompany?.data?.enrichment_data?.raw_data?.phones?.[0] ??
+    "";
+
+  // Activity modals for company sidebar (Call, Task, Meeting, Note, Email with record_type company)
+  const companyActivityModals = useCrmActivityModals({
+    recordType: "company",
+    recordId: selectedCompany?.id ?? selectedCompany?.rawData?.id ?? 0,
+    recordName: selectedCompany?.name ?? "",
+    recordEmail:
+      selectedCompany?.data?.email ??
+      selectedCompany?.email ??
+      selectedCompany?.data?.enrichment_data?.raw_data?.emails?.[0] ??
+      selectedCompany?.data?.enrichment_data?.structured_data?.emails?.[0]?.email ??
+      "",
+    recordPhone: companySidebarPhone,
+  });
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
@@ -2594,10 +2618,18 @@ const CrmCompanyManagement = () => {
   }, []);
 
   // Handle company row click
-  const handleCompanyClick = useCallback((company: any) => {
-    setSelectedCompany(company);
-    setShowCompanySidebar(true);
-  }, []);
+  const handleCompanyClick = useCallback(
+    (company: any) => {
+      const id = company?.id ?? company?.rawData?.id;
+      if (id != null) {
+        router.push(`/crm/companies/company-detailpage?id=${id}`);
+      } else {
+        setSelectedCompany(company);
+        setShowCompanySidebar(true);
+      }
+    },
+    [router],
+  );
 
   // Handle close company sidebar
   const handleCloseCompanySidebar = useCallback(() => {
@@ -3321,9 +3353,10 @@ const CrmCompanyManagement = () => {
             height: "100vh",
             backgroundColor: "#ffffff",
             boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-            zIndex: 1001,
+            zIndex: 999999,
             display: "flex",
             flexDirection: "column",
+
           }}
         >
           {/* Header */}
@@ -3608,7 +3641,7 @@ const CrmCompanyManagement = () => {
                     </div>
                   </div>
 
-                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
+                  {/* Optional: Campaign, Associate with, Lifecycle stage, Disposition, Legal basis */}
                   <div
                     className="contact-form-section"
                     style={{ marginTop: "24px" }}
@@ -3680,7 +3713,7 @@ const CrmCompanyManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Contact owner
+                        Associate with
                       </label>
                       <Select
                         value={(() => {
@@ -3712,7 +3745,7 @@ const CrmCompanyManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select contact owner"
+                        placeholder="Select associate with"
                         isClearable
                         isSearchable
                         styles={{
@@ -5181,7 +5214,7 @@ const CrmCompanyManagement = () => {
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: true,
+                  showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
@@ -7173,9 +7206,10 @@ const CrmCompanyManagement = () => {
             }}
             recording={selectedRecording}
           />
+          {companyActivityModals.modals}
         </div>{" "}
         {/* End main content area */}
-        {/* Company Detail Sidebar – company info only, links (website/social) instead of Call/Note/Meeting */}
+        {/* Company Detail Sidebar – same design as prospects: Call, Task, Meeting, Note, Email with record_type company */}
         {showCompanySidebar &&
           (() => {
             const enrichment = selectedCompany?.data?.enrichment_data as
@@ -7190,41 +7224,25 @@ const CrmCompanyManagement = () => {
                   : `https://${domain}`
                 : null);
             const struct = enrichment?.structured_data;
-            const structSocial = struct?.social_links || [];
-            const seenUrls = new Set<string>();
-            const linkActions: QuickAction[] = [];
-            if (websiteUrl && !seenUrls.has(websiteUrl)) {
-              seenUrls.add(websiteUrl);
-              linkActions.push({
-                id: "website",
-                label: "Website",
-                icon: LinkIcon,
-                onClick: () => window.open(websiteUrl, "_blank"),
-              });
-            }
-            structSocial.forEach(
-              (
-                s:
-                  | { platform?: string | null; url?: string | null }
-                  | null
-                  | undefined,
-              ) => {
-                if (!s?.url || seenUrls.has(s.url)) return;
-                seenUrls.add(s.url);
-                const label = s.platform
-                  ? String(s.platform).charAt(0).toUpperCase() +
-                    String(s.platform).slice(1)
-                  : "Social";
-                linkActions.push({
-                  id: `social-${linkActions.length}`,
-                  label,
-                  icon: (s.platform || "").toLowerCase().includes("linkedin")
-                    ? Linkedin
-                    : ExternalLink,
-                  onClick: () => window.open(s.url!, "_blank"),
-                });
+            const companyQuickActions: QuickAction[] = [
+              { id: "note", label: "Note", icon: ClipboardList, onClick: companyActivityModals.openNote },
+              { id: "email", label: "Email", icon: Mail, onClick: companyActivityModals.openEmail },
+              {
+                id: "call",
+                label: "Call",
+                icon: Phone,
+                disabled: !companySidebarPhone,
+                onClick: () =>
+                  companySidebarPhone &&
+                  handleCallClick({
+                    ...selectedCompany,
+                    phone: companySidebarPhone,
+                    name: selectedCompany?.name,
+                  }),
               },
-            );
+              { id: "task", label: "Task", icon: ClipboardList, onClick: companyActivityModals.openTask },
+              { id: "meeting", label: "Meeting", icon: Calendar, onClick: companyActivityModals.openMeeting },
+            ];
             const aboutFields: SidebarField[] = [];
             if (selectedCompany?.name)
               aboutFields.push({
@@ -7442,7 +7460,11 @@ const CrmCompanyManagement = () => {
                 recordLink={{
                   label: "View record",
                   onClick: () => {
-                    if (selectedCompany) handleViewData(selectedCompany);
+                    if (selectedCompany?.id != null) {
+                      router.push(
+                        `/crm/companies/company-detailpage?id=${selectedCompany.id}`,
+                      );
+                    }
                     setShowCompanySidebar(false);
                   },
                 }}
@@ -7462,7 +7484,7 @@ const CrmCompanyManagement = () => {
                     },
                   ],
                 }}
-                quickActions={linkActions}
+                quickActions={companyQuickActions}
                 sections={sections}
               />
             );

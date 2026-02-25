@@ -236,22 +236,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       iconBgColor: '#E0F2FE',
       subtitle: 'Outbound calls in the system',
     },
-    {
-      title: 'Inbound',
-      value: summary?.inbound || 0,
-      icon: PhoneIncoming,
-      iconColor: '#10B981',
-      iconBgColor: '#D1FAE5',
-      subtitle: 'Inbound calls in the system',
-    },
-    {
-      title: 'Outbound',
-      value: summary?.outbound || 0,
-      icon: PhoneOutgoing,
-      iconColor: '#0EA5E9',
-      iconBgColor: '#E0F2FE',
-      subtitle: 'Outbound calls in the system',
-    }
+   
   ];
 
   // Create cards data for PageSummaryGrid

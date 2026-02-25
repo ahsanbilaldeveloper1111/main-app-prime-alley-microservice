@@ -985,7 +985,7 @@ const ContactPanel = () => {
         <div style={{ paddingTop: 8 }}>
           <FieldRow label="Email" value="rizwan@primealley.com" />
           <FieldRow label="Phone Number" value="+44 7831 505446" />
-          <FieldRow label="Contact owner" value="Rizwan Haider" />
+          <FieldRow label="Associate with" value="Rizwan Haider" />
           <FieldRow label="Last Contacted" value="" />
           <FieldRow label="Lifecycle Stage" value="Lead" />
           <FieldRow label="Lead Status" value="New" />
