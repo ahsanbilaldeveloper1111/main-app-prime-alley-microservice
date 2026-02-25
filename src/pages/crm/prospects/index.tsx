@@ -82,6 +82,8 @@ import {
   FileText,
   Target,
   Layers,
+  MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
@@ -8267,13 +8269,6 @@ const CrmProspectsManagement = () => {
             }}
             quickActions={[
               {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {}, // This is handled internally now
-                disabled: false,
-              },
-              {
                 id: "call",
                 label: "Call",
                 icon: Phone,
@@ -8281,16 +8276,16 @@ const CrmProspectsManagement = () => {
                 disabled: !selectedProspect?.phone,
               },
               {
-                id: "email",
-                label: "Email",
-                icon: Mail,
+                id: "whatsapp",
+                label: "WhatsApp",
+                icon: MessageCircle,
                 onClick: () => {},
-                //disabled: !selectedProspect?.email
+                disabled: false,
               },
               {
-                id: "task",
-                label: "Task",
-                icon: CheckSquare,
+                id: "sms",
+                label: "SMS",
+                icon: MessageSquare,
                 onClick: () => {},
                 disabled: false,
               },
@@ -8302,10 +8297,17 @@ const CrmProspectsManagement = () => {
                 disabled: false,
               },
               {
+                id: "email",
+                label: "Email",
+                icon: Mail,
+                onClick: () => {},
+                disabled: false,
+              },
+              {
                 id: "more",
                 label: "More",
                 icon: MoreVertical,
-                onClick: () => console.log("More actions"),
+                onClick: () => {},
                 disabled: false,
               },
             ]}
