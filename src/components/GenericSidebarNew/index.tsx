@@ -167,10 +167,14 @@ export interface GenericSidebarProps {
   };
   actionsDropdown?: {
     label: string;
-    items: Array<{
-      label: string;
-      onClick: () => void;
-    }>;
+    items: Array<
+      | { label: string; onClick: () => void }
+      | {
+          label: string;
+          subItems: Array<{ label: string; value: string }>;
+          onSubItemSelect: (value: string) => void;
+        }
+    >;
   };
   permissionMessage?: string;
 
@@ -449,7 +453,7 @@ interface NotesModalProps {
   isOpen: boolean;
   onClose: () => void;
   recordName: string;
-  onSave: (note: string, createTask: boolean, taskDueDate?: string) => void;
+  onSave: (note: string, createTask: boolean, taskDueDate?: string, attachments?: File[]) => void;
 }
 
 const NotesModal: React.FC<NotesModalProps> = ({
@@ -490,6 +494,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
       noteText,
       createTask,
       createTask ? "In 3 business days (Friday)" : undefined,
+      attachments.length > 0 ? attachments : undefined,
     );
     setNoteText("");
     setCreateTask(false);
@@ -2875,7 +2880,6 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   // State management
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [title, setTitle] = useState("");
-  const [hostType, setHostType] = useState<"user" | "rotation">("user");
   const [selectedHost, setSelectedHost] = useState(hostEmail);
   const [startDate, setStartDate] = useState(new Date());
   const [startTime, setStartTime] = useState("01:00");
@@ -2895,9 +2899,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   const [showHostDropdown, setShowHostDropdown] = useState(false);
   const [showAttendeesDropdown, setShowAttendeesDropdown] = useState(false);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
+  const [selectedTimezone, setSelectedTimezone] = useState("Asia/Almaty");
 
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const startDateInputRef = useRef<HTMLInputElement>(null);
   const locationDropdownRef = useRef<HTMLDivElement>(null);
+  const timezoneDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -2915,6 +2922,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         !locationDropdownRef.current.contains(event.target as Node)
       ) {
         setShowLocationDropdown(false);
+      }
+      if (
+        timezoneDropdownRef.current &&
+        !timezoneDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowTimezoneDropdown(false);
       }
     };
 
@@ -3015,8 +3028,46 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     );
   };
 
-  const handleDateSelect = (date: Date) => {
-    setStartDate(date);
+  const formatDateForDateInput = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = `${date.getMonth() + 1}`.padStart(2, "0");
+    const dd = `${date.getDate()}`.padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const parseDateInputToLocalDate = (value: string) => {
+    // value format: YYYY-MM-DD
+    const [y, m, d] = value.split("-").map((p) => Number(p));
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  };
+
+  const setStartDateAndSyncWeek = (date: Date) => {
+    const next = new Date(date);
+    setStartDate(next);
+    setCurrentMonth(next);
+  };
+
+  /** Get the date for a calendar column (dayIndex) in the visible week */
+  const getDateForColumn = (dayIndex: number) => {
+    const dayDate = new Date(currentMonth);
+    const startOfWeek = new Date(dayDate);
+    startOfWeek.setDate(
+      dayDate.getDate() - dayDate.getDay() + (hideWeekends ? 1 : 0),
+    );
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + dayIndex);
+    return d;
+  };
+
+  const openStartDatePicker = () => {
+    const el = startDateInputRef.current;
+    if (!el) return;
+    if ("showPicker" in el && typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
+      (el as HTMLInputElement & { showPicker: () => void }).showPicker();
+      return;
+    }
+    else el.click();
   };
 
   const handlePrevWeek = () => {
@@ -3040,9 +3091,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     try {
       await onSchedule({
         title,
-        hostType,
+        hostType: "user",
         hostEmail: selectedHost,
-        startDate: startDate.toISOString(),
+        // Pass a date-only string to avoid timezone shifting (e.g. UTC+ offsets -> previous day in ISO UTC).
+        startDate: formatDateForDateInput(startDate),
         startTime,
         endTime,
         attendees,
@@ -3052,7 +3104,6 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
         internalNote,
       });
       setTitle("");
-      setHostType("user");
       setStartDate(new Date());
       setStartTime("01:00");
       setEndTime("01:30");
@@ -3085,6 +3136,43 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     "Client Office",
     "Custom Location",
   ];
+
+  const meetingTimezones = [
+    "UTC",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "America/Toronto",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Europe/Moscow",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Asia/Almaty",
+    "Asia/Bangkok",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Australia/Sydney",
+    "Australia/Melbourne",
+  ];
+
+  const getTimezoneLabel = (tz: string) => {
+    try {
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        timeZoneName: "longOffset",
+      });
+      const parts = formatter.formatToParts(new Date());
+      const offsetPart = parts.find((p) => p.type === "timeZoneName");
+      const offset = offsetPart?.value ?? "";
+      const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+      return offset ? `${offset} ${city}` : tz;
+    } catch {
+      return tz;
+    }
+  };
 
   return (
     <div
@@ -3199,58 +3287,6 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 Host
               </label>
 
-              <div
-                style={{ display: "flex", gap: "16px", marginBottom: "12px" }}
-              >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    color: "#141414",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="hostType"
-                    checked={hostType === "user"}
-                    onChange={() => setHostType("user")}
-                    style={{
-                      width: "16px",
-                      height: "16px",
-                      cursor: "pointer",
-                    }}
-                  />
-                  User
-                </label>
-
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    color: "#141414",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="hostType"
-                    checked={hostType === "rotation"}
-                    onChange={() => setHostType("rotation")}
-                    style={{
-                      width: "16px",
-                      height: "16px",
-                      cursor: "pointer",
-                    }}
-                  />
-                  Meeting rotation
-                </label>
-              </div>
-
               <div style={{ position: "relative" }}>
                 <button
                   onClick={() => setShowHostDropdown(!showHostDropdown)}
@@ -3340,7 +3376,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
+                      position: "relative",
+                      cursor: "pointer",
                     }}
+                    onClick={openStartDatePicker}
                   >
                     <Calendar size={16} style={{ color: "#718096" }} />
                     <span>
@@ -3350,6 +3389,26 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         year: "numeric",
                       })}
                     </span>
+                    <input
+                      aria-label="Start date"
+                      ref={startDateInputRef}
+                      type="date"
+                      value={formatDateForDateInput(startDate)}
+                      onChange={(e) => {
+                        const parsed = parseDateInputToLocalDate(e.target.value);
+                        if (parsed) setStartDateAndSyncWeek(parsed);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: 0,
+                        cursor: "pointer",
+                        zIndex: 2,
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -3918,7 +3977,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
             >
               {/* Left - Today Button */}
               <button
-                onClick={() => setStartDate(new Date())}
+                onClick={() => setStartDateAndSyncWeek(new Date())}
                 style={{
                   padding: "8px 16px",
                   backgroundColor: "#ffffff",
@@ -4052,7 +4111,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
               </label>
 
               {/* Right - Timezone Selector */}
-              <div style={{ position: "relative" }}>
+              <div
+                style={{ position: "relative" }}
+                ref={timezoneDropdownRef}
+              >
                 <button
                   onClick={() => setShowTimezoneDropdown(!showTimezoneDropdown)}
                   style={{
@@ -4076,9 +4138,66 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  UTC +05:00 Almaty, Aqtau, Aqtobe, Ashgabat
-                  <ChevronDown size={14} />
+                  {getTimezoneLabel(selectedTimezone)}
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: showTimezoneDropdown ? "rotate(180deg)" : "none",
+                      transition: "transform 0.2s",
+                    }}
+                  />
                 </button>
+                {showTimezoneDropdown && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      right: 0,
+                      marginTop: "4px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "5px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                      zIndex: 1001,
+                      overflow: "hidden",
+                      maxHeight: "280px",
+                      overflowY: "auto",
+                      minWidth: "240px",
+                    }}
+                  >
+                    {meetingTimezones.map((tz) => (
+                      <button
+                        key={tz}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTimezone(tz);
+                          setShowTimezoneDropdown(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 16px",
+                          backgroundColor:
+                            selectedTimezone === tz ? "#f7fafc" : "transparent",
+                          border: "none",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          color: "#141414",
+                          cursor: "pointer",
+                          transition: "background-color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f7fafc";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor =
+                            selectedTimezone === tz ? "#f7fafc" : "transparent";
+                        }}
+                      >
+                        {getTimezoneLabel(tz)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -4112,6 +4231,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 currentDayDate.setDate(startOfWeek.getDate() + index);
 
                 const isCurrentDay = isToday(currentDayDate);
+                const isSelectedDay = isSelected(currentDayDate);
 
                 return (
                   <div
@@ -4124,7 +4244,9 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                           ? "1px solid #e2e8f0"
                           : "none",
                       backgroundColor: "#ffffff",
+                      cursor: "pointer",
                     }}
+                    onClick={() => setStartDateAndSyncWeek(currentDayDate)}
                   >
                     <div
                       style={{
@@ -4140,10 +4262,13 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       style={{
                         fontSize: "16px",
                         fontWeight: isCurrentDay ? "600" : "400",
-                        color: isCurrentDay ? "#ffffff" : "#141414",
+                        color:
+                          isCurrentDay || isSelectedDay ? "#ffffff" : "#141414",
                         backgroundColor: isCurrentDay
                           ? "#ff3842"
-                          : "transparent",
+                          : isSelectedDay
+                            ? "#141414"
+                            : "transparent",
                         borderRadius: "50%",
                         width: "32px",
                         height: "32px",
@@ -4202,6 +4327,14 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         cursor: "pointer",
                         position: "relative",
                       }}
+                      onClick={() => {
+                        const cellDate = getDateForColumn(dayIndex);
+                        setStartDateAndSyncWeek(cellDate);
+                        setStartTime(
+                          `${hour.toString().padStart(2, "0")}:00`,
+                        );
+                        setEndTime(`${hour.toString().padStart(2, "0")}:30`);
+                      }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = "#f0f4f8";
                       }}
@@ -4241,7 +4374,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
       </div>
     </div>
   );
-};
+};    
 
 // ============================================================================
 // MAIN COMPONENT
@@ -4431,6 +4564,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     new Set(),
   );
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const [openActionsSubMenuIndex, setOpenActionsSubMenuIndex] = useState<
+    number | null
+  >(null);
+  const [actionsSubMenuSearch, setActionsSubMenuSearch] = useState("");
   const [showSectionActions, setShowSectionActions] = useState<string | null>(
     null,
   );
@@ -4524,6 +4661,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setShowActionsDropdown(false);
+        setOpenActionsSubMenuIndex(null);
+        setActionsSubMenuSearch("");
       }
 
       Object.entries(sectionDropdownRefs.current).forEach(([key, ref]) => {
@@ -4563,12 +4702,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowNotesModal(false);
   };
 
-  const handleNoteSave = async (note: string, createTask: boolean, taskDueDate?: string) => {
+  const handleNoteSave = async (note: string, createTask: boolean, taskDueDate?: string, attachments?: File[]) => {
     const text = note.trim();
     if (!text) return;
     if (recordType && recordId != null) {
       try {
-        await createCrmNote({ record_type: recordType, record_id: Number(recordId), text });
+        await createCrmNote({
+          record_type: recordType,
+          record_id: Number(recordId),
+          text,
+          ...(attachments && attachments.length > 0 && { attachments }),
+        });
         setShowNotesModal(false);
         toast.success('Note created successfully');
         onNoteCreate?.(note, createTask, taskDueDate);
@@ -6193,7 +6337,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               {actionsDropdown && (
                 <div style={{ position: "relative" }} ref={dropdownRef}>
                   <button
-                    onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                    onClick={() => {
+                      const next = !showActionsDropdown;
+                      setShowActionsDropdown(next);
+                      if (next) {
+                        setOpenActionsSubMenuIndex(null);
+                        setActionsSubMenuSearch("");
+                      }
+                    }}
                     style={{
                       padding: "6px 14px",
                       backgroundColor: "transparent",
@@ -6234,35 +6385,155 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                         overflow: "hidden",
                       }}
                     >
-                      {actionsDropdown.items.map((item, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            item.onClick();
-                            setShowActionsDropdown(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "10px 16px",
-                            backgroundColor: "transparent",
-                            border: "none",
-                            textAlign: "left",
-                            fontSize: "14px",
-                            color: "#141414",
-                            cursor: "pointer",
-                            transition: "background-color 0.2s",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "#f7fafc";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor =
-                              "transparent";
-                          }}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
+                      {actionsDropdown.items.map((item, index) => {
+                        const hasSubItems = "subItems" in item && item.subItems?.length;
+                        const isSubMenuOpen = openActionsSubMenuIndex === index;
+                        const searchLower = actionsSubMenuSearch.trim().toLowerCase();
+                        const filteredSubItems =
+                          hasSubItems && isSubMenuOpen && searchLower
+                            ? item.subItems.filter((sub) =>
+                                sub.label.toLowerCase().includes(searchLower),
+                              )
+                            : hasSubItems
+                              ? item.subItems
+                              : [];
+                        return (
+                          <div key={index} style={{ position: "relative" }}>
+                            <button
+                              onClick={() => {
+                                if (hasSubItems) {
+                                  setOpenActionsSubMenuIndex((prev) =>
+                                    prev === index ? null : index,
+                                  );
+                                  if (openActionsSubMenuIndex !== index)
+                                    setActionsSubMenuSearch("");
+                                } else {
+                                  if ("onClick" in item) item.onClick();
+                                  setShowActionsDropdown(false);
+                                  setOpenActionsSubMenuIndex(null);
+                                }
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "10px 16px",
+                                backgroundColor:
+                                  isSubMenuOpen ? "#f7fafc" : "transparent",
+                                border: "none",
+                                textAlign: "left",
+                                fontSize: "14px",
+                                color: "#141414",
+                                cursor: "pointer",
+                                transition: "background-color 0.2s",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!hasSubItems)
+                                  e.currentTarget.style.backgroundColor =
+                                    "#f7fafc";
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!hasSubItems)
+                                  e.currentTarget.style.backgroundColor =
+                                    "transparent";
+                              }}
+                            >
+                              {item.label}
+                              {hasSubItems && (
+                                <ChevronDown
+                                  size={14}
+                                  style={{
+                                    transform: isSubMenuOpen
+                                      ? "rotate(180deg)"
+                                      : "none",
+                                  }}
+                                />
+                              )}
+                            </button>
+                            {hasSubItems && isSubMenuOpen && (
+                              <div
+                                style={{
+                                  backgroundColor: "#f8fafc",
+                                  borderTop: "1px solid #e2e8f0",
+                                  maxHeight: "280px",
+                                  overflow: "hidden",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  placeholder="Search owner..."
+                                  value={actionsSubMenuSearch}
+                                  onChange={(e) =>
+                                    setActionsSubMenuSearch(e.target.value)
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    margin: "8px",
+                                    padding: "6px 10px",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: "4px",
+                                    fontSize: "13px",
+                                    outline: "none",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    maxHeight: "220px",
+                                    overflowY: "auto",
+                                  }}
+                                >
+                                  {filteredSubItems.length === 0 ? (
+                                    <div
+                                      style={{
+                                        padding: "12px 16px 12px 24px",
+                                        fontSize: "14px",
+                                        color: "#64748b",
+                                      }}
+                                    >
+                                      No matching owner
+                                    </div>
+                                  ) : (
+                                    filteredSubItems.map((sub, subIndex) => (
+                                      <button
+                                        key={subIndex}
+                                        onClick={() => {
+                                          item.onSubItemSelect(sub.value);
+                                          setShowActionsDropdown(false);
+                                          setOpenActionsSubMenuIndex(null);
+                                          setActionsSubMenuSearch("");
+                                        }}
+                                        style={{
+                                          width: "100%",
+                                          padding: "8px 16px 8px 24px",
+                                          backgroundColor: "transparent",
+                                          border: "none",
+                                          textAlign: "left",
+                                          fontSize: "14px",
+                                          color: "#141414",
+                                          cursor: "pointer",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor =
+                                            "#e2e8f0";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor =
+                                            "transparent";
+                                        }}
+                                      >
+                                        {sub.label}
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

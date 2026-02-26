@@ -1208,6 +1208,25 @@ const CrmProspectsManagement = () => {
     [],
   );
 
+  const fetchCrmDataForExport = useCallback(
+    async (filters: Record<string, any>) => {
+      const PER_PAGE = 100;
+      const allData: CrmDataItem[] = [];
+      let page = 1;
+      for (;;) {
+        const response = await getCrmData(
+          buildExportParams(filters, { page, per_page: PER_PAGE }),
+        );
+        const chunk = response?.data || [];
+        allData.push(...chunk);
+        if (chunk.length < PER_PAGE) break;
+        page += 1;
+      }
+      return allData;
+    },
+    [buildExportParams],
+  );
+
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
     const sources = new Set<string>();
@@ -2325,6 +2344,42 @@ const CrmProspectsManagement = () => {
     setShowProspectSidebar(false);
     setSelectedProspect(null);
   }, []);
+
+  // Handle owner change from prospect sidebar (Update owner dropdown)
+  const handleProspectOwnerSelect = useCallback(
+    async (ownerValue: string) => {
+      const prospect = selectedProspect;
+      if (!prospect?.id) return;
+      const name = prospect.name ?? "";
+      const phone = prospect.phone ?? "";
+      const campaignId =
+        prospect.campaign_id ?? prospect.campaign?.id ?? null;
+      const existingData = (prospect.data as Record<string, unknown>) ?? {};
+      try {
+        await updateCrmData(prospect.id, {
+          name,
+          phone,
+          campaign_id: campaignId,
+          data: { ...existingData, contact_owner: ownerValue || undefined },
+        });
+        fetchCrmData();
+        setSelectedProspect((prev: CrmDataItem | null) =>
+          prev
+            ? {
+                ...prev,
+                data: {
+                  ...(prev.data as Record<string, unknown>),
+                  contact_owner: ownerValue || null,
+                },
+              }
+            : null,
+        );
+      } catch {
+        // Error already shown by updateCrmData
+      }
+    },
+    [selectedProspect, fetchCrmData],
+  );
 
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -8258,8 +8313,16 @@ const CrmProspectsManagement = () => {
                   },
                 },
                 {
-                  label: "Assign to User",
-                  onClick: () => console.log("Assign"),
+                  label: "Update owner",
+                  subItems: extensions.map((ext: any) => ({
+                    label:
+                      ext.display_name ||
+                      ext.name ||
+                      ext.extension ||
+                      String(ext.id ?? ""),
+                    value: String(ext.extension ?? ext.id ?? ""),
+                  })),
+                  onSubItemSelect: handleProspectOwnerSelect,
                 },
                 {
                   label: "Delete",
@@ -8849,8 +8912,15 @@ const CrmProspectsManagement = () => {
                 >
                   <option value="">All owners</option>
                   {extensions.map((ext) => (
-                    <option key={ext.extension} value={ext.extension}>
-                      {ext.name || ext.extension}
+                    <option
+                      key={String(ext.id || ext.extension)}
+                      value={String(ext.id || ext.extension)}
+                    >
+                      {ext.display_name ||
+                        ext.name ||
+                        ext.id ||
+                        ext.extension ||
+                        ""}
                     </option>
                   ))}
                 </Form.Select>
@@ -9016,36 +9086,107 @@ const CrmProspectsManagement = () => {
               const ext = name.endsWith(".csv") ? "" : ".csv";
               setExporting(true);
               try {
-                const PER_PAGE = 100;
-                const allData: CrmDataItem[] = [];
-                let page = 1;
-                for (;;) {
-                  const response = await getCrmData(
-                    buildExportParams(exportFilters, {
-                      page,
-                      per_page: PER_PAGE,
-                    }),
-                  );
-                  const chunk = response?.data || [];
-                  allData.push(...chunk);
-                  if (chunk.length < PER_PAGE) break;
-                  page += 1;
-                }
+                const allData = await fetchCrmDataForExport(exportFilters);
                 if (allData.length === 0) {
                   toast.info("No prospects match the selected filters.");
                   return;
                 }
-                const exportColumns = prospectsColumns.filter((c) =>
-                  selectedColumns.includes(c.key),
+
+                // Export ALL fields present in the API response rows.
+                // - Top-level keys become columns (excluding campaign/company objects).
+                // - Nested `data` object expands into columns by field name only (no "data." prefix).
+                // - campaign_id shows campaign name (from campaign object); company_name from company object.
+                // - crm_summary column shows crm_summary.summary only.
+                const topLevelKeys = new Set<string>();
+                const nestedDataKeys = new Set<string>();
+                for (const row of allData as any[]) {
+                  if (!row || typeof row !== "object") continue;
+                  for (const k of Object.keys(row)) {
+                    if (k === "data" && row.data && typeof row.data === "object") {
+                      for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
+                    } else if (k !== "campaign" && k !== "company") {
+                      topLevelKeys.add(k);
+                    }
+                  }
+                }
+
+                const preferredTopLevelOrder = [
+                  "id",
+                  "name",
+                  "phone",
+                  "user_extension",
+                  "campaign_id",
+                  "source_file",
+                  "directory",
+                  "is_viewed",
+                  "scheduled_call_at",
+                  "uploaded_by",
+                  "created_by",
+                  "note",
+                  "company_name",
+                  "company_domain",
+                  "company_id",
+                  "created_at",
+                  "updated_at",
+                  "tags",
+                  "crm_summary",
+                ];
+
+                const orderedTopLevel = [
+                  ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
+                  ...Array.from(topLevelKeys)
+                    .filter((k) => !preferredTopLevelOrder.includes(k))
+                    .sort((a, b) => a.localeCompare(b)),
+                ];
+                const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
+                  a.localeCompare(b),
                 );
-                const getCellValue = (row: any, col: TableColumn<any>) => {
-                  const raw = (col as any).accessor
-                    ? (col as any).accessor(row)
-                    : row[col.key as keyof CrmDataItem];
+                const nestedDataKeysSet = new Set(orderedNestedData);
+
+                // Headers: top-level keys + data field names only (no "data." prefix); dedupe so shared keys appear once
+                const headers = [
+                  ...orderedTopLevel,
+                  ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
+                ];
+
+                const getCellValue = (row: any, header: string) => {
+                  // campaign_id: show campaign label (name) from campaign object
+                  if (header === "campaign_id") {
+                    const label = row?.campaign?.name;
+                    if (label != null) return label;
+                    const id = row?.campaign_id;
+                    return id != null ? String(id) : "";
+                  }
+                  // company_name: show name from company object
+                  if (header === "company_name") {
+                    const name = row?.company?.name;
+                    if (name != null) return name;
+                    const fallback = row?.company_name;
+                    return fallback != null ? String(fallback) : "";
+                  }
+                  // crm_summary: show summary text only, not the full object
+                  if (header === "crm_summary") {
+                    const summary =
+                      row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+                    if (summary != null) return typeof summary === "string" ? summary : String(summary);
+                    return "";
+                  }
+                  // Nested data fields: use field name only (read from row.data; if key exists in both, prefer data)
+                  let raw: any;
+                  if (nestedDataKeysSet.has(header)) {
+                    raw = row?.data?.[header] ?? row?.[header];
+                  } else {
+                    raw = row?.[header];
+                  }
                   if (raw == null) return "";
-                  return typeof raw === "object"
-                    ? JSON.stringify(raw)
-                    : String(raw);
+                  if (typeof raw === "string") return raw;
+                  if (typeof raw === "number" || typeof raw === "boolean")
+                    return String(raw);
+                  try {
+                    return JSON.stringify(raw);
+                  } catch {
+                    return String(raw);
+                  }
                 };
                 const escapeCsv = (val: string) => {
                   const s = String(val);
@@ -9053,10 +9194,10 @@ const CrmProspectsManagement = () => {
                   return s;
                 };
                 const csvContent = [
-                  exportColumns.map((col) => escapeCsv(col.label)).join(","),
+                  headers.map((h) => escapeCsv(h)).join(","),
                   ...allData.map((row) =>
-                    exportColumns
-                      .map((col) => escapeCsv(getCellValue(row, col)))
+                    headers
+                      .map((h) => escapeCsv(getCellValue(row, h)))
                       .join(","),
                   ),
                 ].join("\n");

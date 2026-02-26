@@ -1324,6 +1324,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<CrmActivitie
                               {meeting.meeting_type} · {meetingDate ? new Date(meeting.meeting_date).toLocaleDateString('en-US') : '—'} {meeting.meeting_time ?? ''}
                               {meeting.status ? ` · ${meeting.status}` : ''}
                             </p>
+                            {meeting.meet_link && (
+                              <p style={{ fontSize: '13px', color: '#2563eb', margin: '6px 0 0 0', lineHeight: '1.5' }}>
+                                <a href={meeting.meet_link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                  Join meeting
+                                </a>
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
