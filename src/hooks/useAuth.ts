@@ -2,7 +2,6 @@ import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
-import { sessionStore } from '../utils/sessionStore';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
 import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 

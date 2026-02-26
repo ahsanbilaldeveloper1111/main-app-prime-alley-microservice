@@ -2,7 +2,6 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import PageHeader from "@components/PageHeader";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import {

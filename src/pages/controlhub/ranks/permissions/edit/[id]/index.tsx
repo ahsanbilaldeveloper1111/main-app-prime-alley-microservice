@@ -1,13 +1,11 @@
 import React,{ReactElement, useEffect, useState} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, Form, Modal, Row, OverlayTrigger, Tooltip } from 'react-bootstrap'
-import RolesSourceData from '@views/Table/DataTable/SourceData/RolesSourceData'
+import { Button, Card, Col, Form, Row, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { toast } from 'react-toastify'
-import permissionsData from '@common/JsonData/PermissionsData'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
-import { CheckSquare, Square, ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import '@assets/scss/common.scss';
 
 interface Permission {

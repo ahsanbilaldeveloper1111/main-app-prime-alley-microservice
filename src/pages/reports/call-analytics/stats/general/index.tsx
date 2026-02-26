@@ -2,7 +2,6 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
 import { Column } from '@components/CustomDataTable';
 import { Row, Form } from 'react-bootstrap';
@@ -15,7 +14,7 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
+import { formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 
 // Helper function to convert HH:MM:SS to seconds
 const timeStringToSeconds = (timeStr: string): number => {

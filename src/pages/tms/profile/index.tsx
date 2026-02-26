@@ -1,8 +1,7 @@
-import React, { ReactElement, useState, useCallback, useEffect, useMemo } from "react";
+import React, { ReactElement, useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { Button, Card, Row, Form, Alert, Col } from "react-bootstrap";
+import { Button, Card, Row, Form, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { FaQrcode } from "react-icons/fa";
 
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -10,7 +9,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { ClusterName } from "@models/tms/CiscoPBXResponse";
 import Select from "react-select";
 
-import { User, UserSettingUpdate } from "@models/tms/User";
+import { User } from "@models/tms/User";
 import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 

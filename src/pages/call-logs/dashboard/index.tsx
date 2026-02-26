@@ -2,38 +2,26 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
-import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
+import { Button, Modal, Row, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import CallLogsFilters from '@components/filters/CallLogsFilters';
-import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
+import { ModuleSlug } from '@utils/Helper';
 import '@assets/scss/common.scss';
 
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import moment from 'moment';
 import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
-import PageLoader from '@components/PageLoader';
 
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { SummaryCard } from '@components/PageSummaryGrid';
 import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from 'lucide-react';
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import StatsCards from "@components/GenericStatsCards";
 
-import { motion } from 'framer-motion';
 
 
 interface Summary {

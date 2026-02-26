@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import { useRouter } from "next/router";
 import {
-  X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -16,7 +15,6 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
@@ -24,27 +22,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
   Ticket,
-  Paperclip,
   Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
   AlertCircle,
-  ShoppingCart,
-  Pencil,
-  Trash2,
-  MessageCircle,
 } from "lucide-react";
 import Layout from "@layout/index";
 import { getAllCrmDataById, type CrmDataItem } from "@utils/crm";
-import { GlobalDateTimeFormat } from "@utils/Helper";
-import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel, {

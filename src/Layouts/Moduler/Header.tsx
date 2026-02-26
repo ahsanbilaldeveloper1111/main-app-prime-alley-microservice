@@ -7,7 +7,6 @@ import tokenService from "../../utils/tokenService";
 // Import sidebar styles
 import "../../assets/scss/sidebar.scss";
 
-import CompanyLogo from "@assets/images/ringedge-logo.png";
 import CompanyLogo2 from "@assets/images/Prime3.png";
 
 import { authAPI } from "@utils/api";
@@ -15,7 +14,6 @@ import { useAuth } from "../../hooks/useAuth";
 import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-import { FiChevronDown } from "react-icons/fi";
 
 // Destructure constants for easier use
 const { BASE_URL, DOM_SELECTORS, TIMING, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;

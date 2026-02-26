@@ -10,7 +10,6 @@ import { appWithTranslation } from "next-i18next";
 import { ToastContainer } from 'react-toastify';
 import * as Sentry from "@sentry/nextjs";
 import Providers from "@components/providers";
-import favicon from "@assets/images/favicon.png";
 import Router, { useRouter } from "next/router";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";

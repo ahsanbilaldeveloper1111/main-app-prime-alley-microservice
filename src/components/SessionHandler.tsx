@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import tokenService from '../utils/tokenService';
-import { useBrowserCloseDetection } from '../hooks/useBrowserCloseDetection';
 
 interface SessionHandlerProps {
   children: React.ReactNode;

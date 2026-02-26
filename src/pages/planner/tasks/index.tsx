@@ -9,61 +9,29 @@ import React, {
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 import { listTasks, listProjects, getTask, updateTask, deleteTask, getTaskActivities } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
-import { GlobalDateFormat, GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
-import { Spinner } from "react-bootstrap";
+import { ModuleSlug } from "@utils/Helper";
 import { 
   Container, 
-  Row, 
-  Col, 
-  Card, 
   Button, 
-  Form, 
-  Table, 
-  Badge, 
-  Dropdown,
-  Nav,
-  Offcanvas,
-  InputGroup,
-  Modal
+  Badge
 } from 'react-bootstrap';
 import { 
-  CheckSquare, 
-  Plus, 
-  FolderPlus, 
-  ChevronDown, 
-  Search, 
-  X,
+  Plus,
   MoreVertical,
-  User,
-  Calendar,
-  AlertCircle,
-  CalendarDays,
-  Users,
-  Star,
-  Grid3x3,
-  Bell,
-  Edit,
   Trash2,
-  MessageSquare,
-  Send,
   SlidersHorizontal,
   Pencil
 } from 'lucide-react';
-import SelectBox from '@components/SelectBox';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
-import moment from 'moment';
 
 interface Task {
   id: string;

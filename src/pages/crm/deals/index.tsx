@@ -17,29 +17,11 @@ import GenericTable, {
 } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "react-icons/fi";
-import { ChevronDown } from "lucide-react";
+
+
 import {
   getDeals,
   getStages,
@@ -55,18 +37,6 @@ import {
   deleteMeeting,
   markDealLost,
   getLead,
-  updateDeal,
-  getCrmProducts,
-  getCampaignById,
-  getIndustries,
-  getBusinessTypes,
-  createEstimate,
-  CrmProduct,
-  StageData,
-  IndustryData,
-  DealTemplateData,
-  DealTemplateField,
-  BusinessTypeData,
   PDFDownloadDeal,
   getDealFollowUps,
   createDealFollowUp,
@@ -80,11 +50,8 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -108,11 +75,7 @@ import {
   X,
   Users,
   PlusCircle,
-  Zap,
-  Star,
   Clock,
-  Search,
-  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -128,7 +91,6 @@ import {
   ShoppingBag,
   History,
   GitBranch,
-  MessageSquare,
   Send,
   UserCheck,
   User,
@@ -138,15 +100,10 @@ import {
   Phone as PhoneIcon,
   Paperclip,
   CheckSquare,
-  Upload,
   Download as DownloadIcon,
   AlertCircle,
   RotateCcw,
   Percent,
-  Package,
-  RefreshCw,
-  ArrowLeft,
-  Copy,
   Trash,
 } from "lucide-react";
 import {
@@ -161,11 +118,8 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber as parsePhoneNumberLib } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
 import "@assets/scss/common.scss";

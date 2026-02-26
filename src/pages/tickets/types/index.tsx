@@ -10,11 +10,11 @@ import {
   DeleteType,
 } from "@utils/ticket-types";
 import { Column } from "@components/CustomDataTable";
-import { Button, Card, Form, Row,Col } from "react-bootstrap";
+import { Button, Form } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import PageHeader from "@components/PageHeader";
-import { Plus, Edit, Trash2, Info, Ticket, List, CheckCircle, Tag } from "lucide-react";
+import { Plus, Edit, Trash2, Info, Ticket } from "lucide-react";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import FormModal from "@pages/partial/FormModal";
 import "@assets/scss/common.scss";

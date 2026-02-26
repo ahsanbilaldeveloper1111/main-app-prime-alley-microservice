@@ -15,7 +15,6 @@ import { Button } from "react-bootstrap";
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 import "@assets/scss/datatable-style.scss";
 import { GetProducts, GetProductCategories } from "@utils/accounting";

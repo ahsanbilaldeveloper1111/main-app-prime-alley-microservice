@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useState, useMemo, useCallback } from "react";
+import React, { ReactElement, useState, useMemo, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -20,18 +20,12 @@ import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import Select from "react-select";
 import "@assets/scss/common.scss";
 
 import GsmCompanyFilter from "@components/filters/GsmCompanyFilter";
-import AnimatedNumber from "@components/AnimatedNumber";
-import imgStatus1 from "@assets/images/widget/img-status-1.svg";
-import imgStatus2 from "@assets/images/widget/img-status-2.svg";
-import imgStatus3 from "@assets/images/widget/img-status-3.svg";
-import imgStatus4 from "@assets/images/widget/img-status-4.svg";
-import { FiEdit, FiTrash2, FiEye, FiSend, FiMessageSquare } from "react-icons/fi";
+import { FiTrash2, FiEye, FiSend, FiMessageSquare } from "react-icons/fi";
 import DatatableActionButton from "@components/DatatableActionButton";
 import GsmAssignmentModal from "@pages/gsm/partial/GsmAssignmentModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";

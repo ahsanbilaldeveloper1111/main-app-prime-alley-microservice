@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Maximize2, Minimize2, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
-import { Badge, Button } from 'react-bootstrap';
+import { Badge } from 'react-bootstrap';
 import AICompose, { type AIComposeOpenedFrom } from '@components/aicompose';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';

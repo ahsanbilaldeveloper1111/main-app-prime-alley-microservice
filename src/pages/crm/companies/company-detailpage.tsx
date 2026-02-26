@@ -17,7 +17,6 @@ import {
   Building2,
   Link2,
   AlertCircle,
-  MessageCircle,
   FileText,
   ExternalLink,
 } from "lucide-react";

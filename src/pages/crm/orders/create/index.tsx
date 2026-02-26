@@ -17,10 +17,8 @@ import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";

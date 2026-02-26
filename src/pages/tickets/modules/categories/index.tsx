@@ -5,11 +5,10 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListSubmodules, CreateSubmodule, DeleteSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
 import { Column } from '@components/CustomDataTable';
-import { Button, Row, Col, Card, Badge } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { GetHierarchyData } from '@utils/users';
-import Select from 'react-select';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";

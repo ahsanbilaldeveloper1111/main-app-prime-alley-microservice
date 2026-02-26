@@ -1,15 +1,12 @@
 import NonLayout from "@layout/NonLayout";
-import Image from "next/image";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
 import PageLoader from "@components/PageLoader";
-import logodark from "@assets/images/Prime3.png";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({

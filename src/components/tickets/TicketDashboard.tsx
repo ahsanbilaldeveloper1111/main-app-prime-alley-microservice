@@ -1,20 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Row, Col } from 'react-bootstrap';
 import { DashboardData } from '@utils/tickets';
-import AnimatedNumber from '@components/AnimatedNumber';
 import ChartDonut from '@components/ChartDonut';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg';
 import TicketsFilters from '@components/filters/TicketFilters';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import PageSummaryGrid from '@components/PageSummaryGrid';
 
 
 interface Summary {

@@ -6,7 +6,7 @@ import GenericTable, { TableColumn } from '@components/GenericTable';
 import { getHostGroups, ZebbixHostGroup } from '@utils/zebbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';

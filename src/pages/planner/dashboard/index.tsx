@@ -9,8 +9,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { 
-  Plus, LayoutGrid, ChevronDown,
-  MoreVertical, Folder
+  Plus, LayoutGrid, ChevronDown, Folder
 } from 'lucide-react';
 import { Button, Spinner } from 'react-bootstrap';
 import ProjectTabsContent from '../projects/partials/ProjectTabsContent';

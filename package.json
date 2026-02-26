@@ -10,6 +10,7 @@
     "build:silent": "NODE_OPTIONS='--max-old-space-size=8192' next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "build:all-ts-errors": "__NEXT_TEST_MODE=true npm run build",
     "build:all-ts-errors-win": "set __NEXT_TEST_MODE=true && npm run build:win",
     "test": "node src/__tests__/run-all-tests.js"
@@ -128,6 +129,7 @@
     "autoprefixer": "^10.4.21",
     "eslint": "^9.29.0",
     "eslint-config-next": "^15.3.4",
+    "eslint-plugin-unused-imports": "^4.1.6",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.8.3"

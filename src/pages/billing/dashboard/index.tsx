@@ -7,13 +7,11 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form } from 'react-bootstrap';
-import { AlertCircle, Check, Clock, DollarSign, FileText, Wallet, TrendingUp, Package } from 'lucide-react';
-import Link from 'next/link';
+import { Card, Row, Col, Badge, Form } from 'react-bootstrap';
+import { AlertCircle, Check, Clock, FileText, Wallet, TrendingUp, Package } from 'lucide-react';
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import router from "next/router";
 import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer,Legend} from 'recharts';
-import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
 import { formatNumber } from "@utils/Helper";
 
 const CURRENCY_SYMBOL = '';

@@ -9,13 +9,9 @@ import {
   Eye,
   ShoppingBag,
   Briefcase,
-  PieChart,
-  Link as LinkIcon,
   Target,
   Megaphone,
   Database,
-  TrendingUp,
-  XCircle,
   BarChart3,
   Phone,
   Languages,
@@ -26,10 +22,7 @@ import {
   List,
   Package,
   Layers,
-  Tags,
   CreditCard,
-  Building,
-  MapPin,
   Settings,
   History,
   ChartNoAxesCombined,
@@ -39,15 +32,12 @@ import {
   Workflow,
   NotebookText,
   DollarSign,
-  PhoneCallIcon,
   MonitorSpeaker,
   Monitor,
   Server,
   Group,
-  ShieldPlus,
   Shield,
   NotebookTabs,
-  HelpCircle,
   Info,
   CircleQuestionMark,
   Boxes
@@ -55,12 +45,8 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-import { authAPI } from "@utils/api";
-import { useAuth } from "../../hooks/useAuth";
-import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
-import Translate from '@pages/ai-ml/translate';
 
 // Destructure constants for easier use
 const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;

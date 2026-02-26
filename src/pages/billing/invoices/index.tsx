@@ -26,20 +26,14 @@ import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import {
   getInvoices,
-  createInvoice,
-  updateInvoice,
-  deleteInvoice,
   getInvoice,
   getProductsWithCompanyPricing,
-  payInvoice,
   createDirectPayment,
   downloadInvoicePdf,
   InvoiceData,
   InvoiceCreateUpdatePayload,
   InvoiceCreateUpdateAPIPayload,
   InvoiceItemCreateUpdatePayload,
-  InvoiceItemAPIPayload,
-  InvoiceItemData,
   CompanyData,
   ProductData,
   CreateDirectPaymentData,
@@ -49,7 +43,7 @@ import {
 import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 
-import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
+import { Button, Modal, Row, Form, Alert, Card } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
@@ -66,9 +60,8 @@ import { FaShieldAlt, FaCreditCard } from "react-icons/fa";
 import "@assets/scss/common.scss";
 
 import "@assets/scss/tabs.scss";
-import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
-import { Divide, DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter } from "lucide-react";
+import { DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{

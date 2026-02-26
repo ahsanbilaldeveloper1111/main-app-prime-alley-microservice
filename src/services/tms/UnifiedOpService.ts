@@ -10,7 +10,7 @@ import {
     SearchParams,
 } from "@models/tms/CiscoPBXResponse";
 
-import {  AdLdapDetail, GetUserProfilingDraftParams, UnifiedOpUpdateParams, VerifyUserInfoParams, UserProfilingDraft, GetUserProfilingDraftListParams, UpdateUserParams, UpdateAppUserParams, AddPhoneParams, RemovePhoneParams, RemoveUserParams, RemoveLineParams, AddLineParams, AddRemoteDestinationParams, UpdateLineParams, UpdateDNCRParams, SyncImagicleParams, SyncPBXParams, UpdatePhoneParams, AddUserParams, UpdateOnlyLdapUserParams, AddOnlyLdapUserParams, RemoveLdapUserParams, GetUserProfilingErrorLogRequest, UpdateUserProfilingErrorLogRequest, UserProfilingErrorLog, AddRemoteDestinationProfileParams, TestUpdateOnlyLdapUserParams, TestUpdateDNCRParams, UpdateProfilingErrorLogsRequest,VerifyLdapUserParams } from "@models/tms/UnfidiedOp";
+import {  AdLdapDetail, UnifiedOpUpdateParams, VerifyUserInfoParams, UserProfilingDraft, GetUserProfilingDraftListParams, UpdateUserParams, UpdateAppUserParams, AddPhoneParams, RemovePhoneParams, RemoveUserParams, RemoveLineParams, AddLineParams, AddRemoteDestinationParams, UpdateLineParams, UpdateDNCRParams, SyncImagicleParams, SyncPBXParams, UpdatePhoneParams, AddUserParams, UpdateOnlyLdapUserParams, AddOnlyLdapUserParams, RemoveLdapUserParams, GetUserProfilingErrorLogRequest, UpdateUserProfilingErrorLogRequest, UserProfilingErrorLog, AddRemoteDestinationProfileParams, UpdateProfilingErrorLogsRequest,VerifyLdapUserParams } from "@models/tms/UnfidiedOp";
 
 
 class UnifiedOpService {

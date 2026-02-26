@@ -7,7 +7,7 @@ import {
   X, ChevronDown, ChevronRight, Mail, Calendar, MessageSquare, ClipboardList,
   FileText, Pencil, Trash2, MessageCircle, AlertCircle, Phone,
 } from 'lucide-react';
-import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, getCampaigns, getTasks, createTask, updateTask, deleteTask, createTaskNote, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry, type TaskData } from '@utils/crm';
+import { getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, getCampaigns, getTasks, createTask, updateTask, deleteTask, type CrmNoteItem, type CrmMeetingListItem, type AuditTrailEntry, type TaskData } from '@utils/crm';
 import { getSmsList, getChats, getWhatsAppChatMessages, sendWhatsApp, getEmails, type SmsListItem, type SmsListMeta } from '@utils/communication';
 import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { ListCallLogs } from '@utils/calls';

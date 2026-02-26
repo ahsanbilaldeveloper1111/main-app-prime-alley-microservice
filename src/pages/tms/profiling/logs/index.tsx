@@ -4,19 +4,15 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
+import { Row } from "react-bootstrap";
 import { Col } from "react-bootstrap";
-import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import Select from "react-select";
 
 import { ListCustomerProfilingLogs } from "@utils/tms/tmsProfiling";
 import Link from "next/link";

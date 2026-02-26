@@ -4,27 +4,20 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
+import { Modal, Row, Tab, Tabs } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import CallLogsFilters from '@components/filters/CallLogsFilters';
-import AnimatedNumber from '@components/AnimatedNumber';
 import ChartBar from '@components/ChartBar';
 import ChartDonut from '@components/ChartDonut';
 import StatCard from '@components/StatCard';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
-import { easeInOut, easeOut, easeIn } from "framer-motion";
-import moment from 'moment';
+import { easeOut, easeIn } from "framer-motion";
 
 
 interface Summary {
@@ -58,7 +51,6 @@ interface ChartData {
 }
 
 import dynamic from 'next/dynamic';
-import { ApexOptions } from 'apexcharts';
 import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 

@@ -1,8 +1,8 @@
 import '@assets/scss/datatable-style.scss';
 
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
-import { io, Socket } from "socket.io-client";
-import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
+import { Socket } from "socket.io-client";
+import { Col, Button, Card, Modal, Row } from 'react-bootstrap';
 
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
@@ -14,38 +14,25 @@ import dynamic from 'next/dynamic';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
-import CallRecordingsFilters from '@components/filters/CallRecordingFilter';
-import BarFilters from '@components/BarFilters';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import AnimatedNumber from '@components/AnimatedNumber';
-import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { SummaryCard } from '@components/PageSummaryGrid';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
-import SelectBox from '@components/SelectBox';
-import { BarChart3, Hash, Phone, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { Hash, Phone, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
+import StatsCards from "@components/GenericStatsCards";
 import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
 
 import '@assets/scss/common.scss';
 
 // Utils
-import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
+import { ListCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
 
 // Assets
-import imgStatus1 from '@assets/images/widget/img-status-1.svg';
-import imgStatus2 from '@assets/images/widget/img-status-2.svg';
-import imgStatus3 from '@assets/images/widget/img-status-3.svg';
-import imgStatus4 from '@assets/images/widget/img-status-4.svg';
-import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
 import { formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
-import PageLoader from '@components/PageLoader';
-import CircularProgressLoader from '@components/CircularProgressLoader';
 import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });

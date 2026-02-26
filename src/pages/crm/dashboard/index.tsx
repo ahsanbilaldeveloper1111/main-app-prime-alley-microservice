@@ -7,9 +7,7 @@ import {
   Col,
   Button,
   Badge,
-  ProgressBar,
   Spinner,
-  Table,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
@@ -28,7 +26,6 @@ import {
   Handshake,
   ShoppingBag,
   TrendingUp,
-  Edit,
   Calendar,
 } from "lucide-react";
 import Link from "next/link";
@@ -40,34 +37,28 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Legend,
 } from "recharts";
 
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import { ListGroup, Form } from 'react-bootstrap';
+import StatsCards from "@components/GenericStatsCards";
+import { ListGroup } from 'react-bootstrap';
 import {
   Users,
   UserPlus,
   DollarSign,
   ShoppingCart,
-  Search,
-  Mail,
   CheckCircle,
   ChevronRight,
-  ChevronDown,
 
 } from 'lucide-react';
 import { LineChart, Line,} from 'recharts';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import { GlobalDateTimeFormat,formatNumber ,convertDateTimeWithOffsetToLocal} from "@utils/Helper";
+import { GlobalDateTimeFormat,formatNumber } from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {

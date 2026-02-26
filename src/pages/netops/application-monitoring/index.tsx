@@ -4,16 +4,14 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { getSystemMetrics, getSystemMetricsServers, SystemMetric, ServerMetricsListResponse } from "@utils/netops";
-import { Container, Row, Col, Card, Badge, Dropdown, Form, Table } from 'react-bootstrap';
+import { Row, Col, Card, Badge, Dropdown, Form, Table } from 'react-bootstrap';
 import { 
   Server, 
   HardDrive, 
@@ -22,15 +20,13 @@ import {
   CheckCircle, 
   AlertTriangle, 
   RefreshCw,
-  ChevronDown,
   Database,
-  Play,
   AlertCircle,
   XCircle,
   Clock,
   Network
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 const ApplicationMonitoring = () => {
       const router = useRouter();

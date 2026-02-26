@@ -1,13 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { useTokenService } from './useTokenService';
-import { useSession } from 'next-auth/react';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { io, Socket } from "socket.io-client";
+import { useTokenService } from "./useTokenService";
+import { useSession } from "next-auth/react";
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_WHATSAPP_SOCKET_URL;
 
-type ConnectionStateListener = (connected: boolean, error: string | null) => void;
+type ConnectionStateListener = (
+  connected: boolean,
+  error: string | null,
+) => void;
 
 let sharedSocket: Socket | null = null;
 let refCount = 0;
@@ -19,7 +22,7 @@ function notifyConnectionState(connected: boolean, error: string | null) {
 
 function getOrCreateSocket(
   getAccessToken: () => string | null,
-  moduleSlug?: string
+  moduleSlug?: string,
 ): Socket | null {
   if (sharedSocket?.connected) return sharedSocket;
   const token = getAccessToken();
@@ -33,21 +36,21 @@ function getOrCreateSocket(
   const socket = io(SOCKET_URL, {
     auth: {
       token,
-      module_slug: moduleSlug || '',
+      module_slug: moduleSlug || "",
     },
-    transports: ['websocket', 'polling'],
+    transports: ["websocket", "polling"],
   });
 
-  socket.on('connect', () => {
+  socket.on("connect", () => {
     notifyConnectionState(true, null);
   });
 
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     notifyConnectionState(false, null);
   });
 
-  socket.on('connect_error', (err) => {
-    notifyConnectionState(false, err.message || 'Connection failed');
+  socket.on("connect_error", (err) => {
+    notifyConnectionState(false, err.message || "Connection failed");
   });
 
   sharedSocket = socket;
@@ -87,11 +90,13 @@ export interface UseAppSocketReturn {
  * Use for WhatsApp, notifications, and other features that use the same socket server.
  * Connect when authenticated; disconnect when no consumer is mounted (ref-counted).
  */
-export function useAppSocket(options: UseAppSocketOptions = {}): UseAppSocketReturn {
+export function useAppSocket(
+  options: UseAppSocketOptions = {},
+): UseAppSocketReturn {
   const { moduleSlug, enabled = true } = options;
   const { data: session, status } = useSession();
   const { getAccessToken } = useTokenService();
-  const [socket, setSocketState] = useState<Socket | null>(null);
+  const [socketState, setSocketState] = useState<Socket | null>(null);
   const [isConnected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listenerRef = useRef<ConnectionStateListener | null>(null);
@@ -100,22 +105,19 @@ export function useAppSocket(options: UseAppSocketOptions = {}): UseAppSocketRet
     const s = sharedSocket;
     if (!s?.connected) return;
     const list = Array.isArray(channels) ? channels : [channels];
-    s.emit('subscribe', list);
+    s.emit("subscribe", list);
   }, []);
 
   const unsubscribe = useCallback((channels: string | string[]) => {
     const s = sharedSocket;
     if (!s?.connected) return;
     const list = Array.isArray(channels) ? channels : [channels];
-    s.emit('unsubscribe', list);
+    s.emit("unsubscribe", list);
   }, []);
 
   useEffect(() => {
     const shouldConnect =
-      enabled &&
-      status === 'authenticated' &&
-      !!session &&
-      !!getAccessToken();
+      enabled && status === "authenticated" && !!session && !!getAccessToken();
 
     if (!shouldConnect) {
       return;
@@ -147,7 +149,7 @@ export function useAppSocket(options: UseAppSocketOptions = {}): UseAppSocketRet
   }, [enabled, status, session, moduleSlug, getAccessToken]);
 
   return {
-    socket,
+    socket: socketState,
     isConnected,
     error,
     subscribe,

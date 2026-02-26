@@ -23,7 +23,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -44,11 +43,9 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
@@ -72,7 +69,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Trash2,
   MoreVertical,
   Phone as PhoneIcon,
   Phone,
@@ -81,28 +77,18 @@ import {
   History,
   FileText,
   Target,
-  Layers,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   getCrmDataById,
@@ -140,7 +126,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";

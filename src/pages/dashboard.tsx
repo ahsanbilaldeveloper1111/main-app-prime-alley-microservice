@@ -4,33 +4,26 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
-import {  Row, Col, Card, Button, ProgressBar, Badge, Form } from 'react-bootstrap';
+import {  Row, Col, Card, Button, ProgressBar, Badge } from 'react-bootstrap';
 import {
-  Search,
   FileText,
   Users,
   ShoppingCart,
   Phone,
   CheckCircle,
-  XCircle,
   Clock,
   AlertCircle,
   MessageSquare,
   PhoneCall,
   AlertOctagon,
   DollarSign,
-  Wrench,
-  Package,
-  Ban,
   PhoneMissed,
   PhoneIncoming,
   PhoneOff,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import TimezoneSearch from '@components/TimezoneSearch';
 import { GetTranscriptionOverview } from '@utils/calls';
 import { getCrmDashboardOverview } from '@utils/crm';
-import { toast } from 'react-toastify';
 
 // Helper function to format numbers with commas
 const formatNumber = (value: number | undefined | null): string => {

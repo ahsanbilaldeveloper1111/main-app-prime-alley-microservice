@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { FaTimes, FaExpand, FaCompress, FaPhone, FaPhoneSlash, FaBackspace, FaPause, FaExchangeAlt, FaPhoneVolume, FaPhoneAlt } from 'react-icons/fa';
+import { FaTimes, FaExpand, FaCompress, FaPhone, FaPhoneSlash, FaBackspace, FaPause, FaExchangeAlt } from 'react-icons/fa';
 import { MdCallMissed, MdCallMade, MdCallReceived } from 'react-icons/md';
 import { MdCallMerge } from 'react-icons/md';
 import PreDialAssessment from './PreDialAssessment';
-import LeadForm from './LeadForm';
 
 const ModalOverlay = styled.div<{ isOpen: boolean }>`
   position: fixed;

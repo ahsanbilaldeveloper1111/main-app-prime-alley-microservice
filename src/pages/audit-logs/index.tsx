@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, ReactElement } from "
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
-import { Card, Dropdown, Modal, Table, Form, Button } from "react-bootstrap";
+import { Modal, Table, Form, Button } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { FileText } from "lucide-react";
@@ -10,7 +10,7 @@ import GenericTable, { TableColumn, PaginationConfig, ToolbarConfig } from "@com
 import GenericSidebar from "@components/GenericSidebarNew";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;

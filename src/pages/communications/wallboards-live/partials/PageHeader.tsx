@@ -1,7 +1,6 @@
 import React from 'react'
 import { Button, Col, Row } from 'react-bootstrap'
-import { ChevronDown, ChevronUp, DiscAlbum, PhoneCall, Filter } from 'lucide-react'
-import Link from 'next/link'
+import { ChevronDown, ChevronUp, Filter } from 'lucide-react'
 
 interface PageHeaderProps {
   session: any

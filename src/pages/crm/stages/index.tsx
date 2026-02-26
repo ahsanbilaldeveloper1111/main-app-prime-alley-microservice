@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import {
   getStages,
   createStage,
@@ -25,24 +24,14 @@ import {
   Col,
   Badge,
   Form,
-  Alert,
   Card,
   Table,
   Dropdown,
   InputGroup,
 } from "react-bootstrap";
-import Select from "react-select";
-import { FiTrash2, FiPlus, FiSave, FiEdit2, FiEye } from "react-icons/fi";
+import { FiTrash2, FiEdit2, FiEye } from "react-icons/fi";
 import {
-  History,
   X,
-  Clock,
-  User,
-  GitBranch,
-  DollarSign,
-  MessageSquare,
-  Send,
-  UserCheck,
   Plus,
   FileText,
   Layers,
@@ -59,33 +48,22 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  CheckCircle,
   XCircle,
-  ChevronRight as ChevronRightIcon,
   Search,
-  Filter,
   RotateCcw,
-  AlertCircle,
 } from "lucide-react";
 import {
   PieChart,
   Pie,
   Cell,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
 } from "recharts";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 

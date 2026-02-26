@@ -9,7 +9,7 @@ import { Button, Row, Col, Form, OverlayTrigger, Tooltip, Modal } from 'react-bo
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import Select, { SingleValue } from 'react-select';
+import Select from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { getParentUsers, assignRankBulk } from '@utils/users';
 import { Copy, Users } from 'lucide-react';

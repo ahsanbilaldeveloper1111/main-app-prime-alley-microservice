@@ -3,13 +3,12 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { GetAllSubmodules,ListSubmodules, CreateSubmodule, DeleteSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
+import {ListSubmodules, CreateSubmodule, GetAllModules, ListSubmoduleChildren, CreateSubmoduleChild, DeleteSubmoduleChild } from '@utils/ticket-module';
 import { Column } from '@components/CustomDataTable';
-import { Button, Row, Col, Card, Badge } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { GetHierarchyData } from '@utils/users';
-import Select from 'react-select';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -17,7 +16,7 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
-import { Edit, Info, Trash2 } from 'lucide-react';
+import { Info, Trash2 } from 'lucide-react';
 import moment from 'moment';
 
 

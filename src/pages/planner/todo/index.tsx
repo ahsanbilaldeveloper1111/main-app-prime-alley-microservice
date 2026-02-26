@@ -18,7 +18,6 @@ import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { 
   Calendar, 
-  Tag, 
   Phone, 
   FileText, 
   CreditCard, 
@@ -26,13 +25,8 @@ import {
   Briefcase, 
   Mail,
   ChevronDown,
-  MoreVertical,
   Plus,
   X,
-  Bell,
-  Grid3x3,
-  User,
-  Link as LinkIcon,
   Copy,
   Trash2,
   Pencil,

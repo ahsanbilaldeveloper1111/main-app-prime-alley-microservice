@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
-  X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -9,7 +8,6 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
@@ -17,19 +15,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
-  Ticket,
-  Paperclip,
   Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
   AlertCircle,
-  ShoppingCart,
 } from "lucide-react";
 import Layout from "@layout/index";
 import { getLead, type LeadData } from "@utils/crm";

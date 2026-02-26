@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Form, Button, Card, Modal, Badge, Pagination } from 'react-bootstrap';
-import { Video, Clock, Sparkles } from 'lucide-react';
+import { Video, Clock } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import {
@@ -12,7 +12,6 @@ import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 const { PERMISSIONS: P } = HEADER_CONSTANTS;
-import { generateEmail } from '@utils/communication';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
 

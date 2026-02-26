@@ -11,11 +11,8 @@ import {
   Headphones,
   Globe,
   ChevronDown,
-  ChevronRight,
   Star,
   Search,
-  Menu,
-  X,
   Home,
   Settings,
   NotebookText

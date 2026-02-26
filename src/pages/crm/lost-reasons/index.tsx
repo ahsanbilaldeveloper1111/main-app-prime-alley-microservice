@@ -10,8 +10,8 @@ import {
   deleteLostReason,
 } from "@utils/crm";
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Col, Badge, Form, Alert } from "react-bootstrap";
-import { FiEdit, FiTrash2, FiPlus, FiSave, FiEdit2 } from "react-icons/fi";
+import { Button, Row, Col, Form } from "react-bootstrap";
+import { FiTrash2, FiPlus, FiEdit2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -20,7 +20,6 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 

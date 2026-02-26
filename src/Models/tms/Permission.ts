@@ -1,4 +1,4 @@
-import { Module, ModuleName } from './Module';
+import { ModuleName } from './Module';
 import { UserType } from './User';
 
 export interface Permission {

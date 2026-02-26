@@ -4,11 +4,9 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
@@ -17,11 +15,7 @@ import { useSession } from "next-auth/react";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useUserProfilesMinified } from "@hooks/useUserProfilesMinified";
 import { 
-  Search, 
-  ChevronDown, 
-  AlertCircle,
-  ChevronRight,
-  Grid3x3,
+  ChevronDown,
   Plus,
   Users,
   Calendar,

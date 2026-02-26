@@ -1,15 +1,12 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useRef } from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
+import { Modal, Row } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import '@assets/scss/common.scss';
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
@@ -18,23 +15,17 @@ import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { motion } from 'framer-motion';
 
 // NetOps API imports
 import { 
   getComprehensiveMonitoring, 
   getMonitoringDashboard, 
   getDevices, 
-  getServices, 
-  getAlerts,
+  getServices,
   ComprehensiveMonitoringResponse,
   MonitoringDashboardResponse,
   Device,
-  Service,
-  Alert,
-  DeviceStatus,
-  MonitoringSummary,
-  AlertsSummary
+  Service
 } from '@utils/netops';
 
 import dynamic from 'next/dynamic';

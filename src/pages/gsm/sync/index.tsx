@@ -1,9 +1,9 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { ListGsmManagement } from '@utils/GsmManagement';
-import { SyncPorts, ViewGsm, SyncPortsMobileNumber, GetClientGsmProfile } from '@utils/GsmAssign';
+import { SyncPorts, ViewGsm, SyncPortsMobileNumber } from '@utils/GsmAssign';
 
 import { Button, Row, Col, Card, Form, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';

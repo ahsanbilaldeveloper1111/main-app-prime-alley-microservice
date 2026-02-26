@@ -1,8 +1,6 @@
 // import { useProfile } from '@common/UserHooks';
-import { useRouter } from 'next/router';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { ReactNode } from 'react'
-import Footer from '@components/Footer';
 
 interface NonLayoutProps  {
     children: ReactNode

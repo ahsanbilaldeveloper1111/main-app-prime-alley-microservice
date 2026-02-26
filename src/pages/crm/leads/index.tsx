@@ -16,11 +16,7 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -39,8 +35,6 @@ import {
   updateLead,
   getCampaigns,
   getCampaignById,
-  getCrmData,
-  getCrmDataById,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
@@ -49,7 +43,6 @@ import type {
   StageData,
   CampaignData,
   CrmDataItem,
-  IndustryData,
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -58,11 +51,8 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Popover,
   OverlayTrigger,
@@ -86,7 +76,6 @@ import {
   Target,
   CheckCircle,
   TrendingUp,
-  BarChart3,
   Plus,
   Eye,
   Edit,
@@ -96,7 +85,6 @@ import {
   X,
   Users,
   Clock,
-  Search,
   Filter,
   Layers,
   Calendar,

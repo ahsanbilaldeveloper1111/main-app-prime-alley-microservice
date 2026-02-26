@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, ChevronDown, FileText, CheckSquare, 
+import { FileText, CheckSquare, 
   PieChart, AlertTriangle, Plus, MoreVertical, GripVertical,
-  Link, Clock, Archive, X, ArrowRight
+  Link, X
 } from 'lucide-react';
 import { Row, Col } from 'react-bootstrap';
 import StatsCard from '@components/work-planner/stats-cards';

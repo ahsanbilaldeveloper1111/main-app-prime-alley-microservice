@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Row, Col, Card, Form, Badge, Button, Dropdown } from 'react-bootstrap';
+import { Row, Col, Card, Form, Badge, Button } from 'react-bootstrap';
 import { GetTicket, GetComments, GetAssigneeComments, AddComment } from '@utils/tickets';
 import { toast } from 'react-toastify';
 import moment from 'moment';
@@ -8,8 +8,6 @@ import {
   ChevronLeft,
   Clock,
   Hash,
-  Share2,
-  ChevronDown,
   AlertTriangle,
   FileText,
   RefreshCw,
