@@ -27,6 +27,9 @@ import DealsData from "@pages/crm/deals";
 import TasksData from "@pages/crm/crm-tasks";
 import AssociateTaskModal from "@components/AssociateTaskModal";
 import CreateTaskSidebar from "@components/CreateTaskSidebar";
+import UserActivityByCategory from "@components/UserActivityByCategory";
+import TwoCharts from "@components/TwoCharts";
+
 
 // ─── Styles (inline via style tag approach using className strings) ───────────
 
@@ -624,113 +627,36 @@ const SalesDashboard: NextPageWithLayout = () => {
           )}
         </div>
 
-        {/* ── Outreach Activities ── */}
+        {/* ── User Activity By Category ── */}
         <div style={styles.section}>
           <SectionHeader
-            title="Outreach activities"
+            title="User activity by category"
             infoIcon
-            onToggle={() => toggleSection("outreach")}
-            isCollapsed={collapsedSections.has("outreach")}
+            onToggle={() => toggleSection("userActivity")}
+            isCollapsed={collapsedSections.has("userActivity")}
           />
-          {!collapsedSections.has("outreach") && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIllustration}>
-              <OutreachIllustration />
+          {!collapsedSections.has("userActivity") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <UserActivityByCategory />
             </div>
-            <p style={styles.emptyText}>Automate outreach with your contacts.</p>
-            <a style={styles.emptyLink}>
-              Manage sequences <ExternalLink size={12} />
-            </a>
-          </div>
           )}
         </div>
 
-        {/* ── Suggested Tasks ── */}
         <div style={styles.section}>
           <SectionHeader
-            title="Suggested tasks (1)"
+            title="Activity"
             infoIcon
-            onToggle={() => toggleSection("suggested")}
-            isCollapsed={collapsedSections.has("suggested")}
+            onToggle={() => toggleSection("twoCharts")}
+            isCollapsed={collapsedSections.has("twoCharts")}
           />
-          {!collapsedSections.has("suggested") && (
-          <div style={styles.suggestedCard}>
-            <div style={styles.suggestedLeft}>
-              <div style={styles.suggestedIcon}>
-                <Mail size={13} color="#666" />
-              </div>
-              <div>
-                <div style={styles.suggestedText}>
-                  Send a follow up to the email that you sent Re: test to rizwan
-                </div>
-                <div style={styles.suggestedSubtext}>
-                  There has been no reply to your email in 6 days
-                </div>
-                <a style={styles.followUpLink}>Follow up</a>
-              </div>
+          {!collapsedSections.has("twoCharts") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <TwoCharts />
             </div>
-            <div style={styles.suggestedRight}>
-              <div style={styles.dealAvatar}>NF</div>
-              <div style={styles.dealInfo}>
-                <div style={styles.dealName}>New Feb Deal</div>
-                <div style={styles.dealAmount}>Amount: US$66,000.00</div>
-                <div style={styles.dealClose}>Close date: 28/02/2026</div>
-              </div>
-              <div style={{ cursor: "pointer", color: "#999" }}>
-                <MoreHorizontal size={16} />
-              </div>
-            </div>
-          </div>
           )}
         </div>
 
-        {/* ── Follow up on meetings ── */}
-        <div style={styles.section}>
-          <SectionHeader
-            title="Follow up on meetings (0)"
-            infoIcon
-            onToggle={() => toggleSection("meetings")}
-            isCollapsed={collapsedSections.has("meetings")}
-          />
-          {!collapsedSections.has("meetings") && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIllustration}>
-              <CalendarIllustration />
-            </div>
-            <div style={styles.emptyTitle}>You're all caught up on meetings.</div>
-            <p style={styles.emptyText}>
-              Take immediate follow-up actions after meetings to secure opportunities.
-            </p>
-            <a style={styles.emptyLink}>
-              View schedule <ExternalLink size={12} />
-            </a>
-          </div>
-          )}
-        </div>
-
-        {/* ── Recently stalled Deals ── */}
-        <div style={styles.section}>
-          <SectionHeader
-            title="Recently stalled Deals (0)"
-            infoIcon
-            onToggle={() => toggleSection("stalled")}
-            isCollapsed={collapsedSections.has("stalled")}
-          />
-          {!collapsedSections.has("stalled") && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIllustration}>
-              <StalledIllustration />
-            </div>
-            <div style={styles.emptyTitle}>You're all caught up on recently stalled deals.</div>
-            <p style={styles.emptyText}>
-              Deals that have stalled in the past 14 days will show up here so you can follow up before momentum is lost.
-            </p>
-            <a style={styles.emptyLink}>
-              View deals <ExternalLink size={12} />
-            </a>
-          </div>
-          )}
-        </div>
+       
         </>
         )}
 

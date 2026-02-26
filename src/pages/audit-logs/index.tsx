@@ -688,15 +688,20 @@ const AuditLogsNewPage = () => {
   const filterPills = useMemo(() => {
     const pills: any[] = [];
     if (visibleAuditModules.length === 0) return pills;
-    pills.push({
-      id: "audit_module",
-      label: selectedAuditModule ? selectedAuditModule.moduleName : "Select Module",
-      showDropdown: true,
-      dropdownOptions: [
-        // { label: "Select module", value: "", onClick: () => handleAuditModuleChange("") },
-        ...visibleAuditModules.map((n) => ({ label: n.moduleName, value: n.moduleName, onClick: () => handleAuditModuleChange(n.moduleName) })),
-      ],
+    
+    // Add individual module pills instead of dropdown
+    visibleAuditModules.forEach((module) => {
+      pills.push({
+        id: `audit_module_${module.moduleName}`,
+        label: module.moduleName,
+        active: selectedAuditModule?.moduleName === module.moduleName,
+        onClick: () => handleAuditModuleChange(module.moduleName),
+        onClear: selectedAuditModule?.moduleName === module.moduleName 
+          ? () => handleAuditModuleChange("")
+          : undefined,
+      });
     });
+    
     if (!selectedAuditModule) return pills;
     pills.push({
       id: "audit_service",
@@ -756,7 +761,8 @@ const AuditLogsNewPage = () => {
   const toolbarConfig: ToolbarConfig = useMemo(() => ({
     showTabs: false,
     showSearch: false,
-    showFiltersButton: true,
+    showFiltersButton: false,
+    showFilterPills: true,
     showSortButton: false,
     showExportButton: false,
     filterPills,
@@ -777,42 +783,56 @@ const AuditLogsNewPage = () => {
 
   return (
     <>
+      <style>{`
+        .gt-toolbar-main,
+        .gt-filter-pills {
+          border: none !important;
+          padding: 0 !important;
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="Audit Logs" mainLink="/audit-logs" subTitle="Audit Logs" />
-      <PageHeader title="Audit Logs" description="View audit logs by module and service" />
-      <div style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}>
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-         
-            <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <GenericTable
-                data={dataList as Record<string, unknown>[]}
-                columns={getColumnsForModule(selectedAuditModule?.moduleName ?? null)}
-                actions={[]}
-                showActions={false}
-                selectable={false}
-                selectedRows={[]}
-                onSelectionChange={() => {}}
-                pagination={pagination}
-                onPaginationChange={handlePaginationChange}
-                sortable
-                defaultSortColumn="formatted_timestamp"
-                defaultSortDirection="desc"
-                onSort={() => {}}
-                onPreviewClick={handlePreviewClick}
-                loading={auditLogsLoading}
-                emptyMessage="No audit logs found matching your criteria"
-                loadingMessage="Loading audit logs..."
-                hover
-                uniqueKey="id"
-                fixedHeight
-                maxHeight="calc(100vh - 280px)"
-                showToolbar
+      <div style={{ backgroundColor: "#ffffff", minHeight: "100vh" }}>
+        <div style={{ padding: "20px" }}>
+          <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", marginBottom: "8px" }}>
+            Audit Logs
+          </h1>
+          <p style={{ fontSize: "14px", fontWeight: 100, color: "#666", marginBottom: "20px" }}>
+            View audit logs by module and service
+          </p>
+          <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <GenericTable
+              data={dataList as Record<string, unknown>[]}
+              columns={getColumnsForModule(selectedAuditModule?.moduleName ?? null)}
+              actions={[]}
+              showActions={false}
+              selectable={false}
+              selectedRows={[]}
+              onSelectionChange={() => {}}
+              pagination={pagination}
+              onPaginationChange={handlePaginationChange}
+              sortable
+              defaultSortColumn="formatted_timestamp"
+              defaultSortDirection="desc"
+              onSort={() => {}}
+              onPreviewClick={handlePreviewClick}
+              loading={auditLogsLoading}
+              emptyMessage="No audit logs found matching your criteria"
+              loadingMessage="Loading audit logs..."
+              hover
+              uniqueKey="id"
+              fixedHeight
+              maxHeight="calc(100vh - 280px)"
+              showToolbar
               toolbar={toolbarConfig}
               statsCards={selectedAuditModule ? auditLogsStatsCards : []}
-              />
-            </div>
-         
+              showToolbarActions={false}
+              noBorder={true}
+            />
+          </div>
         </div>
-        {showSidebar && selectedRow && (
+      </div>
+
+      {showSidebar && selectedRow && (
           <GenericSidebar
             isOpen={showSidebar}
             onClose={handleCloseSidebar}
@@ -843,45 +863,44 @@ const AuditLogsNewPage = () => {
           />
         )}
 
-        <Modal show={showAuditDateCustomModal} onHide={() => setShowAuditDateCustomModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Custom date range</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Start date</Form.Label>
-              <Form.Control
-                type="date"
-                value={customStartDate}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomStartDate(e.target.value)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-0">
-              <Form.Label>End date</Form.Label>
-              <Form.Control
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={() => setShowAuditDateCustomModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setAuditStartDate(customStartDate);
-                setAuditEndDate(customEndDate);
-                setShowAuditDateCustomModal(false);
-              }}
-            >
-              Apply
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      </div>
+      <Modal show={showAuditDateCustomModal} onHide={() => setShowAuditDateCustomModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Custom date range</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group className="mb-3">
+            <Form.Label>Start date</Form.Label>
+            <Form.Control
+              type="date"
+              value={customStartDate}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomStartDate(e.target.value)}
+            />
+          </Form.Group>
+          <Form.Group className="mb-0">
+            <Form.Label>End date</Form.Label>
+            <Form.Control
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowAuditDateCustomModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setAuditStartDate(customStartDate);
+              setAuditEndDate(customEndDate);
+              setShowAuditDateCustomModal(false);
+            }}
+          >
+            Apply
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };
