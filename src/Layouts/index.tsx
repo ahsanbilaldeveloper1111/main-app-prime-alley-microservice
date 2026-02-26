@@ -613,7 +613,7 @@ const Layout = ({ children }: LayoutProps) => {
         
         /* CRM Prime-style top bar */
         .app-topbar-merged {
-          background: #260646 !important;
+          background: #00385d !important;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
           height: 48px !important;
           padding: 0 16px !important;
@@ -630,7 +630,7 @@ const Layout = ({ children }: LayoutProps) => {
           width: 100%;
           height: 34px;
           padding: 6px 36px 6px 14px;
-          background:rgb(53, 9, 97);
+          background:rgb(2, 68, 112);
           border: 1px solid #958c8c;
           border-radius: 20px;
           color: #fff;
@@ -643,12 +643,12 @@ const Layout = ({ children }: LayoutProps) => {
         }
         
         .crm-prime-search-input:hover {
-          background: rgb(70, 14, 126);
+          background: rgb(1, 83, 138);
         }
         
         .crm-prime-search-input:focus {
           outline: none;
-          background: rgb(70, 14, 126);
+          background: rgb(1, 83, 138);
           border-color: #fff;
           color: #fff;
         }
