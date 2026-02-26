@@ -97,7 +97,6 @@ import GenericTable, {
 import GenericSidebar, {
   SidebarSection,
   QuickAction,
-  BreezeRecordSummary,
   SidebarField,
 } from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
@@ -656,11 +655,11 @@ const CrmProspectsManagement = () => {
     disposition: "",
     legal_basis: [] as string[],
     company_domain: "",
-    next_call: "",
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
     note: "",
-    is_viewed: false,
+    source: "",
+    next_call: "" as string | undefined,
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -781,7 +780,7 @@ const CrmProspectsManagement = () => {
           ),
           tags: tagsArray,
           note: item.note ?? d.note ?? "",
-          is_viewed: item.is_viewed ?? d.is_viewed ?? false,
+          source: d.source ?? (item as any).source ?? "",
         });
         if (!cancelled) setContactFormLoading(false);
       })
@@ -3113,11 +3112,11 @@ const CrmProspectsManagement = () => {
                 disposition: "",
                 legal_basis: [],
                 company_domain: "",
-                next_call: "",
                 scheduled_call_at: "",
                 tags: [],
                 note: "",
-                is_viewed: false,
+                source: "",
+                next_call: "",
               });
               setShowCreateContactSidebar(true);
             }}
@@ -3180,6 +3179,10 @@ const CrmProspectsManagement = () => {
         toast.error("Name, email and phone are required");
         return;
       }
+      if (contactForm.campaign_id == null) {
+        toast.error("Campaign is required");
+        return;
+      }
       const sessionUser = session?.user as any;
       const userExtension = String(sessionUser?.phone ?? "");
       const assignedTo = userExtension;
@@ -3192,20 +3195,19 @@ const CrmProspectsManagement = () => {
           phone: contactForm.phoneNumber.trim(),
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
+          scheduled_call_at: contactForm.scheduled_call_at || undefined,
           data: {
             email: contactForm.email.trim(),
             assigned_to: assignedTo,
             uploaded_by: uploadedBy,
             company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
-            next_call: contactForm.next_call || undefined,
             tags: contactForm.tags?.length
               ? contactForm.tags.map((t) => t.value || t.label)
               : undefined,
-            is_viewed: contactForm.is_viewed,
-            scheduled_call_at: contactForm.scheduled_call_at || undefined,
             note: contactForm.note || undefined,
             contact_owner: contactForm.contact_owner ?? undefined,
+            source: contactForm.source?.trim() || undefined,
             lifecycle_stage: contactForm.lifecycle_stage || undefined,
             legal_basis: contactForm.legal_basis?.length
               ? contactForm.legal_basis
@@ -3224,11 +3226,11 @@ const CrmProspectsManagement = () => {
           disposition: "",
           legal_basis: [],
           company_domain: "",
-          next_call: "",
           scheduled_call_at: "",
           tags: [],
           note: "",
-          is_viewed: false,
+          source: "",
+          next_call: "",
         });
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -3256,6 +3258,10 @@ const CrmProspectsManagement = () => {
       toast.error("Name, email and phone are required");
       return;
     }
+    if (contactForm.campaign_id == null) {
+      toast.error("Campaign is required");
+      return;
+    }
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
@@ -3266,12 +3272,11 @@ const CrmProspectsManagement = () => {
           email: contactForm.email.trim(),
           company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
-          next_call: contactForm.next_call || undefined,
           tags: contactForm.tags?.length
             ? contactForm.tags.map((t) => t.value || t.label)
             : undefined,
-          is_viewed: contactForm.is_viewed,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          source: contactForm.source?.trim() || undefined,
           note: contactForm.note || undefined,
           contact_owner: contactForm.contact_owner ?? undefined,
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -3297,7 +3302,8 @@ const CrmProspectsManagement = () => {
     const isFormValid =
       contactForm.email?.trim() &&
       contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
+      (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
+      contactForm.campaign_id != null;
 
     return (
       <>
@@ -3623,7 +3629,7 @@ const CrmProspectsManagement = () => {
                       style={{ marginBottom: "20px" }}
                     >
                       <label
-                        className="contact-form-label"
+                        className="contact-form-label contact-form-label-required"
                         style={{
                           display: "block",
                           fontSize: "14px",
@@ -3632,7 +3638,7 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Campaign
+                        Campaign <span style={{ color: "#f2545b" }}>*</span>
                       </label>
                       {(() => {
                         const campaignSelectOptions = availableCampaigns.map(
@@ -3735,6 +3741,48 @@ const CrmProspectsManagement = () => {
                             fontSize: "14px",
                           }),
                         }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Source
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.source}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            source: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                        placeholder="Enter source"
                       />
                     </div>
                     <div
@@ -3993,41 +4041,6 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Next call
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={contactForm.next_call}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            next_call: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
                         Scheduled call at
                       </label>
                       <input
@@ -4132,29 +4145,6 @@ const CrmProspectsManagement = () => {
                         }
                         onBlur={(e) =>
                           (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div className="contact-form-field">
-                      <Form.Check
-                        type="checkbox"
-                        checked={contactForm.is_viewed}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            is_viewed: e.target.checked,
-                          })
-                        }
-                        label={
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#141414",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Is viewed
-                          </span>
                         }
                       />
                     </div>
@@ -8175,21 +8165,7 @@ const CrmProspectsManagement = () => {
               selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
             }
             onNoteCreate={handleNoteCreate}
-            breezeRecordSummary={{
-              content:
-                "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-              timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
-              onRefresh: () => console.log("Refresh AI summary"),
-              onThumbsUp: () => console.log("Thumbs up"),
-              onThumbsDown: () => console.log("Thumbs down"),
-              onCopy: () => {
-                navigator.clipboard.writeText(
-                  "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-                );
-                console.log("Summary copied");
-              },
-              onAskQuestion: () => console.log("Ask AI a question"),
-            }}
+            crmSummary={selectedProspect?.data?.crm_summary ?? selectedProspect?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
               onClick: () => console.log("View full prospect record"),

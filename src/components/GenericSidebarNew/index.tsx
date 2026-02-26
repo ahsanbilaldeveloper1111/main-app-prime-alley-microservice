@@ -105,7 +105,14 @@ export interface QuickAction {
   disabled?: boolean;
 }
 
-export interface BreezeRecordSummary {
+/** CRM summary from API (lead, prospect, deal, order, etc.) */
+export interface CrmSummary {
+  id: number;
+  summary: string;
+}
+
+/** Internal display shape for record summary (content + optional callbacks; callbacks unused when using crmSummary from API). */
+interface RecordSummaryDisplay {
   content: string;
   timestamp: string;
   onRefresh?: () => void;
@@ -143,8 +150,8 @@ export interface GenericSidebarProps {
   quickActions?: QuickAction[];
   onQuickActionClick?: (actionId: string) => void;
 
-  // Breeze AI Summary
-  breezeRecordSummary?: BreezeRecordSummary;
+  /** CRM summary from API - same field from prospect, lead, deal, order. When set, Record summary section is shown; "No summary available" if summary is empty. */
+  crmSummary?: CrmSummary | null;
 
   // Sections
   sections?: SidebarSection[];
@@ -5357,7 +5364,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   phone,
   quickActions,
   onQuickActionClick,
-  breezeRecordSummary,
+  crmSummary,
   sections = [],
   width = "470px",
   recordLink,
@@ -5398,7 +5405,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
     ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
     ?? '';
-    const handleCall = useCallback(
+
+  // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
+  const recordSummary: RecordSummaryDisplay | undefined =
+    crmSummary !== undefined
+      ? { content: (crmSummary?.summary ?? '').trim(), timestamp: '' }
+      : undefined;
+
+  const handleCall = useCallback(
       async (phoneNumber: string) => {
         const numberToDial = (phoneNumber || "").trim();
         if (!numberToDial) {
@@ -5802,38 +5816,56 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       type: RECORD_TYPES;
     },
   ) => {
+    if (!record || record.id == null || record.type == null) {
+      toast.error("No record linked. Schedule the meeting from a prospect, lead, deal, or order.");
+      return;
+    }
     const meeting_date = meetingData.startDate.slice(0, 10);
     const meeting_time =
       meetingData.startTime.length === 5
         ? meetingData.startTime
         : meetingData.startTime.slice(0, 5);
+    const end_time =
+      meetingData.endTime.length === 5
+        ? meetingData.endTime
+        : meetingData.endTime.slice(0, 5);
     const extensions = userExtension
-      ? [userExtension]
+      ? [userExtension].map((e) => String(e).slice(0, 15))
       : [meetingData.hostEmail?.slice(0, 15) || "0"];
+    if (extensions.length === 0 || !extensions[0]) {
+      toast.error("Extension is required to create a meeting.");
+      return;
+    }
+    const start_date_time = `${meeting_date}T${meeting_time}:00`;
+    const end_date_time = `${meeting_date}T${end_time}:00`;
+    const recordType = record.type as "prospect" | "lead" | "deal" | "order";
     try {
-      console.log("record received in handleMeetingSchedule", record);
       await createMeeting({
         name: meetingData.title.trim(),
         meeting_type: "Video",
         meeting_date,
         meeting_time,
+        record_type: recordType,
+        record_id: record.id,
         extensions,
-        ...(record?.id != null && { record_id: record.id }),
-        ...(record?.type != null && { record_type: record.type }),
-        ...(leadId != null && { lead_id: leadId }),
-        ...(dealId != null && { deal_id: dealId }),
-        ...(meetingData.attendees?.length
-          ? { attendees: meetingData.attendees }
-          : {}),
+        ...(tenantId && { tenant_id: tenantId }),
+        ...(userExtension && { extension_user: userExtension }),
+        start_date_time,
+        end_date_time,
+        ...(meetingData.attendees?.length > 0 && {
+          emails: meetingData.attendees,
+          attendees: meetingData.attendees,
+        }),
+        ...(meetingData.reminders?.length > 0 && {
+          reminders: meetingData.reminders,
+        }),
         ...([meetingData.description, meetingData.internalNote].filter(Boolean)
-          .length
-          ? {
-              summary: [meetingData.description, meetingData.internalNote]
-                .filter(Boolean)
-                .join("\n\n")
-                .slice(0, 255),
-            }
-          : {}),
+          .length > 0 && {
+          summary: [meetingData.description, meetingData.internalNote]
+            .filter(Boolean)
+            .join("\n\n")
+            .slice(0, 255),
+        }),
       });
       onMeetingSchedule?.(meetingData);
     } catch (err: unknown) {
@@ -7292,8 +7324,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             </div>
           </div>
 
-          {/* Breeze Record Summary */}
-          {breezeRecordSummary && (
+          {/* Record summary (from API crm_summary) */}
+          {recordSummary && (
             <div
               style={{
                 backgroundColor: "#ffffff",
@@ -7361,6 +7393,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     padding: "20px",
                   }}
                 >
+                  {(recordSummary.timestamp || recordSummary.onRefresh) && (
                   <div
                     style={{
                       display: "flex",
@@ -7371,10 +7404,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       marginBottom: "12px",
                     }}
                   >
-                    <span>{breezeRecordSummary.timestamp}</span>
-                    {breezeRecordSummary.onRefresh && (
+                    {recordSummary.timestamp && <span>{recordSummary.timestamp}</span>}
+                    {recordSummary.onRefresh && (
                       <button
-                        onClick={breezeRecordSummary.onRefresh}
+                        onClick={recordSummary.onRefresh}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7390,6 +7423,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       </button>
                     )}
                   </div>
+                  )}
 
                   <div
                     style={{
@@ -7402,7 +7436,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       borderRadius: "5px",
                     }}
                   >
-                    {breezeRecordSummary.content}
+                    {recordSummary.content || 'No summary available'}
                   </div>
 
                   <div
@@ -7414,9 +7448,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       borderTop: "1px solid #fee",
                     }}
                   >
-                    {breezeRecordSummary.onThumbsUp && (
+                    {recordSummary.onThumbsUp && (
                       <button
-                        onClick={breezeRecordSummary.onThumbsUp}
+                        onClick={recordSummary.onThumbsUp}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7440,9 +7474,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                         <ThumbsUp size={16} />
                       </button>
                     )}
-                    {breezeRecordSummary.onThumbsDown && (
+                    {recordSummary.onThumbsDown && (
                       <button
-                        onClick={breezeRecordSummary.onThumbsDown}
+                        onClick={recordSummary.onThumbsDown}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7466,9 +7500,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                         <ThumbsDown size={16} />
                       </button>
                     )}
-                    {breezeRecordSummary.onCopy && (
+                    {recordSummary.onCopy && (
                       <button
-                        onClick={breezeRecordSummary.onCopy}
+                        onClick={recordSummary.onCopy}
                         style={{
                           background: "transparent",
                           border: "none",
@@ -7494,9 +7528,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     )}
                   </div>
 
-                  {breezeRecordSummary.onAskQuestion && (
+                  {recordSummary.onAskQuestion && (
                     <button
-                      onClick={breezeRecordSummary.onAskQuestion}
+                      onClick={recordSummary.onAskQuestion}
                       style={{
                         marginTop: "16px",
                         width: "36%",
