@@ -33,16 +33,6 @@ import {
   ChevronDown,
   Maximize2,
   X,
-  Bold,
-  Italic,
-  Underline,
-  Link,
-  Image as ImageIcon,
-  List,
-  Paperclip,
-  Plus,
-  MessageSquare,
-  Strikethrough,
   Sparkles,
 } from 'lucide-react';
 import { generateSms } from '@utils/communication';
@@ -104,7 +94,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   const [createTask, setCreateTask] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const [showContactInput, setShowContactInput] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -112,7 +101,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   const [generateLoading, setGenerateLoading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const contactInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -151,7 +139,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
       activityDate,
       createTask,
       taskDueDate: createTask ? 'In 3 business days (Wednesday)' : undefined,
-      attachments,
+      attachments: [],
     });
     // Reset state
     setMessageText('');
@@ -160,7 +148,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
     setCreateTask(false);
     setIsDraftSaved(false);
     setIsMaximized(false);
-    setAttachments([]);
     setShowContactInput(false);
     setContactSearch('');
     setGeneratePrompt('');
@@ -326,20 +313,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
     }
   };
 
-  const handleAttachment = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments((prev) => [...prev, ...files]);
-    e.target.value = '';
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
@@ -362,24 +335,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
       }
     }
   };
-
-  // ── Shared button style helper ────────────────────────────────────────────
-
-  const toolbarBtnStyle: React.CSSProperties = {
-    background: 'transparent',
-    border: 'none',
-    padding: '6px',
-    cursor: 'pointer',
-    color: '#141414',
-    display: 'flex',
-    alignItems: 'center',
-    borderRadius: '3px',
-  };
-
-  const hoverIn = (e: React.MouseEvent<HTMLButtonElement>) =>
-    (e.currentTarget.style.backgroundColor = '#f5f8fa');
-  const hoverOut = (e: React.MouseEvent<HTMLButtonElement>) =>
-    (e.currentTarget.style.backgroundColor = 'transparent');
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -675,130 +630,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             }}
           />
         </div>
-
-        {/* ── Formatting Toolbar ── */}
-        <div
-          style={{
-            padding: '8px 20px',
-            borderTop: '1px solid #e2e8f0',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '2px',
-            flexWrap: 'wrap',
-          }}
-        >
-          {/* Bold */}
-          <button style={toolbarBtnStyle} title="Bold (Ctrl+B)" onClick={handleBold} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Bold size={16} />
-          </button>
-          {/* Italic */}
-          <button style={toolbarBtnStyle} title="Italic (Ctrl+I)" onClick={handleItalic} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Italic size={16} />
-          </button>
-          {/* Underline */}
-          <button style={toolbarBtnStyle} title="Underline (Ctrl+U)" onClick={handleUnderline} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Underline size={16} />
-          </button>
-          {/* Strikethrough */}
-          <button style={toolbarBtnStyle} title="Strikethrough" onClick={handleStrikethrough} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Strikethrough size={16} />
-          </button>
-
-          {/* More dropdown */}
-          <button
-            style={{
-              ...toolbarBtnStyle,
-              padding: '6px 10px',
-              fontSize: '13px',
-              fontWeight: '500',
-              gap: '4px',
-            }}
-            onMouseEnter={hoverIn}
-            onMouseLeave={hoverOut}
-          >
-            More
-            <ChevronDown size={14} />
-          </button>
-
-          <div style={{ width: '1px', height: '20px', backgroundColor: '#cbd5e0', margin: '0 2px' }} />
-
-          {/* Link */}
-          <button style={toolbarBtnStyle} title="Link (Ctrl+K)" onClick={handleLink} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Link size={16} />
-          </button>
-          {/* Image */}
-          <button style={toolbarBtnStyle} title="Insert Image" onClick={handleImage} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <ImageIcon size={16} aria-hidden />
-          </button>
-          {/* Code / Quote */}
-          <button style={toolbarBtnStyle} title="Code" onClick={handleCode} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <MessageSquare size={16} />
-          </button>
-          {/* List */}
-          <button style={toolbarBtnStyle} title="Bullet List" onClick={handleList} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <List size={16} />
-          </button>
-          {/* Attachment */}
-          <button style={toolbarBtnStyle} title="Attach File" onClick={handleAttachment} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Paperclip size={16} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-          />
-          {/* AI / Plus */}
-          <button style={toolbarBtnStyle} title="More options" onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Plus size={16} />
-          </button>
-        </div>
-
-        {/* ── Attachments ── */}
-        {attachments.length > 0 && (
-          <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: '600' }}>
-              Attachments ({attachments.length})
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {attachments.map((file, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 10px',
-                    backgroundColor: '#f5f8fa',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, overflow: 'hidden' }}>
-                    <Paperclip size={14} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {file.name}
-                    </span>
-                    <span style={{ color: '#666', fontSize: '12px', flexShrink: 0 }}>
-                      ({(file.size / 1024).toFixed(1)} KB)
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => removeAttachment(index)}
-                    style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', color: '#718096', display: 'flex', alignItems: 'center' }}
-                    title="Remove"
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#f44336')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#718096')}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── Associated Records ── */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>

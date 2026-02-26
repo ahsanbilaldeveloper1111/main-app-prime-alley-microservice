@@ -201,8 +201,13 @@ export const routePermissions: RoutePermission[] = [
             { path: '/orders-delivery',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
+            
+            { path: '/tasks-old', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            { path: '/tasks-old/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+
             { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            {path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
+            { path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            
             {
                 path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
                 children: [
