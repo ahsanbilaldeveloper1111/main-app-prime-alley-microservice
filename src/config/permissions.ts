@@ -38,7 +38,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
     {path:'/crm-tasks',permissions: ['']},
-   
+    {path:'/main-dashboard',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },
@@ -55,7 +55,7 @@ export const routePermissions: RoutePermission[] = [
     
     { path: '/company', permissions: ['set-company-image-users'] },
     { path: '/audit-logs', permissions: [''] },
-
+   
 
 
 
@@ -132,6 +132,8 @@ export const routePermissions: RoutePermission[] = [
             {path:'/approvals/approval-detailpage',permissions: ['']},
             {path:'/inbox',permissions: ['']},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
+            {path:'/main-dashboard',permissions: ['']},
+            
         ]
     },
     //crm services end
