@@ -46,6 +46,8 @@ export interface ZabbixItem {
   key_: string;
   lastvalue: string;
   units: string;
+  lastclock?: string;
+  hosts?: Array<{ hostid: string; host: string; name: string }>;
   [key: string]: unknown;
 }
 
@@ -111,12 +113,101 @@ export interface ZabbixHostGroupUpdateParams {
   [key: string]: unknown;
 }
 
+// Items params
+export interface ZabbixItemsByHostNameParams {
+  output?: string[];
+  hostids?: string[];
+  [key: string]: unknown;
+}
+
+export interface ZabbixItemsByGroupParams {
+  output?: string[];
+  selectHosts?: string[];
+  groupids?: string[];
+  tags?: Array<{ tag: string; value: string }>;
+  evaltype?: number;
+  filter?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// Problems / Events
+export interface ZabbixProblemParams {
+  output?: string;
+  selectAcknowledges?: string;
+  recent?: boolean;
+  sortfield?: string[];
+  sortorder?: string;
+  time_from?: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixProblemsByHostParams {
+  output?: string;
+  hostids?: string[];
+  recent?: boolean;
+  sortfield?: string[];
+  sortorder?: string;
+  [key: string]: unknown;
+}
+
+// Alerts
+export interface ZabbixAlertsParams {
+  output?: string;
+  selectHosts?: string[];
+  selectRelatedObject?: string[];
+  source?: number;
+  object?: number;
+  value?: number;
+  sortfield?: string[];
+  sortorder?: string;
+  limit?: number;
+  [key: string]: unknown;
+}
+
+// Events acknowledge
+export interface ZabbixEventAcknowledgeParams {
+  eventids: string[];
+  action: number;
+  message?: string;
+  [key: string]: unknown;
+}
+
+// Triggers
+export interface ZabbixTriggersParams {
+  output?: string;
+  selectHosts?: string[];
+  selectLastEvent?: string;
+  monitored?: boolean;
+  only_true?: boolean;
+  [key: string]: unknown;
+}
+
+export interface ZabbixTriggersByHostParams {
+  output?: string;
+  hostids?: string[];
+  monitored?: boolean;
+  [key: string]: unknown;
+}
+
+// Graphs
+export interface ZabbixGraphsByHostParams {
+  output?: string;
+  hostids?: string[];
+  [key: string]: unknown;
+}
+
+// Templates
+export interface ZabbixTemplatesParams {
+  output?: string[];
+  [key: string]: unknown;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildPayload<T>(params: T): ZabbixJsonRpcPayload<T> {
-  return { params };
+function buildPayload<T>(params: T): T {
+  return params;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,20 +389,65 @@ export async function getItemsByHostId(
 }
 
 /**
- * POST items/by-host-name – get items by host name(s) (item.get with filter)
+ * POST items/by-host-name – get items by host name(s) or host id(s) (item.get)
  */
 export async function getItemsByHostName(
   hostNames: string[],
-  params?: { output?: string[] }
+  options?: { output?: string[] }
+): Promise<ZabbixJsonRpcResponse<ZabbixItem[]>>;
+export async function getItemsByHostName(
+  params: ZabbixItemsByHostNameParams
+): Promise<ZabbixJsonRpcResponse<ZabbixItem[]>>;
+export async function getItemsByHostName(
+  hostNamesOrParams: string[] | ZabbixItemsByHostNameParams,
+  options?: { output?: string[] }
 ): Promise<ZabbixJsonRpcResponse<ZabbixItem[]>> {
   try {
-    const requestParams = {
-      output: params?.output ?? ["itemid", "name", "key_", "lastvalue", "units"],
-      filter: { host: hostNames },
-    };
+    const isParams = !Array.isArray(hostNamesOrParams);
+    const requestParams = isParams
+      ? {
+          output: (hostNamesOrParams as ZabbixItemsByHostNameParams).output ?? [
+            "itemid",
+            "name",
+            "key_",
+            "lastvalue",
+            "units",
+          ],
+          ...(hostNamesOrParams as ZabbixItemsByHostNameParams),
+        }
+      : {
+          output: options?.output ?? ["itemid", "name", "key_", "lastvalue", "units"],
+          filter: { host: hostNamesOrParams as string[] },
+        };
     const payload = buildPayload(requestParams);
     const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<ZabbixItem[]>>(
       `${ZABBIX_PREFIX}/items/by-host-name`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST items/by-group – get items by group(s) (item.get with groupids, tags, filter)
+ */
+export async function getItemsByGroup(
+  params: ZabbixItemsByGroupParams
+): Promise<ZabbixJsonRpcResponse<ZabbixItem[]>> {
+  try {
+    const defaultParams: ZabbixItemsByGroupParams = {
+      output: ["itemid", "name", "key_", "lastvalue", "units", "lastclock"],
+      selectHosts: ["hostid", "host", "name"],
+      ...params,
+    };
+    const payload = buildPayload(defaultParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<ZabbixItem[]>>(
+      `${ZABBIX_PREFIX}/items/by-group`,
       payload
     );
     if (data.error) {
@@ -406,6 +542,296 @@ export async function deleteHostGroups(
     const payload = buildPayload(ids);
     const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<{ groupids: string[] }>>(
       `${ZABBIX_PREFIX}/host-groups/delete`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Problems API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST problems – get problems (problem.get)
+ */
+export async function getProblems(
+  params: ZabbixProblemParams = {}
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      selectAcknowledges: "extend",
+      recent: false,
+      sortfield: ["eventid"],
+      sortorder: "DESC",
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/problems`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST problems/by-host – get problems by host id(s)
+ */
+export async function getProblemsByHost(
+  params: ZabbixProblemsByHostParams
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      recent: false,
+      sortfield: ["eventid"],
+      sortorder: "DESC",
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/problems/by-host`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST problems/recent – get recent problems
+ */
+export async function getProblemsRecent(
+  params: ZabbixProblemParams
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      recent: true,
+      sortfield: ["eventid"],
+      sortorder: "DESC",
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/problems/recent`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Alerts API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST alerts – get alerts (alert.get)
+ */
+export async function getAlerts(
+  params: ZabbixAlertsParams = {}
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      selectHosts: ["hostid", "name"],
+      selectRelatedObject: ["description", "priority"],
+      source: 0,
+      object: 0,
+      value: 1,
+      sortfield: ["clock"],
+      sortorder: "DESC",
+      limit: 50,
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/alerts`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Events API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST events – get events (event.get)
+ */
+export async function getEvents(
+  params: Record<string, unknown> = {}
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const payload = buildPayload(params);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/events`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST events/acknowledge – acknowledge or close events (event.acknowledge)
+ * action: 1 = close problem, 6 = acknowledge
+ */
+export async function acknowledgeEvents(
+  params: ZabbixEventAcknowledgeParams
+): Promise<ZabbixJsonRpcResponse<{ eventids: string[] }>> {
+  try {
+    const payload = buildPayload(params);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<{ eventids: string[] }>>(
+      `${ZABBIX_PREFIX}/events/acknowledge`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Triggers API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST triggers – get triggers (trigger.get)
+ */
+export async function getTriggers(
+  params: ZabbixTriggersParams = {}
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      selectHosts: ["hostid", "host", "name"],
+      selectLastEvent: "extend",
+      monitored: true,
+      only_true: true,
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/triggers`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST triggers/by-host – get triggers by host id(s)
+ */
+export async function getTriggersByHost(
+  params: ZabbixTriggersByHostParams
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      monitored: true,
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/triggers/by-host`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Graphs API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST graphs/by-host – get graphs by host id(s)
+ */
+export async function getGraphsByHost(
+  params: ZabbixGraphsByHostParams
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: "extend",
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/graphs/by-host`,
+      payload
+    );
+    if (data.error) {
+      throw new Error(data.error.message || "Zabbix API error");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Templates API
+// ---------------------------------------------------------------------------
+
+/**
+ * POST templates – get templates (template.get)
+ */
+export async function getTemplates(
+  params: ZabbixTemplatesParams = {}
+): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+  try {
+    const requestParams = {
+      output: ["templateid", "name"],
+      ...params,
+    };
+    const payload = buildPayload(requestParams);
+    const { data } = await axiosInstance.post<ZabbixJsonRpcResponse<unknown[]>>(
+      `${ZABBIX_PREFIX}/templates`,
       payload
     );
     if (data.error) {
