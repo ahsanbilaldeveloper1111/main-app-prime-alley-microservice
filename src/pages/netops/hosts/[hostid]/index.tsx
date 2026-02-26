@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getItemsByHostId, getHosts, ZebbixItem, ZebbixHost } from '@utils/zebbix';
+import { getItemsByHostId, getHostById, ZabbixItem, ZabbixHost } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
@@ -14,12 +14,12 @@ import '@assets/scss/tabs.scss';
 const HostItemsDetail = () => {
   const router = useRouter();
   const hostid = router.query.hostid as string | undefined;
-  const [items, setItems] = useState<ZebbixItem[]>([]);
-  const [host, setHost] = useState<ZebbixHost | null>(null);
+  const [items, setItems] = useState<ZabbixItem[]>([]);
+  const [host, setHost] = useState<ZabbixHost | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const tableColumns: TableColumn<ZebbixItem>[] = [
+  const tableColumns: TableColumn<ZabbixItem>[] = [
     { key: 'itemid', label: 'Item ID', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
     {
@@ -36,9 +36,9 @@ const HostItemsDetail = () => {
     if (!hostid) return;
     setLoading(true);
     try {
-      const [itemsRes, hostsRes] = await Promise.all([
+      const [itemsRes, hostRes] = await Promise.all([
         getItemsByHostId(hostid),
-        getHosts(),
+        getHostById(hostid),
       ]);
       if (itemsRes.error) {
         toast.error(itemsRes.error.message || 'Failed to fetch items');
@@ -47,13 +47,14 @@ const HostItemsDetail = () => {
         const list = itemsRes.result ?? [];
         setItems(Array.isArray(list) ? list : []);
       }
-      if (hostsRes.result && Array.isArray(hostsRes.result)) {
-        const found = (hostsRes.result as ZebbixHost[]).find((h) => h.hostid === hostid);
-        setHost(found ?? null);
+      if (hostRes.result && Array.isArray(hostRes.result) && hostRes.result.length > 0) {
+        setHost((hostRes.result as ZabbixHost[])[0]);
+      } else {
+        setHost(null);
       }
     } catch (error) {
       console.error('Error fetching host items:', error);
-      toast.error('Failed to fetch items');
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch items');
       setItems([]);
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ const HostItemsDetail = () => {
         </Col>
       </Row>
 
-      <GenericTable<ZebbixItem>
+      <GenericTable<ZabbixItem>
         data={items}
         columns={tableColumns}
         loading={loading}

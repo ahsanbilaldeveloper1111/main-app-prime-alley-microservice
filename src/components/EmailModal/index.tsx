@@ -10,10 +10,21 @@ import {
 } from "lucide-react";
 import { generateEmail } from "@utils/communication";
 
+/** Normalize recipient to array (single string or array of strings). */
+function normalizeRecipientEmails(v?: string | string[]): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map((e) => String(e).trim()).filter(Boolean);
+  return String(v)
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
 interface EmailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  recipientEmail?: string;
+  /** Single email, comma-separated string, or array of emails */
+  recipientEmail?: string | string[];
   recipientName?: string;
   senderEmail?: string;
   senderName?: string;
@@ -51,9 +62,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   contextPayload,
   onSend,
 }) => {
-  const [toEmails, setToEmails] = useState<string[]>(
-    recipientEmail ? [recipientEmail] : [],
-  );
+  const initialTo = normalizeRecipientEmails(recipientEmail);
+  const [toEmails, setToEmails] = useState<string[]>(initialTo);
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [bccEmails, setBccEmails] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
@@ -86,6 +96,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [showToneDropdown, setShowToneDropdown] = useState(false);
   const bodyEditorRef = useRef<HTMLDivElement>(null);
   const bodySetByGenerateRef = useRef(false);
+  const moreFormattingRef = useRef<HTMLDivElement>(null);
+  const [showMoreFormattingDropdown, setShowMoreFormattingDropdown] =
+    useState(false);
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const [showLengthDropdown, setShowLengthDropdown] = useState(false);
   const [showUrgencyDropdown, setShowUrgencyDropdown] = useState(false);
@@ -95,8 +108,11 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const optionsPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (recipientEmail && !toEmails.includes(recipientEmail)) {
-      setToEmails([recipientEmail]);
+    const next = normalizeRecipientEmails(recipientEmail);
+    if (next.length > 0) {
+      setToEmails((prev) =>
+        next.some((e) => !prev.includes(e)) ? next : prev,
+      );
     }
   }, [recipientEmail]);
 
@@ -132,6 +148,20 @@ const EmailModal: React.FC<EmailModalProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!showMoreFormattingDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        moreFormattingRef.current &&
+        !moreFormattingRef.current.contains(e.target as Node)
+      ) {
+        setShowMoreFormattingDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMoreFormattingDropdown]);
 
   const handleGenerateEmail = async () => {
     const query = generatePrompt.trim();
@@ -386,6 +416,54 @@ const EmailModal: React.FC<EmailModalProps> = ({
             : currentBccInput;
       addEmail(value, type);
     }
+  };
+
+  const syncBodyFromEditor = () => {
+    if (bodyEditorRef.current)
+      setEmailBody(bodyEditorRef.current.innerHTML ?? "");
+  };
+
+  const handleBold = () => {
+    bodyEditorRef.current?.focus();
+    document.execCommand("bold", false);
+    syncBodyFromEditor();
+  };
+  const handleItalic = () => {
+    bodyEditorRef.current?.focus();
+    document.execCommand("italic", false);
+    syncBodyFromEditor();
+  };
+  const handleUnderline = () => {
+    bodyEditorRef.current?.focus();
+    document.execCommand("underline", false);
+    syncBodyFromEditor();
+  };
+  const handleLink = () => {
+    bodyEditorRef.current?.focus();
+    const url = window.prompt("Enter URL:", "https://") ?? "https://";
+    document.execCommand("createLink", false, url);
+    syncBodyFromEditor();
+  };
+  const handleImage = () => {
+    bodyEditorRef.current?.focus();
+    const url = window.prompt("Enter image URL:", "https://") ?? "https://";
+    document.execCommand("insertImage", false, url);
+    syncBodyFromEditor();
+  };
+  const handleList = () => {
+    bodyEditorRef.current?.focus();
+    document.execCommand("insertUnorderedList", false);
+    syncBodyFromEditor();
+  };
+  const handleCode = () => {
+    const el = bodyEditorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+    const selectedText = range?.toString() || "code";
+    document.execCommand("insertHTML", false, `<code>${selectedText}</code>`);
+    syncBodyFromEditor();
   };
 
   const handleSend = async () => {
@@ -1124,6 +1202,28 @@ const EmailModal: React.FC<EmailModalProps> = ({
               const html = bodyEditorRef.current?.innerHTML ?? "";
               setEmailBody(html);
             }}
+            onKeyDown={(e) => {
+              if (e.ctrlKey || e.metaKey) {
+                switch (e.key.toLowerCase()) {
+                  case "b":
+                    e.preventDefault();
+                    handleBold();
+                    break;
+                  case "i":
+                    e.preventDefault();
+                    handleItalic();
+                    break;
+                  case "u":
+                    e.preventDefault();
+                    handleUnderline();
+                    break;
+                  case "k":
+                    e.preventDefault();
+                    handleLink();
+                    break;
+                }
+              }
+            }}
             style={{
               width: "100%",
               minHeight: isMaximized ? "400px" : "200px",
@@ -1167,6 +1267,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1180,6 +1281,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               fontWeight: "600",
             }}
             title="Bold"
+            onClick={handleBold}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1190,6 +1292,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             B
           </button>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1204,6 +1307,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               fontStyle: "italic",
             }}
             title="Italic"
+            onClick={handleItalic}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1214,6 +1318,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             I
           </button>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1228,6 +1333,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               textDecoration: "underline",
             }}
             title="Underline"
+            onClick={handleUnderline}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1237,31 +1343,93 @@ const EmailModal: React.FC<EmailModalProps> = ({
           >
             U
           </button>
+          <div style={{ position: "relative" }} ref={moreFormattingRef}>
+            <button
+              type="button"
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "6px 10px",
+                cursor: "pointer",
+                color: "#141414",
+                display: "flex",
+                alignItems: "center",
+                borderRadius: "3px",
+                fontSize: "13px",
+                fontWeight: "500",
+                gap: "4px",
+              }}
+              title="More formatting"
+              onClick={() =>
+                setShowMoreFormattingDropdown((v) => !v)
+              }
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f5f8fa")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+            >
+              More
+              <ChevronDown size={14} />
+            </button>
+            {showMoreFormattingDropdown && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: "100%",
+                  marginTop: "4px",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "5px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  zIndex: 1001,
+                  minWidth: "120px",
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "none",
+                    background: "transparent",
+                    fontSize: "14px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    handleList();
+                    setShowMoreFormattingDropdown(false);
+                  }}
+                >
+                  List
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "none",
+                    background: "transparent",
+                    fontSize: "14px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    fontFamily: "monospace",
+                  }}
+                  onClick={() => {
+                    handleCode();
+                    setShowMoreFormattingDropdown(false);
+                  }}
+                >
+                  Code
+                </button>
+              </div>
+            )}
+          </div>
           <button
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
-              fontWeight: "500",
-              gap: "4px",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            More
-            <ChevronDown size={14} />
-          </button>
-          <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1273,6 +1441,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               borderRadius: "3px",
             }}
             title="Link"
+            onClick={handleLink}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1283,6 +1452,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <Link size={16} />
           </button>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1294,6 +1464,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               borderRadius: "3px",
             }}
             title="Image"
+            onClick={handleImage}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1304,6 +1475,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <Image size={16} aria-label="Insert Image" />
           </button>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -1328,6 +1500,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <ChevronDown size={14} />
           </button>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",

@@ -2,7 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
-  useEffect
+  useEffect,
+  useRef
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -13,7 +14,7 @@ import {
   MoreVertical, Folder
 } from 'lucide-react';
 import { Button, Spinner } from 'react-bootstrap';
-import ProjectTabsContent from '../projects/partials/ProjectTabsContent';
+import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/partials/ProjectTabsContent';
 import { listProjects } from '@utils/tasks';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
@@ -23,6 +24,7 @@ const WorkPlannerProjectsDashboard = () => {
     const [projects, setProjects] = useState<any[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+    const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
     
     // Fetch extensions for CreateTaskModal
     const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
@@ -239,6 +241,7 @@ const WorkPlannerProjectsDashboard = () => {
                 variant="outline-primary"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 disabled={!selectedProject}
+                onClick={() => projectTabsContentRef.current?.switchToBoardView()}
               >
                 <LayoutGrid size={18} />
                 Board View
@@ -251,6 +254,7 @@ const WorkPlannerProjectsDashboard = () => {
         </div>
 
         <ProjectTabsContent
+          ref={projectTabsContentRef}
           selectedProject={selectedProject}
           hierarchyDataExtensions={hierarchyDataExtensions}
           hierarchyLoading={hierarchyLoading}
