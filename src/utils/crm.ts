@@ -474,14 +474,28 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
   }
 };
 
-/** Create a CRM note for a record (prospect, lead, deal, order, or company). */
+/** Create a CRM note for a record (prospect, lead, deal, order, or company). Supports optional file attachments via FormData. */
 export const createCrmNote = async (payload: {
   record_type: "prospect" | "lead" | "deal" | "order" | "company";
   record_id: number;
   text: string;
+  attachments?: File[];
 }): Promise<any> => {
   try {
-    const response = await axiosInstance.post("/crm/notes", payload);
+    const hasAttachments = payload.attachments && payload.attachments.length > 0;
+    if (hasAttachments) {
+      const formData = new FormData();
+      formData.append("record_type", payload.record_type);
+      formData.append("record_id", String(payload.record_id));
+      formData.append("text", payload.text);
+      payload.attachments!.forEach((file) => {
+        formData.append("attachments[]", file, file.name);
+      });
+      const response = await axiosInstance.post("/crm/notes", formData);
+      return extractData<any>(response.data);
+    }
+    const { attachments: _attachments, ...jsonPayload } = payload;
+    const response = await axiosInstance.post("/crm/notes", jsonPayload);
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create note");
