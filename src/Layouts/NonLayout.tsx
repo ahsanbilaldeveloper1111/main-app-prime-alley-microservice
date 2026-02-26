@@ -1,32 +1,11 @@
-// import { useProfile } from '@common/UserHooks';
-import React from 'react';
-import { ReactNode } from 'react'
+import React, { ReactNode } from "react";
 
-interface NonLayoutProps  {
-    children: ReactNode
-  }
- 
-const NonLayout = ({children} : NonLayoutProps) => {
-    // const { userProfile, loading } = useProfile();
-    // const router = useRouter();
-
-    // const redirectLoginFunction = () => {
-    //     if (typeof window !== 'undefined') { // Check if we're on the client-side
-    //       if (!userProfile) {
-    //         router.push('/auth/login');
-    //       }
-    //     }
-    //   };
-
-    //   useEffect(() => {
-    //     redirectLoginFunction();
-    //   },[])
-    return (
-        <React.Fragment>
-            {children}
-          
-        </React.Fragment>
-    );
+interface NonLayoutProps {
+  children: ReactNode;
 }
+
+const NonLayout = ({ children }: NonLayoutProps) => {
+  return <React.Fragment>{children}</React.Fragment>;
+};
 
 export default NonLayout;

@@ -104,9 +104,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const prevPathnameRef = useRef<string>("");
-  const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<
-    string | null
-  >(null);
+
   const companyImageUrlRef = useRef<string | null>(null);
 
   const [userCompanyName, setUserCompanyName] = useState("");
@@ -126,13 +124,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         if (blob && blob.size > 0) {
           const url = URL.createObjectURL(blob);
           companyImageUrlRef.current = url;
-          setCurrentUserCompanyImageUrl(url);
-        } else {
-          setCurrentUserCompanyImageUrl(null);
         }
       })
       .catch(() => {
-        if (!cancelled) setCurrentUserCompanyImageUrl(null);
+        if (!cancelled) companyImageUrlRef.current = null;
       });
     return () => {
       cancelled = true;
