@@ -1,0 +1,6 @@
+.one-line-ellipsis {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px; // adjust as needed
+    }

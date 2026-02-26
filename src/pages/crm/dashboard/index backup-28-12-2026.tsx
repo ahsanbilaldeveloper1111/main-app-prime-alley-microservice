@@ -1,0 +1,851 @@
+import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import {
+  Card,
+  Row,
+  Col,
+  Button,
+  Badge,
+  ProgressBar,
+  Spinner,
+  Table,
+} from "react-bootstrap";
+import {
+  getCrmDashboard,
+  getCrmDashboardOverview,
+  getLeads,
+  getDeals,
+  getOrders,
+  DashboardData as CrmDashboardData,
+  LeadData,
+  DealData,
+  OrderData,
+} from "@utils/crm";
+import {
+  Target,
+  Handshake,
+  ShoppingBag,
+  TrendingUp,
+  Edit,
+  Calendar,
+} from "lucide-react";
+import Link from "next/link";
+import { toast } from "react-toastify";
+import moment from "moment";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from "recharts";
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+
+// KPI Card Component
+interface KPICardData {
+  title: string;
+  value: string;
+  change?: string;
+  isPositive?: boolean;
+  icon: React.ReactNode;
+  color: string;
+  monthlyValue?: number;
+}
+
+const KPICard: React.FC<KPICardData> = ({ title, value, change, isPositive, icon, color, monthlyValue }) => {
+  return (
+    <Card
+      className="h-100"
+      style={{
+        transition: "all 0.2s ease",
+        border: "1px solid #e9ecef",
+      }}
+    >
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
+            <div className={`text-${color}`}>{icon}</div>
+          </div>
+          {change && (
+            <Badge bg={isPositive ? "success" : "danger"} className="bg-opacity-10">
+              {change}
+            </Badge>
+          )}
+        </div>
+        <h3 className="mb-1">{value}</h3>
+        <p className="text-muted mb-0 small">{title}</p>
+        {monthlyValue !== undefined && (
+          <div className="mt-3 pt-3 border-top d-flex align-items-center gap-2">
+            <Calendar size={16} className={`text-${color}`} />
+            <div>
+              <span className="text-muted small">This Month: </span>
+              <span className={`fw-semibold text-${color}`}>{monthlyValue}</span>
+            </div>
+          </div>
+        )}
+      </Card.Body>
+    </Card>
+  );
+};
+
+// Helper functions for badge colors
+const getDealBadgeColor = (deal: DealData): string => {
+  if (deal.is_lost) return "danger";
+  if (deal.stage?.is_won) return "success";
+  return "secondary";
+};
+
+const getOrderBadgeColor = (order: OrderData): string => {
+  if (order.status === "delivered") return "success";
+  if (order.status === "in_progress") return "info";
+  if (order.status === "approved") return "primary";
+  return "warning";
+};
+
+// Chart color palette - 15 colors for handling large datasets
+const CHART_COLORS = [
+  "#ffc107", // Yellow
+  "#0dcaf0", // Cyan
+  "#6c757d", // Gray
+  "#198754", // Green
+  "#dc3545", // Red
+  "#0d6efd", // Blue
+  "#6610f2", // Purple
+  "#e83e8c", // Pink
+  "#fd7e14", // Orange
+  "#20c997", // Teal
+  "#ff6b6b", // Coral Red
+  "#4ecdc4", // Turquoise
+  "#95e1d3", // Mint
+  "#f38181", // Salmon
+  "#aa96da", // Lavender
+];
+
+const CrmDashboard = () => {
+  const [dashboardData, setDashboardData] = useState<CrmDashboardData | null>(null);
+  const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
+  const [recentDeals, setRecentDeals] = useState<DealData[]>([]);
+  const [recentOrders, setRecentOrders] = useState<OrderData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Chart data states
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [dealsByStage, setDealsByStage] = useState<any[]>([]);
+  const [ordersByStage, setOrdersByStage] = useState<any[]>([]);
+  
+  // Conversion percentages
+  const [leadToDealPercent, setLeadToDealPercent] = useState(0);
+  const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
+
+  const [dashboardOverview, setDashboardOverview] = useState<any>(null);
+  useEffect(() => {
+    fetchDashboardOverview();
+  }, []);
+
+  const fetchDashboardOverview = useCallback(async () => {
+    try {
+      const data = await getCrmDashboardOverview();
+      console.log("Dashboard Overview", data);
+      setDashboardOverview(data);
+    } catch (error) {
+      console.error("Failed to fetch dashboard overview data:", error);
+    }
+  }, []);
+  // Fetch all dashboard data
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch dashboard data and recent items in parallel
+      const [
+        dashboard,
+        leadsResponse,
+        dealsResponse,
+        ordersResponse,
+      ] = await Promise.all([
+        getCrmDashboard().then((res: any) => res.data.data),
+        getLeads({ per_page: 5 }),
+        getDeals({ per_page: 5 }),
+        getOrders({ per_page: 5 }),
+      ]);
+      console.log("ZEZEZE", dashboard);
+      setDashboardData(dashboard as CrmDashboardData);
+
+      // Set conversion percentages from API
+      const conversionStats = (dashboard as CrmDashboardData)?.conversion_stats?.last_30_days;
+      setLeadToDealPercent(conversionStats?.leads_to_deals_percentage || 0);
+      setDealToOrderPercent(conversionStats?.deals_to_orders_percentage || 0);
+
+      // Get recent items
+      console.log("ZEZEZE", leadsResponse);
+      setRecentLeads((leadsResponse?.data as any)?.data?.slice(0, 5) || []);
+      setRecentDeals(dealsResponse?.dataList?.slice(0, 5) || []);
+      setRecentOrders(ordersResponse?.dataList?.slice(0, 5) || []);
+
+      // Process monthly data from API - convert string numbers to numbers
+      const monthlyDataArray = (dashboard as CrmDashboardData)?.monthly_data || [];
+      const processedMonthlyData = monthlyDataArray.map((item: { month: string; month_label: string; leads: number | string; deals: number | string; orders: number | string }) => ({
+        month: item.month_label || item.month,
+        leads: Number(item.leads) || 0,
+        deals: Number(item.deals) || 0,
+        orders: Number(item.orders) || 0,
+      }));
+      setMonthlyData(processedMonthlyData);
+
+      // Process deals by stage from API
+      const dealsDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.deals || [];
+      const dealsByStageData = dealsDistribution.map((item: { stage_name: string; count: number; color: string }, index: number) => ({
+        name: item.stage_name,
+        value: item.count,
+        color: item.color || CHART_COLORS[index % CHART_COLORS.length],
+      }));
+      setDealsByStage(dealsByStageData);
+
+      // Process orders by stage from API
+      const ordersDistribution = (dashboard as CrmDashboardData)?.stage_distribution?.orders || [];
+      const ordersByStageData = ordersDistribution.map((item: { stage_name: string; count: number; color: string }, index: number) => ({
+        name: item.stage_name,
+        value: item.count,
+        color: item.color || CHART_COLORS[index % CHART_COLORS.length],
+      }));
+      setOrdersByStage(ordersByStageData);
+
+      setLoading(false);
+    } catch (error: any) {
+      console.error("Failed to fetch dashboard data:", error);
+      setError(error?.message || "Failed to load dashboard data");
+      setLoading(false);
+      toast.error(error?.message || "Failed to load dashboard data");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  if (loading) {
+    return (
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: "400px" }}
+      >
+        <Spinner animation="border">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error}
+        <Button
+          variant="outline-danger"
+          size="sm"
+          className="ms-3"
+          onClick={fetchDashboardData}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const stats = dashboardData?.stats;
+  
+  const kpiData: KPICardData[] = [
+    {
+      title: "Total Leads (All Time)",
+      value: (stats?.leads?.total || 0).toString(),
+      icon: <Target size={24} />,
+      color: "primary",
+      monthlyValue: stats?.leads?.this_month,
+    },
+    {
+      title: "Total Deals (All Time)",
+      value: (stats?.deals?.total || 0).toString(),
+      icon: <Handshake size={24} />,
+      color: "success",
+      monthlyValue: stats?.deals?.this_month,
+    },
+    {
+      title: "Total Orders (All Time)",
+      value: (stats?.orders?.total || 0).toString(),
+      icon: <ShoppingBag size={24} />,
+      color: "info",
+      monthlyValue: stats?.orders?.this_month,
+    },
+    {
+      title: "Lead to Deal Conversion (Past 30 Days)",
+      value: `${leadToDealPercent}%`,
+      icon: <TrendingUp size={24} />,
+      color: "warning",
+    },
+    {
+      title: "Deal to Order Conversion (Past 30 Days)",
+      value: `${dealToOrderPercent}%`,
+      icon: <TrendingUp size={24} />,
+      color: "secondary",
+    },
+  ];
+
+  // Calculate max count for progress bars
+  const leadsByStage = dashboardData?.stage_distribution?.leads || [];
+  const maxLeadCount = leadsByStage.reduce(
+    (max, stage) => Math.max(max, stage.count),
+    0
+  ) || 1;
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem
+        mainTitle="CRM"
+        mainLink="/crm/dashboard"
+        subTitle="Dashboard"
+      />
+
+      <PageHeader title="CRM Dashboard" />
+
+      <div className="container-fluid">
+        {/* KPI Cards */}
+        <style>{`
+          @media (min-width: 1400px) {
+            .kpi-card-col { flex: 0 0 20% !important; max-width: 20% !important; }
+          }
+          @media (min-width: 1200px) and (max-width: 1399px) {
+            .kpi-card-col { flex: 0 0 25% !important; max-width: 25% !important; }
+          }
+          @media (min-width: 992px) and (max-width: 1199px) {
+            .kpi-card-col { flex: 0 0 33.333% !important; max-width: 33.333% !important; }
+          }
+          @media (min-width: 768px) and (max-width: 991px) {
+            .kpi-card-col { flex: 0 0 50% !important; max-width: 50% !important; }
+          }
+          @media (max-width: 767px) {
+            .kpi-card-col { flex: 0 0 100% !important; max-width: 100% !important; }
+          }
+          .dashboard-table-wrapper {
+            width: 100%;
+            overflow: hidden;
+          }
+          .dashboard-table-wrapper .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+          }
+          .dashboard-table-wrapper .table-responsive table {
+            width: 100%;
+            max-width: 100%;
+            table-layout: auto;
+            margin-bottom: 0;
+          }
+          .dashboard-table-wrapper .table-responsive table thead th {
+            white-space: normal;
+            word-wrap: break-word;
+            vertical-align: middle;
+            padding: 12px 16px;
+          }
+          .dashboard-table-wrapper .table-responsive table tbody td {
+            padding: 12px 16px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+          }
+          .dashboard-table-wrapper .table-responsive table thead th:last-child,
+          .dashboard-table-wrapper .table-responsive table tbody td:last-child {
+            min-width: 60px !important;
+            max-width: 80px !important;
+            width: 60px !important;
+          }
+        `}</style>
+        <Row className="mb-4">
+          {kpiData.map((kpi) => (
+            <Col key={kpi.title} className="mb-3 kpi-card-col">
+              <KPICard {...kpi} />
+            </Col>
+          ))}
+        </Row>
+
+        {/* Charts Row */}
+        <Row className="mb-4">
+          {/* Monthly Bar Chart */}
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Leads, Deals & Orders by Month</h5>
+                {monthlyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart 
+                      data={monthlyData}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                      barCategoryGap="15%"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 11, fill: "#6c757d" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis 
+                        allowDecimals={false}
+                        tick={{ fontSize: 11, fill: "#6c757d" }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                          backgroundColor: "#fff",
+                          padding: "8px 12px"
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: "15px", fontSize: "12px" }}
+                        iconType="rect"
+                        iconSize={12}
+                      />
+                      <Bar dataKey="leads" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} name="Leads" />
+                      <Bar dataKey="deals" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} name="Deals" />
+                      <Bar dataKey="orders" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} name="Orders" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No data available</div>
+                )}
+                  </Card.Body>
+                </Card>
+          </Col>
+
+          {/* Deals by Stage Pie Chart */}
+          <Col lg={3} className="mb-4 d-flex">
+                <Card className="border-0 shadow-sm h-100 w-100">
+                  <Card.Body>
+                <h5 className="mb-4 fw-bold">Deals by Stage</h5>
+                {dealsByStage.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={dealsByStage}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius="80%"
+                        dataKey="value"
+                        label={false}
+                      >
+                        {dealsByStage.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}
+                        formatter={(value: any, name: any) => [
+                          `${value} deals`,
+                          name
+                        ]}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => value}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No deals data available</div>
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Orders by Stage Doughnut Chart */}
+          <Col lg={3} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body>
+                <h5 className="mb-4 fw-bold">Orders by Stage</h5>
+                {ordersByStage.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={ordersByStage}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="40%"
+                        outerRadius="80%"
+                        dataKey="value"
+                        label={false}
+                      >
+                        {ordersByStage.map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: "8px",
+                          border: "1px solid #e9ecef",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}
+                        formatter={(value: any, name: any) => [
+                          `${value} orders`,
+                          name
+                        ]}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => value}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">No orders data available</div>
+                )}
+                  </Card.Body>
+                </Card>
+          </Col>
+        </Row>
+
+        {/* Leads by Stage */}
+        {leadsByStage.length > 0 && (
+          <Row className="mb-4">
+            <Col lg={6} className="mb-4 d-flex">
+              <Card className="border-0 shadow-sm h-100 w-100">
+                <Card.Body>
+                  <h5 className="mb-4 fw-bold">Leads by Stage</h5>
+                  {leadsByStage.map((item) => (
+                    <div key={item.stage_id} className="mb-3">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="fw-semibold">{item.stage_name}</span>
+                        <Badge
+                          bg="primary"
+                          className="bg-opacity-10 text-dark"
+                        >
+                          {item.count}
+                        </Badge>
+                      </div>
+                      <ProgressBar
+                        now={(item.count / maxLeadCount) * 100}
+                        style={{
+                          height: "8px",
+                          backgroundColor: "#e9ecef",
+                        }}
+                        className="rounded"
+                      />
+                    </div>
+                  ))}
+                </Card.Body>
+              </Card>
+            </Col>
+
+          {/* Recent Leads */}
+            <Col lg={6} className="mb-4 d-flex">
+              <Card className="border-0 shadow-sm h-100 w-100">
+                <Card.Body className="d-flex flex-column">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="mb-0 fw-bold">Recent Leads</h5>
+                <Link
+                  href="/crm/leads"
+                      className="btn btn-link btn-sm text-decoration-none"
+                >
+                      View All →
+                </Link>
+                        </div>
+                  <div className="dashboard-table-wrapper flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                    {recentLeads.length > 0 ? (
+                      <div className="table-responsive">
+                        <Table hover className="mb-0">
+                          <thead
+                            style={{
+                              position: "sticky",
+                              top: 0,
+                              backgroundColor: "#fff",
+                              zIndex: 1,
+                            }}
+                          >
+                            <tr>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "120px",
+                                }}
+                              >
+                                Name
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "80px",
+                                }}
+                              >
+                                Stage
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "100px",
+                                }}
+                              >
+                                Created
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "100px",
+                                }}
+                              >
+                                Last Activity
+                              </th>
+                              <th
+                                style={{
+                                  fontSize: "0.85rem",
+                                  fontWeight: 600,
+                                  borderBottom: "2px solid #dee2e6",
+                                  minWidth: "60px",
+                                  maxWidth: "80px",
+                                  width: "60px",
+                                }}
+                              >
+                                Action
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {recentLeads.map((lead) => (
+                              <tr key={lead.id}>
+                                <td style={{ fontSize: "0.9rem", fontWeight: 500, whiteSpace: "normal", wordWrap: "break-word" }}>
+                                  {lead.name || "Unnamed Lead"}
+                                </td>
+                                <td style={{ whiteSpace: "nowrap" }}>
+                                  <Badge bg="primary" className="bg-opacity-10 text-dark">
+                            {lead.stage?.name || "No Stage"}
+                                  </Badge>
+                                </td>
+                                <td style={{ fontSize: "0.85rem", color: "#6c757d", whiteSpace: "nowrap" }}>
+                                  {moment(lead.created_at).format("MMM DD, YYYY")}
+                                </td>
+                                <td style={{ fontSize: "0.85rem", color: "#6c757d", whiteSpace: "nowrap" }}>
+                                  {moment(lead.updated_at).format("MMM DD, YYYY")}
+                                </td>
+                                <td style={{ whiteSpace: "nowrap", textAlign: "center", minWidth: "60px", maxWidth: "80px", width: "60px" }}>
+                        <Link
+                          href={`/crm/leads/${lead.id}/edit`}
+                          className="btn btn-sm btn-outline-secondary"
+                          title="Edit"
+                        >
+                                    <Edit size={14} />
+                        </Link>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-muted text-center py-4">No recent leads</p>
+                    )}
+                  </div>
+              </Card.Body>
+            </Card>
+            </Col>
+          </Row>
+        )}
+
+        {/* Recent Deals and Orders */}
+        <Row>
+          {/* Recent Deals */}
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body className="d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
+                    Recent Deals
+                  </h5>
+                <Link
+                    href="/crm/deals"
+                    className="btn btn-link btn-sm text-decoration-none"
+                >
+                    View All →
+                </Link>
+                        </div>
+                <div className="flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  {recentDeals.length > 0 ? (
+                    recentDeals.map((deal) => (
+                      <div key={deal.id} className="mb-3 d-flex align-items-start gap-2">
+                        <div
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: "#0d6efd",
+                            marginTop: "6px",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div className="flex-grow-1">
+                          <h6
+                            className="mb-2"
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: 600,
+                              color: "#2c3e50",
+                            }}
+                          >
+                            {deal.name || "Unnamed Deal"}
+                        </h6>
+                          <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <small className="text-muted">
+                              Created: {moment(deal.created_at).format("MMM DD, YYYY")}
+                            </small>
+                            {deal.grand_total && (
+                              <small className="text-muted">
+                                Value: {deal.grand_total}
+                              </small>
+                            )}
+                            <Badge
+                              bg={getDealBadgeColor(deal)}
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 500,
+                                padding: "4px 10px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {deal.stage?.name || "No Stage"}
+                            </Badge>
+                        </div>
+                      </div>
+                      <Link
+                          href={`/crm/deals/${deal.id}/edit`}
+                        className="btn btn-sm btn-outline-secondary"
+                        title="Edit"
+                      >
+                          <Edit size={14} />
+                      </Link>
+                    </div>
+                  ))
+                ) : (
+                    <p className="text-muted text-center py-4">No recent deals</p>
+                )}
+          </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Recent Orders */}
+          <Col lg={6} className="mb-4 d-flex">
+            <Card className="border-0 shadow-sm h-100 w-100">
+              <Card.Body className="d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h5 className="mb-0 fw-bold" style={{ color: "#2c3e50" }}>
+                    Recent Orders
+                  </h5>
+                    <Link
+                    href="/crm/orders"
+                    className="btn btn-link btn-sm text-decoration-none"
+                    >
+                    View All →
+                    </Link>
+                  </div>
+                <div className="flex-grow-1" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                  {recentOrders.length > 0 ? (
+                    recentOrders.map((order) => (
+                      <div key={order.id} className="mb-3 d-flex align-items-start gap-2">
+                        <div
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: "#0d6efd",
+                            marginTop: "6px",
+                            flexShrink: 0,
+                          }}
+                        />
+                        <div className="flex-grow-1">
+                          <h6
+                            className="mb-2"
+                            style={{
+                              fontSize: "0.95rem",
+                              fontWeight: 600,
+                              color: "#2c3e50",
+                            }}
+                          >
+                            {order.order_number} - {order.customer_name}
+                          </h6>
+                          <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <small className="text-muted">
+                              Creted: {moment(order.created_at).format("MMM DD, YYYY")}
+                            </small>
+                            {order.final_amount && (
+                              <small className="text-muted">
+                                Amount: {order.final_amount}
+                              </small>
+                            )}
+                            <Badge
+                              bg={getOrderBadgeColor(order)}
+                              style={{
+                                fontSize: "0.7rem",
+                                fontWeight: 500,
+                                padding: "4px 10px",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {order.stage?.name || "No Stage"}
+                            </Badge>
+                  </div>
+                        </div>
+                    <Link
+                          href={`/crm/orders/${order.id}/edit`}
+                          className="btn btn-sm btn-outline-secondary"
+                          title="Edit"
+                    >
+                          <Edit size={14} />
+                    </Link>
+                  </div>
+                    ))
+                  ) : (
+                    <p className="text-muted text-center py-4">No recent orders</p>
+                    )}
+                  </div>
+                </Card.Body>
+              </Card>
+                      </Col>
+                    </Row>
+            </div>
+    </React.Fragment>
+  );
+};
+
+CrmDashboard.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default CrmDashboard;

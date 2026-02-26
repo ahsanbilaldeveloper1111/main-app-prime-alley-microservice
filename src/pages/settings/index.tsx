@@ -1,0 +1,975 @@
+import "@assets/scss/datatable-style.scss";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+} from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import { Col, Row, Card } from "react-bootstrap";
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
+import { 
+  Users as UsersIcon, 
+  Briefcase, 
+  Phone, 
+  CreditCard, 
+  Network, 
+  Ticket,
+  Megaphone,
+  Package,
+  Layers,
+  UserCheck,
+  Building2,
+  Shield,
+  Settings as SettingsIcon,
+  AlertCircle,
+  CheckCircle,
+  ArrowUp,
+  HelpCircle,
+  Tag,
+  FileText,
+  ClipboardList,
+  CalendarCheck,
+  Bot,
+  Wrench,
+  MessageCircle,
+  Globe,
+  BarChart2,
+  Settings as SettingsCogIcon,
+  PhoneOutgoing,
+  PhoneIncoming
+} from 'lucide-react';
+
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+
+// Import ControlHub components
+import Users from "@pages/controlhub/users";
+import Teams from "@pages/controlhub/teams";
+import Groups from "@pages/controlhub/groups";
+import Ranks from "@pages/controlhub/ranks";
+
+// Import CRM components
+import Campaigns from "@pages/crm/campaigns";
+import Industries from "@pages/crm/industries";
+import Products from "@pages/crm/products";
+import Stages from "@pages/crm/stages";
+import DealTemplates from "@pages/crm/deal-templates";
+import BusinessTypes from "@pages/crm/business-types";
+
+// Import Telco Gateway components
+import GsmAssign from "@pages/gsm/assign";
+import GsmSync from "@pages/gsm/sync";
+import CompanyPO from "@pages/gsm/company/po";
+
+// Import Billing components
+import PaymentMethods from "@pages/billing/payment-methods";
+
+// Import NetOps components
+import Devices from "@pages/netops/devices";
+import Services from "@pages/netops/services";
+import Alerts from "@pages/netops/alerts-old";
+
+// Import Tickets components
+import TicketStatuses from "@pages/tickets/statuses";
+import TicketModules from "@pages/tickets/modules";
+import ModuleCategories from "@pages/tickets/modules/categories";
+import ModuleSubCategories from "@pages/tickets/modules/sub-categories";
+import TicketTypes from "@pages/tickets/types";
+
+// Import FAQ components
+import FAQModules from "@pages/faqs/modules";
+import FAQTopics from "@pages/faqs/topics";
+import FAQItems from "@pages/faqs/items";
+import FAQTypes from "@pages/faqs/types";
+
+// Import Staff Insights & Work Planner components
+import RequestCategories from "@pages/workforce/request-categories";
+import RequestSubCategories from "@pages/workforce/sub-categories";
+import WorkPlannerStatuses from "@pages/planner/statuses";
+
+// Import AI Chat components
+import ToolProfiles from "@pages/chat/tools-profiles";
+import FaqProfiles from "@pages/chat/faq-profiles";
+import AIChatFAQsTenant from "@pages/chat/ai-faqs/tenant";
+import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
+
+// Import AI Analysis (ai-ml) components
+import ManageExtensions from "@pages/ai-ml/manage-extensions";
+import BackendOperations from "@pages/ai-ml/backend-operations";
+import ManualAnalysis from "@pages/ai-ml/analysis";
+import AIMLProfiles from "@pages/agents/outbound-agent";
+
+// Import Outbound / Inbound AI Agent components
+import OutboundTrunkProfiles from "@pages/ai-agent/outbound/trunk-profiles";
+import InboundTrunkProfiles from "@pages/ai-agent/inbound/trunk-profiles";
+import InboundBotProfiles from "@pages/agents/inbound-agent";
+import InboundFAQs from "@pages/ai-agent/inbound/faqs";
+
+import { HEADER_CONSTANTS} from "@constants/headerConstants";
+
+// Destructure constants for easier use
+const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
+
+
+const Settings = () => {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<string>("user-management");
+  const [activeUserManagementTab, setActiveUserManagementTab] = useState<string>("user-directory");
+  const [activeCrmTab, setActiveCrmTab] = useState<string>("campaigns");
+  const [activeTicketsTab, setActiveTicketsTab] = useState<string>("statuses");
+  const [activeTelcoTab, setActiveTelcoTab] = useState<string>("assign-devices");
+  const [activeNetopsTab, setActiveNetopsTab] = useState<string>("devices-list");
+  const [activeHelpCenterTab, setActiveHelpCenterTab] = useState<string>("modules");
+  const [activeStaffInsightsTab, setActiveStaffInsightsTab] = useState<string>("request-categories");
+  const [activeWorkPlannerTab, setActiveWorkPlannerTab] = useState<string>("statuses");
+  const [activeAIChatTab, setActiveAIChatTab] = useState<string>("tools-profiles");
+  const [activeAIAnalysisTab, setActiveAIAnalysisTab] = useState<string>("manage-extensions");
+  const [activeOutboundAIAgentTab, setActiveOutboundAIAgentTab] = useState<string>("trunk-profiles");
+  const [activeInboundAIAgentTab, setActiveInboundAIAgentTab] = useState<string>("trunk-profiles");
+
+  // Track which tabs have been visited to prevent re-mounting
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["user-management"]));
+  const [visitedUserManagementTabs, setVisitedUserManagementTabs] = useState<Set<string>>(new Set(["user-directory"]));
+  const [visitedCrmTabs, setVisitedCrmTabs] = useState<Set<string>>(new Set(["campaigns"]));
+  const [visitedTicketsTabs, setVisitedTicketsTabs] = useState<Set<string>>(new Set(["statuses"]));
+  const [visitedTelcoTabs, setVisitedTelcoTabs] = useState<Set<string>>(new Set(["assign-devices"]));
+  const [visitedNetopsTabs, setVisitedNetopsTabs] = useState<Set<string>>(new Set(["devices-list"]));
+  const [visitedBillingTab, setVisitedBillingTab] = useState<boolean>(false);
+  const [visitedHelpCenterTabs, setVisitedHelpCenterTabs] = useState<Set<string>>(new Set(["modules"]));
+  const [visitedStaffInsightsTabs, setVisitedStaffInsightsTabs] = useState<Set<string>>(new Set(["request-categories"]));
+  const [visitedWorkPlannerTabs, setVisitedWorkPlannerTabs] = useState<Set<string>>(new Set(["statuses"]));
+  const [visitedAIChatTabs, setVisitedAIChatTabs] = useState<Set<string>>(new Set(["tools-profiles"]));
+  const [visitedAIAnalysisTabs, setVisitedAIAnalysisTabs] = useState<Set<string>>(new Set(["manage-extensions"]));
+  const [visitedOutboundAIAgentTabs, setVisitedOutboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
+  const [visitedInboundAIAgentTabs, setVisitedInboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
+
+  // Initialize tabs from URL on mount
+  useEffect(() => {
+    if (router.isReady) {
+      const { tab, subtab } = router.query;
+      
+      if (tab && typeof tab === 'string') {
+        const mainTab = tab;
+        setActiveTab(mainTab);
+        setVisitedTabs(prev => new Set(prev).add(mainTab));
+        
+        // Set sub-tab based on main tab
+        if (subtab && typeof subtab === 'string') {
+          switch (mainTab) {
+            case "user-management":
+              setActiveUserManagementTab(subtab);
+              setVisitedUserManagementTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "crm":
+              setActiveCrmTab(subtab);
+              setVisitedCrmTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "tickets":
+              setActiveTicketsTab(subtab);
+              setVisitedTicketsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "telco-gateway":
+              setActiveTelcoTab(subtab);
+              setVisitedTelcoTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "devices-management":
+              setActiveNetopsTab(subtab);
+              setVisitedNetopsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "help-center":
+              setActiveHelpCenterTab(subtab);
+              setVisitedHelpCenterTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "staff-insights":
+              setActiveStaffInsightsTab(subtab);
+              setVisitedStaffInsightsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "work-planner":
+              setActiveWorkPlannerTab(subtab);
+              setVisitedWorkPlannerTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "ai-chat":
+              setActiveAIChatTab(subtab);
+              setVisitedAIChatTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "ai-analysis":
+              setActiveAIAnalysisTab(subtab);
+              setVisitedAIAnalysisTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "outbound-ai-agent":
+              setActiveOutboundAIAgentTab(subtab);
+              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "inbound-ai-agent":
+              setActiveInboundAIAgentTab(subtab);
+              setVisitedInboundAIAgentTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "billing":
+              setVisitedBillingTab(true);
+              break;
+          }
+        } else {
+          // If no subtab in URL, set default subtab for the main tab
+          switch (mainTab) {
+            case "user-management":
+              setActiveUserManagementTab("user-directory");
+              setVisitedUserManagementTabs(prev => new Set(prev).add("user-directory"));
+              break;
+            case "crm":
+              setActiveCrmTab("campaigns");
+              setVisitedCrmTabs(prev => new Set(prev).add("campaigns"));
+              break;
+            case "tickets":
+              setActiveTicketsTab("statuses");
+              setVisitedTicketsTabs(prev => new Set(prev).add("statuses"));
+              break;
+            case "telco-gateway":
+              setActiveTelcoTab("assign-devices");
+              setVisitedTelcoTabs(prev => new Set(prev).add("assign-devices"));
+              break;
+            case "devices-management":
+              setActiveNetopsTab("devices-list");
+              setVisitedNetopsTabs(prev => new Set(prev).add("devices-list"));
+              break;
+            case "help-center":
+              setActiveHelpCenterTab("modules");
+              setVisitedHelpCenterTabs(prev => new Set(prev).add("modules"));
+              break;
+            case "staff-insights":
+              setActiveStaffInsightsTab("request-categories");
+              setVisitedStaffInsightsTabs(prev => new Set(prev).add("request-categories"));
+              break;
+            case "work-planner":
+              setActiveWorkPlannerTab("statuses");
+              setVisitedWorkPlannerTabs(prev => new Set(prev).add("statuses"));
+              break;
+            case "ai-chat":
+              setActiveAIChatTab("tools-profiles");
+              setVisitedAIChatTabs(prev => new Set(prev).add("tools-profiles"));
+              break;
+            case "ai-analysis":
+              setActiveAIAnalysisTab("manage-extensions");
+              setVisitedAIAnalysisTabs(prev => new Set(prev).add("manage-extensions"));
+              break;
+            case "outbound-ai-agent":
+              setActiveOutboundAIAgentTab("trunk-profiles");
+              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
+              break;
+            case "inbound-ai-agent":
+              setActiveInboundAIAgentTab("trunk-profiles");
+              setVisitedInboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
+              break;
+            case "billing":
+              setVisitedBillingTab(true);
+              break;
+          }
+        }
+      }
+    }
+  }, [router.isReady, router.query]);
+
+  // Handle main tab change
+  const handleMainTabChange = (key: string | null) => {
+    const tabKey = key || "user-management";
+    setActiveTab(tabKey);
+    setVisitedTabs(prev => new Set(prev).add(tabKey));
+    // Track billing tab when it becomes active
+    if (tabKey === "billing") {
+      setVisitedBillingTab(true);
+    }
+    
+    // Update URL
+    const defaultSubTab = getDefaultSubTab(tabKey);
+    if (tabKey === "billing") {
+      router.replace({
+        pathname: router.pathname,
+        query: { ...router.query, tab: tabKey }
+      }, undefined, { shallow: true });
+    } else {
+      router.replace({
+        pathname: router.pathname,
+        query: { ...router.query, tab: tabKey, subtab: defaultSubTab }
+      }, undefined, { shallow: true });
+    }
+  };
+
+  // Get default sub-tab for a main tab
+  const getDefaultSubTab = (mainTab: string): string => {
+    switch (mainTab) {
+      case "user-management": return "user-directory";
+      case "crm": return "campaigns";
+      case "tickets": return "statuses";
+      case "telco-gateway": return "assign-devices";
+      case "devices-management": return "devices-list";
+      case "help-center": return "modules";
+      case "staff-insights": return "request-categories";
+      case "work-planner": return "statuses";
+      case "ai-chat": return "tools-profiles";
+      case "ai-analysis": return "manage-extensions";
+      case "outbound-ai-agent": return "trunk-profiles";
+      case "inbound-ai-agent": return "trunk-profiles";
+      default: return "";
+    }
+  };
+
+  // Handle sub-tab changes
+  const handleUserManagementTabChange = (key: string | null) => {
+    const tabKey = key || "user-directory";
+    setActiveUserManagementTab(tabKey);
+    setVisitedUserManagementTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "user-management", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleCrmTabChange = (key: string | null) => {
+    const tabKey = key || "campaigns";
+    setActiveCrmTab(tabKey);
+    setVisitedCrmTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "crm", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleTicketsTabChange = (key: string | null) => {
+    const tabKey = key || "statuses";
+    setActiveTicketsTab(tabKey);
+    setVisitedTicketsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "tickets", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleTelcoTabChange = (key: string | null) => {
+    const tabKey = key || "assign-devices";
+    setActiveTelcoTab(tabKey);
+    setVisitedTelcoTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "telco-gateway", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleNetopsTabChange = (key: string | null) => {
+    const tabKey = key || "devices-list";
+    setActiveNetopsTab(tabKey);
+    setVisitedNetopsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "devices-management", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleHelpCenterTabChange = (key: string | null) => {
+    const tabKey = key || "modules";
+    setActiveHelpCenterTab(tabKey);
+    setVisitedHelpCenterTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "help-center", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleStaffInsightsTabChange = (key: string | null) => {
+    const tabKey = key || "request-categories";
+    setActiveStaffInsightsTab(tabKey);
+    setVisitedStaffInsightsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "staff-insights", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleWorkPlannerTabChange = (key: string | null) => {
+    const tabKey = key || "statuses";
+    setActiveWorkPlannerTab(tabKey);
+    setVisitedWorkPlannerTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "work-planner", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleAIChatTabChange = (key: string | null) => {
+    const tabKey = key || "tools-profiles";
+    setActiveAIChatTab(tabKey);
+    setVisitedAIChatTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "ai-chat", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleAIAnalysisTabChange = (key: string | null) => {
+    const tabKey = key || "manage-extensions";
+    setActiveAIAnalysisTab(tabKey);
+    setVisitedAIAnalysisTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "ai-analysis", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleOutboundAIAgentTabChange = (key: string | null) => {
+    const tabKey = key || "trunk-profiles";
+    setActiveOutboundAIAgentTab(tabKey);
+    setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "outbound-ai-agent", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleInboundAIAgentTabChange = (key: string | null) => {
+    const tabKey = key || "trunk-profiles";
+    setActiveInboundAIAgentTab(tabKey);
+    setVisitedInboundAIAgentTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "inbound-ai-agent", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  // Check if a tab should render
+  const shouldRenderTab = (mainTab: string, subTab?: string) => {
+    if (!visitedTabs.has(mainTab)) return false;
+    if (activeTab !== mainTab) return false;
+    
+    if (subTab) {
+      switch (mainTab) {
+        case "user-management":
+          return visitedUserManagementTabs.has(subTab) && activeUserManagementTab === subTab;
+        case "crm":
+          return visitedCrmTabs.has(subTab) && activeCrmTab === subTab;
+        case "tickets":
+          return visitedTicketsTabs.has(subTab) && activeTicketsTab === subTab;
+        case "telco-gateway":
+          return visitedTelcoTabs.has(subTab) && activeTelcoTab === subTab;
+        case "devices-management":
+          return visitedNetopsTabs.has(subTab) && activeNetopsTab === subTab;
+        case "billing":
+          return visitedBillingTab;
+        case "help-center":
+          return visitedHelpCenterTabs.has(subTab) && activeHelpCenterTab === subTab;
+        case "staff-insights":
+          return visitedStaffInsightsTabs.has(subTab) && activeStaffInsightsTab === subTab;
+        case "work-planner":
+          return visitedWorkPlannerTabs.has(subTab) && activeWorkPlannerTab === subTab;
+        case "ai-chat":
+          return visitedAIChatTabs.has(subTab) && activeAIChatTab === subTab;
+        case "ai-analysis":
+          return visitedAIAnalysisTabs.has(subTab) && activeAIAnalysisTab === subTab;
+        case "outbound-ai-agent":
+          return visitedOutboundAIAgentTabs.has(subTab) && activeOutboundAIAgentTab === subTab;
+        case "inbound-ai-agent":
+          return visitedInboundAIAgentTabs.has(subTab) && activeInboundAIAgentTab === subTab;
+        default:
+          return false;
+      }
+    }
+    return true;
+  };
+
+  // Define main tabs with icons and colors
+  const mainTabs = [
+    {
+      key: "user-management",
+      title: "User Management",
+      icon: UsersIcon,
+      color: "#6c757d",
+      permission: PERMISSIONS.CONTROL_HUB_SERVICES
+    },
+    {
+      key: "crm",
+      title: "CRM Management",
+      icon: Briefcase,
+      color: "#0d6efd",
+      permission: PERMISSIONS.CRM_SERVICES
+    },
+    {
+      key: "telco-gateway",
+      title: "Carrier Gateway",
+      icon: Phone,
+      color: "#ff9800",
+      permission: PERMISSIONS.GSM_SERVICES
+    },
+    {
+      key: "billing",
+      title: "Billing & Payments",
+      icon: CreditCard,
+      color: "#9c27b0",
+      permission: PERMISSIONS.ACCOUNTS_SERVICES
+    },
+    {
+      key: "devices-management",
+      title: "Devices Management",
+      icon: Network,
+      color: "#f44336",
+      permission: PERMISSIONS.NETOPS_SERVICES
+    },
+    {
+      key: "tickets",
+      title: "Tickets",
+      icon: Ticket,
+      color: "#2196f3",
+      permission: PERMISSIONS.TICKETS_SERVICES
+    },
+
+    {
+      key: "help-center",
+      title: "Help Center",
+      icon: HelpCircle,
+      color: "#17a2b8",
+      permission: PERMISSIONS.TICKETS_SERVICES // Using tickets permission for now, adjust if needed
+    },
+    {
+      key: "staff-insights",
+      title: "Staff Insights",
+      icon: ClipboardList,
+      color: "#5c6bc0",
+      permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+    },
+    {
+      key: "work-planner",
+      title: "Work Planner",
+      icon: CalendarCheck,
+      color: "#26a69a",
+      permission: PERMISSIONS.WORK_PLANNER_SERVICES
+    },
+    {
+      key: "ai-chat",
+      title: "AI Chat",
+      icon: Bot,
+      color: "#7c4dff",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "ai-analysis",
+      title: "AI Analysis",
+      icon: BarChart2,
+      color: "#00bcd4",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "outbound-ai-agent",
+      title: "Outbound Ai Agent",
+      icon: PhoneOutgoing,
+      color: "#00897b",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "inbound-ai-agent",
+      title: "Inbound Ai Agent",
+      icon: PhoneIncoming,
+      color: "#5e35b1",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    }
+  ];
+
+  // Define sub-tabs for each main tab
+  const subTabsConfig: Record<string, Array<{key: string, title: string, icon: any, color: string, permission: string}>> = {
+    "user-management": [
+      { key: "user-directory", title: "User Directory", icon: UsersIcon, color: "#6c757d", permission: PERMISSIONS.VIEW_USERS },
+      { key: "supervisor-teams", title: "Supervisor Teams", icon: UserCheck, color: "#0d6efd", permission: PERMISSIONS.VIEW_TEAMS },
+      { key: "management-groups", title: "Management Groups", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_GROUPS },
+      { key: "ranks-and-permissions", title: "Ranks and Permissions", icon: Shield, color: "#ff9800", permission: PERMISSIONS.VIEW_RANKS }
+    ],
+    "crm": [
+      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
+      { key: "product-groups", title: "Product Groups", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
+      { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+      { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
+      { key: "business-types", title: "Business Types", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },
+      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS }
+    ],
+    "telco-gateway": [
+      { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#0d6efd", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
+      { key: "sync-gsm", title: "Sync GSM", icon: ArrowUp, color: "#198754", permission: PERMISSIONS.VIEW_GSM_SYNC },
+      { key: "company-profiling", title: "Company Profiling", icon: Building2, color: "#ff9800", permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING }
+    ],
+    "devices-management": [
+      { key: "devices-list", title: "Devices List", icon: Network, color: "#0d6efd", permission: PERMISSIONS.VIEW_NETOPS_DEVICES },
+      { key: "services", title: "Services", icon: SettingsIcon, color: "#198754", permission: PERMISSIONS.VIEW_SERVICES_NETOPS },
+      { key: "alerts", title: "Alerts", icon: AlertCircle, color: "#f44336", permission: PERMISSIONS.VIEW_NETOPS_ALERTS }
+    ],
+    "tickets": [
+      { key: "statuses", title: "Statuses", icon: CheckCircle, color: "#0d6efd", permission: PERMISSIONS.VIEW_TICKETS_STATUS },
+      { key: "modules", title: "Modules", icon: Layers, color: "#198754", permission: PERMISSIONS.VIEW_TICKETS_MODULES },
+      { key: "categories", title: "Categories", icon: Package, color: "#ff9800", permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
+      { key: "sub-categories", title: "Sub Categories", icon: Layers, color: "#9c27b0", permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
+      { key: "types", title: "Types", icon: Ticket, color: "#2196f3", permission: PERMISSIONS.VIEW_TICKETS_TYPES }
+    ],
+    "help-center": [
+      { key: "modules", title: "FAQ Modules", icon: Layers, color: "#0d6efd", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "topics", title: "FAQ Topics", icon: Tag, color: "#ff9800", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "items", title: "FAQ Items", icon: HelpCircle, color: "#198754", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "types", title: "FAQ Types", icon: Tag, color: "#17a2b8", permission: PERMISSIONS.TICKETS_SERVICES }
+    ],
+    "staff-insights": [
+      { key: "request-categories", title: "Request Categories", icon: ClipboardList, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT },
+      // { key: "sub-categories", title: "Sub-Categories", icon: Layers, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT }
+    ],
+    "work-planner": [
+      { key: "statuses", title: "Statuses", icon: CalendarCheck, color: "#26a69a", permission: PERMISSIONS.WORK_PLANNER_SERVICES }
+    ],
+    "ai-chat": [
+      { key: "tools-profiles", title: "Tools Profiles", icon: Wrench, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "faq-profiles", title: "FAQ Profiles", icon: MessageCircle, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "tenant-profile", title: "Tenant Profile", icon: Building2, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "global-faqs", title: "Global FAQs", icon: Globe, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES }
+    ],
+    "ai-analysis": [
+      { key: "manage-extensions", title: "Manage Extensions", icon: SettingsCogIcon, color: "#00bcd4", permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML },
+      { key: "backend-operations", title: "Backend Operations", icon: Wrench, color: "#00bcd4", permission: PERMISSIONS.TRANSLATE_AIML },
+      { key: "manual-analysis", title: "Manual Analysis", icon: FileText, color: "#00bcd4", permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML }
+    ],
+    "outbound-ai-agent": [
+      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES }
+    ],
+    "inbound-ai-agent": [
+      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "faqs", title: "FAQs", icon: HelpCircle, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES }
+    ]
+  };
+
+  const getActiveSubTab = (mainTab: string) => {
+    switch(mainTab) {
+      case "user-management": return activeUserManagementTab;
+      case "crm": return activeCrmTab;
+      case "tickets": return activeTicketsTab;
+      case "telco-gateway": return activeTelcoTab;
+      case "devices-management": return activeNetopsTab;
+      case "help-center": return activeHelpCenterTab;
+      case "staff-insights": return activeStaffInsightsTab;
+      case "work-planner": return activeWorkPlannerTab;
+      case "ai-chat": return activeAIChatTab;
+      case "ai-analysis": return activeAIAnalysisTab;
+      case "outbound-ai-agent": return activeOutboundAIAgentTab;
+      case "inbound-ai-agent": return activeInboundAIAgentTab;
+      default: return "";
+    }
+  };
+
+  const handleSubTabClick = (mainTab: string, subTabKey: string) => {
+    switch(mainTab) {
+      case "user-management": handleUserManagementTabChange(subTabKey); break;
+      case "crm": handleCrmTabChange(subTabKey); break;
+      case "tickets": handleTicketsTabChange(subTabKey); break;
+      case "telco-gateway": handleTelcoTabChange(subTabKey); break;
+      case "devices-management": handleNetopsTabChange(subTabKey); break;
+      case "help-center": handleHelpCenterTabChange(subTabKey); break;
+      case "staff-insights": handleStaffInsightsTabChange(subTabKey); break;
+      case "work-planner": handleWorkPlannerTabChange(subTabKey); break;
+      case "ai-chat": handleAIChatTabChange(subTabKey); break;
+      case "ai-analysis": handleAIAnalysisTabChange(subTabKey); break;
+      case "outbound-ai-agent": handleOutboundAIAgentTabChange(subTabKey); break;
+      case "inbound-ai-agent": handleInboundAIAgentTabChange(subTabKey); break;
+    }
+  };
+
+  return (
+    <React.Fragment>
+      <style>{`
+        .settings-filter-buttons {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 0;
+          padding: 0;
+          width: 100%;
+        }
+
+        .settings-filter-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border-radius: 8px;
+          border: 1px solid;
+          font-weight: 500;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: white;
+          white-space: nowrap;
+        }
+
+        .settings-filter-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-filter-button.active {
+          color: white;
+        }
+
+        .settings-filter-button.active .filter-icon {
+          color: white;
+        }
+
+        .settings-filter-button:not(.active) .filter-icon {
+          color: inherit;
+        }
+
+        .settings-sub-filter-buttons {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 0;
+          padding: 0;
+          width: 100%;
+        }
+
+        .settings-sub-filter-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border-radius: 8px;
+          border: 1px solid;
+          font-weight: 500;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: white;
+          white-space: nowrap;
+        }
+
+        .settings-sub-filter-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-sub-filter-button.active {
+          color: white;
+        }
+
+        .settings-sub-filter-button.active .filter-icon {
+          color: white;
+        }
+
+        .settings-sub-filter-button:not(.active) .filter-icon {
+          color: inherit;
+        }
+
+        .filter-icon {
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
+        }
+      `}</style>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Settings" />
+
+      <PageHeader
+        title="Settings"
+        showSearch={false}
+      />
+
+      <Row>
+        <Col md={12}>
+          <Card className="shadow-sm border-0">
+            <Card.Body style={{ padding: 0 }}>
+              {/* Main Filter Buttons - At the top */}
+              <div >
+                <div className="settings-filter-buttons shadow px-3 py-3">
+                {mainTabs.map((tab) => {
+                  if (!session?.user?.permissions?.includes(tab.permission)) return null;
+                  // Show Help Center tab only if user is admin
+                  if (tab.key === "help-center" && Number(session?.user?.is_admin) !== 1) return null;
+                  const IconComponent = tab.icon;
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      className={`settings-filter-button ${isActive ? 'active' : ''}`}
+                      onClick={() => handleMainTabChange(tab.key)}
+                      style={{
+                        backgroundColor: isActive ? tab.color : 'white',
+                        borderColor: isActive ? tab.color : tab.color,
+                        color: isActive ? 'white' : tab.color
+                      }}
+                    >
+                      <IconComponent className="filter-icon" size={18} />
+                      <span>{tab.title}</span>
+                    </button>
+                  );
+                })}
+                </div>
+              </div>
+
+              {/* Sub Filter Buttons */}
+              {subTabsConfig[activeTab] && subTabsConfig[activeTab].length > 0 && (
+                <div >
+                  <div className="settings-sub-filter-buttons px-3 py-3 shadow">
+                  {subTabsConfig[activeTab].map((subTab) => {
+                    if (!session?.user?.permissions?.includes(subTab.permission)) return null;
+                    const SubIconComponent = subTab.icon;
+                    const isActive = getActiveSubTab(activeTab) === subTab.key;
+                    return (
+                      <button
+                        key={subTab.key}
+                        className={`settings-sub-filter-button ${isActive ? 'active' : ''}`}
+                        onClick={() => handleSubTabClick(activeTab, subTab.key)}
+                        style={{
+                          backgroundColor: isActive ? subTab.color : 'white',
+                          borderColor: isActive ? subTab.color : subTab.color,
+                          color: isActive ? 'white' : subTab.color
+                        }}
+                      >
+                        <SubIconComponent className="filter-icon" size={16} />
+                        <span>{subTab.title}</span>
+                      </button>
+                    );
+                  })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab Content */}
+              <div style={{ padding: '24px' }}>
+                {/* User Management Content */}
+                {activeTab === "user-management" && shouldRenderTab("user-management", activeUserManagementTab) && (
+                  <div>
+                    {activeUserManagementTab === "user-directory" && <Users />}
+                    {activeUserManagementTab === "supervisor-teams" && <Teams />}
+                    {activeUserManagementTab === "management-groups" && <Groups />}
+                    {activeUserManagementTab === "ranks-and-permissions" && <Ranks />}
+                  </div>
+                )}
+                {/* CRM Content */}
+                {activeTab === "crm" && shouldRenderTab("crm", activeCrmTab) && (
+                  <div>
+                    {activeCrmTab === "campaigns" && <Campaigns />}
+                    {activeCrmTab === "product-groups" && <Industries />}
+                    {activeCrmTab === "products" && <Products />}
+                    {activeCrmTab === "stages" && <Stages />}
+                    {activeCrmTab === "deal-templates" && <DealTemplates />}
+                    {activeCrmTab === "business-types" && <BusinessTypes />}
+                  </div>
+                )}
+
+               {/*  Telco Gateway Content */}
+                {activeTab === "telco-gateway" && shouldRenderTab("telco-gateway", activeTelcoTab) && (
+                  <div>
+                    {activeTelcoTab === "assign-devices" && <GsmAssign />}
+                    {activeTelcoTab === "sync-gsm" && <GsmSync />}
+                    {activeTelcoTab === "company-profiling" && <CompanyPO />}
+                  </div>
+                )}
+
+                {/* Billing Content */}
+                {activeTab === "billing" && shouldRenderTab("billing") && session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
+                  <div>
+                    <PaymentMethods />
+                  </div>
+                )}
+
+            
+
+                {/* Devices Management Content */}
+                {activeTab === "devices-management" && shouldRenderTab("devices-management", activeNetopsTab) && (
+                  <div>
+                    {activeNetopsTab === "devices-list" && <Devices />}
+                    {activeNetopsTab === "services" && <Services />}
+                    {activeNetopsTab === "alerts" && <Alerts />}
+                  </div>
+                )}
+
+                {/* Tickets Content */}
+                {activeTab === "tickets" && shouldRenderTab("tickets", activeTicketsTab) && (
+                  <div>
+                    {activeTicketsTab === "statuses" && <TicketStatuses />}
+                    {activeTicketsTab === "modules" && <TicketModules />}
+                    {activeTicketsTab === "categories" && <ModuleCategories />}
+                    {activeTicketsTab === "sub-categories" && <ModuleSubCategories />}
+                    {activeTicketsTab === "types" && <TicketTypes />}
+                  </div>
+                )}
+
+                {/* Help Center Content */}
+                {activeTab === "help-center" && shouldRenderTab("help-center", activeHelpCenterTab) && (
+                  <div>
+                    {activeHelpCenterTab === "modules" && <FAQModules />}
+                    {activeHelpCenterTab === "topics" && <FAQTopics />}
+                    {activeHelpCenterTab === "items" && <FAQItems />}
+                    {activeHelpCenterTab === "types" && <FAQTypes />}
+                  </div>
+                )}
+
+                {/* Staff Insights Content */}
+                {activeTab === "staff-insights" && shouldRenderTab("staff-insights", activeStaffInsightsTab) && (
+                  <div>
+                    {activeStaffInsightsTab === "request-categories" && <RequestCategories />}
+                    {/* {activeStaffInsightsTab === "sub-categories" && <RequestSubCategories />} */}
+                  </div>
+                )}
+
+                {/* Work Planner Content */}
+                {activeTab === "work-planner" && shouldRenderTab("work-planner", activeWorkPlannerTab) && (
+                  <div>
+                    {activeWorkPlannerTab === "statuses" && <WorkPlannerStatuses />}
+                  </div>
+                )}
+
+                {/* AI Chat Content */}
+                {activeTab === "ai-chat" && shouldRenderTab("ai-chat", activeAIChatTab) && (
+                  <div>
+                    {activeAIChatTab === "tools-profiles" && <ToolProfiles />}
+                    {activeAIChatTab === "faq-profiles" && <FaqProfiles />}
+                    {activeAIChatTab === "tenant-profile" && <AIChatFAQsTenant />}
+                    {activeAIChatTab === "global-faqs" && <AIChatFAQsGlobal />}
+                  </div>
+                )}
+
+                {/* AI Analysis Content */}
+                {activeTab === "ai-analysis" && shouldRenderTab("ai-analysis", activeAIAnalysisTab) && (
+                  <div>
+                    {activeAIAnalysisTab === "manage-extensions" && <ManageExtensions />}
+                    {activeAIAnalysisTab === "backend-operations" && <BackendOperations />}
+                    {activeAIAnalysisTab === "manual-analysis" && <ManualAnalysis />}
+                  </div>
+                )}
+
+                {/* Outbound Ai Agent Content */}
+                {activeTab === "outbound-ai-agent" && shouldRenderTab("outbound-ai-agent", activeOutboundAIAgentTab) && (
+                  <div>
+                    {activeOutboundAIAgentTab === "trunk-profiles" && <OutboundTrunkProfiles />}
+                    {activeOutboundAIAgentTab === "bot-profiles" && <AIMLProfiles />}
+                  </div>
+                )}
+
+                {/* Inbound Ai Agent Content */}
+                {activeTab === "inbound-ai-agent" && shouldRenderTab("inbound-ai-agent", activeInboundAIAgentTab) && (
+                  <div>
+                    {activeInboundAIAgentTab === "trunk-profiles" && <InboundTrunkProfiles />}
+                    {activeInboundAIAgentTab === "bot-profiles" && <InboundBotProfiles />}
+                    {activeInboundAIAgentTab === "faqs" && <InboundFAQs />}
+                  </div>
+                )}
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </React.Fragment>
+  );
+};
+
+Settings.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default Settings;

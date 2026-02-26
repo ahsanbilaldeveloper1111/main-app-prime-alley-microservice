@@ -1,0 +1,910 @@
+import React, { useMemo, useState } from 'react';
+import { 
+  Plus, MoreVertical, Calendar,
+  SlidersHorizontal
+} from 'lucide-react';
+import { formatDateForTable } from '@utils/Helper';
+import { updateTask, deleteTask, getTask, getTaskActivities } from '@utils/tasks';
+import { toast } from 'react-toastify';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import CreateTaskModal from '@components/work-planner/createtask-modal';
+import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
+import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
+
+interface BoardViewProps {
+  selectedProject: any;
+  hierarchyDataExtensions?: any[];
+  statuses: any[];
+  boardTasks: any[];
+  loadingBoardTasks: boolean;
+  labels: any[];
+  boardSearchTerm: string;
+  setBoardSearchTerm: (term: string) => void;
+  boardSelectedAssignee: string;
+  setBoardSelectedAssignee: (assignee: string) => void;
+  boardSelectedPriority: string;
+  setBoardSelectedPriority: (priority: string) => void;
+  boardSelectedLabel: string;
+  setBoardSelectedLabel: (label: string) => void;
+  showCompletedTasks: boolean;
+  setShowCompletedTasks: (show: boolean) => void;
+  onClearFilters: () => void;
+  onTaskClick?: (task: any) => void;
+  onCreateTask: (statusId: number) => void;
+  getAllBoardAssignees: () => string[];
+  getAllBoardPriorities: () => string[];
+  getTasksByStatus: (statusId: string | number | null) => any[];
+  onTaskStatusChange?: () => void; // Callback to refresh board data after status change
+}
+
+const BoardView: React.FC<BoardViewProps> = ({
+  selectedProject,
+  hierarchyDataExtensions = [],
+  statuses,
+  boardTasks,
+  loadingBoardTasks,
+  labels,
+  boardSearchTerm,
+  setBoardSearchTerm,
+  boardSelectedAssignee,
+  setBoardSelectedAssignee,
+  boardSelectedPriority,
+  setBoardSelectedPriority,
+  boardSelectedLabel,
+  setBoardSelectedLabel,
+  showCompletedTasks,
+  setShowCompletedTasks,
+  onClearFilters,
+  onTaskClick,
+  onCreateTask,
+  getAllBoardAssignees,
+  getAllBoardPriorities,
+  getTasksByStatus,
+  onTaskStatusChange
+}) => {
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
+  const [taskActivities, setTaskActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [taskComments, setTaskComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [draggedTask, setDraggedTask] = useState<any>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loadingTaskForEdit, setLoadingTaskForEdit] = useState(false);
+  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+
+  const extensionNameByNumber = useMemo(() => {
+    const map = new Map<string, string>();
+    (hierarchyDataExtensions || []).forEach((ext: any) => {
+      const extNumber = String(ext?.extension_number || ext?.id || '').trim();
+      const name = String(ext?.user?.name || ext?.name || '').trim();
+      if (extNumber && name) map.set(extNumber, name);
+    });
+    return map;
+  }, [hierarchyDataExtensions]);
+
+  const extensionsForModal = useMemo(() => (hierarchyDataExtensions || []).map((ext: any) => ({
+    id: String(ext?.extension_number ?? ext?.id ?? ''),
+    name: String(ext?.user?.name || ext?.name || '')
+  })), [hierarchyDataExtensions]);
+
+  const getUserNameFromExtension = (extensionNumber: any): string => {
+    const key = String(extensionNumber || '').trim();
+    if (!key) return '';
+    return extensionNameByNumber.get(key) || key;
+  };
+
+  const getAssigneeDisplayName = (assignee: any): string => {
+    if (!assignee) return '';
+    if (assignee.user?.name) return String(assignee.user.name);
+    const extNum = assignee.extension_number || assignee.extension || assignee.id;
+    return getUserNameFromExtension(extNum);
+  };
+
+  const handleTaskClick = async (task: any) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+    setTaskActivities([]);
+    setTaskComments([]);
+    setActiveDetailTab('activity');
+    if (onTaskClick) {
+      onTaskClick(task);
+    }
+    if (task?.id) {
+      try {
+        setLoadingActivities(true);
+        const activitiesResponse = await getTaskActivities(task.id, 1, 5);
+        if (activitiesResponse) {
+          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
+        }
+      } catch (err) {
+        console.error('Error fetching task activities:', err);
+        setTaskActivities([]);
+      } finally {
+        setLoadingActivities(false);
+      }
+    }
+  };
+
+  const handleEditClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedTask?.id) return;
+    try {
+      setLoadingTaskForEdit(true);
+      const withRelations = ['project', 'status', 'assignees', 'labels', 'parent', 'children'];
+      const taskData = await getTask(selectedTask.id, withRelations);
+      if (taskData) {
+        setSelectedTask(taskData);
+        setShowTaskDetail(false);
+        setShowEditModal(true);
+      }
+    } catch (err) {
+      console.error('Error loading task for edit:', err);
+      toast.error('Failed to load task');
+    } finally {
+      setLoadingTaskForEdit(false);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedTask?.id) return;
+    try {
+      setDeleting(true);
+      await deleteTask(selectedTask.id);
+      setShowDeleteModal(false);
+      setShowTaskDetail(false);
+      setSelectedTask(null);
+      if (onTaskStatusChange) onTaskStatusChange();
+      toast.success('Task deleted');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      toast.error('Failed to delete task');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleTaskUpdate = () => {
+    setShowEditModal(false);
+    setSelectedTask(null);
+    if (onTaskStatusChange) onTaskStatusChange();
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, task: any) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', task.id.toString());
+    // Add visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Reset visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggedTask(null);
+    setDragOverStatus(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, statusId: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStatus(statusId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStatus(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatusId: number) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+
+    if (!draggedTask || !selectedProject?.id) {
+      return;
+    }
+
+    // Don't update if dropped in the same status
+    if (draggedTask.status_id === targetStatusId || draggedTask.status?.id === targetStatusId) {
+      setDraggedTask(null);
+      return;
+    }
+
+    try {
+      // Build complete payload with all task fields
+      const payload: any = {
+        status_id: targetStatusId
+      };
+
+      // Include all existing task fields
+      if (draggedTask.title) payload.title = draggedTask.title;
+      if (draggedTask.description) payload.description = draggedTask.description;
+      if (draggedTask.priority) payload.priority = draggedTask.priority;
+      if (draggedTask.due_date) payload.due_date = draggedTask.due_date;
+      if (draggedTask.project_id !== undefined && draggedTask.project_id !== null) {
+        payload.project_id = draggedTask.project_id;
+      }
+
+      // Map assignees to extension_numbers
+      if (draggedTask.assignees && Array.isArray(draggedTask.assignees) && draggedTask.assignees.length > 0) {
+        payload.extension_numbers = draggedTask.assignees.map((assignee: any) => 
+          assignee.extension_number || assignee.extension || assignee.id
+        ).filter(Boolean);
+      } else if (draggedTask.extension_numbers && Array.isArray(draggedTask.extension_numbers)) {
+        payload.extension_numbers = draggedTask.extension_numbers;
+      }
+
+      // Map labels to label_ids
+      if (draggedTask.labels && Array.isArray(draggedTask.labels) && draggedTask.labels.length > 0) {
+        payload.label_ids = draggedTask.labels.map((label: any) => label.id).filter((id: any) => id !== undefined && id !== null);
+      } else if (draggedTask.label_ids && Array.isArray(draggedTask.label_ids)) {
+        payload.label_ids = draggedTask.label_ids;
+      }
+
+      // Update task via API with complete payload
+      await updateTask(draggedTask.id, payload);
+
+      // Refresh board data
+      if (onTaskStatusChange) {
+        onTaskStatusChange();
+      }
+
+      setDraggedTask(null);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      toast.error('Failed to update task status');
+      setDraggedTask(null);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch(priority?.toLowerCase()) {
+      case 'high': 
+      case 'urgent': 
+        return { bg: '#FEE2E2', text: '#991B1B' };
+      case 'medium': 
+        return { bg: '#FEF3C7', text: '#92400E' };
+      default: 
+        return { bg: '#E5E7EB', text: '#4B5563' };
+    }
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch(status?.toLowerCase()) {
+      case 'done': 
+      case 'completed': 
+        return 'success';
+      case 'in progress': 
+      case 'in-progress': 
+        return 'warning';
+      case 'review': 
+        return 'info';
+      default: 
+        return 'secondary';
+    }
+  };
+
+  const getPriorityVariant = (priority: string) => {
+    switch(priority?.toLowerCase()) {
+      case 'high': 
+      case 'urgent': 
+        return 'danger';
+      case 'medium': 
+        return 'warning';
+      default: 
+        return 'secondary';
+    }
+  };
+
+  const boardFilterFields: FilterField[] = useMemo(() => [
+    { id: 'search', label: 'Search', type: 'text', value: boardSearchTerm, onChange: (v: string) => setBoardSearchTerm(v ?? ''), placeholder: 'Search tasks...' },
+    { id: 'assignee', label: 'Assignee', type: 'dropdown', value: boardSelectedAssignee, onChange: (v) => setBoardSelectedAssignee(v ?? 'All Assignees'), options: [{ value: 'All Assignees', label: 'All Assignees' }, ...getAllBoardAssignees().map((a) => ({ value: a, label: a }))] },
+    { id: 'priority', label: 'Priority', type: 'dropdown', value: boardSelectedPriority, onChange: (v) => setBoardSelectedPriority(v ?? 'All Priorities'), options: [{ value: 'All Priorities', label: 'All Priorities' }, ...getAllBoardPriorities().map((p) => ({ value: p, label: p }))] },
+    { id: 'label', label: 'Label', type: 'dropdown', value: boardSelectedLabel, onChange: (v) => setBoardSelectedLabel(v ?? 'All Labels'), options: [{ value: 'All Labels', label: 'All Labels' }, ...(labels || []).map((l: any) => ({ value: l.name, label: l.name }))] },
+  ], [boardSearchTerm, boardSelectedAssignee, boardSelectedPriority, boardSelectedLabel, labels, getAllBoardAssignees, getAllBoardPriorities]);
+
+  const styles = {
+    card: {
+      backgroundColor: 'white',
+      border: 'none',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+      padding: '1.5rem',
+      marginBottom: '1.5rem'
+    },
+    filterRow: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '1rem'
+    },
+    input: {
+      width: '100%',
+      padding: '0.75rem',
+      border: '1px solid #E5E9F2',
+      borderRadius: '6px',
+      fontSize: '0.9rem',
+      outline: 'none',
+      fontFamily: 'inherit'
+    },
+    select: {
+      width: '100%',
+      padding: '0.75rem',
+      border: '1px solid #E5E9F2',
+      borderRadius: '6px',
+      fontSize: '0.9rem',
+      outline: 'none',
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      backgroundColor: 'white'
+    },
+    inputGroup: {
+      position: 'relative' as const,
+      display: 'flex',
+      alignItems: 'center'
+    },
+    inputIcon: {
+      position: 'absolute' as const,
+      left: '0.75rem',
+      pointerEvents: 'none' as const
+    },
+    inputWithIcon: {
+      paddingLeft: '2.5rem'
+    },
+    buttonOutline: {
+      padding: '0.625rem 1.25rem',
+      backgroundColor: 'white',
+      color: '#4680FF',
+      border: '1px solid #4680FF',
+      borderRadius: '6px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      fontSize: '0.9rem',
+      transition: 'all 0.2s'
+    },
+    board: {
+      display: 'flex',
+      gap: '1rem',
+      overflowX: 'auto' as const,
+      paddingBottom: '1rem'
+    },
+    column: {
+      minWidth: '280px',
+      maxWidth: '300px',
+      backgroundColor: '#E5E7EB',
+      borderRadius: '12px',
+      padding: '1rem',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      height: 'fit-content'
+    },
+    columnHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '1rem'
+    },
+    columnTitle: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      fontSize: '0.95rem',
+      fontWeight: '600',
+      color: '#1F2937'
+    },
+    columnCount: {
+      fontSize: '0.85rem',
+      color: '#6B7280',
+      fontWeight: '500'
+    },
+    moreButton: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '0.25rem',
+      borderRadius: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#6B7280',
+      transition: 'background 0.2s'
+    },
+    addButton: {
+      width: '100%',
+      padding: '0.75rem',
+      backgroundColor: 'white',
+      border: '2px dashed #D1D5DB',
+      borderRadius: '8px',
+      color: '#4B5563',
+      fontSize: '0.9rem',
+      fontWeight: '500',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '0.5rem',
+      marginBottom: '0.75rem',
+      transition: 'all 0.2s'
+    },
+    taskCard: {
+      backgroundColor: 'white',
+      borderRadius: '10px',
+      padding: '1.125rem',
+      marginBottom: '0.875rem',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+      cursor: 'grab',
+      transition: 'all 0.2s ease',
+      border: '1px solid #f1f5f9',
+      userSelect: 'none' as const
+    },
+    columnDropZone: {
+      minHeight: '100px',
+      transition: 'background-color 0.2s'
+    },
+    taskTitle: {
+      fontSize: '0.925rem',
+      fontWeight: '600',
+      color: '#1e293b',
+      marginBottom: '0.875rem',
+      lineHeight: '1.5',
+      letterSpacing: '-0.01em'
+    },
+    taskMeta: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      flexWrap: 'wrap' as const,
+      marginBottom: '0.875rem'
+    },
+    label: {
+      padding: '0.3rem 0.75rem',
+      borderRadius: '6px',
+      fontSize: '0.725rem',
+      fontWeight: '600',
+      color: 'white',
+      letterSpacing: '0.3px'
+    },
+    priority: {
+      padding: '0.3rem 0.75rem',
+      borderRadius: '6px',
+      fontSize: '0.725rem',
+      fontWeight: '600',
+      letterSpacing: '0.3px'
+    },
+    taskFooter: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: '0.625rem',
+      borderTop: '1px solid #f1f5f9'
+    },
+    taskIcons: {
+      display: 'flex',
+      gap: '0.875rem',
+      alignItems: 'center'
+    },
+    dueDate: {
+      fontSize: '0.75rem',
+      color: '#DC2626',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.25rem'
+    },
+    assignees: {
+      display: 'flex',
+      gap: '0.25rem',
+      marginLeft: '-0.25rem'
+    },
+    avatar: {
+      width: '28px',
+      height: '28px',
+      borderRadius: '50%',
+      border: '2px solid white',
+      fontSize: '0.7rem',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#e2e8f0',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+      marginLeft: '-0.25rem'
+    }
+  };
+
+  if (!selectedProject) {
+    return (
+      <div style={styles.card}>
+        <div style={{ textAlign: 'center', padding: '3rem 2rem', color: '#6B7280' }}>
+          <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: '500' }}>No project selected</p>
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Please select a project to view the board</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingBoardTasks) {
+    return (
+      <div style={styles.card}>
+        <div style={{ textAlign: 'center', padding: '3rem 2rem' }}>
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <style>{`
+        .task-detail-panel {
+          width: 500px;
+        }
+        
+        .task-detail-header {
+          padding: 1.25rem 1.5rem;
+          border-bottom: 2px solid #e2e8f0;
+          background-color: #f8fafc;
+        }
+        
+        .task-detail-body {
+          padding: 1.5rem;
+          background-color: #ffffff;
+        }
+        
+        .detail-section {
+          margin-bottom: 1.25rem;
+          padding: 1rem;
+          background-color: #f8fafc;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+        }
+        
+        .detail-label {
+          font-size: 0.75rem;
+          color: #64748b;
+          margin-bottom: 0.625rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .assignee-group {
+          display: flex;
+          gap: 0.5rem;
+        }
+        
+        .assignee-badge {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+        
+        .add-assignee {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border: 2px dashed #cbd5e1;
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        
+        .add-assignee:hover {
+          border-color: #667eea;
+          color: #667eea;
+        }
+      `}</style>
+
+      {/* Page header with Filters button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1rem',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F2937' }}>
+          {selectedProject?.name ? `${selectedProject.name} – Board` : 'Board'}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFilterSidebar(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: 'white',
+            color: '#4680FF',
+            border: '1px solid #4680FF',
+            borderRadius: '6px',
+            fontWeight: '500',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+          }}
+        >
+          <SlidersHorizontal size={18} />
+          Filters
+        </button>
+      </div>
+
+      <GenericFilterSidebar
+        isOpen={showFilterSidebar}
+        onClose={() => setShowFilterSidebar(false)}
+        title="Filters"
+        subtitle="Filter board tasks"
+        filters={boardFilterFields}
+        onApply={() => setShowFilterSidebar(false)}
+        onReset={() => {
+          onClearFilters();
+          setShowFilterSidebar(false);
+        }}
+        width="400px"
+        showApplyButton
+        showResetButton
+      />
+
+      {/* Kanban Board */}
+      <div style={styles.board}>
+        {statuses.map((status: any) => {
+          const statusTasks = getTasksByStatus(status.id);
+          return (
+            <div 
+              key={status.id} 
+              style={{
+                ...styles.column,
+                borderTop: `3px solid ${status.color || '#6B7280'}`,
+                backgroundColor: dragOverStatus === status.id ? '#F0F9FF' : '#E5E7EB',
+                border: dragOverStatus === status.id ? '2px dashed #4680FF' : 'none'
+              }}
+              onDragOver={(e) => handleDragOver(e, status.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, status.id)}
+            >
+              <div style={styles.columnHeader}>
+                <div style={styles.columnTitle}>
+                  {status.name}
+                  <span style={styles.columnCount}>{statusTasks.length}</span>
+                </div>
+                <button 
+                  style={styles.moreButton}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <MoreVertical size={16} />
+                </button>
+              </div>
+
+              <button 
+                style={styles.addButton}
+                onClick={() => onCreateTask(status.id)}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.borderColor = '#9CA3AF';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.borderColor = '#D1D5DB';
+                }}
+              >
+                <Plus size={16} />
+                Add Task
+              </button>
+
+              {statusTasks.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.875rem' }}>
+                  No tasks
+                </div>
+              ) : (
+                statusTasks.map((task: any) => {
+                  return (
+                    <div
+                      key={task.id}
+                      draggable
+                      style={styles.taskCard}
+                      onDragStart={(e) => handleDragStart(e, task)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => handleTaskClick(task)}
+                      onMouseOver={(e) => {
+                        if (draggedTask?.id !== task.id) {
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.cursor = 'grab';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (draggedTask?.id !== task.id) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
+                          e.currentTarget.style.borderColor = '#f1f5f9';
+                          e.currentTarget.style.cursor = 'grab';
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        // Prevent text selection while dragging
+                        if (e.button === 0) {
+                          e.currentTarget.style.cursor = 'grabbing';
+                        }
+                      }}
+                      onMouseUp={(e) => {
+                        e.currentTarget.style.cursor = 'grab';
+                      }}
+                    >
+                      <div style={styles.taskTitle}>{task.title || 'Untitled Task'}</div>
+
+                      {(task.labels?.length > 0 || task.priority) && (
+                        <div style={styles.taskMeta}>
+                          {task.labels?.map((label: any, idx: number) => (
+                            <span 
+                              key={idx}
+                              style={{...styles.label, backgroundColor: label.color || '#06b6d4'}}
+                            >
+                              {label.name}
+                            </span>
+                          ))}
+                          {task.priority && (
+                            <span 
+                              style={{
+                                ...styles.priority,
+                                backgroundColor: getPriorityColor(task.priority).bg,
+                                color: getPriorityColor(task.priority).text
+                              }}
+                            >
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div style={styles.taskFooter}>
+                        <div style={styles.taskIcons}>
+                          {task.due_date && (
+                            <span style={styles.dueDate}>
+                              <Calendar size={14} />
+                              {formatDateForTable(task.due_date)}
+                            </span>
+                          )}
+                        </div>
+
+                        {task.assignees && task.assignees.length > 0 && (
+                          <div style={styles.assignees}>
+                            {task.assignees.slice(0, 3).map((assignee: any, idx: number) => {
+                              const name = getAssigneeDisplayName(assignee);
+                              const assigneeInitials = name !== '' 
+                                ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                                : 'UN';
+                              return (
+                                  <div key={idx} style={styles.avatar} title={name}>
+                                    {assigneeInitials}
+                                </div>
+                              );
+                            })}
+                            {task.assignees.length > 3 && (
+                              <div style={{...styles.avatar, backgroundColor: '#E5E7EB', color: '#6B7280'}}>
+                                +{task.assignees.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Task Detail Sidebar */}
+      <TaskDetailOffcanvas
+        show={showTaskDetail}
+        onHide={() => {
+          setShowTaskDetail(false);
+          setTaskActivities([]);
+        }}
+        selectedTask={selectedTask ? {
+          id: String(selectedTask.id),
+          title: selectedTask.title,
+          status: selectedTask.status?.name || 'Active',
+          priority: selectedTask.priority || 'Normal',
+          project: selectedTask.project?.name || 'No Project',
+          dueDate: selectedTask.due_date ? formatDateForTable(selectedTask.due_date) : undefined,
+          description: selectedTask.description,
+          rawData: selectedTask
+        } : null}
+        taskActivities={taskActivities}
+        loadingActivities={loadingActivities}
+        activeDetailTab={activeDetailTab}
+        setActiveDetailTab={setActiveDetailTab}
+        taskComments={taskComments}
+        setTaskComments={setTaskComments}
+        loadingComments={loadingComments}
+        setLoadingComments={setLoadingComments}
+        newComment={newComment}
+        setNewComment={setNewComment}
+        submittingComment={submittingComment}
+        setSubmittingComment={setSubmittingComment}
+        editingCommentId={editingCommentId}
+        setEditingCommentId={setEditingCommentId}
+        editingCommentText={editingCommentText}
+        setEditingCommentText={setEditingCommentText}
+        onEditTask={() => handleEditClick({ stopPropagation: () => {} } as React.MouseEvent)}
+        onOpenDeleteModal={() => {
+          setShowTaskDetail(false);
+          setShowDeleteModal(true);
+        }}
+        hierarchyDataExtensions={hierarchyDataExtensions}
+        getStatusVariant={(s) => getStatusVariant(s)}
+        getPriorityVariant={(p) => getPriorityVariant(p || '')}
+      />
+
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+        }}
+        onConfirm={confirmDelete}
+        itemName={selectedTask?.title ? `"${selectedTask.title}"` : `Task #${selectedTask?.task_id || selectedTask?.id}`}
+        itemType="task"
+        loading={deleting}
+      />
+
+      <CreateTaskModal
+        show={showEditModal}
+        onHide={() => {
+          setShowEditModal(false);
+          setSelectedTask(null);
+        }}
+        onCreate={handleTaskUpdate}
+        extensions={extensionsForModal}
+        labels={labels}
+        statuses={statuses}
+        project={selectedProject}
+        task={selectedTask}
+        isEdit={true}
+      />
+    </>
+  );
+};
+
+export default BoardView;

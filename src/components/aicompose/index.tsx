@@ -1,0 +1,297 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Container, Card } from 'react-bootstrap';
+import { MessageSquare, Mail, MessageCircle, Video } from 'lucide-react';
+import type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps, FooterHandlers, CommonChannelOptions } from './types';
+import WhatsAppSection from './partials/WhatsAppSection';
+import EmailSection from './partials/EmailSection';
+import SmsSection from './partials/SmsSection';
+import MeetingsSection from './partials/MeetingsSection';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
+
+export type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps } from './types';
+
+const getChannelFromOpenedFrom = (from: AIComposeOpenedFrom): AIComposeChannel =>
+  from === 'meet-now' || from === 'schedule' ? 'meetings' : from;
+
+const getInitialMeetingType = (from: AIComposeOpenedFrom): 'instant' | 'scheduled' | undefined =>
+  from === 'meet-now' ? 'instant' : from === 'schedule' ? 'scheduled' : undefined;
+
+const CHANNEL_ORDER: Record<AIComposeChannel, number> = {
+  whatsapp: 0,
+  email: 1,
+  sms: 2,
+  meetings: 3,
+};
+
+const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextPayload, moduleSlug }) => {
+  const { hasPermission } = usePermissions();
+  const canWhatsApp = hasPermission(P.SEND_WHATSAPP_MESSAGE_CRM) || hasPermission(P.VIEW_WHATSAPP_MESSAGES_CRM);
+  const canEmail = hasPermission(P.SEND_EMAIL_CRM) || hasPermission(P.VIEW_EMAILS_CRM);
+  const canSms = hasPermission(P.SEND_SMS_CRM) || hasPermission(P.VIEW_SMS_CRM);
+  const canMeetings = hasPermission(P.CREATE_MEETING_CRM) || hasPermission(P.VIEW_MEETINGS_CRM);
+
+  const visibleChannels = useMemo((): AIComposeChannel[] => {
+    const ch: AIComposeChannel[] = [];
+    if (canWhatsApp) ch.push('whatsapp');
+    if (canEmail) ch.push('email');
+    if (canSms) ch.push('sms');
+    if (canMeetings) ch.push('meetings');
+    return ch;
+  }, [canWhatsApp, canEmail, canSms, canMeetings]);
+
+  const [selectedChannel, setSelectedChannel] = useState<AIComposeChannel>(
+    () => getChannelFromOpenedFrom(openedFrom)
+  );
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
+
+  useEffect(() => {
+    setSelectedChannel(getChannelFromOpenedFrom(openedFrom));
+  }, [openedFrom]);
+
+  useEffect(() => {
+    if (visibleChannels.length > 0 && !visibleChannels.includes(selectedChannel)) {
+      setSelectedChannel(visibleChannels[0]);
+    }
+  }, [visibleChannels, selectedChannel]);
+
+  const handleTabChange = (e: React.MouseEvent, newChannel: AIComposeChannel) => {
+    e.stopPropagation();
+    if (newChannel === selectedChannel) return;
+    const dir = CHANNEL_ORDER[newChannel] > CHANNEL_ORDER[selectedChannel] ? 1 : -1;
+    setSlideDirection(dir);
+    setSelectedChannel(newChannel);
+  };
+
+  const [footerHandlers, setFooterHandlers] = useState<FooterHandlers | null>(null);
+  const registerFooter = useCallback((handlers: FooterHandlers | null) => {
+    setFooterHandlers(() => handlers);
+  }, []);
+
+  const [commonOptions, setCommonOptions] = useState<CommonChannelOptions>({
+    industry: '',
+    customIndustry: '',
+    tone: 'professional',
+    language: 'en',
+    customLanguage: '',
+    urgency: 'normal',
+    ctaType: '',
+    customCtaType: '',
+  });
+
+  return (
+    <Container fluid className="p-0" style={{ backgroundColor: 'transparent', minHeight: 'min-content' }}>
+      <style>{`
+        .ai-compose-tab-slide-holder { overflow: hidden; min-height: 320px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .ai-compose-tab-slide-content {
+          animation-duration: 0.3s;
+          animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          animation-fill-mode: both;
+        }
+        .ai-compose-tab-slide-content.slide-next {
+          animation-name: ai-compose-slide-from-right;
+        }
+        .ai-compose-tab-slide-content.slide-prev {
+          animation-name: ai-compose-slide-from-left;
+        }
+        @keyframes ai-compose-slide-from-right {
+          from { transform: translateX(28px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes ai-compose-slide-from-left {
+          from { transform: translateX(-28px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
+      <Card className="border-0 d-flex flex-column flex-grow-1" style={{ boxShadow: 'none', backgroundColor: 'white', minHeight: 0 }}>
+        <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4 flex-shrink-0">
+          <div>
+            <h4 className="mb-1 fw-bold">AI Compose</h4>
+            <small className="text-muted">Channel-ready copy with instant preview</small>
+          </div>
+        </Card.Header>
+
+        <Card.Body className="p-4 flex-grow-1 d-flex flex-column min-h-0" style={{ overflowY: 'visible' }}>
+          {/* Channel tabs */}
+          <div className="mb-2">
+                <div className="d-flex gap-2 mb-3">
+                  {canWhatsApp && (
+                  <button
+                    onClick={(e) => handleTabChange(e, 'whatsapp')}
+                    style={{
+                      padding: '10px 20px',
+                      border: selectedChannel === 'whatsapp' ? '2px solid #25D366' : '2px solid #e5e7eb',
+                      backgroundColor: selectedChannel === 'whatsapp' ? '#d4f4dd' : 'white',
+                      color: selectedChannel === 'whatsapp' ? '#25D366' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedChannel !== 'whatsapp') {
+                        e.currentTarget.style.borderColor = '#25D366';
+                        e.currentTarget.style.backgroundColor = '#f0fdf4';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedChannel !== 'whatsapp') {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }
+                    }}
+                  >
+                    <MessageCircle size={18} />
+                    WhatsApp
+                  </button>
+                  )}
+                  {canEmail && (
+                  <button
+                    onClick={(e) => handleTabChange(e, 'email')}
+                    style={{
+                      padding: '10px 20px',
+                      border: selectedChannel === 'email' ? '2px solid #ef4444' : '2px solid #e5e7eb',
+                      backgroundColor: selectedChannel === 'email' ? '#fee2e2' : 'white',
+                      color: selectedChannel === 'email' ? '#ef4444' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedChannel !== 'email') {
+                        e.currentTarget.style.borderColor = '#ef4444';
+                        e.currentTarget.style.backgroundColor = '#fef2f2';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedChannel !== 'email') {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }
+                    }}
+                  >
+                    <Mail size={18} />
+                    Email
+                  </button>
+                  )}
+                  {canSms && (
+                  <button
+                    onClick={(e) => handleTabChange(e, 'sms')}
+                    style={{
+                      padding: '10px 20px',
+                      border: selectedChannel === 'sms' ? '2px solid #3b82f6' : '2px solid #e5e7eb',
+                      backgroundColor: selectedChannel === 'sms' ? '#dbeafe' : 'white',
+                      color: selectedChannel === 'sms' ? '#3b82f6' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedChannel !== 'sms') {
+                        e.currentTarget.style.borderColor = '#3b82f6';
+                        e.currentTarget.style.backgroundColor = '#eff6ff';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedChannel !== 'sms') {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }
+                    }}
+                  >
+                    <MessageSquare size={18} />
+                    SMS
+                  </button>
+                  )}
+                  {canMeetings && (
+                  <button
+                    onClick={(e) => handleTabChange(e, 'meetings')}
+                    style={{
+                      padding: '10px 20px',
+                      border: selectedChannel === 'meetings' ? '2px solid #f59e0b' : '2px solid #e5e7eb',
+                      backgroundColor: selectedChannel === 'meetings' ? '#fffbeb' : 'white',
+                      color: selectedChannel === 'meetings' ? '#f59e0b' : '#6b7280',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedChannel !== 'meetings') {
+                        e.currentTarget.style.borderColor = '#f59e0b';
+                        e.currentTarget.style.backgroundColor = '#fef3c7';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedChannel !== 'meetings') {
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                        e.currentTarget.style.backgroundColor = 'white';
+                      }
+                    }}
+                  >
+                    <Video size={18} />
+                    Meetings
+                  </button>
+                  )}
+                </div>
+              </div>
+
+          {/* Tab content: one section per channel (slide animation); common options rendered inside each section */}
+          <div className="ai-compose-tab-slide-holder rounded-3 border mb-3 flex-grow-1" style={{ borderColor: 'var(--bs-border-color)' }}>
+            <div
+              key={selectedChannel}
+              className={`ai-compose-tab-slide-content rounded-3 p-3 d-flex flex-column flex-grow-1 min-h-0 ${slideDirection === 1 ? 'slide-next' : 'slide-prev'}`}
+              style={{ minHeight: '320px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {visibleChannels.length === 0 ? (
+                <div className="d-flex align-items-center justify-content-center text-muted py-5">
+                  <p className="mb-0">You don&apos;t have permission to use any channel here.</p>
+                </div>
+              ) : (
+                <>
+                  {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} initialMeetingType={getInitialMeetingType(openedFrom)} />}
+                </>
+              )}
+            </div>
+          </div>
+        </Card.Body>
+
+        {/* <Card.Footer className="bg-white border-top d-flex justify-content-between align-items-center py-3">
+          <div />
+          <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => footerHandlers?.cancel()}>Cancel</Button>
+            <Button variant="outline-primary" onClick={() => footerHandlers?.copy()}>Copy</Button>
+            <Button variant="outline-secondary" onClick={() => footerHandlers?.later()}>Later</Button>
+            <Button variant="success" className="px-4" onClick={() => footerHandlers?.send()}>Send</Button>
+          </div>
+        </Card.Footer> */}
+      </Card>
+    </Container>
+  );
+};
+
+export default AICompose;

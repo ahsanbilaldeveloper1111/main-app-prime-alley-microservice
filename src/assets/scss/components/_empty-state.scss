@@ -1,0 +1,37 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  
+  .empty-state-icon {
+    margin-bottom: 1rem;
+    width: 100px;
+    
+    svg {
+      opacity: 0.6;
+    }
+  }
+  
+  .empty-state-title {
+    font-weight: 600;
+    color: #263238;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .empty-state-description {
+    font-size: 0.9rem;
+    color: #6c757d;
+    line-height: 1.4;
+  }
+}
+
+// Table empty state specific styles
+.table-empty-state {
+  .empty-state {
+    min-height: 150px;
+    padding: 2rem 1rem;
+  }
+} 

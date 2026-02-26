@@ -1,0 +1,51 @@
+
+  
+:root {
+      --bg-color: #f0f4f8;
+      --main-text: #2c3e50;
+      --light-text: #7f8c8d;
+      --card-bg: #ffffff;
+      --primary-accent: #2583f2;
+      --primary-accent-dark: #1a6bc4;
+      --danger-color: #e74c3c;
+      --danger-hover: #c0392b;
+      --border-color: #e6eaf2;
+      --input-bg: #f8fafd;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+      --transition-speed: 0.3s ease-out;
+      --border-radius-sm: 8px;
+      --border-radius-md: 12px;
+  }
+
+
+
+#gsm-detail-modal{
+    .singleListItem{font-weight: 600;}
+    .listItemTitle{float:left;margin-right:5px;color:var(--main-text);}
+    .listItemValue{color:var(--primary-accent-dark);}
+    .action-button-container{
+        .btn{
+            padding:7px 10px;
+            font-size:0.65rem;
+            i{
+                font-size:0.65rem;
+            }
+        }
+    }
+    .location-container{
+        height: 150px;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius-sm);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm);
+
+        font-size:1.8rem;
+        font-weight: 600;
+    }
+}

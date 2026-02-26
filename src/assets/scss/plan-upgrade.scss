@@ -1,0 +1,303 @@
+  /* CSS */
+  :root {
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --info-color: #17a2b8;
+    --white-color: #ffffff;
+    --light-bg: #f8f9fa;
+    --dark-text: #343a40;
+    --card-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+    --border-color: #dee2e6;
+}
+
+body {
+ 
+}
+.plan-upgrade-container{
+    max-width: 1000px;
+    margin: 0 auto;
+    background-color: var(--white-color);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+}
+.container {
+  
+    background-color: var(--white-color);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+}
+
+h1 {
+    font-weight: 700;
+    font-size: 2.2rem;
+    color: var(--dark-text);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    text-align: center;
+    color: var(--secondary-color);
+    font-size: 1.1rem;
+    margin-bottom: 40px;
+}
+
+.highlight-message {
+    background-color: #e6f7ff; /* Light blue */
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    padding: 15px 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+}
+.highlight-message span {
+    color: var(--dark-text);
+}
+
+/* --- Pricing Table --- */
+.pricing-table {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, minmax(200px, 1fr)); /* Feature column + 3 plan columns */
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 40px;
+}
+
+.pricing-header, .pricing-row {
+    display: contents; /* Allows grid items to flow like table rows */
+}
+
+.pricing-cell {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 0.95rem;
+}
+
+.pricing-cell:nth-child(4n + 1) { /* Feature column */
+    background-color: var(--light-bg);
+    font-weight: 600;
+    color: var(--dark-text);
+    justify-content: flex-start;
+}
+.pricing-cell:not(:first-child):not(:nth-child(4n+1)) { /* Plan columns */
+    justify-content: center;
+}
+
+.pricing-header .pricing-cell {
+    background-color: var(--primary-color);
+    color: var(--white-color);
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-bottom-color: var(--primary-hover);
+}
+.pricing-header .pricing-cell:nth-child(1) { /* Empty top-left corner */
+     background-color: var(--light-bg);
+     border-bottom-color: var(--border-color);
+}
+
+/* Styling for the recommended plan */
+.pricing-cell.recommended {
+    border: 2px solid var(--primary-color);
+    background-color: #eaf4ff; /* Lighter primary color for bg */
+    font-weight: 600;
+}
+.pricing-cell.recommended .price {
+    color: var(--primary-color);
+    font-size: 1.4rem;
+}
+.pricing-header .pricing-cell.recommended {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+.pricing-header .pricing-cell.recommended:first-child {
+    background-color: var(--light-bg); /* Reset first header cell if it happens to be recommended */
+}
+
+/* Icons */
+.fa-check { color: var(--success-color); }
+.fa-times { color: var(--secondary-color); opacity: 0.6; }
+
+.price {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--dark-text);
+    margin-top: 5px;
+}
+.price small {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: var(--secondary-color);
+}
+
+.btn {
+    // padding: 10px 25px;
+    // border: none;
+    // border-radius: 5px;
+    // cursor: pointer;
+    // font-weight: 600;
+    // text-decoration: none;
+    // display: inline-block;
+    // transition: background-color 0.2s, box-shadow 0.2s;
+    // text-align: center;
+    // width: 80%; /* Ensure buttons fill their cells */
+}
+
+.btn-select-plan {
+    background-color: var(--primary-color);
+    color: var(--white-color);
+}
+.btn-select-plan:hover {
+    background-color: var(--primary-hover);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+}
+
+.btn-contact-sales {
+    background-color: var(--secondary-color);
+    color: var(--white-color);
+}
+.btn-contact-sales:hover {
+    background-color: #5a6268;
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);
+}
+
+/* --- Payment Form --- */
+.payment-section {
+    background-color: var(--light-bg);
+    padding: 30px;
+    border-radius: 8px;
+    margin-top: 40px;
+}
+.payment-section h3 {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1rem;
+    box-sizing: border-box; /* Include padding in width */
+}
+.form-control:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.card-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+.card-details-grid .form-group:first-child {
+    grid-column: 1 / -1; /* Card number spans full width */
+}
+
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    margin-top: 20px;
+    margin-bottom: 25px;
+    font-size: 0.9rem;
+}
+.form-checkbox input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.2);
+}
+.form-checkbox a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+.form-checkbox a:hover {
+    text-decoration: underline;
+}
+
+.btn-confirm-upgrade {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1rem;
+    background-color: var(--success-color);
+    color: var(--white-color);
+}
+.btn-confirm-upgrade:hover {
+    background-color: #218838;
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+}
+
+.security-info {
+    text-align: center;
+    margin-top: 20px;
+    color: var(--secondary-color);
+    font-size: 0.85rem;
+}
+.security-info i {
+    margin-right: 5px;
+    color: var(--info-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+    }
+    .pricing-table {
+        grid-template-columns: 1fr repeat(1, minmax(200px, 1fr)); /* Feature + 1 plan column */
+        font-size: 0.9rem;
+    }
+     .pricing-table .pricing-header .pricing-cell:not(:first-child):not(.recommended),
+     .pricing-table .pricing-row .pricing-cell:not(:first-child):not(.recommended) {
+        display: none; /* Hide non-recommended plans on small screens */
+    }
+    .pricing-header .pricing-cell:nth-child(4n + 1) { /* First column on mobile */
+        border-right: 1px solid var(--border-color); /* Add border for separation */
+    }
+    .pricing-header .pricing-cell.recommended:first-child {
+        display: flex; /* Ensure the first header cell for recommended plan shows */
+    }
+
+    .card-details-grid {
+        grid-template-columns: 1fr; /* Stack card details on small screens */
+    }
+    .card-details-grid .form-group:first-child {
+        grid-column: auto; /* Reset column span */
+    }
+    .pricing-cell {
+        padding: 10px 15px;
+    }
+    h1 {
+        font-size: 1.8rem;
+    }
+    .subtitle {
+        font-size: 1rem;
+    }
+    .highlight-message {
+        font-size: 1rem;
+    }
+}

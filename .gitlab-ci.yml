@@ -1,0 +1,18 @@
+stages:
+  - deploy
+
+deploy_dev:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  resource_group: dev
+  script:
+    - bash ci/deploy.sh dev
+
+deploy_stage:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "qa"'
+  resource_group: stage
+  script:
+    - bash ci/deploy.sh stage

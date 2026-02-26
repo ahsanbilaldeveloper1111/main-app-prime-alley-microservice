@@ -1,0 +1,359 @@
+.bg-color-theme{
+      background:linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+      color: #fff;
+}
+.compaign_title{font-size:0.7rem;}
+.text-bold{font-weight:600;}
+.data-summary{
+      text-align: center;
+      .card-title{
+            font-size:0.8rem;
+            font-weight:600;
+            text-transform: uppercase;
+            opacity: 0.7;
+      }
+      .text-success{
+            color: #28a745;
+      }
+      .text-danger{
+            color: #dc3545;
+      }
+      .text-warning{
+            color: #ffc107;
+      }
+      .text-info{
+            color: #17a2b8;
+      }
+      .text-primary{
+            color: #007bff;
+      }
+      .text-secondary{
+            color: #6c757d;
+      }
+}
+.statusBox{
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+      
+}
+
+.table-live-agents{
+      width: 100%;
+      table{
+            min-width: 100%;
+      }
+
+      td,th{
+            padding: 0.3rem 0.5rem !important;
+            font-size: 0.6rem;
+            min-width: initial;
+            border:0;
+      }
+      table th{
+            text-transform: capitalize;
+            opacity: 0.7;
+            font-size: 0.6rem;
+      }
+
+      &.table-live-calls{
+            td,th{
+                  font-size: 0.8rem;
+            }
+            table th{
+                  font-size: 0.6rem;
+            }
+           
+      }
+      
+}
+.device-icon{
+      position: relative;
+      transition: all 0.2s ease;
+      &:hover{
+            background-color: #c0c5ca98;
+      }
+}     
+.device-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      position: absolute;
+      top: -3px;
+      right: -5px;
+  }
+
+@keyframes dangerPulse {
+      0% {
+            border-left-color: #dc3545;
+            background-color: rgba(220, 53, 69, 0.1);
+      }
+      50% {
+            border-left-color: #ff6b7a;
+            background-color: rgba(220, 53, 69, 0.15);
+      }
+      100% {
+            border-left-color: #dc3545;
+            background-color: rgba(220, 53, 69, 0.1);
+      }
+}
+
+@keyframes dangerBreathe {
+      0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+            background-color: rgb(246, 97, 109);
+            color: #fff;
+      }
+      50% {
+            transform: scale(1.04);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+            background-color: rgba(220, 53, 69);
+            color: #fff;
+            
+      }
+}
+
+.alert-danger-animation {
+      animation: dangerPulse 3s ease-in-out infinite, dangerBreathe 1.5s ease-in-out infinite;
+      border-left: 5px solid #dc3545;
+      position: relative;
+      background-color: rgba(220, 53, 69, 0.1);
+      transition: all 0s ease;
+}
+
+.alert-danger-animation:hover {
+      transform: scale(1.01);
+      box-shadow: 0 6px 12px rgba(220, 53, 69, 0.4);
+}
+
+  .realtime-alerts{
+      position: relative;
+      
+      .alert{
+            border-left: 5px solid;
+            &.alert-danger{
+                  background-color: #f8d7da;
+                  border-color: #f5c6cb;
+                  color: #721c24;
+                  border-left-color: #721c24;
+            }
+            &.alert-warning{
+                  background-color: #fff3cd;
+                  border-color: #ffeeba;
+                  color: #856404;
+                  border-left-color: #856404;
+            }
+            &.alert-success{
+                  background-color: #d4edda;
+                  border-color: #c3e6cb;
+                  color: #155724;
+                  border-left-color: #155724;
+            }
+            &.alert-info{
+                  background-color: #d1ecf1;
+                  border-color: #bee5eb;
+                  color: #0c5460;
+                  border-left-color: #0c5460;
+            }
+            
+      }
+  }
+
+  // Campaign Navigation Styles
+  .campaign-navigation {
+      margin: 0px 0 15px !important;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      
+      .navigation-dots {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            
+            .dot {
+                  width: 15px;
+                  height: 15px;
+                  border-radius: 50%;
+                  border: none;
+                  background-color: #aaaaaa;
+                  cursor: pointer;
+                  transition: all 0.3s ease;
+                  
+                  &:hover,&.active {
+                        background-color: rgba(14, 14, 14, 0.7);
+                        // transform: scale(1.1);
+                  }
+            }
+      }
+      
+      .btn-outline-light {
+            border-color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.8);
+            
+            &:hover {
+                  background-color: rgba(255, 255, 255, 0.1);
+                  border-color: rgba(255, 255, 255, 0.8);
+                  color: #fff;
+            }
+            
+            &:focus {
+                  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+            }
+      }
+  }
+
+   .compaign-performance{
+       margin-top:40px;
+       display: flex;
+       justify-content: center;
+       align-items: center;
+       flex-direction: column;
+       
+       h3{
+             font-size:1.5rem;
+             font-weight:900;
+             text-transform: capitalize;
+             text-align: center;
+             
+       }
+       p{
+             font-size:0.8rem;
+             text-align: center;
+             
+       }
+   }
+
+   .form-live-agent-status {
+       .form-group {
+             min-width: 50%;
+             
+             .form-control-sm {
+                   min-width: 100px;
+                   height: 28px !important;
+                   min-height: 29px !important;
+                   border: 1px solid #ced4da;
+                   border-radius: 0.25rem;
+                   background-color: #f8f9fa;
+             }
+             
+             .form-select-sm {
+                   min-width: 100px;
+                   
+                   .react-select__control {
+                         min-height: 31px !important;
+                         height: 31px !important;
+                         border: 1px solid #ced4da !important;
+                         border-radius: 0.25rem !important;
+                         background-color: #f8f9fa !important;
+                   }
+                   
+                   .react-select__value-container {
+                         height: 29px;
+                         padding: 0 8px;
+                   }
+                   
+                   .react-select__input-container {
+                         
+                   }
+                   
+                   .react-select__placeholder {
+                         line-height: 29px;
+                   }
+                   
+                   .react-select__single-value {
+                         line-height: 29px;
+                   }
+                   
+                   .react-select__indicator {
+                         padding: 4px 8px;
+                   }
+             }
+       }
+   }
+
+   .form-live-agent-status{
+      label{
+            font-size:0.6rem;
+      }
+      .form-select-sm{
+            min-width: 100px;
+      }
+   }
+
+
+    .compaign-description{
+       ul{
+             text-align: left;
+             list-style: none;
+             padding: 0;
+             margin: 0;
+             display: flex;
+             gap: 5px;
+             
+             li{
+                   position: relative;
+                   padding-left: 10px;
+                   
+                   &::before {
+                         content: "•";
+                         position: absolute;
+                         left: 0;
+                         color: #666;
+                         font-weight: bold;
+                   }
+             }
+       }
+    }
+
+    // Campaign Slide Animation
+    .slide-out {
+        animation: slideOut 0.3s ease-in-out forwards;
+    }
+
+    .slide-in {
+        animation: slideIn 0.3s ease-in-out forwards;
+    }
+
+    @keyframes slideOut {
+        0% {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+    }
+
+    @keyframes slideIn {
+        0% {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .card-bg-light-gray{
+      background-color: #d7d7d799;
+    }
+    .agent-model-modal .modal-dialog {
+      width: 700px;
+      @media (max-width: 768px) {
+            width: 100%;
+      }
+    }
+  
+    .modal-content {
+      background-color: rgba(255, 255, 255, 0.9);
+     
+   
+    }

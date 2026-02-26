@@ -1,0 +1,79 @@
+.message-in {
+      justify-content: flex-start;
+      margin-bottom: 10px;
+      
+      .chat-msg {
+        &:not(:first-child) {
+          .msg-content {
+            border-top-left-radius: 0;
+          }
+        }
+        &:not(:last-child) {
+          .msg-content {
+            border-bottom-left-radius: 0;
+          }
+        }
+      }
+}
+
+.message-out {
+      margin-bottom: 10px;
+      
+      justify-content: flex-end;
+  
+      p {
+        color: #fff;
+      }
+  
+      p:last-child {
+        text-align: right;
+      }
+      .chat-msg {
+        &:not(:first-child) {
+          .msg-content {
+            border-top-right-radius: 0;
+          }
+        }
+        &:not(:last-child) {
+          .msg-content {
+            border-bottom-right-radius: 0;
+          }
+        }
+      }
+    }
+
+    .chat-avtar {
+      img {
+        border: 1px solid var(--bs-success);
+        padding: 3px;
+      }
+
+      .chat-badge {
+        bottom: 8px;
+        right: 8px;
+        width: 8px;
+        height: 8px;
+      }
+    }
+   
+  .msg-content{
+      padding: 12px 16px;
+      border-radius: 10px;
+      text-transform: capitalize;
+
+      &.bg-success{
+        background-color: #007bff;
+      }
+  }
+  .msg-content {
+    box-shadow: none;
+    border-color: #f1f1f1;
+}
+#call-analysis-tabs-tabpane-transcript .card-body{
+  background-color: #efeded;
+}
+span.time-stamp {
+  margin-top: 5px;
+  display: inline-block;
+
+}

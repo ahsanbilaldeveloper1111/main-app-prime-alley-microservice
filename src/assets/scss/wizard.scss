@@ -1,0 +1,253 @@
+.wizard-steps {
+  .step-indicator {
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+    }
+    
+    .step-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px;
+      font-weight: bold;
+      font-size: 16px;
+      border: 2px solid #dee2e6;
+      background-color: #fff;
+      color: #6c757d;
+      transition: all 0.3s ease;
+      
+      &.active {
+        border-color: #007bff;
+        background-color: #007bff;
+        color: #fff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+      }
+      
+      &.completed {
+        border-color: #28a745;
+        background-color: #28a745;
+        color: #fff;
+      }
+    }
+    
+    .step-title {
+      font-size: 12px;
+      color: #6c757d;
+      font-weight: 500;
+      max-width: 80px;
+      margin: 0 auto;
+      line-height: 1.2;
+      
+      .active & {
+        color: #007bff;
+        font-weight: 600;
+      }
+      
+      .completed & {
+        color: #28a745;
+        font-weight: 600;
+      }
+    }
+  }
+  
+  .progress {
+    height: 8px;
+    border-radius: 4px;
+    
+    .progress-bar {
+      transition: width 0.5s ease;
+    }
+  }
+}
+
+.wizard-card {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    
+    .card-title {
+      margin: 0;
+      color: #495057;
+      font-weight: 600;
+    }
+  }
+}
+
+.wizard-navigation {
+  .btn {
+    min-width: 100px;
+    font-weight: 500;
+    
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.step-content {
+  min-height: 400px;
+  
+  .form-group {
+    margin-bottom: 1.5rem;
+    
+    label {
+      font-weight: 500;
+      color: #495057;
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-control {
+      border-radius: 0.375rem;
+      border: 1px solid #ced4da;
+      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+      
+      &:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+      }
+    }
+  }
+}
+
+.extension-ranges-container {
+  .extension-range-row {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+    
+    &:hover {
+      background-color: #e9ecef;
+    }
+  }
+}
+
+.sim-ports-container {
+  .sim-port-item {
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+    }
+    
+    &.active {
+      border-color: #28a745 !important;
+      background-color: rgba(40, 167, 69, 0.1) !important;
+      
+      label {
+        color: #28a745 !important;
+        font-weight: 600 !important;
+      }
+    }
+  }
+}
+
+.calling-access-section {
+  .table {
+    th {
+      background-color: #f8f9fa;
+      border-color: #dee2e6;
+      font-weight: 600;
+      color: #495057;
+    }
+    
+    td {
+      border-color: #dee2e6;
+      vertical-align: middle;
+    }
+  }
+}
+
+.input-group {
+  .form-control {
+    border-right: 0;
+  }
+  
+  .btn {
+    border-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .wizard-steps {
+    .step-indicator {
+      .step-circle {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+      }
+      
+      .step-title {
+        font-size: 10px;
+        max-width: 60px;
+      }
+    }
+  }
+  
+  .wizard-navigation {
+    .btn {
+      min-width: 80px;
+      font-size: 14px;
+    }
+  }
+}
+
+// Animation classes
+.fade-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.fade-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+.fade-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.fade-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity 300ms, transform 300ms;
+}
+
+// Custom scrollbar for long forms
+.step-content {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+    
+    &:hover {
+      background: #a8a8a8;
+    }
+  }
+}

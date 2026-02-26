@@ -1,0 +1,53 @@
+@keyframes fadeInUpRow {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animated-row {
+      opacity: 0;
+      animation: fadeInUpRow 1.4s ease forwards;
+    }
+    
+    .blurry{
+      filter: blur(3px);
+    }
+
+
+    @keyframes fadeInBlurry {
+      from {
+        opacity: 0;
+        filter: blur(3px);
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+      }
+    }
+    
+    .react-row-blur {
+      opacity: 0;
+      animation: fadeInBlurry 0.6s ease forwards;
+    }
+
+    .expandable-content {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.4s ease;
+    }
+    
+    .expandable-content.open {
+      max-height: 500px; // adjust based on expected content height
+      opacity: 1;
+      transform: translateY(0);
+    }
+    

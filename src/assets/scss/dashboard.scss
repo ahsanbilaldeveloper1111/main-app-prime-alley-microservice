@@ -1,0 +1,106 @@
+a.btnServices{
+      background:white !important;
+      color:#2583f2   !important;
+      border-radius:10px !important;
+      padding:10px 20px !important;
+      border:1px solid #2583f2   !important;
+      font-weight:600 !important;
+      font-size:1rem !important;
+      transition:all 0.3s ease !important;
+      &.active{
+          
+      }
+      &:hover{
+        background: #f1f1f1 !important;
+    }
+  }
+
+
+  .dashboard-alert {
+      background: linear-gradient(135deg, #2583f2 0%, #1a6bc4 100%);
+      padding:20px;
+      color:white;
+      border-radius:20px;
+      min-height:230px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:left;
+
+      h1{
+          color:white;
+          font-size: 2rem; font-weight: 700; margin-bottom: 1rem;
+      }
+      p{
+          color:white;
+          font-size: 1rem; margin-bottom: 1rem; color: #e0e7ff
+      }
+      .btn{
+          background:white;
+          color:white;
+          border-radius:10px;
+          padding:10px 20px;
+          background:  linear-gradient(135deg, #0b3c75 0%, #0b5dbf 100%);
+      }
+      .bt:hover{
+          background:white;
+          color:black;
+      }
+  }
+
+  .locked-btn{
+    border-radius:10px !important;
+    padding:10px 20px !important;
+    border:1px solid #2583f2 !important;
+    background:#2583f2 !important;
+    color:white !important;
+    font-weight:600 !important;
+    font-size:1rem !important;
+    transition:all 0.3s ease !important;
+    &:hover{
+      background: #155097 !important;
+      color: white !important;
+    }
+  }
+  .insights-box{
+      border-radius:20px;
+      height:140px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      
+  h2{
+          font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; color: #111827;
+      }
+          p{
+          font-size: .9rem; color:#6b7280;margin-top:5px;margin-bottom:0;
+          
+          }
+  }
+
+  .bg-success.service-badge {
+      background: #d3fbd5 !important;
+      color: #4CAF50;
+      font-weight: bold;
+  }
+  .bg-dark.service-badge {
+    background: #f1f1f1 !important;
+    color: #9a9a9a;
+    font-weight: 600;
+}
+  .serviceHeading{
+    font-size:1.2rem !important;
+  }
+
+  .topTicker{
+    background: linear-gradient(135deg, #b5cde9 0%, #d9fbe6 100%);
+    text-align: center;
+    color: #237feb;
+    padding: 10px 0;
+    border-radius: 10px;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    font-weight: bold;
+   
+  }

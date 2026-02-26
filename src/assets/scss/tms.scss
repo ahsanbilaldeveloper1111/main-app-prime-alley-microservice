@@ -1,0 +1,104 @@
+.profiling-create-form{
+      .form-control{
+            height: 38px;
+            border-radius: 4px;
+            border-color:hsl(0, 0%, 80%);
+      }
+}
+.min-width-100{
+      min-width: 100px;
+}
+p.detail-value {
+      color: #212529;
+      margin-bottom: 0;
+      padding: .5rem;
+      background-color: #f8f9fa;
+      border-radius: .25rem;
+      border-left: 3px solid #2196F3;
+      box-sizing: border-box;
+      line-height: normal;
+  }
+  .detail-label {
+      font-weight: 600;
+      color: #495057;
+      margin-bottom: .5rem;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+  }
+  svg.feather:not([class*=wid-]) {
+      width: 20px;
+  }
+  .detail-label svg {
+      margin-right: 10px;
+      position: relative;
+      margin-top: -7px;
+  }
+  .comparison-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      background-color: #f8f9fa;
+      border-radius: 0.25rem;
+  }
+  .old-column, .new-column {
+      flex: 1;
+      text-align: center;
+  }
+  .data-change-item {
+      padding: 0.75rem;
+      border: 1px solid #e9ecef;
+      border-radius: 0.25rem;
+      margin-bottom: 0.5rem;
+      background-color: #fff;
+  }
+  .data-change-item.changed {
+      border-left: 4px solid #28a745;
+      background-color: #f8fff9;
+  }
+  .field-name {
+      font-weight: 600;
+      color: #495057;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+  }
+  .field-values {
+      display: flex
+  ;
+      align-items: center;
+      gap: 1rem;
+  }
+  .old-value, .new-value {
+      flex: 1;
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      min-height: 40px;
+      display: flex
+  ;
+      align-items: center;
+  }
+  .old-value {
+      background-color: #fff5f5;
+      border: 1px solid #fed7d7;
+  }
+  .value-content {
+      width: 100%;
+      min-height: 40px;
+      display: flex
+  ;
+      align-items: flex-start;
+      padding: 0.5rem;
+  }
+  .change-arrow {
+      color: #6c757d;
+      display: flex
+  ;
+      align-items: center;
+  }
+  .new-value {
+      background-color: #f0fff4;
+      border: 1px solid #c6f6d5;
+  }

@@ -1,0 +1,177 @@
+@use 'sass:color';
+@use 'node_modules/bootstrap/scss/functions';
+@use 'node_modules/bootstrap/scss/mixins';
+@use 'node_modules/bootstrap/scss/variables';
+
+@use "./style.scss";
+@use "./style-preset.scss";
+@use "./uikit.scss";
+// @use "../fonts/tabler-icons.min.css";
+// @use "../fonts/feather.css";
+// @use "../fonts/fontawesome.css";
+// @use "../fonts/material.css";
+
+// Define a variable for the Google Fonts URL
+
+
+
+// Now you can use the font in your styles
+// body {
+//   font-family: 'Public Sans', sans-serif;
+// }
+.pc-sidebar{
+    background-color: #2c4661 !important;
+}
+.pc-sidebar .pc-navbar > .pc-item{
+    margin: 0 !important;
+    padding: 0 !important ;
+}
+.pc-sidebar .pc-navbar > .pc-item:hover:not(.active) > .pc-link:after,
+.pc-sidebar .pc-navbar > .pc-item > .pc-link.active:after {
+    background: #2585f8;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-radius: 0 !important;
+}
+.pc-sidebar .pc-link{
+    color: #fff;
+    .pc-link{
+        color:#01353c;
+    }
+}
+.pc-submenu-popup .pc-link {
+    color: #01353c;
+}
+
+.paymenttab {
+    display: none !important;
+    
+    // background-color: transparent !important;
+    // border: 0 !important;
+}
+.dropdown-menu .dropdown-item svg.svg-dropdown-icon{
+    fill: var(--bs-dropdown-link-color);
+    font-size: 5px;
+}
+#left-right-fix{
+    overflow-x: scroll !important;
+    overflow-y: scroll !important;
+    height: 500px;
+}
+#right-fix{
+    overflow-x: scroll !important;
+    overflow-y: scroll !important;
+    height: 500px;
+}
+
+.tableScroller{
+    max-height: 250px;
+    overflow-y: auto !important;
+}
+.modal-body{
+    background-color: white !important;
+}
+ .pc-sidebar .pc-submenu-popup.active {
+    position: fixed;
+    padding: 10px 0;
+    top: 74px;
+    left: 180px;
+    width: 280px;
+    border: 1px solid var(--bs-border-color);
+    background: var(--pc-sidebar-background);
+    box-shadow: var(--pc-card-box-shadow);
+    border-radius: var(--bs-border-radius);
+    transition: all .1s ease-in-out
+}
+
+.pc-sidebar .pc-submenu-popup .pc-submenu-title {
+    color: var(--pc-heading-color);
+    padding: 15px 35px;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    position: relative
+}
+
+.pc-sidebar .pc-submenu-popup .pc-submenu-title::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    left: 34px;
+    right: 34px;
+    height: 1px;
+    opacity: .6;
+    background: var(--pc-sidebar-submenu-border-color)
+}
+
+ .pc-sidebar .pc-submenu-popup:not(.active) {
+    opacity: 0;
+    width: 0
+}
+.pc-sidebar{
+    width: 180px !important;
+}
+
+
+// .datatable-table > :not(:last-child) > :last-child > *, .table > :not(:last-child) > :last-child > * {
+//     border-bottom-color: #DBE0E5;
+//     text-align: right;
+// }
+
+
+
+button.nav-tab-link {
+    display: block !important;
+    width: 100% !important;
+    text-align: left;
+    border: 1px solid transparent;
+    padding: 10px;
+    background: transparent;
+    border-radius: 5px;
+    position: relative;
+    &:hover, &:active, &:focus{
+        border-color: var(--bs-primary);
+        color: var(--bs-primary);
+        background-color:transparent;
+    }
+   
+
+}
+.filterBoxDropdown{
+    width: 700px;
+}
+.filterBox{
+    .filterBox-content{
+        max-height: 400px;
+        padding-right: 10px;
+        overflow-y: auto;
+    }
+    .filterBox-content::-webkit-scrollbar{
+        width: 2px;
+    }
+    .filterBox-content::-webkit-scrollbar-thumb{
+        background-color: var(--bs-primary);
+    }
+}
+
+.react-datepicker-wrapper{
+    display: block !important;
+}
+.tagClearFilter{
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bs-primary);
+}
+
+.action-box i:before{
+    color: #2c4661;
+}
+.layout-collapse .pc-sidebar.pc-sidebar-hide{
+    display: none !important;
+}
+#v-pills-tabContent {
+    max-height: 200px;
+    overflow-y: auto;
+}

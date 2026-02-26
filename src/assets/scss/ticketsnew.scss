@@ -1,0 +1,115 @@
+.pc-container {
+    margin-left: auto !important;
+}
+
+.table-responsive .table th:last-child, .table-responsive .table td:last-child {
+    min-width: auto !important;
+}
+
+.pc-container .pc-content {
+    padding-left: 0px !important;
+}
+
+.layout-collapse .pc-sidebar {
+    display: none !important
+}
+
+.pc-header {
+    display:none !important
+}
+.ticket-breadcrumbs-title .breadcrumb {
+    margin: 0px !important;
+    padding: 0px !important;
+}
+.badge.bg-secondary {
+    // background: rgb(104 124 213) !important;
+    background:  #a8dfca !important;
+  }
+  
+ 
+  .table-responsive .table th:first-child, .table-responsive .table td:first-child {
+    min-width: auto !important;
+  }
+
+ .margin-minus-10 {
+    margin-top: -25px !important;
+}
+.card-body .bg-opacity-10.badge {
+    --bs-bg-opacity: 0.5 !important;
+}
+
+.form-check-input[type=checkbox] {
+    border-radius: 0px !important;
+}
+
+input.form-control.form-control-sm {
+    height: 38px !important;
+}
+
+input#includeAssignedRecords {
+    border-radius: 2em !important;
+}
+
+
+/* Hide the default radio input */
+.custom-radio input[type="radio"] {
+    display: none;
+  }
+  
+  /* Create a custom radio appearance */
+  .custom-radio label {
+    position: relative;
+    padding-left: 28px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #1f2937;
+    user-select: none;
+  }
+  
+  /* Outer circle */
+  .custom-radio label::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border: 2px solid #ccc !important;
+    border-radius: 50% !important;
+    background-color: #fff !important;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  /* Inner circle when checked */
+  .custom-radio input[type="radio"]:checked + label::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50% !important;
+    background-color: #0d6efd !important; /* Bootstrap primary blue */
+  }
+  
+  /* Hover effect */
+  .custom-radio label:hover::before {
+    border-color: #0d6efd !important;
+  }
+  #product-active-switch {
+    border-radius: 2em !important;
+  }
+  @media (min-width: 992px) { /* lg and up */
+    .custom-col {
+      flex: 0 0 20%;
+      max-width: 20%;
+    }
+  }
+  
+//   .five-col {
+//     flex: 0 0 20%;   /* 5 items in a row */
+//     max-width: 20%;
+//   }
+  

@@ -1,0 +1,36 @@
+body {
+    background-color: #fff;
+}
+.billing-details-cards {
+    height: 100%;
+    padding: 11px 17px 0 17px;
+}
+
+.table-responsive .table th:last-child, .table-responsive .table td:last-child {
+    min-width: auto !important;
+}
+
+.billing-head-table.border-primary {
+    border-color: none !important;
+}
+
+.badge, .theTable .badge, .theTable td:last-child  {
+    color:  #ffffff !important;        
+  }
+
+.white-text {
+    color: #fff !important;
+}
+
+.custtabs {
+    border: 1px solid #ccc !important;
+}
+.view-receipt-btn {
+    border: 1px solid #ccc !important;
+    border-radius: 5px !important;
+    padding: 5px 10px !important;
+    background-color: #f5f0f0 !important;
+}
+// .customer-management-card {
+//     min-height: 200px;
+// }

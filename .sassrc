@@ -1,0 +1,6 @@
+{
+  "quietDeps": true,
+  "style": "compressed",
+  "sourceMap": false,
+  "loadPaths": ["src/assets/scss", "node_modules"]
+} 

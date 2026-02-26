@@ -1,0 +1,114 @@
+const data = [
+      {
+          id: 1,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 2,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 3,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 4,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 5,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 6,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 7,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 8,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 9,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      },
+      {
+          id: 10,
+          Date: '2025-01-01',
+          Time: '10:00:00',
+          UserName: 'John Doe',
+          Department: 'Sales',
+          Type: 'Inbound',
+          Duration: '10:00:00',
+          Extension: '1234567890',
+          PhoneNumber: '1234567890'
+      }
+  ]
+  
+  export default data;
