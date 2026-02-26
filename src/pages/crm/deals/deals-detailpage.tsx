@@ -1270,42 +1270,60 @@ const DealRecordPage: NextPageWithLayout = () => {
 
               {!collapsedSections.has('breeze') && (
                 <div style={{ padding: '20px' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '13px',
-                    color: '#141414',
-                    marginBottom: '12px',
-                  }}>
-                    <span>Generated Feb 14, 2026</span>
-                    <button
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '2px',
-                        cursor: 'pointer',
-                        color: '#141414',
+                  {(deal as any)?.crm_summary?.summary != null && (
+                    <>
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                      }}
-                      title="Refresh"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
+                        gap: '6px',
+                        fontSize: '13px',
+                        color: '#141414',
+                        marginBottom: '12px',
+                      }}>
+                        {deal?.updated_at && (
+                          <span>
+                            Updated{' '}
+                            {new Date(deal.updated_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        )}
+                        <button
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '2px',
+                            cursor: 'pointer',
+                            color: '#141414',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Refresh"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      </div>
 
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#141414',
-                    lineHeight: '1.6',
-                    marginBottom: '16px',
-                    border: '1px solid #ff9fcc',
-                    padding: '18px 20px',
-                    borderRadius: '10px',
-                  }}>
-                    {deal?.name ?? 'This deal'} for {deal?.company_name ?? 'N/A'} is currently in the {deal?.stage?.name ?? deal?.status ?? 'N/A'} stage with a value of {formatDealAmount(deal)} and a {deal?.probability ?? 0}% probability of closing. The expected close date is {formatDate(deal?.expected_close_date)}. The deal owner is {deal?.assigned_to ?? 'N/A'}. Recommended next steps: prepare presentation materials, schedule final negotiation meeting, and ensure all stakeholders are aligned before the expected close date.
-                  </div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: '#141414',
+                        lineHeight: '1.6',
+                        marginBottom: '16px',
+                        border: '1px solid #ff9fcc',
+                        padding: '18px 20px',
+                        borderRadius: '10px',
+                      }}>
+                        {(deal as any)?.crm_summary?.summary}
+                      </div>
+                    </>
+                  )}
+                  {(deal as any)?.crm_summary?.summary == null && (
+                    <div style={{ fontSize: '14px', color: '#718096' }}>
+                      No summary available.
+                    </div>
+                  )}
 
                   <div style={{
                     display: 'flex',
