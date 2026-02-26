@@ -31,7 +31,10 @@ const HostGroups = () => {
   const fetchHostGroups = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getHostGroups();
+      const response = await getHostGroups({
+        output: ["groupid", "name"],
+        selectHosts: ["hostid"]
+      });
       if (response.error) {
         toast.error(response.error.message || 'Failed to fetch host groups');
         setGroups([]);

@@ -5,7 +5,7 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { getHosts, getItemsByHostName, ZabbixHost, ZabbixItem } from '@utils/zabbix';
-import { Button, Row, Col, Modal } from 'react-bootstrap';
+import { Button, Row, Col, Modal, Badge } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
@@ -70,14 +70,31 @@ const Hosts = () => {
   );
 
   const tableColumns: TableColumn<ZabbixHost>[] = [
-    { key: 'hostid', label: 'Host ID', sortable: true },
-    { key: 'host', label: 'Host', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
+    // { key: 'hostid', label: 'Host ID', sortable: true },
+    { key: 'host', label: 'Name / Hostname', sortable: true },
+   
     {
       key: 'ip',
-      label: 'IP',
+      label: 'Address',
       sortable: true,
       render: (row) => <span>{row.interfaces?.[0]?.ip ?? '-'}</span>,
+    },
+    {
+      key: 'groups',
+      label: 'Groups',
+      sortable: true,
+      render: (row) => <span>{row.groups?.map((group) => group.name).join(', ') ?? '-'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (row) =>
+        Number(row.status) === 1 ? (
+          <Badge bg="success">Monitored</Badge>
+        ) : (
+          <Badge bg="danger">Not monitored</Badge>
+        ),
     },
   ];
 
@@ -98,10 +115,8 @@ const Hosts = () => {
     setLoading(true);
     try {
       const response = await getHosts({
-        output: 'extend',
-        selectInterfaces: 'extend',
-        selectGroups: 'extend',
-        selectParentTemplates: ['templateid', 'name'],
+       output: ["hostid", "host", "name"],
+        selectInterfaces: ["interfaceid", "ip"]
       });
       if (response.error) {
         toast.error(response.error.message || 'Failed to fetch hosts');
