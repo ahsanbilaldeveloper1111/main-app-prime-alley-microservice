@@ -3,15 +3,13 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
-import { getTriggers } from '@utils/zabbix';
+import { getAlerts, getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import Link from 'next/link';
 import { FORMAT_CLOCK } from '@utils/Helper';
 
 const SEVERITY_LABELS: Record<string, string> = {
@@ -23,15 +21,8 @@ const SEVERITY_LABELS: Record<string, string> = {
   '5': 'Disaster',
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-  '0': 'Not classified',
-  '1': 'Low',
-  '2': 'Medium',
-  '3': 'High',
-  '4': 'Critical',
-};
 
-const NetopsTriggers = () => {
+const HostAlerts = () => {
   const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
   const [hosts, setHosts] = useState<ZebbixHost[]>([]);
   const [selectedHostId, setSelectedHostId] = useState<string>('');
@@ -45,20 +36,31 @@ const NetopsTriggers = () => {
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<any[] | any>[] = [
-    // { key: 'triggerid', label: 'Trigger ID', sortable: true },
-    { key: 'name', label: 'Host', sortable: true,  render: (row) => (
-        <Link className="text-primary" href={`/netops/hosts/${row?.hosts?.[0]?.hostid ?? ''}`}>
-          {row?.hosts?.[0]?.host ?? '-'}
-        </Link>
-      ), },
-    { key: 'description', label: 'Description', sortable: true, render: (row) => row?.description ?? '-' },
-    { key: 'priority', label: 'Priority', sortable: true, render: (row) => PRIORITY_LABELS[row?.priority ?? '0'] ?? '-' },
-    { key: 'status', label: 'Status', sortable: true, render: (row) => row?.status ?? '-' },
-    { key: 'lastchange', label: 'Last Change', sortable: true, render: (row) => FORMAT_CLOCK(row?.lastchange ?? '') },
-    { key: 'lastEventName', label: 'Last Event', sortable: true, render: (row) => row?.lastEvent?.name ?? '-' },
-    { key: 'lastEventId', label: 'Last Event ID', sortable: true, render: (row) => row?.lastEvent?.eventid ?? '-' },
-    { key: 'lasteventtime', label: 'Last Event Time', sortable: true, render: (row) => FORMAT_CLOCK(row?.lastEvent?.clock ?? '') },
+  const tableColumns: TableColumn<ZebbixAlert>[] = [
+    // { key: 'eventid', label: 'Event ID', sortable: true },
+    { key: 'name', label: 'Name', sortable: true },
+    {
+      key: 'severity',
+      label: 'Severity',
+      sortable: true,
+      render: (row) => (
+        <span className="badge bg-warning text-dark">
+          {SEVERITY_LABELS[row.severity] ?? row.severity}
+        </span>
+      ),
+    },
+    {
+      key: 'clock',
+      label: 'Time',
+      sortable: true,
+      render: (row) => FORMAT_CLOCK(row.clock ?? ''),
+    },
+    {
+      key: 'host',
+      label: 'Host',
+      sortable: true,
+      render: (row) => row.hosts?.[0]?.host ?? '-',
+    },
   ];
 
   const fetchHosts = useCallback(async () => {
@@ -75,19 +77,16 @@ const NetopsTriggers = () => {
     }
   }, []);
 
-  const fetchTriggers = useCallback(async () => {
+  const fetchAlerts = useCallback(async () => {
     if (!selectedHostId) {
       setAlerts([]);
       return;
     }
     setLoading(true);
     try {
-      const response = await getTriggers({
-        output: "extend",
-        selectHosts: ["host"],
-      });
+      const response = await getAlerts(selectedHostId);
       if (response?.error) {
-        toast.error(response.error.message || 'Failed to fetch templates');
+        toast.error(response.error.message || 'Failed to fetch alerts');
         setAlerts([]);
         return;
       }
@@ -119,8 +118,8 @@ const NetopsTriggers = () => {
   }, [refreshKey]);
 
   useEffect(() => {
-    fetchTriggers();
-  }, [selectedHostId, refreshKey, fetchTriggers]);
+    fetchAlerts();
+  }, [selectedHostId, refreshKey, fetchAlerts]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -153,14 +152,15 @@ const NetopsTriggers = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/triggers" subTitle="Triggers" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle="Alerts" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Triggers</h2>
+                <h2 className="mb-0">Host Alerts</h2>
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
                 <select
@@ -179,7 +179,7 @@ const NetopsTriggers = () => {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Search triggers..."
+                  placeholder="Search alerts..."
                   value={searchValue}
                   onChange={(e) => {
                     setSearchValue(e.target.value);
@@ -202,8 +202,8 @@ const NetopsTriggers = () => {
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No triggers found for this host.' : 'Select a host to view triggers.'}
-        loadingMessage="Loading triggers..."
+        emptyMessage={selectedHostId ? 'No alerts found for this host.' : 'Select a host to view alerts.'}
+        loadingMessage="Loading alerts..."
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
@@ -226,8 +226,8 @@ const NetopsTriggers = () => {
   );
 };
 
-NetopsTriggers.getLayout = (page: ReactElement) => {
+HostAlerts.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default NetopsTriggers;
+export default HostAlerts;

@@ -853,7 +853,7 @@ const SelectServer = () => {
                               {status.status}
                             </div>
                             <button className="btn btn-link"
-                            onClick={() => router.push(`/netops/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
+                            onClick={() => router.push(`/pulse/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
                       
                              style={{ fontSize: '12px' }}>
                               Open Monitoring
@@ -1141,7 +1141,7 @@ const SelectServer = () => {
                 justifyContent: 'center',
                 fontSize: '15px'
               }}
-              onClick={() => router.push(`/netops/application-monitoring`)}
+              onClick={() => router.push(`/pulse/application-monitoring`)}
             >
               Open Monitoring <ChevronRight size={20} />
             </button>

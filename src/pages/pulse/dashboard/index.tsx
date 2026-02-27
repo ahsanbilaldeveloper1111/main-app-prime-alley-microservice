@@ -279,7 +279,7 @@ const NetOpsDashboard = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Network Operations Dashboard" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Network Operations Dashboard" />
 
       <Row className="mb-3">
         <Col md={12}>
@@ -471,7 +471,7 @@ const NetOpsDashboard = () => {
                     </table>
                     <div className="d-flex justify-content-center">
                       {session?.user?.permissions?.includes('alerts-netops') && (
-                      <Link href="/netops/alerts" className="link-primary">View All Alerts</Link>
+                      <Link href="/pulse/alerts" className="link-primary">View All Alerts</Link>
                       )}
                     </div>
                   </div>
@@ -525,7 +525,7 @@ const NetOpsDashboard = () => {
                   </table>
                   <div className="d-flex justify-content-center">
                     {session?.user?.permissions?.includes('devices-netops') && (
-                      <Link href="/netops/devices" className="link-primary">View All Devices</Link>
+                      <Link href="/pulse/devices" className="link-primary">View All Devices</Link>
                     )}
                   </div>
                 </div>

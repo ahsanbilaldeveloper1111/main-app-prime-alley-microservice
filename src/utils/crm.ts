@@ -1225,6 +1225,22 @@ export const getCompanies = async (
   }
 };
 
+export const getMinifiedCompanies = async (
+  params: {} = {},
+): Promise<any[] | null> => {
+  try {
+    const response = await axiosInstance.get("/crm/companies", { params });
+    return response.data?.data ?? [];
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch companies",
+    );
+    throw error;
+  }
+};
+
 export const getCompany = async (id: number): Promise<CompanyData> => {
   try {
     const response = await axiosInstance.get(`/crm/companies/${id}`);

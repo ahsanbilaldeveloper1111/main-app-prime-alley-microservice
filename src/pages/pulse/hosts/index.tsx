@@ -61,7 +61,7 @@ const Hosts = () => {
   const handleViewItemsClick = useCallback(
     (row: ZabbixHost) => {
       if (row.hostid) {
-        router.push(`/netops/hosts/${row.hostid}`);
+        router.push(`/pulse/hosts/${row.hostid}`);
       } else {
         toast.error('Host ID not available');
       }
@@ -178,7 +178,7 @@ const Hosts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
 
       <Row className="mb-3">
         <Col md={12}>

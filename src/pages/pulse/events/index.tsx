@@ -4,13 +4,17 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
-import { getTemplates } from '@utils/zabbix';
+import {  getEvents } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
+import { FORMAT_CLOCK } from '@utils/Helper';
+import moment from 'moment';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 const SEVERITY_LABELS: Record<string, string> = {
   '0': 'Not classified',
@@ -21,14 +25,15 @@ const SEVERITY_LABELS: Record<string, string> = {
   '5': 'Disaster',
 };
 
-const formatClock = (clock: string) => {
-  const num = parseInt(clock, 10);
-  if (isNaN(num)) return clock;
-  const d = new Date(num * 1000);
-  return d.toLocaleString();
-};
+// const formatClock = (clock: string) => {
+//   const num = parseInt(clock, 10);
+//   if (isNaN(num)) return clock;
+//   const d = new Date(num * 1000);
+//   return d.toLocaleString();
+// };
 
-const NetopsTemplates = () => {
+const NetopsEvents = () => {
+  const router = useRouter();
   const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
   const [hosts, setHosts] = useState<ZebbixHost[]>([]);
   const [selectedHostId, setSelectedHostId] = useState<string>('');
@@ -42,16 +47,34 @@ const NetopsTemplates = () => {
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZebbixAlert>[] = [
-    { key: 'templateid', label: 'Template ID', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
+  const tableColumns: TableColumn<any[] | any>[] = [
+    { key: 'date_time', label: 'Date & Time', sortable: true, render: (row) => FORMAT_CLOCK(row.clock ?? '') },
+    { key: 'name', label: 'Customer', sortable: true },
     {
-      key: 'host',
-      label: 'Template Groups',
-      sortable: true,
-      render: (row) => row.hosts?.[0]?.host ?? '-',
+      key: 'device', label: 'Device', sortable: true,
+      render: (row) => (
+        <Link href={`/pulse/hosts/${row?.hosts?.[0]?.hostid ?? ''}`} className="badge bg-warning text-dark">
+          {row?.hosts?.[0]?.host ?? '-'}
+        </Link>
+      ),
     },
+    {
+      key: 'severity',
+      label: 'Severity',
+      sortable: true,
+      render: (row) => (
+        <span className="badge bg-warning text-dark">
+          {SEVERITY_LABELS[row.severity] ?? row.severity}
+        </span>
+      ),
+    },
+    { key: 'type', label: 'Type', sortable: true, },
+    { key: 'description', label: 'Description', sortable: true,render: (row) => row?.relatedObject?.description ?? '-' },
   ];
+
+  const handleDeviceClick = (deviceId: string) => {
+    router.push(`/pulse/devices/${deviceId}`);
+  };
 
   const fetchHosts = useCallback(async () => {
     try {
@@ -67,16 +90,16 @@ const NetopsTemplates = () => {
     }
   }, []);
 
-  const fetchTemplates = useCallback(async () => {
+  const fetchEvents = useCallback(async () => {
     if (!selectedHostId) {
       setAlerts([]);
       return;
     }
     setLoading(true);
     try {
-      const response = await getTemplates({
-        // hostids: [selectedHostId]
-        output: ["templateid", "name"],
+      const response = await getEvents({
+        //hostids: [selectedHostId],
+        output: ["eventid", "name", "severity", "clock"],
         selectHosts: ["host"],
       });
       if (response?.error) {
@@ -112,8 +135,8 @@ const NetopsTemplates = () => {
   }, [refreshKey]);
 
   useEffect(() => {
-    fetchTemplates();
-  }, [selectedHostId, refreshKey, fetchTemplates]);
+    fetchEvents();
+  }, [selectedHostId, refreshKey, fetchEvents]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -146,17 +169,17 @@ const NetopsTemplates = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/templates" subTitle="Templates" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/events" subTitle="Events" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Templates</h2>
+                <h2 className="mb-0">Events</h2>
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                {/* <select
+                <select
                   className="form-select"
                   value={selectedHostId}
                   onChange={(e) => setSelectedHostId(e.target.value)}
@@ -168,7 +191,7 @@ const NetopsTemplates = () => {
                       {h.name ?? h.host ?? h.hostid}
                     </option>
                   ))}
-                </select> */}
+                </select>
                 <input
                   type="text"
                   className="form-control"
@@ -195,8 +218,8 @@ const NetopsTemplates = () => {
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No templates found for this host.' : 'Select a host to view templates.'}
-        loadingMessage="Loading templates..."
+        emptyMessage={selectedHostId ? 'No events found for this host.' : 'Select a host to view events.'}
+        loadingMessage="Loading events..."
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
@@ -219,8 +242,8 @@ const NetopsTemplates = () => {
   );
 };
 
-NetopsTemplates.getLayout = (page: ReactElement) => {
+NetopsEvents.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default NetopsTemplates;
+export default NetopsEvents;

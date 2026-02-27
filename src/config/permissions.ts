@@ -157,7 +157,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.VIEW_CALL_RECORDINGS]
             },
             {
-                path: '/call-analytics',
+                path: '/call-analysis',
                 permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
                 children: [
                     {

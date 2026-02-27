@@ -4,17 +4,15 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
-import {  getEvents } from '@utils/zabbix';
+import { getTriggers } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import { FORMAT_CLOCK } from '@utils/Helper';
-import moment from 'moment';
-import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { FORMAT_CLOCK } from '@utils/Helper';
 
 const SEVERITY_LABELS: Record<string, string> = {
   '0': 'Not classified',
@@ -25,15 +23,15 @@ const SEVERITY_LABELS: Record<string, string> = {
   '5': 'Disaster',
 };
 
-// const formatClock = (clock: string) => {
-//   const num = parseInt(clock, 10);
-//   if (isNaN(num)) return clock;
-//   const d = new Date(num * 1000);
-//   return d.toLocaleString();
-// };
+const PRIORITY_LABELS: Record<string, string> = {
+  '0': 'Not classified',
+  '1': 'Low',
+  '2': 'Medium',
+  '3': 'High',
+  '4': 'Critical',
+};
 
-const NetopsEvents = () => {
-  const router = useRouter();
+const NetopsTriggers = () => {
   const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
   const [hosts, setHosts] = useState<ZebbixHost[]>([]);
   const [selectedHostId, setSelectedHostId] = useState<string>('');
@@ -48,33 +46,20 @@ const NetopsEvents = () => {
   });
 
   const tableColumns: TableColumn<any[] | any>[] = [
-    { key: 'date_time', label: 'Date & Time', sortable: true, render: (row) => FORMAT_CLOCK(row.clock ?? '') },
-    { key: 'name', label: 'Customer', sortable: true },
-    {
-      key: 'device', label: 'Device', sortable: true,
-      render: (row) => (
-        <Link href={`/netops/hosts/${row?.hosts?.[0]?.hostid ?? ''}`} className="badge bg-warning text-dark">
+    // { key: 'triggerid', label: 'Trigger ID', sortable: true },
+    { key: 'name', label: 'Host', sortable: true,  render: (row) => (
+        <Link className="text-primary" href={`/pulse/hosts/${row?.hosts?.[0]?.hostid ?? ''}`}>
           {row?.hosts?.[0]?.host ?? '-'}
         </Link>
-      ),
-    },
-    {
-      key: 'severity',
-      label: 'Severity',
-      sortable: true,
-      render: (row) => (
-        <span className="badge bg-warning text-dark">
-          {SEVERITY_LABELS[row.severity] ?? row.severity}
-        </span>
-      ),
-    },
-    { key: 'type', label: 'Type', sortable: true, },
-    { key: 'description', label: 'Description', sortable: true,render: (row) => row?.relatedObject?.description ?? '-' },
+      ), },
+    { key: 'description', label: 'Description', sortable: true, render: (row) => row?.description ?? '-' },
+    { key: 'priority', label: 'Priority', sortable: true, render: (row) => PRIORITY_LABELS[row?.priority ?? '0'] ?? '-' },
+    { key: 'status', label: 'Status', sortable: true, render: (row) => row?.status ?? '-' },
+    { key: 'lastchange', label: 'Last Change', sortable: true, render: (row) => FORMAT_CLOCK(row?.lastchange ?? '') },
+    { key: 'lastEventName', label: 'Last Event', sortable: true, render: (row) => row?.lastEvent?.name ?? '-' },
+    { key: 'lastEventId', label: 'Last Event ID', sortable: true, render: (row) => row?.lastEvent?.eventid ?? '-' },
+    { key: 'lasteventtime', label: 'Last Event Time', sortable: true, render: (row) => FORMAT_CLOCK(row?.lastEvent?.clock ?? '') },
   ];
-
-  const handleDeviceClick = (deviceId: string) => {
-    router.push(`/netops/devices/${deviceId}`);
-  };
 
   const fetchHosts = useCallback(async () => {
     try {
@@ -90,16 +75,15 @@ const NetopsEvents = () => {
     }
   }, []);
 
-  const fetchEvents = useCallback(async () => {
+  const fetchTriggers = useCallback(async () => {
     if (!selectedHostId) {
       setAlerts([]);
       return;
     }
     setLoading(true);
     try {
-      const response = await getEvents({
-        //hostids: [selectedHostId],
-        output: ["eventid", "name", "severity", "clock"],
+      const response = await getTriggers({
+        output: "extend",
         selectHosts: ["host"],
       });
       if (response?.error) {
@@ -135,8 +119,8 @@ const NetopsEvents = () => {
   }, [refreshKey]);
 
   useEffect(() => {
-    fetchEvents();
-  }, [selectedHostId, refreshKey, fetchEvents]);
+    fetchTriggers();
+  }, [selectedHostId, refreshKey, fetchTriggers]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -169,14 +153,14 @@ const NetopsEvents = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/events" subTitle="Events" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/triggers" subTitle="Triggers" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Events</h2>
+                <h2 className="mb-0">Triggers</h2>
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
                 <select
@@ -195,7 +179,7 @@ const NetopsEvents = () => {
                 <input
                   type="text"
                   className="form-control"
-                  placeholder="Search alerts..."
+                  placeholder="Search triggers..."
                   value={searchValue}
                   onChange={(e) => {
                     setSearchValue(e.target.value);
@@ -218,8 +202,8 @@ const NetopsEvents = () => {
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No events found for this host.' : 'Select a host to view events.'}
-        loadingMessage="Loading events..."
+        emptyMessage={selectedHostId ? 'No triggers found for this host.' : 'Select a host to view triggers.'}
+        loadingMessage="Loading triggers..."
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
@@ -242,8 +226,8 @@ const NetopsEvents = () => {
   );
 };
 
-NetopsEvents.getLayout = (page: ReactElement) => {
+NetopsTriggers.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default NetopsEvents;
+export default NetopsTriggers;

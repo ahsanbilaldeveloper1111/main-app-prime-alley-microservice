@@ -93,8 +93,8 @@ const HostGroups = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle="Host Groups" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle="Host Groups" />
 
       <Row className="mb-3">
         <Col md={12}>

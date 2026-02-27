@@ -92,7 +92,7 @@ const Dashboard = () => {
             description: 'Track, monitor, and control all network operations seamlessly with NetOps',
             icon: <i className="ph-duotone ph-brain"></i>,
             gradient: 'from-pink-500 to-rose-600',
-            link: '/netops/dashboard'
+            link: '/pulse/dashboard'
         },
        
         {

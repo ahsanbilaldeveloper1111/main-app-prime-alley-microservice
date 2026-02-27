@@ -58,15 +58,15 @@ const HostItemsDetail = () => {
     if (hostid) fetchItems();
   }, [hostid, refreshKey, fetchItems]);
 
-  const handleBack = () => router.push('/netops/hosts');
+  const handleBack = () => router.push('/pulse/hosts');
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
   const hostName = host?.name ?? host?.host ?? `Host ${hostid}`;
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle={hostName} />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle={hostName} />
 
       <Row className="mb-3">
         <Col md={12}>
