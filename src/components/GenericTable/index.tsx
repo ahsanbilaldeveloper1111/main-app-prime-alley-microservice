@@ -286,6 +286,12 @@ export interface GenericTableProps<T = any> {
 
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
+  
+  // Hide toolbar actions (three dots menu)
+  showToolbarActions?: boolean;
+  
+  // Remove border from table card
+  noBorder?: boolean;
 }
 
 const GenericTable = <T extends Record<string, any>>({
@@ -325,6 +331,8 @@ const GenericTable = <T extends Record<string, any>>({
   fixedHeight = false,
   maxHeight = "calc(100vh - 300px)",
   statsCards,
+  showToolbarActions = true,
+  noBorder = false,
 }: GenericTableProps<T>) => {
   const router = useRouter();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
@@ -949,25 +957,27 @@ const GenericTable = <T extends Record<string, any>>({
             )}
 
             {/* Actions Menu */}
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn gt-icon-btn"
-              >
-                <MoreVertical size={16} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                {toolbar.showImport && (
-                  <Dropdown.Item onClick={toolbar.onImportClick}>
-                    Import
-                  </Dropdown.Item>
-                )}
-                <Dropdown.Item>Bulk Actions</Dropdown.Item>
-                <Dropdown.Divider />
-                <Dropdown.Item>Settings</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
+            {showToolbarActions && (
+              <Dropdown>
+                <Dropdown.Toggle
+                  variant="outline-secondary"
+                  size="sm"
+                  className="gt-toolbar-btn gt-icon-btn"
+                >
+                  <MoreVertical size={16} />
+                </Dropdown.Toggle>
+                <Dropdown.Menu align="end">
+                  {toolbar.showImport && (
+                    <Dropdown.Item onClick={toolbar.onImportClick}>
+                      Import
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Item>Bulk Actions</Dropdown.Item>
+                  <Dropdown.Divider />
+                  <Dropdown.Item>Settings</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
 
             {/* Save */}
             {/* {toolbar.showSaveButton && (
@@ -1324,7 +1334,7 @@ const GenericTable = <T extends Record<string, any>>({
       {renderToolbar()}
 
       {/* Table */}
-      <Card className="border-1 shadow-sm generic-table-card">
+      <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
         <Card.Body className="p-0">
           <div
             className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}

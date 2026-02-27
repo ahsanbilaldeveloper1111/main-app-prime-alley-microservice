@@ -157,7 +157,7 @@ const GlobalBreezeStyles: React.FC = () => (
 
 const BreezeSparkleIcon: React.FC<{ size?: number; color?: string }> = ({
   size = 48,
-  color = "#260646",
+  color = "#00385d",
 }) => (
   <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
     <path

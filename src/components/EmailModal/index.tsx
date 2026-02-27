@@ -78,9 +78,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
     "templates" | "sequences" | "documents" | "meetings" | "quotes"
   >("templates");
   const [createTask, setCreateTask] = useState(false);
-  const [showSendDropdown, setShowSendDropdown] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
-  const sendDropdownRef = useRef<HTMLDivElement>(null);
 
   // Generate email (AI) state – same options as EmailSection
   const [generatePrompt, setGeneratePrompt] = useState("");
@@ -133,12 +131,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        sendDropdownRef.current &&
-        !sendDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowSendDropdown(false);
-      }
       if (
         optionsPanelRef.current &&
         !optionsPanelRef.current.contains(event.target as Node)
@@ -606,7 +598,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
           backgroundColor: "#ffffff",
         }}
       >
-        {["Templates", "Sequences", "Documents", "Meetings", "Quotes"].map(
+        {["Templates", "Meetings"].map(
           (tab) => (
             <button
               key={tab}
@@ -1530,31 +1522,33 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <Paperclip size={16} />
           </button>
         </div>
-        <button
-          type="button"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: "6px 10px",
-            cursor: "pointer",
-            color: "#141414",
-            display: "flex",
-            alignItems: "center",
-            borderRadius: "3px",
-            fontSize: "13px",
-            fontWeight: "500",
-            gap: "4px",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f5f8fa")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.backgroundColor = "transparent")
-          }
-        >
-          Associated with 1 record
-          <ChevronDown size={14} />
-        </button>
+        {/* Associated with 1 record - temporarily hidden */}
+        <div style={{ display: "none" }}>
+          <button
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "6px 10px",
+              cursor: "pointer",
+              color: "#141414",
+              display: "flex",
+              alignItems: "center",
+              borderRadius: "3px",
+              fontSize: "13px",
+              fontWeight: "500",
+              gap: "4px",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = "#f5f8fa")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = "transparent")
+            }
+          >
+            Associated with 1 record
+            <ChevronDown size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Footer - Task Creation and Send */}
@@ -1568,161 +1562,57 @@ const EmailModal: React.FC<EmailModalProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ position: "relative" }} ref={sendDropdownRef}>
-            <div style={{ display: "flex", alignItems: "stretch" }}>
-              <button
-                onClick={handleSend}
-                disabled={toEmails.length === 0 || sendLoading}
-                style={{
-                  padding: "8px 16px",
-                  paddingRight: "12px",
-                  backgroundColor:
-                    toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
-                  color: "#141414",
-                  border: "none",
-                  borderRadius: "4px 0 0 4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor:
-                    toEmails.length > 0 && !sendLoading
-                      ? "pointer"
-                      : "not-allowed",
-                  transition: "background-color 0.2s",
-                  borderRight: "1px solid #a0aec0",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-                onMouseEnter={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#b8c5d0";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#cbd5e0";
-                  }
-                }}
-              >
-                {sendLoading ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm"
-                      role="status"
-                      aria-hidden="true"
-                      style={{
-                        width: "14px",
-                        height: "14px",
-                        borderWidth: "2px",
-                      }}
-                    />
-                    Sending...
-                  </>
-                ) : (
-                  "Send"
-                )}
-              </button>
-              <button
-                onClick={() => setShowSendDropdown(!showSendDropdown)}
-                disabled={toEmails.length === 0 || sendLoading}
-                style={{
-                  padding: "8px 8px",
-                  backgroundColor:
-                    toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
-                  color: "#141414",
-                  border: "none",
-                  borderRadius: "0 4px 4px 0",
-                  fontSize: "14px",
-                  cursor:
-                    toEmails.length > 0 && !sendLoading
-                      ? "pointer"
-                      : "not-allowed",
-                  transition: "background-color 0.2s",
-                  display: "flex",
-                  alignItems: "center",
-                }}
-                onMouseEnter={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#b8c5d0";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (toEmails.length > 0 && !sendLoading) {
-                    e.currentTarget.style.backgroundColor = "#cbd5e0";
-                  }
-                }}
-              >
-                <ChevronDown size={16} />
-              </button>
-            </div>
-            {showSendDropdown && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "100%",
-                  left: 0,
-                  marginBottom: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "180px",
-                  zIndex: 1000,
-                  overflow: "hidden",
-                }}
-              >
-                <button
-                  onClick={() => {
-                    handleSend();
-                    setShowSendDropdown(false);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    fontSize: "14px",
-                    color: "#33475b",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Send now
-                </button>
-                <button
-                  onClick={() => {
-                    console.log("Schedule send");
-                    setShowSendDropdown(false);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "10px 16px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    textAlign: "left",
-                    fontSize: "14px",
-                    color: "#33475b",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Schedule send
-                </button>
-              </div>
-            )}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={handleSend}
+              disabled={toEmails.length === 0 || sendLoading}
+              style={{
+                padding: "8px 16px",
+                backgroundColor:
+                  toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
+                color: "#141414",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor:
+                  toEmails.length > 0 && !sendLoading
+                    ? "pointer"
+                    : "not-allowed",
+                transition: "background-color 0.2s",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              onMouseEnter={(e) => {
+                if (toEmails.length > 0 && !sendLoading) {
+                  e.currentTarget.style.backgroundColor = "#b8c5d0";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (toEmails.length > 0 && !sendLoading) {
+                  e.currentTarget.style.backgroundColor = "#cbd5e0";
+                }
+              }}
+            >
+              {sendLoading ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm"
+                    role="status"
+                    aria-hidden="true"
+                    style={{
+                      width: "14px",
+                      height: "14px",
+                      borderWidth: "2px",
+                    }}
+                  />
+                  Sending...
+                </>
+              ) : (
+                "Send"
+              )}
+            </button>
           </div>
         </div>
 

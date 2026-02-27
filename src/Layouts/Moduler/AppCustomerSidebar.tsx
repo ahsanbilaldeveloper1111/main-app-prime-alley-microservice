@@ -960,7 +960,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       left: 0;
       height: 100vh;
       width: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
-      background: #260646;
+      background: #00385d;
       border: none;
       display: flex;
       flex-direction: column;
@@ -1121,7 +1121,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       top: 0;
       min-width: 200px;
       max-width: 220px;
-      background: #260646 !important;
+      background: #00385d !important;
       border-radius: 0 8px 8px 0;
       box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.12);
       z-index: 1010;
