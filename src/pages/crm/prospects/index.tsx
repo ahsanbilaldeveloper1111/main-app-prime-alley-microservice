@@ -1,5 +1,8 @@
 import "@assets/scss/datatable-style.scss";
 import parsePhoneNumber from "libphonenumber-js";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 import React, {
   ReactElement,
@@ -62,6 +65,7 @@ import {
   X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
+  Plus,
   ArrowUp,
   ArrowDown,
   Download,
@@ -650,6 +654,7 @@ const CrmProspectsManagement = () => {
     firstName: "",
     lastName: "",
     email: "",
+    phone_country_code: "",
     phoneNumber: "",
     campaign_id: null as number | null,
     contact_owner: null as string | null,
@@ -661,6 +666,11 @@ const CrmProspectsManagement = () => {
     tags: [] as Array<{ value: string; label: string; id?: number }>,
     note: "",
     source: "",
+    custom_fields: [] as Array<{
+      id: string;
+      field_name: string;
+      field_value: string;
+    }>,
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -763,11 +773,38 @@ const CrmProspectsManagement = () => {
                   },
             )
           : [];
+        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
+        let phoneCountryCode = "";
+        let phoneNumber = item.phone ?? "";
+        if (typeof item.phone === "string" && item.phone.trim()) {
+          try {
+            const normalized = item.phone.replace(/\s/g, "");
+            const parsed = parsePhoneNumberInput(normalized);
+            if (parsed) {
+              phoneCountryCode = `+${parsed.countryCallingCode}`;
+              phoneNumber = parsed.nationalNumber;
+            }
+          } catch {
+            // keep phoneNumber as-is, phoneCountryCode ""
+          }
+        }
+        const rawCustomFields =
+          d.custom_fields ?? (item as any)?.custom_fields ?? [];
+        const customFieldsArray = Array.isArray(rawCustomFields)
+          ? rawCustomFields
+              .map((f: any) => ({
+                id: String(f?.id ?? `${Date.now()}-${Math.random()}`),
+                field_name: String(f?.field_name ?? f?.title ?? "").trim(),
+                field_value: String(f?.field_value ?? f?.value ?? "").trim(),
+              }))
+              .filter((f) => f.field_name || f.field_value)
+          : [];
         setContactForm({
           firstName,
           lastName,
           email: d.email ?? (item as any).email ?? "",
-          phoneNumber: item.phone ?? "",
+          phone_country_code: phoneCountryCode,
+          phoneNumber,
           campaign_id: item.campaign_id ?? d.campaign_id ?? null,
           contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
@@ -780,6 +817,7 @@ const CrmProspectsManagement = () => {
           tags: tagsArray,
           note: item.note ?? d.note ?? "",
           source: d.source ?? (item as any).source ?? "",
+          custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
       })
@@ -1568,14 +1606,7 @@ const CrmProspectsManagement = () => {
       }
 
       setMetrics(
-        response.metrics || {
-          assigned_records: 0,
-          unassigned_records: 0,
-          scheduled_records: 0,
-          not_scheduled_records: 0,
-          scheduled_next_hour_records: 0,
-          scheduled_next_24_hours_records: 0,
-        },
+        response.metrics || {},
       );
     } catch (error: any) {
       // Only handle error if this is still the latest request
@@ -2407,34 +2438,70 @@ const CrmProspectsManagement = () => {
   const prospectsStatsCards: StatsCardData[] = useMemo(
     () => [
       {
-        title: "Prospects missing Owner",
-        value: dataList.filter(
-          (p: any) => !p.user_extension || p.user_extension === "",
-        ).length,
+        title: "All Prospects",
+        value: metrics.total_all_records ?? 0,
+        icon: Users,
+        iconColor: "#6366F1",
+        iconBgColor: "#EEF2FF",
+        subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`,
       },
       {
-        title: "Prospects missing Lead Status",
-        value: dataList.filter(
-          (p: any) => !p.disposition || p.disposition === "",
-        ).length,
+        title: "Scheduled",
+        value: metrics.scheduled_records ?? 0,
+        icon: Calendar,
+        iconColor: "#10B981",
+        iconBgColor: "#D1FAE5",
+        metric: {
+          text: `${metrics.scheduled_next_hour_records ?? 0} in next hour`,
+          dotColor: "#F59E0B",
+        },
       },
       {
-        title: "Prospects never called",
-        value: dataList.filter((p: any) => !p.last_called_at).length,
+        title: "Overdue",
+        value: metrics.overdue_scheduled_records ?? 0,
+        icon: ClockIcon,
+        iconColor: "#F97316",
+        iconBgColor: "#FFEDD5",
+        metric: {
+          text: "Client-defined",
+          dotColor: "#F97316",
+        },
       },
       {
-        title: "Prospects with no recent activity",
-        value: dataList.filter((p: any) => {
-          if (!p.last_called_at) return true;
-          const daysSinceActivity = moment().diff(
-            moment(p.last_called_at),
-            "days",
-          );
-          return daysSinceActivity > 30;
-        }).length,
+        title: "Converted Prospects",
+        value: metrics.converted_prospects_records ?? 0,
+        icon: Target,
+        iconColor: "#8B5CF6",
+        iconBgColor: "#EDE9FE",
+        metric: {
+          text: "Has associated leads",
+          dotColor: "#8B5CF6",
+        },
+      },
+      {
+        title: "Recently Contacted",
+        value: metrics.recently_contacted_last_24h_records ?? 0,
+        icon: MessageCircle,
+        iconColor: "#0EA5E9",
+        iconBgColor: "#E0F2FE",
+        metric: {
+          text: "In last 24 hrs",
+          dotColor: "#0EA5E9",
+        },
+      },
+      {
+        title: "Not Contacted",
+        value: metrics.not_contacted_records ?? 0,
+        icon: XCircle,
+        iconColor: "#64748B",
+        iconBgColor: "#F1F5F9",
+        metric: {
+          text: "No call attempt has occurred yet.",
+          dotColor: "#94A3B8",
+        },
       },
     ],
-    [dataList],
+    [metrics],
   );
 
   // Define columns for GenericTable - Clean declarative definitions
@@ -3217,6 +3284,7 @@ const CrmProspectsManagement = () => {
                 firstName: "",
                 lastName: "",
                 email: "",
+                phone_country_code: "",
                 phoneNumber: "",
                 campaign_id: null,
                 contact_owner: null,
@@ -3228,6 +3296,7 @@ const CrmProspectsManagement = () => {
                 tags: [],
                 note: "",
                 source: "",
+                custom_fields: [],
               });
               setShowCreateContactSidebar(true);
             }}
@@ -3300,11 +3369,21 @@ const CrmProspectsManagement = () => {
       const assignedTo = userExtension;
       const uploadedBy = userExtension;
 
+      const phoneForPayload =
+        contactForm.phone_country_code && contactForm.phoneNumber?.trim()
+          ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
+          : contactForm.phoneNumber?.trim() ?? "";
+      const customFieldsForPayload = (contactForm.custom_fields ?? [])
+        .map((f) => ({
+          field_name: String(f.field_name ?? "").trim(),
+          field_value: String(f.field_value ?? "").trim(),
+        }))
+        .filter((f) => f.field_name || f.field_value);
       setCreateContactLoading(true);
       try {
         await createCrmData({
           name,
-          phone: contactForm.phoneNumber.trim(),
+          phone: phoneForPayload,
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
@@ -3324,6 +3403,9 @@ const CrmProspectsManagement = () => {
             legal_basis: contactForm.legal_basis?.length
               ? contactForm.legal_basis
               : undefined,
+            custom_fields: customFieldsForPayload.length
+              ? customFieldsForPayload
+              : undefined,
           },
         });
         fetchCrmData();
@@ -3331,6 +3413,7 @@ const CrmProspectsManagement = () => {
           firstName: "",
           lastName: "",
           email: "",
+          phone_country_code: "",
           phoneNumber: "",
           campaign_id: null,
           contact_owner: null,
@@ -3342,6 +3425,7 @@ const CrmProspectsManagement = () => {
           tags: [],
           note: "",
           source: "",
+          custom_fields: [],
         });
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -3373,11 +3457,21 @@ const CrmProspectsManagement = () => {
       toast.error("Campaign is required");
       return;
     }
+    const phoneForPayload =
+      contactForm.phone_country_code && contactForm.phoneNumber?.trim()
+        ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
+        : contactForm.phoneNumber?.trim() ?? "";
+    const customFieldsForPayload = (contactForm.custom_fields ?? [])
+      .map((f) => ({
+        field_name: String(f.field_name ?? "").trim(),
+        field_value: String(f.field_value ?? "").trim(),
+      }))
+      .filter((f) => f.field_name || f.field_value);
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
         name,
-        phone: contactForm.phoneNumber.trim(),
+        phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
         source: contactForm.source?.trim() || undefined,
@@ -3393,6 +3487,9 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
           legal_basis: contactForm.legal_basis?.length
             ? contactForm.legal_basis
+            : undefined,
+          custom_fields: customFieldsForPayload.length
+            ? customFieldsForPayload
             : undefined,
         },
       });
@@ -3702,31 +3799,50 @@ const CrmProspectsManagement = () => {
                       >
                         Phone <span style={{ color: "#f2545b" }}>*</span>
                       </label>
-                      <input
-                        type="tel"
-                        data-test-id="phone-input"
-                        value={contactForm.phoneNumber}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            phoneNumber: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
+                      <div className="phone-input-wrapper contact-form-phone-input-wrapper">
+                        <PhoneInput
+                          international
+                          defaultCountry="US"
+                          value={
+                            contactForm.phone_country_code && contactForm.phoneNumber
+                              ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
+                              : contactForm.phoneNumber || undefined
+                          }
+                          onChange={(value) => {
+                            if (value) {
+                              try {
+                                const phoneNumber = parsePhoneNumberInput(value);
+                                if (phoneNumber) {
+                                  setContactForm({
+                                    ...contactForm,
+                                    phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                    phoneNumber: phoneNumber.nationalNumber,
+                                  });
+                                } else {
+                                  setContactForm({
+                                    ...contactForm,
+                                    phone_country_code: "",
+                                    phoneNumber: value,
+                                  });
+                                }
+                              } catch {
+                                setContactForm({
+                                  ...contactForm,
+                                  phone_country_code: "",
+                                  phoneNumber: value,
+                                });
+                              }
+                            } else {
+                              setContactForm({
+                                ...contactForm,
+                                phone_country_code: "",
+                                phoneNumber: "",
+                              });
+                            }
+                          }}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -4259,6 +4375,162 @@ const CrmProspectsManagement = () => {
                         }
                       />
                     </div>
+
+                    {/* Custom fields (user-defined) */}
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: contactForm.custom_fields?.length ? "12px" : "0px" }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setContactForm((prev) => ({
+                            ...prev,
+                            custom_fields: [
+                              ...(prev.custom_fields ?? []),
+                              {
+                                id: `${Date.now()}-${Math.random()}`,
+                                field_name: "",
+                                field_value: "",
+                              },
+                            ],
+                          }))
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 10px",
+                          backgroundColor: "transparent",
+                          border: "1px dashed #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          color: "#141414",
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f7fafc";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Plus size={16} />
+                        Add custom field
+                      </button>
+                    </div>
+
+                    {!!contactForm.custom_fields?.length && (
+                      <div style={{ marginTop: "12px" }}>
+                        {contactForm.custom_fields.map((f, idx) => (
+                          <div
+                            key={f.id}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr auto",
+                              gap: "10px",
+                              alignItems: "center",
+                              marginBottom: "10px",
+                            }}
+                          >
+                            <input
+                              type="text"
+                              value={f.field_name}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).map(
+                                    (cf, i) =>
+                                      i === idx ? { ...cf, field_name: v } : cf,
+                                  ),
+                                }));
+                              }}
+                              placeholder="Title"
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                outline: "none",
+                              }}
+                              onFocus={(e) =>
+                                (e.currentTarget.style.borderColor = "#0091ae")
+                              }
+                              onBlur={(e) =>
+                                (e.currentTarget.style.borderColor = "#8a8a8a")
+                              }
+                            />
+                            <input
+                              type="text"
+                              value={f.field_value}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).map(
+                                    (cf, i) =>
+                                      i === idx ? { ...cf, field_value: v } : cf,
+                                  ),
+                                }));
+                              }}
+                              placeholder="Value"
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                outline: "none",
+                              }}
+                              onFocus={(e) =>
+                                (e.currentTarget.style.borderColor = "#0091ae")
+                              }
+                              onBlur={(e) =>
+                                (e.currentTarget.style.borderColor = "#8a8a8a")
+                              }
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Remove custom field ${idx + 1}`}
+                              onClick={() =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).filter(
+                                    (cf) => cf.id !== f.id,
+                                  ),
+                                }))
+                              }
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: 36,
+                                height: 36,
+                                borderRadius: "6px",
+                                border: "1px solid #8a8a8a",
+                                backgroundColor: "transparent",
+                                cursor: "pointer",
+                                color: "#718096",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "#fef2f2";
+                                e.currentTarget.style.borderColor = "#ef4444";
+                                e.currentTarget.style.color = "#ef4444";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "transparent";
+                                e.currentTarget.style.borderColor = "#8a8a8a";
+                                e.currentTarget.style.color = "#718096";
+                              }}
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -4465,6 +4737,19 @@ const CrmProspectsManagement = () => {
           flex: 1;
           overflow-y: auto;
           overflow-x: hidden;
+        }
+        /* Phone input: match other form fields - border like text inputs, no blue focus glow */
+        .contact-form-phone-input-wrapper .PhoneInput {
+          border: 1px solid #8a8a8a !important;
+          border-radius: 4px;
+          padding: 10px 12px;
+          font-size: 14px;
+          box-shadow: none !important;
+        }
+        .contact-form-phone-input-wrapper .PhoneInput:focus-within {
+          border-color: #0091ae !important;
+          outline: none;
+          box-shadow: none !important;
         }
       `,
         }}

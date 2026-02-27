@@ -478,6 +478,9 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [ordersMetrics, setOrdersMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -655,10 +658,12 @@ const CrmOrders = () => {
         const ordersArray: any[] = response?.dataList || [];
         const pagination: any = response?.meta || {};
         const summary: any = response?.summary_tiles || null;
+        const metricsFromApi: any = response?.metrics || null;
 
         setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
         setTotalOrders(pagination?.total || 0);
         setSummaryTiles(summary);
+        setOrdersMetrics(metricsFromApi);
 
         return response;
       } finally {
@@ -1637,68 +1642,69 @@ const CrmOrders = () => {
 
   // Define stats cards for GenericTable
   const ordersStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Orders",
-        value: summaryTiles?.total_orders || totalOrders || 0,
-        icon: ShoppingBag,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in pipeline",
-      },
-      {
-        title: "New",
-        value:
-          summaryTiles?.new_orders || analyticsData.stageCounts["New"] || 0,
-        icon: PlusCircle,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh orders",
-          dotColor: "#2563EB",
+    () => {
+      const m = ordersMetrics || {};
+      return [
+        {
+          title: "All Orders",
+          value: m.total_orders ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_orders ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "In Progress",
-        value: analyticsData.inProgress || 0,
-        icon: Activity,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "Being processed",
-      },
-      {
-        title: "Delivered",
-        value: analyticsData.delivered || 0,
-        icon: Package,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Completed",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
+        {
+          title: "High-Value Orders",
+          value: m.high_value_orders ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Client-defined threshold",
         },
-      },
-      {
-        title: "Pending Approval",
-        value: analyticsData.pendingApproval || 0,
-        icon: AlertCircle,
-        iconColor: "#EF4444",
-        iconBgColor: "#FEE2E2",
-        subtitle: "Requires review",
-      },
-    ],
-    [summaryTiles, totalOrders, analyticsData],
+        {
+          title: "Active Orders",
+          value: m.active_orders ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "In progress",
+        },
+        {
+          title: "Orders under Review",
+          value: m.orders_under_review ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          additionalText: "Orders paused for review",
+        },
+        {
+          title: "Completed Orders",
+          value: m.completed_orders ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#10B981",
+          },
+        },
+        {
+          title: "Canceled Orders",
+          value: m.canceled_orders ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [ordersMetrics],
   );
 
   // Custom select styles

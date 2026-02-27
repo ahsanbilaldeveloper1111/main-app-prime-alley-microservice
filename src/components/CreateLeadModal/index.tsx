@@ -1003,7 +1003,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       return false;
     }
     if (formData.user_extension == null || formData.user_extension === "") {
-      toast.error("Assigned To is required");
+      toast.error("Owner is required");
       return false;
     }
     if (!formData.stage_id) {
@@ -1641,7 +1641,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 </div>
                 <div className="contact-form-field" style={{ marginBottom: "20px" }}>
                   <label className="contact-form-label contact-form-label-required" style={labelStyle}>
-                    Assigned To <span style={{ color: "#f2545b" }}>*</span>
+                    Owner <span style={{ color: "#f2545b" }}>*</span>
                   </label>
                   {formData.type === "opportunity" ? (
                     <Select

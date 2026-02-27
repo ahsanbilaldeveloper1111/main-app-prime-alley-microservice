@@ -28,9 +28,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
-import GenericStatsCards, {
-  StatsCardData,
-} from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
+import MetricsSummaryCards from "@components/MetricsSummaryCards";
 import { useRouter } from "next/router";
 
 // Type definitions
@@ -1185,17 +1184,15 @@ const GenericTable = <T extends Record<string, any>>({
           <div
             style={{
               paddingTop: "16px",
+              paddingLeft: "25px",
+              paddingRight: "25px",
               backgroundColor: "#ffffff",
               paddingBottom: "1px",
               borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #ccccccc",
+              borderRight: "1px solid #cccccc",
             }}
           >
-            <GenericStatsCards
-              data={statsCards}
-              gridMinWidth="250px"
-              valueFontSize="28px"
-            />
+            <MetricsSummaryCards data={statsCards} />
           </div>
         )}
       </div>
