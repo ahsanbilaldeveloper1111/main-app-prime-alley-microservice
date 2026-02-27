@@ -58,6 +58,7 @@ const CustomerDashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('Last 3 months');
   const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
   useEffect(() => {
     getCompanyDetails();
   }, []);
@@ -72,20 +73,21 @@ const CustomerDashboard = () => {
     fetchCompanies();
   }, []);
   useEffect(() => {
-    getDashboardCounters();
-    getProfitLossData();
-    getTopProducts();
-    getRecentActivity();
-    getAnalyticsByMonth();
-  }, [currency, selectedPeriod]);
+    const apiPayload = selectedCompanyId ? { crm_company_id: selectedCompanyId } : {};
+    getDashboardCounters(apiPayload);
+    getProfitLossData(apiPayload);
+    getTopProducts(apiPayload);
+    getRecentActivity(apiPayload);
+    getAnalyticsByMonth(apiPayload);
+  }, [currency, selectedPeriod, selectedCompanyId]);
 
   const getCompanyDetails = async () => {
     const response = await GetCompanyDetails() as any;
     setCurrency(response?.profile?.currency);
   };
 
-  const getDashboardCounters = async () => {
-    const response = await GetDashboardCounters() as any;
+  const getDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetDashboardCounters(params) as any;
     setDashboardCounters(response);
     setSummaryCards([
       { title: 'Subscriptions', value: formatInteger(response?.products?.total ?? 0), icon: Package, iconColor: '#3b82f6', iconBgColor: 'rgba(59, 130, 246, 0.1)' },
@@ -157,18 +159,18 @@ const CustomerDashboard = () => {
     }
   };
 
-  const getProfitLossData = async () => {
-    const response = await GetProfitLossData();
+  const getProfitLossData = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetProfitLossData(params);
     setProfitLossData(response);
   };
 
-  const getTopProducts = async () => {
-    const response = await GetTopProducts();
+  const getTopProducts = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetTopProducts(params);
     setTopProducts(response as any);
   };
 
-  const getRecentActivity = async () => {
-    const response = await GetRecentActivity();
+  const getRecentActivity = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetRecentActivity(params);
     setRecentActivity(response);
   };
 
@@ -206,10 +208,10 @@ const CustomerDashboard = () => {
     };
   };
 
-  const getAnalyticsByMonth = async () => {
+  const getAnalyticsByMonth = async (params: { crm_company_id?: string | number } = {}) => {
     const dateRange = getDateRange(selectedPeriod);
     console.log('Date Range:', dateRange); // Debug log
-    const response = await GetAnalyticsByMonth(dateRange.start_date, dateRange.end_date) as any;
+    const response = await GetAnalyticsByMonth(dateRange.start_date, dateRange.end_date, params) as any;
 
     // Transform the response data for the chart
     // Use response if available, otherwise use sampleResponse
@@ -316,7 +318,21 @@ const CustomerDashboard = () => {
             </ol>
           </nav>
         </div>
-
+        <div className="mb-3 mb-md-0">
+          <Form.Select
+            size="sm"
+            style={{ width: '220px' }}
+            value={selectedCompanyId}
+            onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
+          >
+            <option value="">All companies</option>
+            {companies.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
+        </div>
       </div>
         
                 {/* Summary Cards */}
