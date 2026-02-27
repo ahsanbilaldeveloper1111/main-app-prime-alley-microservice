@@ -590,35 +590,35 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: '/netops/dashboard'
+          url: '/pulse/dashboard'
         },
         {
           id: 'netops-devices',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
           icon: <MonitorSpeaker size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/devices'
+          url: '/pulse/devices'
         },
         {
           id: 'netops-services',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
-          url: '/netops/services'
+          url: '/pulse/services'
         },
         {
           id: 'netops-alerts',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-          url: '/netops/alerts'
+          url: '/pulse/alerts'
         },
         {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: '/netops/uptime-sla'
+          url: '/pulse/uptime-sla'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },

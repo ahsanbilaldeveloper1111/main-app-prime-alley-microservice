@@ -232,8 +232,8 @@ const UptimeSLAMonitoring = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem
-        mainTitle="NetOps"
-        mainLink="/netops/dashboard"
+        mainTitle="Pulse"
+        mainLink="/pulse/dashboard"
         subTitle="Uptime & SLA Monitoring"
       />
 

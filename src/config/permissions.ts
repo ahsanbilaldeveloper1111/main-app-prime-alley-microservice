@@ -157,7 +157,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.VIEW_CALL_RECORDINGS]
             },
             {
-                path: '/call-analytics',
+                path: '/call-analysis',
                 permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
                 children: [
                     {
@@ -283,50 +283,20 @@ export const routePermissions: RoutePermission[] = [
         path: '/netops',
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
-            {
-                path: '/dashboard',
-                permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]
-            },
-            {
-                path: '/devices',
-                permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]
-            },
-            {
-                path: '/services',
-                permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]
-            },
-            {
-                path: '/alerts',
-                permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]
-            },
-            {
-                path: '/uptime-sla',
-                permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
-            },
-            {
-                path: '/server-insights',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/application-monitoring',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/hosts',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/host-groups',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/gateways',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/gateway-ports',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
+            {path: '/dashboard',   permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]},
+            {  path: '/devices',permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]},
+            {path: '/services', permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]},
+            { path: '/alerts',permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]},
+            {path: '/uptime-sla',permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]},
+            {path: '/server-insights',permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            {path: '/application-monitoring',permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/hosts', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/host-groups', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            { path: '/templates', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            { path: '/events', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/triggers', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/gateways', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/gateway-ports', permissions: [PERMISSIONS.NETOPS_SERVICES]},
         ]
     },
     //netops services end

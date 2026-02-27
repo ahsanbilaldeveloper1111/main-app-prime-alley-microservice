@@ -68,9 +68,9 @@ import CompanyPO from "@pages/gsm/company/po";
 import PaymentMethods from "@pages/billing/payment-methods";
 
 // Import NetOps components
-import Devices from "@pages/netops/devices";
-import Services from "@pages/netops/services";
-import Alerts from "@pages/netops/alerts-old";
+import Devices from "@pages/pulse/devices";
+import Services from "@pages/pulse/services";
+import Alerts from "@pages/pulse/alerts-old";
 
 // Import Tickets components
 import TicketStatuses from "@pages/tickets/statuses";

@@ -36,17 +36,10 @@ const HostItemsDetail = () => {
     if (!hostid) return;
     setLoading(true);
     try {
-      const [itemsRes, hostRes] = await Promise.all([
-        getItemsByHostId(hostid),
+      const [ hostRes] = await Promise.all([
         getHostById(hostid),
       ]);
-      if (itemsRes.error) {
-        toast.error(itemsRes.error.message || 'Failed to fetch items');
-        setItems([]);
-      } else {
-        const list = itemsRes.result ?? [];
-        setItems(Array.isArray(list) ? list : []);
-      }
+     
       if (hostRes.result && Array.isArray(hostRes.result) && hostRes.result.length > 0) {
         setHost((hostRes.result as ZabbixHost[])[0]);
       } else {
@@ -65,15 +58,15 @@ const HostItemsDetail = () => {
     if (hostid) fetchItems();
   }, [hostid, refreshKey, fetchItems]);
 
-  const handleBack = () => router.push('/netops/hosts');
+  const handleBack = () => router.push('/pulse/hosts');
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
   const hostName = host?.name ?? host?.host ?? `Host ${hostid}`;
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle={hostName} />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle={hostName} />
 
       <Row className="mb-3">
         <Col md={12}>

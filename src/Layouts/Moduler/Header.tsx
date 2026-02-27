@@ -1420,7 +1420,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DASHBOARD) && (
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/netops/dashboard`}>
+                    <Link className="pc-link" href={`${BASE_URL}/pulse/dashboard`}>
                         <span className="pc-micon"><i className={ICONS.GAUGE}></i></span>
                         <span className="pc-mtext">Dashboard</span>
                     </Link>
@@ -1430,7 +1430,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DEVICES) && (
 
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/netops/devices`}>
+                    <Link className="pc-link" href={`${BASE_URL}/pulse/devices`}>
                         <span className="pc-micon"><i className="ph-duotone ph-devices"></i></span>
                         <span className="pc-mtext">Devices</span>
                     </Link>
@@ -1440,7 +1440,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SERVICES_NETOPS) && (
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/netops/services`}>
+                    <Link className="pc-link" href={`${BASE_URL}/pulse/services`}>
                         <span className="pc-micon"><i className="ph-duotone ph-gear"></i></span>
                         <span className="pc-mtext">Services</span>
                     </Link>
@@ -1449,7 +1449,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_ALERTS_NETOPS) && (
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/netops/alerts`}>
+                    <Link className="pc-link" href={`${BASE_URL}/pulse/alerts`}>
                         <span className="pc-micon"><i className="ph-duotone ph-warning-circle"></i></span>
                         <span className="pc-mtext">Alerts</span>
                     </Link>
@@ -1458,7 +1458,7 @@ const Header = ({ themeMode }: HeaderProps) => {
 
                 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_UPTIME_SLA) && (
                 <li className="pc-item">
-                    <Link className="pc-link" href={`${BASE_URL}/netops/uptime-sla`}>
+                    <Link className="pc-link" href={`${BASE_URL}/pulse/uptime-sla`}>
                         <span className="pc-micon"><i className="ph-duotone ph-chart-line-up"></i></span>
                         <span className="pc-mtext">Uptime & SLA Monitoring</span>
                     </Link>

@@ -197,52 +197,52 @@ export const GetPayments = async (params: PaginationParams = {}) => {
 };
 
 //Dashboard apis start
-export const GetDashboardCounters = async () => {
+export const GetDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-dashboard-counter');
+    const response = await axiosInstance.get('accounting/get-dashboard-counter', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch dashboard counters");
     throw error;
   }
 };
-export const GetProfitLossData = async () => {
+export const GetProfitLossData = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting//get-profit-loss');
+    const response = await axiosInstance.get('accounting//get-profit-loss', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch profit loss data");
     throw error;
   }
 };
-export const GetTopProducts = async () => {
+export const GetTopProducts = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-top-products');
+    const response = await axiosInstance.get('accounting/get-top-products', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch top products");
     throw error;
   }
 };
-export const GetRecentActivity = async () => {
+export const GetRecentActivity = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-recent-activity');
+    const response = await axiosInstance.get('accounting/get-recent-activity', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch recent activity");
     throw error;
   }
 };
-export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string) => {
+export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string, params: { crm_company_id?: string | number } = {}) => {
   try {
-    const params: any = {};
+    const queryParams: any = { ...params };
     if (start_date) {
-      params.start_date = start_date;
+      queryParams.start_date = start_date;
     }
     if (end_date) {
-      params.end_date = end_date;
+      queryParams.end_date = end_date;
     }
-    const response = await axiosInstance.get('accounting/get-analytics-by-month', { params });
+    const response = await axiosInstance.get('accounting/get-analytics-by-month', { params: queryParams });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch analytics by month");

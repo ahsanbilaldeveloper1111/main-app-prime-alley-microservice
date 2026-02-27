@@ -56,7 +56,7 @@ const routePermissions = [
   {path: '/resources/contact-support', permissions: ['']},
   {path: '/reports', permissions: ['reports-services']},
   {
-    path: '/netops',
+    path: '/pulse',
     permissions: ['control-hub-services'],
     children: [
       {path: '/dashboard', permissions: ['control-hub-services']},
@@ -301,7 +301,7 @@ const routePermissions = [
     ]
   },
   {
-    path: '/netops',
+    path: '/pulse',
     permissions: ['health-care-services'],
     children: [
       {path: '/test', permissions: ['health-care-services']}

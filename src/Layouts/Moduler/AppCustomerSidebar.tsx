@@ -174,7 +174,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'crm',          
     'communications',
     'planner',
-    'netops',
+    'pulse',
     'virtual-agents',
     'finance',
     'compliance',
@@ -212,8 +212,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
-      title: "Sales CRM",
-      label: "Sales CRM",
+      title: "Smart CRM",
+      label: "Smart CRM",
       url: '',
       subItems: [
         {
@@ -318,10 +318,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'ai-ml-calls-analysis',
-          title: 'Calls Analytics',
+          title: 'Calls Analysis',
           icon: <FileChartPie size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/communications/call-analytics'
+          url: '/communications/call-analysis'
         },
         {
           id: 'wallboards-live',
@@ -493,70 +493,93 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     //netops services start
     {
-      id: 'netops',
-      key: 'netops',
+      id: 'pulse',
+      key: 'pulse',
       permission: PERMISSIONS.NETOPS_SERVICES,
       icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.NETOPS,
-      title: MENU_LABELS.NETOPS,
-      label: MENU_LABELS.NETOPS,
+      title: "Pulse",
+      label: "Pulse",
       url: '',
       subItems: [
         {
-          id: 'netops-dashboard',
+          id: 'pulse-dashboard',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: '/netops/dashboard'
+          url: '/pulse/dashboard'
         },
         {
-          id: 'netops-hosts',
+          id: 'pulse-hosts',
           title: 'Hosts',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/hosts'
+          url: '/pulse/hosts'
         },
         {
-          id: 'netops-hosts-groups',
+          id: 'pulse-hosts-groups',
           title: 'Hosts Groups',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/host-groups'
+          url: '/pulse/host-groups'
         },
         {
-          id: 'netops-hosts-alerts',
+          id: 'pulse-hosts-alerts',
           title: 'Alerts',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/alerts'
+          url: '/pulse/alerts'
         },
         {
-          id: 'netops-uptime-sla',
+          id: 'pulse-templates',
+          title: 'Templates',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/pulse/templates'
+        },
+        {
+          id: 'pulse-events',
+          title: 'Events',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/pulse/events'
+        },
+        {
+          id: 'pulse-triggers',
+          title: 'Triggers',
+          icon: <Megaphone size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/pulse/triggers'
+        },
+
+
+        {
+          id: 'pulse-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: '/netops/uptime-sla'
+          url: '/pulse/uptime-sla'
         },
         {
-          id: 'netops-select-server',
+          id: 'pulse-select-server',
           title: 'Server Insights',
           icon: <Server size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/server-insights'
+          url: '/pulse/server-insights'
         },
         {
-          id: 'netops-gateways',
+          id: 'pulse-gateways',
           title: 'Gateways',
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/gateways'
+          url: '/pulse/gateways'
         },
         {
-          id: 'netops-gateway-ports',
+          id: 'pulse-gateway-ports',
           title: 'Gateway Ports',
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/gateway-ports'
+          url: '/pulse/gateway-ports'
         },
        
       ].filter(item => !item.permission || hasPermission(item.permission))
