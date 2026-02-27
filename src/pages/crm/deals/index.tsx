@@ -542,6 +542,9 @@ const CrmDeals = () => {
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [dealsMetrics, setDealsMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
   const [dealToConvert, setDealToConvert] = useState<number | null>(null);
@@ -793,10 +796,12 @@ const CrmDeals = () => {
         const dealsArray: any[] = response?.dataList || [];
         const pagination: any = response?.meta || {};
         const summary: any = response?.summary_tiles || null;
+        const metricsFromApi: any = response?.metrics || null;
 
         setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
         setTotalDeals(pagination?.total || 0);
         setSummaryTiles(summary);
+        setDealsMetrics(metricsFromApi);
 
         // Update server pagination meta
         if (pagination && pagination.total !== undefined) {
@@ -2171,90 +2176,22 @@ const CrmDeals = () => {
   // Define stats cards for GenericTable
   const dealsStatsCards: StatsCardData[] = useMemo(
     () => {
-      const now = moment();
-
-      const isLost = (deal: any) => !!deal?.is_lost;
-      const isWon = (deal: any) => {
-        const stageName = (deal?.stage?.name ?? deal?.stage ?? "")
-          .toString()
-          .toLowerCase();
-        return stageName.includes("won") || !!deal?.stage?.is_won;
-      };
-
-      const wonCount = dealsData.filter((d: any) => isWon(d)).length;
-      const lostCount = dealsData.filter((d: any) => isLost(d)).length;
-
-      const wonLast7Days = dealsData.filter((d: any) => {
-        if (!isWon(d)) return false;
-        const dt = d?.updated_at || d?.created_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
-      }).length;
-
-      const atRiskCount = dealsData.filter((d: any) => {
-        if (isLost(d) || isWon(d)) return false;
-        const expected = d?.expected_close_date;
-        if (!expected) return false;
-        const m = moment(expected);
-        return m.isValid() ? m.isBefore(now, "day") : false;
-      }).length;
-
-      const todaysFollowUps = dealsData.filter((d: any) => {
-        const fu = d?.follow_up_date;
-        if (!fu) return false;
-        const m = moment(fu);
-        return m.isValid() ? m.isSame(now, "day") : false;
-      }).length;
-
-      const overdueFollowUps = dealsData.filter((d: any) => {
-        const fu = d?.follow_up_date;
-        if (!fu) return false;
-        const m = moment(fu);
-        return m.isValid() ? m.isBefore(now, "day") : false;
-      }).length;
-
-      const allMeetings = dealsData.flatMap((d: any) => d?.meetings || []);
-      const isScheduledMeeting = (mtg: any) => {
-        const status = (mtg?.status ?? "scheduled").toString().toLowerCase();
-        return status === "scheduled";
-      };
-      const parseMeetingMoment = (mtg: any) => {
-        const date = mtg?.meeting_date;
-        if (!date) return null;
-        const time = (mtg?.meeting_time ?? "").toString().trim();
-        const m = time
-          ? moment(`${date} ${time}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD H:mm"], true)
-          : moment(date, ["YYYY-MM-DD", moment.ISO_8601], true);
-        return m.isValid() ? m : null;
-      };
-
-      const todaysMeetings = allMeetings.filter((mtg: any) => {
-        if (!isScheduledMeeting(mtg)) return false;
-        const m = parseMeetingMoment(mtg);
-        return m ? m.isSame(now, "day") : false;
-      }).length;
-
-      const overdueMeetings = allMeetings.filter((mtg: any) => {
-        if (!isScheduledMeeting(mtg)) return false;
-        const m = parseMeetingMoment(mtg);
-        return m ? m.isBefore(now) : false;
-      }).length;
-
-      const totalAllDeals = summaryTiles?.total_deals || totalDeals || 0;
+      const m = dealsMetrics || {};
+      const todaysMeetings = m.todays_meetings ?? 0;
+      const overdueMeetings = m.overdue_meetings ?? 0;
 
       return [
         {
           title: "All Deals",
-          value: totalAllDeals,
+          value: m.total_deals ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
-          subtitle: `${wonCount} Won / ${lostCount} Lost`,
+          subtitle: `${m.won_deals ?? 0} Won / ${m.lost_deals ?? 0} Lost`,
         },
         {
           title: "High-Value Deals",
-          value: 11,
+          value: m.high_value_deals ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
@@ -2262,7 +2199,7 @@ const CrmDeals = () => {
         },
         {
           title: "At-Risk Deals",
-          value: atRiskCount,
+          value: m.at_risk_deals ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
@@ -2270,23 +2207,23 @@ const CrmDeals = () => {
         },
         {
           title: "Deals Won",
-          value: wonCount,
+          value: m.won_deals ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
           metric: {
-            text: `${wonLast7Days} in last 7 days`,
+            text: `${m.won_deals_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
         },
         {
           title: "Today's Follow-ups",
-          value: todaysFollowUps,
+          value: m.todays_follow_ups ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
           metric: {
-            text: `${todaysFollowUps} Follow-ups / ${todaysMeetings} Meeting${
+            text: `${m.todays_follow_ups ?? 0} Follow-ups / ${todaysMeetings} Meeting${
               todaysMeetings === 1 ? "" : "s"
             }`,
             dotColor: "#10B981",
@@ -2294,12 +2231,12 @@ const CrmDeals = () => {
         },
         {
           title: "Overdue",
-          value: overdueFollowUps + overdueMeetings,
+          value: m.overdue_total ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           metric: {
-            text: `${overdueFollowUps} Follow-ups / ${overdueMeetings} Meeting${
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
               overdueMeetings === 1 ? "" : "s"
             }`,
             dotColor: "#8B5CF6",
@@ -2307,7 +2244,7 @@ const CrmDeals = () => {
         },
       ];
     },
-    [dealsData, summaryTiles, totalDeals],
+    [dealsMetrics],
   );
 
   // Define columns for GenericTable

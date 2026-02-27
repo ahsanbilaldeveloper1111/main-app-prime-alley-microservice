@@ -888,8 +888,6 @@ const CrmProspectsManagement = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
   const [totalAllProspects, setTotalAllProspects] = useState(0);
-  /** Total count of converted prospects (has_tickets=true) for current filters */
-  const [totalConvertedProspects, setTotalConvertedProspects] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1573,29 +1571,6 @@ const CrmProspectsManagement = () => {
     try {
       const response = await getCrmData(buildCrmDataParams());
 
-      // Fetch converted prospects count (has_tickets=true) for current filters.
-      // If we're already on the converted tab, reuse the same response total.
-      if (memoizedFilters.has_tickets === true) {
-        setTotalConvertedProspects(response.pagination.total || 0);
-      } else {
-        try {
-          const convertedParams: any = buildCrmDataParams({ page: 1, per_page: 1 });
-          convertedParams.has_tickets = true;
-          // Ensure Scheduled tab filter doesn't affect converted count
-          delete convertedParams.has_scheduled_calls;
-          const convertedResponse = await getCrmData(convertedParams);
-
-          // Only update state if this is still the latest request
-          if (currentRequestId !== requestIdRef.current) {
-            return;
-          }
-          setTotalConvertedProspects(convertedResponse.pagination.total || 0);
-        } catch (e) {
-          // Keep previous count on error (avoid flashing to 0)
-          console.error("Failed to fetch converted prospects count:", e);
-        }
-      }
-
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
         return;
@@ -1613,14 +1588,7 @@ const CrmProspectsManagement = () => {
       }
 
       setMetrics(
-        response.metrics || {
-          assigned_records: 0,
-          unassigned_records: 0,
-          scheduled_records: 0,
-          not_scheduled_records: 0,
-          scheduled_next_hour_records: 0,
-          scheduled_next_24_hours_records: 0,
-        },
+        response.metrics || {},
       );
     } catch (error: any) {
       // Only handle error if this is still the latest request
@@ -2450,87 +2418,72 @@ const CrmProspectsManagement = () => {
 
   // Stats cards data for metrics
   const prospectsStatsCards: StatsCardData[] = useMemo(
-    () => {
-      const overdueCount = dataList.filter((p: any) => {
-        if (!p?.scheduled_call_at) return false;
-        return moment(p.scheduled_call_at).isBefore(moment());
-      }).length;
-
-      const recentlyContactedCount = dataList.filter((p: any) => {
-        if (!p?.last_called_at) return false;
-        return moment(p.last_called_at).isAfter(moment().subtract(1, "day"));
-      }).length;
-
-      const notContactedCount = dataList.filter((p: any) => !p?.last_called_at)
-        .length;
-
-      return [
-        {
-          title: "All Prospects",
-          value: totalAllProspects || totalRecords,
-          icon: Users,
-          iconColor: "#6366F1",
-          iconBgColor: "#EEF2FF",
-          subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`,
+    () => [
+      {
+        title: "All Prospects",
+        value: metrics.total_all_records ?? 0,
+        icon: Users,
+        iconColor: "#6366F1",
+        iconBgColor: "#EEF2FF",
+        subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`,
+      },
+      {
+        title: "Scheduled",
+        value: metrics.scheduled_records ?? 0,
+        icon: Calendar,
+        iconColor: "#10B981",
+        iconBgColor: "#D1FAE5",
+        metric: {
+          text: `${metrics.scheduled_next_hour_records ?? 0} in next hour`,
+          dotColor: "#F59E0B",
         },
-        {
-          title: "Scheduled",
-          value: metrics.scheduled_records,
-          icon: Calendar,
-          iconColor: "#10B981",
-          iconBgColor: "#D1FAE5",
-          metric: {
-            text: `${metrics.scheduled_next_hour_records} in next hour`,
-            dotColor: "#F59E0B",
-          },
+      },
+      {
+        title: "Overdue",
+        value: metrics.overdue_scheduled_records ?? 0,
+        icon: ClockIcon,
+        iconColor: "#F97316",
+        iconBgColor: "#FFEDD5",
+        metric: {
+          text: "Client-defined",
+          dotColor: "#F97316",
         },
-        {
-          title: "Overdue",
-          value: overdueCount,
-          icon: ClockIcon,
-          iconColor: "#F97316",
-          iconBgColor: "#FFEDD5",
-          metric: {
-            text: "Based on current list",
-            dotColor: "#F97316",
-          },
+      },
+      {
+        title: "Converted Prospects",
+        value: metrics.converted_prospects_records ?? 0,
+        icon: Target,
+        iconColor: "#8B5CF6",
+        iconBgColor: "#EDE9FE",
+        metric: {
+          text: "Has associated leads",
+          dotColor: "#8B5CF6",
         },
-        {
-          title: "Converted Prospects",
-          value: totalConvertedProspects,
-          icon: Target,
-          iconColor: "#8B5CF6",
-          iconBgColor: "#EDE9FE",
-          metric: {
-            text: "Has associated leads",
-            dotColor: "#8B5CF6",
-          },
+      },
+      {
+        title: "Recently Contacted",
+        value: metrics.recently_contacted_last_24h_records ?? 0,
+        icon: MessageCircle,
+        iconColor: "#0EA5E9",
+        iconBgColor: "#E0F2FE",
+        metric: {
+          text: "In last 24 hrs",
+          dotColor: "#0EA5E9",
         },
-        {
-          title: "Recently Contacted",
-          value: recentlyContactedCount,
-          icon: MessageCircle,
-          iconColor: "#0EA5E9",
-          iconBgColor: "#E0F2FE",
-          metric: {
-            text: "Last 24 hours (current list)",
-            dotColor: "#0EA5E9",
-          },
+      },
+      {
+        title: "Not Contacted",
+        value: metrics.not_contacted_records ?? 0,
+        icon: XCircle,
+        iconColor: "#64748B",
+        iconBgColor: "#F1F5F9",
+        metric: {
+          text: "No call attempt has occurred yet.",
+          dotColor: "#94A3B8",
         },
-        {
-          title: "Not Contacted",
-          value: notContactedCount,
-          icon: XCircle,
-          iconColor: "#64748B",
-          iconBgColor: "#F1F5F9",
-          metric: {
-            text: "No call attempt yet (current list)",
-            dotColor: "#94A3B8",
-          },
-        },
-      ];
-    },
-    [dataList, totalAllProspects, totalRecords, metrics, totalConvertedProspects],
+      },
+    ],
+    [metrics],
   );
 
   // Define columns for GenericTable - Clean declarative definitions

@@ -474,6 +474,9 @@ const CrmDeals = () => {
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [approvalMetrics, setApprovalMetrics] = useState<
+    Record<string, number> | null
+  >(null);
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -706,10 +709,12 @@ const CrmDeals = () => {
         const dealsArray: any[] = response?.dataList || [];
         const pagination: any = response?.meta || {};
         const summary: any = response?.summary_tiles || null;
+        const metricsFromApi: any = response?.metrics || null;
 
         setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
         setTotalDeals(pagination?.total || 0);
         setSummaryTiles(summary);
+        setApprovalMetrics(metricsFromApi);
 
         // Update server pagination meta
         if (pagination && pagination.total !== undefined) {
@@ -2114,103 +2119,55 @@ const CrmDeals = () => {
   // Define stats cards for GenericTable
   const dealsStatsCards: StatsCardData[] = useMemo(
     () => {
-      const now = moment();
-      const totalSubmitted = summaryTiles?.total_deals || totalDeals || 0;
-
-      const approval = (d: any) =>
-        (d?.approval_status ?? d?.approvalStatus ?? "")
-          .toString()
-          .trim()
-          .toLowerCase();
-
-      const submittedLast7Days = dealsData.filter((d: any) => {
-        const dt = d?.created_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
-      }).length;
-
-      const pendingDeals = dealsData.filter((d: any) =>
-        approval(d).includes("pending"),
-      );
-      const approvedDeals = dealsData.filter((d: any) =>
-        approval(d).includes("approved"),
-      );
-      const rejectedDeals = dealsData.filter((d: any) =>
-        approval(d).includes("rejected"),
-      );
-
-      const countCreatedLast7 = (arr: any[]) =>
-        arr.filter((d: any) => {
-          const dt = d?.created_at;
-          if (!dt) return false;
-          const m = moment(dt);
-          return m.isValid()
-            ? m.isAfter(now.clone().subtract(7, "days"))
-            : false;
-        }).length;
-
-      const pendingLast7Days = countCreatedLast7(pendingDeals);
-      const approvedLast7Days = countCreatedLast7(approvedDeals);
-      const rejectedLast7Days = countCreatedLast7(rejectedDeals);
-
-      const recentlyReviewed = dealsData.filter((d: any) => {
-        const a = approval(d);
-        if (!a.includes("approved") && !a.includes("rejected")) return false;
-        const dt = d?.updated_at || d?.approved_at || d?.rejected_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(24, "hours")) : false;
-      }).length;
-
+      const m = approvalMetrics || {};
       return [
         {
           title: "All deals submitted",
-          value: totalSubmitted,
+          value: m.total_submitted ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
           metric: {
-            text: `${submittedLast7Days} in last 7 days`,
+            text: `${m.total_submitted_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
         },
         {
           title: "Pending Approval",
-          value: pendingDeals.length,
+          value: m.pending_approval ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
           metric: {
-            text: `${pendingLast7Days} in last 7 days`,
+            text: `${m.pending_approval_last_7_days ?? 0} in last 7 days`,
             dotColor: "#10B981",
           },
         },
         {
           title: "Approved Deals",
-          value: approvedDeals.length,
+          value: m.approved_deals ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           metric: {
-            text: `${approvedLast7Days} in last 7 days`,
+            text: `${m.approved_deals_last_7_days ?? 0} in last 7 days`,
             dotColor: "#8B5CF6",
           },
         },
         {
           title: "Rejected Deals",
-          value: rejectedDeals.length,
+          value: m.rejected_deals ?? 0,
           icon: XCircle,
           iconColor: "#64748B",
           iconBgColor: "#F1F5F9",
           metric: {
-            text: `${rejectedLast7Days} in last 7 days`,
+            text: `${m.rejected_deals_last_7_days ?? 0} in last 7 days`,
             dotColor: "#94A3B8",
           },
         },
         {
           title: "High-Value (Pending)",
-          value: 5,
+          value: m.high_value_pending ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
@@ -2218,7 +2175,7 @@ const CrmDeals = () => {
         },
         {
           title: "Recently Reviewed",
-          value: recentlyReviewed,
+          value: m.recently_reviewed_last_24h ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
@@ -2226,7 +2183,7 @@ const CrmDeals = () => {
         },
       ];
     },
-    [dealsData, summaryTiles, totalDeals],
+    [approvalMetrics],
   );
 
   // Define columns for GenericTable

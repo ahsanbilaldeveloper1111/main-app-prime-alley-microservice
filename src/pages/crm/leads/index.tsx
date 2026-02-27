@@ -596,6 +596,9 @@ const CrmLeads = () => {
   const [loading, setLoading] = useState(false);
   const [totalLeads, setTotalLeads] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [leadMetrics, setLeadMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   // UI State
   const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
@@ -900,6 +903,7 @@ const CrmLeads = () => {
         const leadsArray: any[] = responseData?.data || [];
         const pagination: any = responseData?.pagination || {};
         const summary: any = responseData?.summary_tiles || null;
+        const metricsFromApi: any = responseData?.metrics || null;
 
         // Set leads data, total, and summary tiles
         setLeadsData(Array.isArray(leadsArray) ? leadsArray : []);
@@ -909,6 +913,7 @@ const CrmLeads = () => {
             0,
         );
         setSummaryTiles(summary);
+        setLeadMetrics(metricsFromApi);
 
         // Transform to GenericListPage expected format
         const transformedData = {
@@ -2640,144 +2645,59 @@ const CrmLeads = () => {
   // Stats cards data for metrics
   const leadsStatsCards: StatsCardData[] = useMemo(
     () => {
-      const now = moment();
-
-      const createdLast7Days = leadsData.filter((l: any) =>
-        l?.created_at ? moment(l.created_at).isAfter(now.clone().subtract(7, "days")) : false,
-      ).length;
-
-      const transformed = leadsData.map(transformLeadData);
-      const allFollowUps = transformed.flatMap((l) => l.followUps || []);
-      const allMeetings = transformed.flatMap((l) => l.meetings || []);
-
-      const isNotCompletedFollowUp = (fu: any) => {
-        const status = (fu?.follow_up_status ?? "").toString().toLowerCase();
-        return status !== "completed";
-      };
-
-      const parseFollowUpMoment = (fu: any) => {
-        if (!fu?.follow_up_date) return null;
-        const m = moment(fu.follow_up_date);
-        return m.isValid() ? m : null;
-      };
-
-      const parseMeetingMoment = (mtg: any) => {
-        const date = mtg?.meeting_date;
-        if (!date) return null;
-        const time = (mtg?.meeting_time ?? "").toString().trim();
-        const m = time
-          ? moment(`${date} ${time}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD H:mm"], true)
-          : moment(date, ["YYYY-MM-DD", moment.ISO_8601], true);
-        return m.isValid() ? m : null;
-      };
-
-      const isScheduledMeeting = (mtg: any) => {
-        const status = (mtg?.status ?? "scheduled").toString().toLowerCase();
-        return status === "scheduled";
-      };
-
-      const todaysFollowUps = allFollowUps.filter((fu) => {
-        if (!isNotCompletedFollowUp(fu)) return false;
-        const m = parseFollowUpMoment(fu);
-        return m ? m.isSame(now, "day") : false;
-      }).length;
-
-      const followUpsNextHour = allFollowUps.filter((fu) => {
-        if (!isNotCompletedFollowUp(fu)) return false;
-        const m = parseFollowUpMoment(fu);
-        return m ? m.isBetween(now, now.clone().add(1, "hour"), undefined, "[)") : false;
-      }).length;
-
-      const overdueFollowUps = allFollowUps.filter((fu) => {
-        if (!isNotCompletedFollowUp(fu)) return false;
-        const m = parseFollowUpMoment(fu);
-        return m ? m.isBefore(now) : false;
-      }).length;
-
-      const todaysMeetings = allMeetings.filter((mtg) => {
-        if (!isScheduledMeeting(mtg)) return false;
-        const m = parseMeetingMoment(mtg);
-        return m ? m.isSame(now, "day") : false;
-      }).length;
-
-      const meetingsNextHour = allMeetings.filter((mtg) => {
-        if (!isScheduledMeeting(mtg)) return false;
-        const m = parseMeetingMoment(mtg);
-        return m ? m.isBetween(now, now.clone().add(1, "hour"), undefined, "[)") : false;
-      }).length;
-
-      const overdueMeetings = allMeetings.filter((mtg) => {
-        if (!isScheduledMeeting(mtg)) return false;
-        const m = parseMeetingMoment(mtg);
-        return m ? m.isBefore(now) : false;
-      }).length;
-
-      const highPriority =
-        summaryTiles?.hot_leads ??
-        transformed.filter((l) => (l.leadPotential ?? "").toString() === "Hot").length;
-
-      const converted =
-        summaryTiles?.converted_leads ??
-        summaryTiles?.converted ??
-        summaryTiles?.converted_to_deals ??
-        0;
-
-      const convertedLast7Days =
-        summaryTiles?.converted_last_7_days ??
-        summaryTiles?.converted_leads_last_7_days ??
-        summaryTiles?.converted_in_last_7_days ??
-        0;
-
+      const m = leadMetrics || {};
+      const todaysMeetings = m.todays_meetings ?? 0;
+      const overdueMeetings = m.overdue_meetings ?? 0;
       return [
         {
           title: "All Leads",
-          value: summaryTiles?.total_leads || totalLeads || 0,
+          value: m.total_leads ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
           metric: {
-            text: `${createdLast7Days} in last 7 days`,
+            text: `${m.total_leads_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
         },
         {
           title: "Today's Follow-ups",
-          value: summaryTiles?.todays_follow_ups ?? todaysFollowUps,
+          value: m.todays_follow_ups ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
           metric: {
-            text: `${summaryTiles?.follow_ups_next_hour ?? followUpsNextHour} in next hour`,
+            text: `${m.follow_ups_next_hour ?? 0} in next hour`,
             dotColor: "#F59E0B",
           },
         },
         {
           title: "Today's Meetings",
-          value: summaryTiles?.todays_meetings ?? todaysMeetings,
+          value: todaysMeetings,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           metric: {
-            text: `${summaryTiles?.meetings_next_hour ?? meetingsNextHour} in next hour`,
+            text: `${m.meetings_next_hour ?? 0} in next hour`,
             dotColor: "#F59E0B",
           },
         },
         {
           title: "Overdue",
-          value: summaryTiles?.overdue_total ?? overdueFollowUps + overdueMeetings,
+          value: m.overdue_total ?? 0,
           icon: Clock,
           iconColor: "#F97316",
           iconBgColor: "#FFEDD5",
           metric: {
-            text: `${summaryTiles?.overdue_follow_ups ?? overdueFollowUps} Follow-ups / ${
-              summaryTiles?.overdue_meetings ?? overdueMeetings
-            } Meeting${(summaryTiles?.overdue_meetings ?? overdueMeetings) === 1 ? "" : "s"}`,
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
+              overdueMeetings === 1 ? "" : "s"
+            }`,
             dotColor: "#F97316",
           },
         },
         {
           title: "High-Priority Leads",
-          value: highPriority,
+          value: m.high_priority_leads ?? 0,
           icon: TrendingUp,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
@@ -2785,18 +2705,18 @@ const CrmLeads = () => {
         },
         {
           title: "Converted Leads",
-          value: converted,
+          value: m.converted_leads ?? 0,
           icon: CheckCircle,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           metric: {
-            text: `${convertedLast7Days} in last 7 days`,
+            text: `${m.converted_leads_last_7_days ?? 0} in last 7 days`,
             dotColor: "#8B5CF6",
           },
         },
       ];
     },
-    [leadsData, summaryTiles, totalLeads],
+    [leadMetrics],
   );
 
   // Custom select styles

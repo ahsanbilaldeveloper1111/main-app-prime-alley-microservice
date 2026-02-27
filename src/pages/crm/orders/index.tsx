@@ -478,6 +478,9 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [ordersMetrics, setOrdersMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -655,10 +658,12 @@ const CrmOrders = () => {
         const ordersArray: any[] = response?.dataList || [];
         const pagination: any = response?.meta || {};
         const summary: any = response?.summary_tiles || null;
+        const metricsFromApi: any = response?.metrics || null;
 
         setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
         setTotalOrders(pagination?.total || 0);
         setSummaryTiles(summary);
+        setOrdersMetrics(metricsFromApi);
 
         return response;
       } finally {
@@ -1638,79 +1643,22 @@ const CrmOrders = () => {
   // Define stats cards for GenericTable
   const ordersStatsCards: StatsCardData[] = useMemo(
     () => {
-      const now = moment();
-
-      const createdLast7Days = ordersData.filter((o: any) => {
-        const dt = o?.created_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
-      }).length;
-
-      const transformed = ordersData.map(transformOrderData);
-
-      const isCompleted = (o: any) =>
-        (o.fulfillmentStatus ?? "")
-          .toString()
-          .toLowerCase()
-          .match(/completed|delivered/) != null;
-
-      const isInProgress = (o: any) =>
-        (o.fulfillmentStatus ?? "")
-          .toString()
-          .toLowerCase()
-          .match(/progress|in_progress|in progress|active/) != null;
-
-      const isUnderReview = (o: any) =>
-        (o.approvalStatus ?? "")
-          .toString()
-          .toLowerCase()
-          .match(/pending|review/) != null;
-
-      const isCancelled = (o: any) => {
-        const f = (o.fulfillmentStatus ?? "").toString().toLowerCase();
-        const s = (o.status ?? "").toString().toLowerCase();
-        return f.includes("cancel") || s.includes("cancel");
-      };
-
-      const completedCount = transformed.filter(isCompleted).length;
-      const activeCount = transformed.filter(isInProgress).length;
-      const underReviewCount = transformed.filter(isUnderReview).length;
-      const cancelledCount = transformed.filter(isCancelled).length;
-
-      const completedLast7Days = ordersData.filter((raw: any) => {
-        const tr = transformOrderData(raw);
-        if (!isCompleted(tr)) return false;
-        const dt = raw?.actual_delivery_date || raw?.updated_at || raw?.created_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
-      }).length;
-
-      const cancelledLast7Days = ordersData.filter((raw: any) => {
-        const tr = transformOrderData(raw);
-        if (!isCancelled(tr)) return false;
-        const dt = raw?.updated_at || raw?.created_at;
-        if (!dt) return false;
-        const m = moment(dt);
-        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
-      }).length;
-
+      const m = ordersMetrics || {};
       return [
         {
           title: "All Orders",
-          value: summaryTiles?.total_orders || totalOrders || 0,
+          value: m.total_orders ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
           metric: {
-            text: `${createdLast7Days} in last 7 days`,
+            text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#6366F1",
           },
         },
         {
           title: "High-Value Orders",
-          value: 11,
+          value: m.high_value_orders ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
@@ -1718,7 +1666,7 @@ const CrmOrders = () => {
         },
         {
           title: "Active Orders",
-          value: activeCount,
+          value: m.active_orders ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
@@ -1726,7 +1674,7 @@ const CrmOrders = () => {
         },
         {
           title: "Orders under Review",
-          value: underReviewCount,
+          value: m.orders_under_review ?? 0,
           icon: Users,
           iconColor: "#6366F1",
           iconBgColor: "#EEF2FF",
@@ -1734,29 +1682,29 @@ const CrmOrders = () => {
         },
         {
           title: "Completed Orders",
-          value: completedCount,
+          value: m.completed_orders ?? 0,
           icon: Calendar,
           iconColor: "#10B981",
           iconBgColor: "#D1FAE5",
           metric: {
-            text: `${completedLast7Days} in last 7 days`,
+            text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#10B981",
           },
         },
         {
           title: "Canceled Orders",
-          value: cancelledCount,
+          value: m.canceled_orders ?? 0,
           icon: Target,
           iconColor: "#8B5CF6",
           iconBgColor: "#EDE9FE",
           metric: {
-            text: `${cancelledLast7Days} in last 7 days`,
+            text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
             dotColor: "#8B5CF6",
           },
         },
       ];
     },
-    [ordersData, summaryTiles, totalOrders],
+    [ordersMetrics],
   );
 
   // Custom select styles
