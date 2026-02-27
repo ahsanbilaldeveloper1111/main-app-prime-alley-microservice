@@ -1061,6 +1061,27 @@ const CrmLeads = () => {
     }
   }, [showExportModal, currentFilters]);
 
+  // Sync leadsFilters from currentFilters when filter sidebar opens (show selected state)
+  useEffect(() => {
+    if (showFiltersSidebar) {
+      setLeadsFilters((prev) => ({
+        ...prev,
+        assignedTo: currentFilters.assigned_to ?? null,
+        stage: currentFilters.stage_id ?? null,
+        businessType: currentFilters.business_type_id ?? null,
+        source: currentFilters.source ?? null,
+        leadPotential: currentFilters.lead_potential ?? null,
+        campaign: currentFilters.campaign_id ?? null,
+        lostReason: currentFilters.lost_reason_id ?? null,
+        leadScoreMin: currentFilters.lead_score_min ?? null,
+        leadScoreMax: currentFilters.lead_score_max ?? null,
+        dateFrom: currentFilters.date_from ?? null,
+        dateTo: currentFilters.date_to ?? null,
+      }));
+      setLeadsSearch(currentFilters.search ?? "");
+    }
+  }, [showFiltersSidebar]);
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
@@ -3843,20 +3864,40 @@ const CrmLeads = () => {
                   onExportClick: () => setShowExportModal(true),
                   showSaveButton: true,
 
-                  // Filter Pills
+                  // Filter Pills (active/activeLabel from currentFilters so applied filters are visible)
                   filterPills: [
                     {
                       id: "contact_owner",
-                      label: "Associate with",
+                      label: "Owner",
                       showDropdown: true,
+                      searchable: true,
+                      active: !!currentFilters.assigned_to,
+                      activeLabel: (() => {
+                        const extId = currentFilters.assigned_to;
+                        if (!extId) return undefined;
+                        const ext = extensions.find(
+                          (e: any) => (e.id || e.extension) === extId,
+                        );
+                        return ext
+                          ? ext.display_name || ext.name || ext.extension
+                          : String(extId);
+                      })(),
+                      onClear: () => {
+                        handleFiltersChange({
+                          ...currentFilters,
+                          assigned_to: undefined,
+                        });
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Owners",
                           value: "all",
                           onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.assigned_to;
-                            handleFiltersChange(newFilters);
+                            handleFiltersChange({
+                              ...currentFilters,
+                              assigned_to: undefined,
+                            });
                             setRefreshKey((prev) => prev + 1);
                           },
                         },
@@ -3877,15 +3918,49 @@ const CrmLeads = () => {
                       id: "create_date",
                       label: "Create date",
                       showDropdown: true,
+                      active: !!(
+                        currentFilters.date_from || currentFilters.date_to
+                      ),
+                      activeLabel: (() => {
+                        if (
+                          !currentFilters.date_from &&
+                          !currentFilters.date_to
+                        )
+                          return undefined;
+                        const from = currentFilters.date_from;
+                        const to = currentFilters.date_to;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (from === today && to === today) return "Today";
+                        const weekStart = moment()
+                          .subtract(7, "days")
+                          .format("YYYY-MM-DD");
+                        if (from === weekStart && to === today)
+                          return "Last 7 Days";
+                        const monthStart = moment()
+                          .subtract(30, "days")
+                          .format("YYYY-MM-DD");
+                        if (from === monthStart && to === today)
+                          return "Last 30 Days";
+                        return "Custom";
+                      })(),
+                      onClear: () => {
+                        handleFiltersChange({
+                          ...currentFilters,
+                          date_from: undefined,
+                          date_to: undefined,
+                        });
+                        setRefreshKey((prev) => prev + 1);
+                      },
                       dropdownOptions: [
                         {
                           label: "All Time",
                           value: "all",
                           onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.date_from;
-                            delete newFilters.date_to;
-                            handleFiltersChange(newFilters);
+                            handleFiltersChange({
+                              ...currentFilters,
+                              date_from: undefined,
+                              date_to: undefined,
+                            });
                             setRefreshKey((prev) => prev + 1);
                           },
                         },
@@ -3945,9 +4020,10 @@ const CrmLeads = () => {
                           label: "All Stages",
                           value: "all",
                           onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.stage_id;
-                            handleFiltersChange(newFilters);
+                            handleFiltersChange({
+                              ...currentFilters,
+                              stage_id: undefined,
+                            });
                             setRefreshKey((prev) => prev + 1);
                           },
                         },
@@ -3973,9 +4049,10 @@ const CrmLeads = () => {
                           label: "All Potential",
                           value: "all",
                           onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.lead_potential;
-                            handleFiltersChange(newFilters);
+                            handleFiltersChange({
+                              ...currentFilters,
+                              lead_potential: undefined,
+                            });
                             setRefreshKey((prev) => prev + 1);
                           },
                         },
@@ -9684,7 +9761,7 @@ const CrmLeads = () => {
         filters={[
           {
             id: "assignedTo",
-            label: "Assigned To",
+            label: "Owner",
             type: "select",
             value: leadsFilters.assignedTo
               ? (() => {
@@ -9712,7 +9789,7 @@ const CrmLeads = () => {
               value: ext.id || ext.extension,
               label: ext.display_name || ext.name || ext.id || ext.extension,
             })),
-            placeholder: "Select user...",
+            placeholder: "Search and select owner...",
             isClearable: true,
           },
           {
@@ -9937,23 +10014,24 @@ const CrmLeads = () => {
           },
         ]}
         onApply={() => {
-          const filtersToApply: Record<string, any> = {};
-
-          filtersToApply.search = leadsSearch;
-          filtersToApply.assigned_to = leadsFilters.assignedTo;
-          filtersToApply.stage_id = leadsFilters.stage;
-          filtersToApply.business_type_id = leadsFilters.businessType;
-          filtersToApply.source = leadsFilters.source;
-          filtersToApply.lead_potential = leadsFilters.leadPotential;
-          filtersToApply.campaign_id = leadsFilters.campaign;
-          filtersToApply.lost_reason_id = leadsFilters.lostReason;
-          filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
-          filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
-          filtersToApply.date_from = leadsFilters.dateFrom;
-          filtersToApply.date_to = leadsFilters.dateTo;
+          // Pass all filter keys so handleFiltersChange can both set and clear (like prospects Apply)
+          const filtersToApply: Record<string, any> = {
+            search: leadsSearch?.trim() || "",
+            assigned_to: leadsFilters.assignedTo ?? undefined,
+            stage_id: leadsFilters.stage ?? undefined,
+            business_type_id: leadsFilters.businessType ?? undefined,
+            source: leadsFilters.source ?? undefined,
+            lead_potential: leadsFilters.leadPotential ?? undefined,
+            campaign_id: leadsFilters.campaign ?? undefined,
+            lost_reason_id: leadsFilters.lostReason ?? undefined,
+            lead_score_min: leadsFilters.leadScoreMin ?? undefined,
+            lead_score_max: leadsFilters.leadScoreMax ?? undefined,
+            date_from: leadsFilters.dateFrom ?? undefined,
+            date_to: leadsFilters.dateTo ?? undefined,
+          };
 
           handleFiltersChange(filtersToApply);
-          setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
         }}
@@ -9972,9 +10050,23 @@ const CrmLeads = () => {
             dateFrom: null,
             dateTo: null,
           });
-          handleFiltersChange({});
-          setCurrentFilters({});
+          // Pass all filter keys as undefined so handleFiltersChange removes each one
+          handleFiltersChange({
+            search: undefined,
+            assigned_to: undefined,
+            stage_id: undefined,
+            business_type_id: undefined,
+            source: undefined,
+            lead_potential: undefined,
+            campaign_id: undefined,
+            lost_reason_id: undefined,
+            lead_score_min: undefined,
+            lead_score_max: undefined,
+            date_from: undefined,
+            date_to: undefined,
+          });
           setActiveFilter("all");
+          setRefreshKey((prev) => prev + 1);
         }}
       />
 

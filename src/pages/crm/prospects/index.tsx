@@ -65,6 +65,7 @@ import {
   X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
+  Plus,
   ArrowUp,
   ArrowDown,
   Download,
@@ -665,6 +666,11 @@ const CrmProspectsManagement = () => {
     tags: [] as Array<{ value: string; label: string; id?: number }>,
     note: "",
     source: "",
+    custom_fields: [] as Array<{
+      id: string;
+      field_name: string;
+      field_value: string;
+    }>,
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -782,6 +788,17 @@ const CrmProspectsManagement = () => {
             // keep phoneNumber as-is, phoneCountryCode ""
           }
         }
+        const rawCustomFields =
+          d.custom_fields ?? (item as any)?.custom_fields ?? [];
+        const customFieldsArray = Array.isArray(rawCustomFields)
+          ? rawCustomFields
+              .map((f: any) => ({
+                id: String(f?.id ?? `${Date.now()}-${Math.random()}`),
+                field_name: String(f?.field_name ?? f?.title ?? "").trim(),
+                field_value: String(f?.field_value ?? f?.value ?? "").trim(),
+              }))
+              .filter((f) => f.field_name || f.field_value)
+          : [];
         setContactForm({
           firstName,
           lastName,
@@ -800,6 +817,7 @@ const CrmProspectsManagement = () => {
           tags: tagsArray,
           note: item.note ?? d.note ?? "",
           source: d.source ?? (item as any).source ?? "",
+          custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
       })
@@ -3278,6 +3296,7 @@ const CrmProspectsManagement = () => {
                 tags: [],
                 note: "",
                 source: "",
+                custom_fields: [],
               });
               setShowCreateContactSidebar(true);
             }}
@@ -3354,6 +3373,12 @@ const CrmProspectsManagement = () => {
         contactForm.phone_country_code && contactForm.phoneNumber?.trim()
           ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
           : contactForm.phoneNumber?.trim() ?? "";
+      const customFieldsForPayload = (contactForm.custom_fields ?? [])
+        .map((f) => ({
+          field_name: String(f.field_name ?? "").trim(),
+          field_value: String(f.field_value ?? "").trim(),
+        }))
+        .filter((f) => f.field_name || f.field_value);
       setCreateContactLoading(true);
       try {
         await createCrmData({
@@ -3378,6 +3403,9 @@ const CrmProspectsManagement = () => {
             legal_basis: contactForm.legal_basis?.length
               ? contactForm.legal_basis
               : undefined,
+            custom_fields: customFieldsForPayload.length
+              ? customFieldsForPayload
+              : undefined,
           },
         });
         fetchCrmData();
@@ -3397,6 +3425,7 @@ const CrmProspectsManagement = () => {
           tags: [],
           note: "",
           source: "",
+          custom_fields: [],
         });
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -3432,6 +3461,12 @@ const CrmProspectsManagement = () => {
       contactForm.phone_country_code && contactForm.phoneNumber?.trim()
         ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
         : contactForm.phoneNumber?.trim() ?? "";
+    const customFieldsForPayload = (contactForm.custom_fields ?? [])
+      .map((f) => ({
+        field_name: String(f.field_name ?? "").trim(),
+        field_value: String(f.field_value ?? "").trim(),
+      }))
+      .filter((f) => f.field_name || f.field_value);
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
@@ -3452,6 +3487,9 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
           legal_basis: contactForm.legal_basis?.length
             ? contactForm.legal_basis
+            : undefined,
+          custom_fields: customFieldsForPayload.length
+            ? customFieldsForPayload
             : undefined,
         },
       });
@@ -4337,6 +4375,162 @@ const CrmProspectsManagement = () => {
                         }
                       />
                     </div>
+
+                    {/* Custom fields (user-defined) */}
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: contactForm.custom_fields?.length ? "12px" : "0px" }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setContactForm((prev) => ({
+                            ...prev,
+                            custom_fields: [
+                              ...(prev.custom_fields ?? []),
+                              {
+                                id: `${Date.now()}-${Math.random()}`,
+                                field_name: "",
+                                field_value: "",
+                              },
+                            ],
+                          }))
+                        }
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "8px 10px",
+                          backgroundColor: "transparent",
+                          border: "1px dashed #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          color: "#141414",
+                          cursor: "pointer",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f7fafc";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Plus size={16} />
+                        Add custom field
+                      </button>
+                    </div>
+
+                    {!!contactForm.custom_fields?.length && (
+                      <div style={{ marginTop: "12px" }}>
+                        {contactForm.custom_fields.map((f, idx) => (
+                          <div
+                            key={f.id}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr auto",
+                              gap: "10px",
+                              alignItems: "center",
+                              marginBottom: "10px",
+                            }}
+                          >
+                            <input
+                              type="text"
+                              value={f.field_name}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).map(
+                                    (cf, i) =>
+                                      i === idx ? { ...cf, field_name: v } : cf,
+                                  ),
+                                }));
+                              }}
+                              placeholder="Title"
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                outline: "none",
+                              }}
+                              onFocus={(e) =>
+                                (e.currentTarget.style.borderColor = "#0091ae")
+                              }
+                              onBlur={(e) =>
+                                (e.currentTarget.style.borderColor = "#8a8a8a")
+                              }
+                            />
+                            <input
+                              type="text"
+                              value={f.field_value}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).map(
+                                    (cf, i) =>
+                                      i === idx ? { ...cf, field_value: v } : cf,
+                                  ),
+                                }));
+                              }}
+                              placeholder="Value"
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                border: "1px solid #8a8a8a",
+                                borderRadius: "4px",
+                                fontSize: "14px",
+                                outline: "none",
+                              }}
+                              onFocus={(e) =>
+                                (e.currentTarget.style.borderColor = "#0091ae")
+                              }
+                              onBlur={(e) =>
+                                (e.currentTarget.style.borderColor = "#8a8a8a")
+                              }
+                            />
+                            <button
+                              type="button"
+                              aria-label={`Remove custom field ${idx + 1}`}
+                              onClick={() =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  custom_fields: (prev.custom_fields ?? []).filter(
+                                    (cf) => cf.id !== f.id,
+                                  ),
+                                }))
+                              }
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: 36,
+                                height: 36,
+                                borderRadius: "6px",
+                                border: "1px solid #8a8a8a",
+                                backgroundColor: "transparent",
+                                cursor: "pointer",
+                                color: "#718096",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = "#fef2f2";
+                                e.currentTarget.style.borderColor = "#ef4444";
+                                e.currentTarget.style.color = "#ef4444";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = "transparent";
+                                e.currentTarget.style.borderColor = "#8a8a8a";
+                                e.currentTarget.style.color = "#718096";
+                              }}
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
