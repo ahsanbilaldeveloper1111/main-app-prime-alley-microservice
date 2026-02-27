@@ -1251,7 +1251,7 @@ const GlobalFloatingCallBar: React.FC = () => {
         callId: activeCall.callId,
         transferAddress: activeCall.calledAddress || activeCall.number,
         targetAddress: transferTarget,
-        mode: "BLIND",
+        mode: "CONSULT",
         transferInitiatorAddress: controllerDevice.controllerAddress,
         transferInitiatorDeviceType: controllerDevice.controllerDeviceType,
         transferInitiatorDeviceName: controllerDevice.controllerDeviceName,
