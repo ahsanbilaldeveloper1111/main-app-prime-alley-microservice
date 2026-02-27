@@ -553,6 +553,7 @@ const CrmProspectsManagement = () => {
     null,
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteModalMode, setDeleteModalMode] = useState<"single" | "bulk" | null>(null);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
@@ -605,7 +606,6 @@ const CrmProspectsManagement = () => {
     {},
   );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // After Call modal states
   const [afterCallData, setAfterCallData] = useState({
@@ -828,12 +828,15 @@ const CrmProspectsManagement = () => {
   const [prospectsFilters, setProspectsFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
-    nextCallScheduled: null as string | null,
     nextCallDateFrom: null as string | null,
     nextCallDateTo: null as string | null,
     sourceFile: null as string | null,
     tags: null as string[] | null,
   });
+  /** View mode: table or board; dropdown shows only the other option to switch */
+  const [prospectsViewMode, setProspectsViewMode] = useState<
+    "table" | "board"
+  >("table");
 
   // Column customization and pagination states
   const defaultSelectedColumns = [
@@ -1103,13 +1106,11 @@ const CrmProspectsManagement = () => {
         memoizedFilters.is_viewed !== ""
       )
         params.is_viewed = memoizedFilters.is_viewed;
-      if (memoizedFilters.start_date)
-        params.date_from = memoizedFilters.start_date;
-      if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
+      // Create date filter: backend expects date_from / date_to
       if (memoizedFilters.created_at_from)
-        params.created_at_from = memoizedFilters.created_at_from;
+        params.date_from = memoizedFilters.created_at_from;
       if (memoizedFilters.created_at_to)
-        params.created_at_to = memoizedFilters.created_at_to;
+        params.date_to = memoizedFilters.created_at_to;
       if (memoizedFilters.last_called_at_from)
         params.last_called_at_from = memoizedFilters.last_called_at_from;
       if (memoizedFilters.last_called_at_to)
@@ -1128,11 +1129,6 @@ const CrmProspectsManagement = () => {
         params.source_file = memoizedFilters.source_file;
       if (memoizedFilters.tag_ids?.length)
         params.tag_ids = memoizedFilters.tag_ids;
-      // Create date filter (from filter pill)
-      if (memoizedFilters.created_at_from)
-        params.created_at_from = memoizedFilters.created_at_from;
-      if (memoizedFilters.created_at_to)
-        params.created_at_to = memoizedFilters.created_at_to;
       // Last activity / last called filter (from filter pill)
       if (memoizedFilters.last_called_at_from)
         params.last_called_at_from = memoizedFilters.last_called_at_from;
@@ -1180,11 +1176,9 @@ const CrmProspectsManagement = () => {
           : [filters.user_extension];
       if (filters.is_viewed !== undefined && filters.is_viewed !== "")
         params.is_viewed = filters.is_viewed;
-      if (filters.start_date) params.date_from = filters.start_date;
-      if (filters.end_date) params.date_to = filters.end_date;
-      if (filters.created_at_from)
-        params.created_at_from = filters.created_at_from;
-      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
+      // Create date filter: backend expects date_from / date_to
+      if (filters.created_at_from) params.date_from = filters.created_at_from;
+      if (filters.created_at_to) params.date_to = filters.created_at_to;
       if (filters.last_called_at_from)
         params.last_called_at_from = filters.last_called_at_from;
       if (filters.last_called_at_to)
@@ -1862,13 +1856,14 @@ const CrmProspectsManagement = () => {
     setShowDeleteModal(true);
   }, []);
 
-  // Confirm delete
+  // Confirm single delete
   const confirmDelete = useCallback(async () => {
     if (!itemToDelete) return;
 
     try {
       await deleteCrmData(itemToDelete.id);
       setShowDeleteModal(false);
+      setDeleteModalMode(null);
       setItemToDelete(null);
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
@@ -2319,7 +2314,8 @@ const CrmProspectsManagement = () => {
 
     try {
       await bulkDeleteCrmData(selectedItems);
-      setShowBulkDeleteModal(false);
+      setShowDeleteModal(false);
+      setDeleteModalMode(null);
       setRefreshKey((prev) => prev + 1);
       setSelectedItems([]);
       setClearSelectedRows(!clearSelectedRows);
@@ -2742,6 +2738,21 @@ const CrmProspectsManagement = () => {
             },
           ]
         : []),
+      ...(session?.user?.permissions?.includes("delete-crm-data-management")
+        ? [
+            {
+              label: "Delete",
+              icon: <Trash2 size={16} />,
+              onClick: (row: any) => {
+                setDeleteModalMode("single");
+                setItemToDelete(row);
+                setShowDeleteModal(true);
+              },
+              variant: "link" as const,
+              className: "text-danger",
+            },
+          ]
+        : []),
     ],
     [
       session,
@@ -3110,42 +3121,77 @@ const CrmProspectsManagement = () => {
     ],
   );
 
-  // Render Add Contacts Button with Dropdown
+  // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
   const renderAddContactsButton = () => (
     <div
       style={{
         position: "absolute",
         right: "19px",
         top: "18px",
-        width: "146px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
       }}
       ref={addContactsRef}
     >
-      <button
-        onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
-        style={{
-          padding: "9px 13px",
-          backgroundColor: "#000000",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "12px",
-          fontWeight: "500",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#1a1a1a";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#000000";
-        }}
-      >
-        Add prospects
-        <ChevronDown size={16} />
-      </button>
+      {session?.user?.permissions?.includes("delete-crm-data-management") &&
+        selectedItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteModalMode("bulk");
+              setShowDeleteModal(true);
+            }}
+            style={{
+              padding: "9px 13px",
+              backgroundColor: "#dc3545",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "12px",
+              fontWeight: "500",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#c82333";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#dc3545";
+            }}
+          >
+            <Trash2 size={16} />
+            Delete ({selectedItems.length})
+          </button>
+        )}
+      <div style={{ width: "146px" }}>
+        <button
+          onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#000000",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          Add prospects
+          <ChevronDown size={16} />
+        </button>
 
       {showAddContactsDropdown && (
         <div
@@ -3230,6 +3276,7 @@ const CrmProspectsManagement = () => {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 
@@ -4706,7 +4753,6 @@ const CrmProspectsManagement = () => {
                   //   prospectsFilters.campaigns.length > 0
                   //     ? 1
                   //     : 0) +
-                  //   (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
                   //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
                   //   (prospectsFilters.tags !== null &&
                   //   prospectsFilters.tags.length > 0
@@ -4836,66 +4882,36 @@ const CrmProspectsManagement = () => {
                       </Col>
                       <Col md={4}>
                         <Form.Label className="small fw-bold mb-2">
-                          Next Call Scheduled
+                          Next Call Date (From)
                         </Form.Label>
-                        <Form.Select
-                          value={prospectsFilters.nextCallScheduled || ""}
+                        <Form.Control
+                          type="date"
+                          value={prospectsFilters.nextCallDateFrom || ""}
                           onChange={(e) => {
-                            const value = e.target.value || null;
+                            const dateValue = e.target.value || null;
                             setProspectsFilters((prev) => ({
                               ...prev,
-                              nextCallScheduled: value,
-                              nextCallDateFrom: null,
-                              nextCallDateTo: null,
+                              nextCallDateFrom: dateValue,
                             }));
-                            setActiveFilter("all");
                           }}
-                        >
-                          <option value="">Select option...</option>
-                          <option value="today">Today</option>
-                          <option value="tomorrow">Tomorrow</option>
-                          <option value="this_week">This Week</option>
-                          <option value="next_week">Next Week</option>
-                          <option value="overdue">Overdue Calls</option>
-                          <option value="custom">Custom Date Range</option>
-                        </Form.Select>
+                        />
                       </Col>
-                      {prospectsFilters.nextCallScheduled === "custom" && (
-                        <>
-                          <Col md={4}>
-                            <Form.Label className="small fw-bold mb-2">
-                              Next Call Date From
-                            </Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={prospectsFilters.nextCallDateFrom || ""}
-                              onChange={(e) => {
-                                const dateValue = e.target.value || null;
-                                setProspectsFilters((prev) => ({
-                                  ...prev,
-                                  nextCallDateFrom: dateValue,
-                                }));
-                              }}
-                            />
-                          </Col>
-                          <Col md={4}>
-                            <Form.Label className="small fw-bold mb-2">
-                              Next Call Date To
-                            </Form.Label>
-                            <Form.Control
-                              type="date"
-                              value={prospectsFilters.nextCallDateTo || ""}
-                              onChange={(e) => {
-                                const dateValue = e.target.value || null;
-                                setProspectsFilters((prev) => ({
-                                  ...prev,
-                                  nextCallDateTo: dateValue,
-                                }));
-                              }}
-                            />
-                          </Col>
-                        </>
-                      )}
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Next Call Date (To)
+                        </Form.Label>
+                        <Form.Control
+                          type="date"
+                          value={prospectsFilters.nextCallDateTo || ""}
+                          onChange={(e) => {
+                            const dateValue = e.target.value || null;
+                            setProspectsFilters((prev) => ({
+                              ...prev,
+                              nextCallDateTo: dateValue,
+                            }));
+                          }}
+                        />
+                      </Col>
                       <Col md={4}>
                         <Form.Label className="small fw-bold mb-2">
                           Source Name
@@ -4999,67 +5015,14 @@ const CrmProspectsManagement = () => {
                                 filtersToApply.tags = prospectsFilters.tags;
                               }
 
-                              // Handle next call scheduled filters
-                              const now = moment();
-                              if (
-                                prospectsFilters.nextCallScheduled === "today"
-                              ) {
-                                const today = now.format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from = today;
-                                filtersToApply.scheduled_call_to = today;
-                              } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "tomorrow"
-                              ) {
-                                const tomorrow = moment()
-                                  .add(1, "day")
-                                  .format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from = tomorrow;
-                                filtersToApply.scheduled_call_to = tomorrow;
-                              } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "this_week"
-                              ) {
-                                const startOfWeek = moment()
-                                  .startOf("week")
-                                  .format("YYYY-MM-DD");
-                                const endOfWeek = moment()
-                                  .endOf("week")
-                                  .format("YYYY-MM-DD");
+                              // Next Call Date (From)/(To) -> scheduled_call_from / scheduled_call_to
+                              if (prospectsFilters.nextCallDateFrom) {
                                 filtersToApply.scheduled_call_from =
-                                  startOfWeek;
-                                filtersToApply.scheduled_call_to = endOfWeek;
-                              } else if (
-                                prospectsFilters.nextCallScheduled ===
-                                "next_week"
-                              ) {
-                                const nextWeekStart = moment()
-                                  .add(1, "week")
-                                  .startOf("week")
-                                  .format("YYYY-MM-DD");
-                                const nextWeekEnd = moment()
-                                  .add(1, "week")
-                                  .endOf("week")
-                                  .format("YYYY-MM-DD");
-                                filtersToApply.scheduled_call_from =
-                                  nextWeekStart;
-                                filtersToApply.scheduled_call_to = nextWeekEnd;
-                              } else if (
-                                prospectsFilters.nextCallScheduled === "overdue"
-                              ) {
-                                filtersToApply.scheduled_call_status =
-                                  "overdue";
-                              } else if (
-                                prospectsFilters.nextCallScheduled === "custom"
-                              ) {
-                                if (prospectsFilters.nextCallDateFrom) {
-                                  filtersToApply.scheduled_call_from =
-                                    prospectsFilters.nextCallDateFrom;
-                                }
-                                if (prospectsFilters.nextCallDateTo) {
-                                  filtersToApply.scheduled_call_to =
-                                    prospectsFilters.nextCallDateTo;
-                                }
+                                  prospectsFilters.nextCallDateFrom;
+                              }
+                              if (prospectsFilters.nextCallDateTo) {
+                                filtersToApply.scheduled_call_to =
+                                  prospectsFilters.nextCallDateTo;
                               }
 
                               handleFiltersChange(filtersToApply);
@@ -5080,7 +5043,6 @@ const CrmProspectsManagement = () => {
                               setProspectsFilters({
                                 assignedTo: null,
                                 campaigns: null,
-                                nextCallScheduled: null,
                                 nextCallDateFrom: null,
                                 nextCallDateTo: null,
                                 sourceFile: null,
@@ -5118,7 +5080,10 @@ const CrmProspectsManagement = () => {
                 </Dropdown.Toggle>
                 <Dropdown.Menu align="end">
                   <Dropdown.Item
-                    onClick={() => setShowBulkDeleteModal(true)}
+                    onClick={() => {
+                      setDeleteModalMode("bulk");
+                      setShowDeleteModal(true);
+                    }}
                     className="d-flex align-items-center text-danger"
                   >
                     <Trash2 size={14} className="me-2" />
@@ -5187,7 +5152,6 @@ const CrmProspectsManagement = () => {
                     sortDirection: direction,
                     currentPage: 1,
                   }));
-                  setRefreshKey((prev) => prev + 1);
                 }}
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
@@ -5273,10 +5237,10 @@ const CrmProspectsManagement = () => {
                     }
                   },
 
-                  // Actions
+                  // Actions (Table view / Board View only; dropdown shows other option)
                   showTableViewDropdown: true,
-                  tableViewLabel: "Table view",
-                  showViewSwitcher: true,
+                  currentTableView: prospectsViewMode,
+                  onTableViewChange: (view) => setProspectsViewMode(view),
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
                   showPipelineDropdown: false,
@@ -5499,91 +5463,6 @@ const CrmProspectsManagement = () => {
                         },
                       ],
                     },
-                    {
-                      id: "lead_status",
-                      label: "Lead Status",
-                      showDropdown: true,
-                      active: !!currentFilters.disposition,
-                      activeLabel: currentFilters.disposition
-                        ? (() => {
-                            const map: Record<string, string> = { hot_lead: "Hot Lead", warm_lead: "Warm Lead", cold_lead: "Cold Lead", qualified: "Qualified", not_interested: "Not Interested" };
-                            return map[String(currentFilters.disposition)] || String(currentFilters.disposition);
-                          })()
-                        : undefined,
-                      onClear: () => {
-                        const newFilters = { ...currentFilters };
-                        delete newFilters.disposition;
-                        handleFiltersChange(newFilters);
-                        setRefreshKey((prev) => prev + 1);
-                      },
-                      dropdownOptions: [
-                        {
-                          label: "All Status",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.disposition;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Hot Lead",
-                          value: "hot_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "hot_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Warm Lead",
-                          value: "warm_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "warm_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Cold Lead",
-                          value: "cold_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "cold_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Qualified",
-                          value: "qualified",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "qualified",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Not Interested",
-                          value: "not_interested",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "not_interested",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
                   ],
                   showAdvancedFilters: true,
                   onAdvancedFiltersClick: handleOpenFiltersSidebar,
@@ -5593,6 +5472,24 @@ const CrmProspectsManagement = () => {
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
+                // When Board View is selected, show board content instead of table
+                customBody={
+                  prospectsViewMode === "board" ? (
+                    <div
+                      className="d-flex align-items-center justify-content-center p-5"
+                      style={{ minHeight: "400px", background: "#f8f9fa" }}
+                    >
+                      <div className="text-center text-muted">
+                        <Layers size={48} className="mb-3 opacity-50" />
+                        <h5 className="mb-2">Board View</h5>
+                        <p className="mb-0 small">
+                          Switch to Table view from the dropdown to see the
+                          table.
+                        </p>
+                      </div>
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
           </div>
@@ -7186,20 +7083,29 @@ const CrmProspectsManagement = () => {
               </>
             )} */}
 
-          {/* Delete Confirmation Modal */}
+          {/* Delete Confirmation Modal (single + bulk) */}
           <DeleteConfirmationModal
             show={showDeleteModal}
             onHide={() => {
               setShowDeleteModal(false);
+              setDeleteModalMode(null);
               setItemToDelete(null);
             }}
-            onConfirm={confirmDelete}
-            itemName={
-              itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined
+            onConfirm={
+              deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
             }
-            itemType="prospect entry"
+            itemName={
+              deleteModalMode === "single" && itemToDelete
+                ? `prospect entry #${itemToDelete.id}`
+                : deleteModalMode === "bulk"
+                  ? `${selectedItems.length} selected prospects`
+                  : undefined
+            }
+            itemType={
+              deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
+            }
             additionalInfo={
-              itemToDelete ? (
+              deleteModalMode === "single" && itemToDelete ? (
                 <div className="alert alert-warning mb-3">
                   <strong>Entry ID:</strong> #{itemToDelete.id}
                   <br />
@@ -7216,6 +7122,12 @@ const CrmProspectsManagement = () => {
                   <br />
                   <strong>Created:</strong>{" "}
                   {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
+                </div>
+              ) : deleteModalMode === "bulk" ? (
+                <div className="alert alert-warning mb-3">
+                  <strong>Warning:</strong> This action cannot be undone. All{" "}
+                  {selectedItems.length} selected entries will be permanently
+                  deleted.
                 </div>
               ) : undefined
             }
@@ -8222,39 +8134,6 @@ const CrmProspectsManagement = () => {
             onCancel={() => setShowHistoryModal(false)}
           />
 
-          {/* Bulk Delete Modal */}
-          <Modal
-            show={showBulkDeleteModal}
-            onHide={() => setShowBulkDeleteModal(false)}
-          >
-            <Modal.Header closeButton>
-              <Modal.Title className="d-flex align-items-center">
-                <FiTrash2 className="me-2" />
-                Bulk Delete Prospects
-              </Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-              <p>
-                Are you sure you want to delete {selectedItems.length} selected
-                prospects?
-              </p>
-              <div className="alert alert-warning">
-                <strong>Warning:</strong> This action cannot be undone. All
-                selected entries will be permanently deleted.
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="secondary"
-                onClick={() => setShowBulkDeleteModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={handleBulkDelete}>
-                Delete {selectedItems.length} Entries
-              </Button>
-            </Modal.Footer>
-          </Modal>
           <SuccessfulModal
             show={showSuccessfulModal}
             onHide={() => setShowSuccessfulModal(false)}
@@ -8588,31 +8467,6 @@ const CrmProspectsManagement = () => {
               styles: customSelectStyles,
             },
             {
-              id: "nextCallScheduled",
-              label: "Next Call Scheduled",
-              type: "dropdown",
-              value: prospectsFilters.nextCallScheduled || "",
-              onChange: (value) => {
-                const selectedValue = value || null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  nextCallScheduled: selectedValue,
-                  nextCallDateFrom: null,
-                  nextCallDateTo: null,
-                }));
-                setActiveFilter("all");
-              },
-              options: [
-                { value: "", label: "Select option..." },
-                { value: "today", label: "Today" },
-                { value: "tomorrow", label: "Tomorrow" },
-                { value: "this_week", label: "This Week" },
-                { value: "next_week", label: "Next Week" },
-                { value: "overdue", label: "Overdue Calls" },
-                { value: "custom", label: "Custom Date Range" },
-              ],
-            },
-            {
               id: "nextCallDateFrom",
               label: "Next Call Date (From)",
               type: "date",
@@ -8718,43 +8572,13 @@ const CrmProspectsManagement = () => {
               filtersToApply.tags = prospectsFilters.tags;
             }
 
-            // Handle next call scheduled filters
-            const now = moment();
-            if (prospectsFilters.nextCallScheduled === "today") {
-              const today = now.format("YYYY-MM-DD");
-              filtersToApply.scheduled_call_from = today;
-              filtersToApply.scheduled_call_to = today;
-            } else if (prospectsFilters.nextCallScheduled === "tomorrow") {
-              const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
-              filtersToApply.scheduled_call_from = tomorrow;
-              filtersToApply.scheduled_call_to = tomorrow;
-            } else if (prospectsFilters.nextCallScheduled === "this_week") {
-              const startOfWeek = moment().startOf("week").format("YYYY-MM-DD");
-              const endOfWeek = moment().endOf("week").format("YYYY-MM-DD");
-              filtersToApply.scheduled_call_from = startOfWeek;
-              filtersToApply.scheduled_call_to = endOfWeek;
-            } else if (prospectsFilters.nextCallScheduled === "next_week") {
-              const nextWeekStart = moment()
-                .add(1, "week")
-                .startOf("week")
-                .format("YYYY-MM-DD");
-              const nextWeekEnd = moment()
-                .add(1, "week")
-                .endOf("week")
-                .format("YYYY-MM-DD");
-              filtersToApply.scheduled_call_from = nextWeekStart;
-              filtersToApply.scheduled_call_to = nextWeekEnd;
-            } else if (prospectsFilters.nextCallScheduled === "overdue") {
-              filtersToApply.scheduled_call_status = "overdue";
-            } else if (prospectsFilters.nextCallScheduled === "custom") {
-              if (prospectsFilters.nextCallDateFrom) {
-                filtersToApply.scheduled_call_from =
-                  prospectsFilters.nextCallDateFrom;
-              }
-              if (prospectsFilters.nextCallDateTo) {
-                filtersToApply.scheduled_call_to =
-                  prospectsFilters.nextCallDateTo;
-              }
+            // Next Call Date (From)/(To) -> scheduled_call_from / scheduled_call_to
+            if (prospectsFilters.nextCallDateFrom) {
+              filtersToApply.scheduled_call_from =
+                prospectsFilters.nextCallDateFrom;
+            }
+            if (prospectsFilters.nextCallDateTo) {
+              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
             }
 
             handleFiltersChange(filtersToApply);
@@ -8770,7 +8594,6 @@ const CrmProspectsManagement = () => {
             setProspectsFilters({
               assignedTo: null,
               campaigns: null,
-              nextCallScheduled: null,
               nextCallDateFrom: null,
               nextCallDateTo: null,
               sourceFile: null,
