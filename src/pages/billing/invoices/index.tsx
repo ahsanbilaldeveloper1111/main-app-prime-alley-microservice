@@ -792,8 +792,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+    date_to?: string;
   }>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
@@ -803,8 +803,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+  date_to?: string;
   }>({});
   const [showDescriptionModal, setShowDescriptionModal] = useState<boolean>(false);
   const [selectedDescription, setSelectedDescription] = useState<string>('');
@@ -1015,29 +1015,29 @@ const InvoiceList = () => {
         onChange: (value) =>
           setPendingFilters((prev) => ({ ...prev, invoice_date_from: value || undefined })),
       },
-      {
-        id: "invoice_date_to",
-        label: "Invoice Date To",
-        type: "date",
-        value: pendingFilters.invoice_date_to ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, invoice_date_to: value || undefined })),
-      },
+      // {
+      //   id: "invoice_date_to",
+      //   label: "Invoice Date To",
+      //   type: "date",
+      //   value: pendingFilters.invoice_date_to ?? "",
+      //   onChange: (value) =>
+      //     setPendingFilters((prev) => ({ ...prev, invoice_date_to: value || undefined })),
+      // },
       {
         id: "due_date_from",
-        label: "Due Date From",
+        label: "Date From",
         type: "date",
-        value: pendingFilters.due_date_from ?? "",
+        value: pendingFilters.date_from ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, due_date_from: value || undefined })),
+          setPendingFilters((prev) => ({ ...prev, date_from: value || undefined })),
       },
       {
         id: "due_date_to",
-        label: "Due Date To",
+        label: "Date To",
         type: "date",
-        value: pendingFilters.due_date_to ?? "",
+        value: pendingFilters.date_to ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, due_date_to: value || undefined })),
+          setPendingFilters((prev) => ({ ...prev, date_to: value || undefined })),
       },
     ],
     [
@@ -1045,8 +1045,8 @@ const InvoiceList = () => {
       pendingFilters.status,
       pendingFilters.invoice_date_from,
       pendingFilters.invoice_date_to,
-      pendingFilters.due_date_from,
-      pendingFilters.due_date_to,
+      pendingFilters.date_from,
+      pendingFilters.date_to,
     ]
   );
 
@@ -1386,7 +1386,7 @@ const InvoiceList = () => {
         // Load products for the first company if available
         if (companiesData.data && companiesData.data.length > 0) {
           const firstCompany = companiesData.data[0];
-          await loadCompanyProducts(firstCompany.id);
+         // await loadCompanyProducts(firstCompany.id);
         }
       } catch (error) {
         console.error("Error fetching companies:", error);

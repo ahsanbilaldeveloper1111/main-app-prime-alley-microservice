@@ -582,7 +582,7 @@ const AccountOverview = () => {
                   <Button 
                     variant="primary" 
                     size="sm"
-                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    onClick={() => router.push('/settings?tab=billing')}
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
                   >
                     Manage Payment Methods
@@ -596,7 +596,7 @@ const AccountOverview = () => {
                   <Button 
                     variant="primary" 
                     size="sm"
-                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    onClick={() => router.push('/settings?tab=billing')}
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
                   >
                     Add Card
@@ -765,7 +765,7 @@ const AccountOverview = () => {
                   variant="outline-primary" 
                   size="sm" 
                   className="d-flex align-items-center"
-                  onClick={() => router.push('/accounting/customer/billing-history')}
+                  onClick={() => router.push('/billing/payment-history')}
                   style={{ textDecoration: 'none', fontSize: '0.75rem' }}
                 >
                   <Eye size={12} className="me-1" /> View All
@@ -868,7 +868,7 @@ const AccountOverview = () => {
                  
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" 
-                  onClick={() => router.push('/accounting/customer/payment-methods')}
+                  onClick={() => router.push('/settings?tab=billing')}
                   style={{ 
                     width: '24px', 
                     height: '24px', 
@@ -883,7 +883,7 @@ const AccountOverview = () => {
 
                 <div 
                   className="d-flex align-items-center gap-2 py-2 px-2" 
-                  onClick={() => router.push('/accounting/customer/product-details')}
+                  onClick={() => router.push('/billing/subscriptions')}
                   style={{ 
                     border: '1px solid #dee2e6', 
                     borderRadius: '4px',

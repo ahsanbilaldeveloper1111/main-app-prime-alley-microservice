@@ -100,8 +100,8 @@ const BillingHistory = () => {
         per_page: pagination.rowsPerPage,
         search: memoizedFilters.search || "",
         status: memoizedFilters.status,
-        payment_date_from: memoizedFilters.payment_date_from,
-        payment_date_to: memoizedFilters.payment_date_to,
+        // date_from: memoizedFilters.payment_date_from,
+        // date_to: memoizedFilters.payment_date_to,
         ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
       }) as any;
       if (currentRequestId !== requestIdRef.current) return;
@@ -218,22 +218,22 @@ const BillingHistory = () => {
           { value: "failed", label: "Failed" },
         ],
       },
-      {
-        id: "payment_date_from",
-        label: "Payment Date From",
-        type: "date",
-        value: pendingFilters.payment_date_from ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, payment_date_from: value || undefined })),
-      },
-      {
-        id: "payment_date_to",
-        label: "Payment Date To",
-        type: "date",
-        value: pendingFilters.payment_date_to ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, payment_date_to: value || undefined })),
-      },
+      // {
+      //   id: "payment_date_from",
+      //   label: "Payment Date From",
+      //   type: "date",
+      //   value: pendingFilters.payment_date_from ?? "",
+      //   onChange: (value) =>
+      //     setPendingFilters((prev) => ({ ...prev, payment_date_from: value || undefined })),
+      // },
+      // {
+      //   id: "payment_date_to",
+      //   label: "Payment Date To",
+      //   type: "date",
+      //   value: pendingFilters.payment_date_to ?? "",
+      //   onChange: (value) =>
+      //     setPendingFilters((prev) => ({ ...prev, payment_date_to: value || undefined })),
+      // },
     ],
     [
       pendingFilters.search,
