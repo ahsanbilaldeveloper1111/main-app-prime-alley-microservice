@@ -885,7 +885,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     let transferInitiatorAddress = params.transferInitiatorAddress;
     let transferInitiatorDeviceType = params.transferInitiatorDeviceType;
     let transferInitiatorDeviceName = params.transferInitiatorDeviceName;
-    
+
     if (!transferInitiatorAddress || !transferInitiatorDeviceType || !transferInitiatorDeviceName) {
       const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
       if (!deviceInfo) {
@@ -898,17 +898,59 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorDeviceType = transferInitiatorDeviceType || deviceInfo.callingDeviceType;
       transferInitiatorDeviceName = transferInitiatorDeviceName || deviceInfo.callingDeviceName;
     }
-    
+
+    // Before transfer: put the active call (e.g. 532–514) on hold, then perform transfer (e.g. to 531).
+    // Hold payload: calling = other party (514, device CSFusmanah), called = initiator (532), controller = initiator.
+    // Derive the other party from the call so we never use initiator (532) as the calling party.
+    const initiator = transferInitiatorAddress!;
+    const callEntry = Array.from(activeCalls.values()).find((c) => c.callId === params.callId);
+    let otherPartyAddress: string = params.transferAddress;
+    if (callEntry) {
+      if (callEntry.callingAddress && callEntry.callingAddress !== initiator) {
+        otherPartyAddress = callEntry.callingAddress;
+      } else if (callEntry.calledAddress && callEntry.calledAddress !== initiator) {
+        otherPartyAddress = callEntry.calledAddress;
+      } else if (callEntry.number && callEntry.number !== initiator) {
+        otherPartyAddress = callEntry.number;
+      }
+    }
+    if (otherPartyAddress === initiator) {
+      return {
+        success: false,
+        error: 'Cannot determine the other party in the call for hold. The call\'s other party (e.g. 514) must not be the transfer initiator (532).',
+      };
+    }
+    const otherPartyDevice = getCallingDeviceInfo(otherPartyAddress, ctiStomp.dnsMap);
+    if (!otherPartyDevice) {
+      return {
+        success: false,
+        error: `No device information for ${otherPartyAddress}. Cannot put call on hold.`,
+      };
+    }
+    const holdResult = await holdCallAPI({
+      callId: params.callId,
+      callingAddress: otherPartyAddress,
+      calledAddress: initiator,
+      callingDeviceType: otherPartyDevice.callingDeviceType,
+      callingDeviceName: otherPartyDevice.callingDeviceName,
+      controllerAddress: initiator,
+      controllerDeviceName: transferInitiatorDeviceName!,
+      controllerDeviceType: transferInitiatorDeviceType!,
+    });
+    if (!holdResult.success) {
+      return holdResult;
+    }
+
     return await transferCallsAPI({
       callId: params.callId,
       transferInitiatorAddress: transferInitiatorAddress!,
       transferInitiatorDeviceType: transferInitiatorDeviceType!,
       transferInitiatorDeviceName: transferInitiatorDeviceName!,
-      transferAddress: params.transferAddress,
+      transferAddress: otherPartyAddress,
       targetAddress: params.targetAddress,
-      mode: params.mode
+      mode: "CONSULT",
     });
-  }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
+  }, [ctiStomp.userAddress, ctiStomp.dnsMap, activeCalls]);
   
   // Device helper functions
   const getCallingDeviceInfoHelper = useCallback(() => {

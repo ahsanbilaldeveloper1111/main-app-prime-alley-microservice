@@ -320,7 +320,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'ai-ml-calls-analysis',
           title: 'Calls Analysis',
           icon: <FileChartPie size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
           url: '/communications/call-analysis'
         },
         {

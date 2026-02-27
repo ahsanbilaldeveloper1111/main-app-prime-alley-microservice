@@ -60,7 +60,7 @@ const CustomerDashboard = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
   useEffect(() => {
-    getCompanyDetails();
+    //getCompanyDetails();
   }, []);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ const CustomerDashboard = () => {
       { title: 'Outstanding Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.outstanding_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)' },
       { title: 'Overdue Invoices', value: formatInteger(response?.invoices?.overdue_invoices_count ?? 0), icon: Clock, iconColor: '#ef4444', iconBgColor: 'rgba(239, 68, 68, 0.1)' },
       { title: 'Overdue Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.overdue_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)', link: { text: 'Pay Now', onClick: () => router.push('/billing/invoices') } },
-      { title: 'Paid This Month', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(52340.5)}`, icon: Wallet, iconColor: '#10B981', iconBgColor: '#D1FAE5', subtitle: 'Last 30 days' }
+      { title: 'Paid This Month', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.paid_amount)}`, icon: Wallet, iconColor: '#10B981', iconBgColor: '#D1FAE5', subtitle: 'Last 30 days' }
     ]);
   };
 

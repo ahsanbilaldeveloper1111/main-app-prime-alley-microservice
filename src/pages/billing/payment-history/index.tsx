@@ -18,6 +18,7 @@ import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
 
 import { GetPayments } from "@utils/accounting";
+import { getMinifiedCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
@@ -42,6 +43,8 @@ const BillingHistory = () => {
   const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | "">("");
   const [currentFilters, setCurrentFilters] = useState<{
     status?: string;
     search?: string;
@@ -75,6 +78,18 @@ const BillingHistory = () => {
   const requestIdRef = useRef(0);
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        setCompanies(result ?? []);
+      } catch (e) {
+        console.error("Error fetching companies:", e);
+      }
+    };
+    fetchCompanies();
+  }, []);
+
   const loadPayments = useCallback(async () => {
     requestIdRef.current += 1;
     const currentRequestId = requestIdRef.current;
@@ -87,6 +102,7 @@ const BillingHistory = () => {
         status: memoizedFilters.status,
         payment_date_from: memoizedFilters.payment_date_from,
         payment_date_to: memoizedFilters.payment_date_to,
+        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
       }) as any;
       if (currentRequestId !== requestIdRef.current) return;
       const list = response?.dataList ?? response?.data ?? [];
@@ -104,7 +120,7 @@ const BillingHistory = () => {
     } finally {
       if (requestIdRef.current === currentRequestId) setLoading(false);
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey]);
+  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey, selectedCompanyId]);
 
   useEffect(() => {
     loadPayments();
@@ -244,7 +260,22 @@ const BillingHistory = () => {
             </ol>
           </nav>
         </div>
-        <div className="d-flex flex-wrap gap-2">
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <Form.Select
+            size="sm"
+            style={{ width: "220px" }}
+            value={String(selectedCompanyId)}
+            onChange={(e) =>
+              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+            }
+          >
+            <option value="">All companies</option>
+            {companies.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
           <Button
             variant="outline-secondary"
             onClick={handleOpenFiltersSidebar}
