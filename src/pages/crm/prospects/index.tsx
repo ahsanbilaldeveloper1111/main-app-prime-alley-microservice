@@ -36,6 +36,7 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import moment from "moment";
+import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import {
   FiUpload,
   FiDatabase,
@@ -5759,22 +5760,34 @@ const CrmProspectsManagement = () => {
                 statsCards={prospectsStatsCards}
                 // When Board View is selected, show board content instead of table
                 customBody={
-                  prospectsViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
-                  ) : undefined
-                }
+  prospectsViewMode === "board" ? (
+    <KanbanBoard
+      columns={prospectsToKanbanColumns(
+        dataList,
+        getInitials,
+        getRandomColor
+      )}
+      onCardClick={(card) => handleViewData(card.raw)}
+      onCardMove={(cardId, fromCol, toCol) => {
+        // Optionally call updateCrmData here to persist the lifecycle_stage change
+        const prospect = dataList.find(p => p.id === cardId);
+        if (prospect) {
+          updateCrmData(Number(cardId), {
+            name: prospect.name || "",
+            phone: prospect.phone || "",
+            campaign_id: prospect.campaign_id,
+            data: { ...prospect.data, lifecycle_stage: toCol },
+            scheduled_call_at: prospect.scheduled_call_at || undefined,
+            company_domain: prospect.data?.company_domain || undefined,
+            company_name: prospect.data?.company_name || undefined,
+            source: prospect.data?.source || undefined,
+          });
+        }
+      }}
+      searchValue={prospectsSearch}
+    />
+  ) : undefined
+}
               />
             </div>
           </div>
