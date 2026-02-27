@@ -1032,7 +1032,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                       </tbody>
                                     </table>
                                     <div className="d-flex justify-content-center">
-                                          <Link href="/call-reports/stats/extension" className="link-primary">View All</Link>
+                                          <Link href="/reports/call-analytics/stats/extension" className="link-primary">View All</Link>
                                     </div>
                                       </div>
                                       </>
@@ -1087,7 +1087,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                 </tbody>
                               </table>
                               <div className="d-flex justify-content-center">
-                                    <Link href="/call-reports/stats/country" className="link-primary">View All</Link>
+                                    <Link href="/reports/call-analytics/stats/country" className="link-primary">View All</Link>
                               </div>
                                       </div>
                                       </>

@@ -36,17 +36,10 @@ const HostItemsDetail = () => {
     if (!hostid) return;
     setLoading(true);
     try {
-      const [itemsRes, hostRes] = await Promise.all([
-        getItemsByHostId(hostid),
+      const [ hostRes] = await Promise.all([
         getHostById(hostid),
       ]);
-      if (itemsRes.error) {
-        toast.error(itemsRes.error.message || 'Failed to fetch items');
-        setItems([]);
-      } else {
-        const list = itemsRes.result ?? [];
-        setItems(Array.isArray(list) ? list : []);
-      }
+     
       if (hostRes.result && Array.isArray(hostRes.result) && hostRes.result.length > 0) {
         setHost((hostRes.result as ZabbixHost[])[0]);
       } else {

@@ -531,6 +531,29 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/netops/alerts'
         },
         {
+          id: 'netops-templates',
+          title: 'Templates',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/templates'
+        },
+        {
+          id: 'netops-events',
+          title: 'Events',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/events'
+        },
+        {
+          id: 'netops-triggers',
+          title: 'Triggers',
+          icon: <Megaphone size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/triggers'
+        },
+
+
+        {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,

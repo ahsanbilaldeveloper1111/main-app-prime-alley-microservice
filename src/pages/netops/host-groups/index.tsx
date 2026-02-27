@@ -24,7 +24,7 @@ const HostGroups = () => {
   });
 
   const tableColumns: TableColumn<ZabbixHostGroup>[] = [
-    { key: 'groupid', label: 'Group ID', sortable: true },
+    // { key: 'groupid', label: 'Group ID', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
   ];
 

@@ -3,14 +3,14 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getAlerts, getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import { getTemplates } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import { FORMAT_CLOCK } from '@utils/Helper';
 
 const SEVERITY_LABELS: Record<string, string> = {
   '0': 'Not classified',
@@ -21,8 +21,14 @@ const SEVERITY_LABELS: Record<string, string> = {
   '5': 'Disaster',
 };
 
+const formatClock = (clock: string) => {
+  const num = parseInt(clock, 10);
+  if (isNaN(num)) return clock;
+  const d = new Date(num * 1000);
+  return d.toLocaleString();
+};
 
-const HostAlerts = () => {
+const NetopsTemplates = () => {
   const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
   const [hosts, setHosts] = useState<ZebbixHost[]>([]);
   const [selectedHostId, setSelectedHostId] = useState<string>('');
@@ -37,27 +43,11 @@ const HostAlerts = () => {
   });
 
   const tableColumns: TableColumn<ZebbixAlert>[] = [
-    // { key: 'eventid', label: 'Event ID', sortable: true },
+    { key: 'templateid', label: 'Template ID', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
     {
-      key: 'severity',
-      label: 'Severity',
-      sortable: true,
-      render: (row) => (
-        <span className="badge bg-warning text-dark">
-          {SEVERITY_LABELS[row.severity] ?? row.severity}
-        </span>
-      ),
-    },
-    {
-      key: 'clock',
-      label: 'Time',
-      sortable: true,
-      render: (row) => FORMAT_CLOCK(row.clock ?? ''),
-    },
-    {
       key: 'host',
-      label: 'Host',
+      label: 'Template Groups',
       sortable: true,
       render: (row) => row.hosts?.[0]?.host ?? '-',
     },
@@ -77,16 +67,20 @@ const HostAlerts = () => {
     }
   }, []);
 
-  const fetchAlerts = useCallback(async () => {
+  const fetchTemplates = useCallback(async () => {
     if (!selectedHostId) {
       setAlerts([]);
       return;
     }
     setLoading(true);
     try {
-      const response = await getAlerts(selectedHostId);
+      const response = await getTemplates({
+        // hostids: [selectedHostId]
+        output: ["templateid", "name"],
+        selectHosts: ["host"],
+      });
       if (response?.error) {
-        toast.error(response.error.message || 'Failed to fetch alerts');
+        toast.error(response.error.message || 'Failed to fetch templates');
         setAlerts([]);
         return;
       }
@@ -118,8 +112,8 @@ const HostAlerts = () => {
   }, [refreshKey]);
 
   useEffect(() => {
-    fetchAlerts();
-  }, [selectedHostId, refreshKey, fetchAlerts]);
+    fetchTemplates();
+  }, [selectedHostId, refreshKey, fetchTemplates]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -152,18 +146,17 @@ const HostAlerts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle="Alerts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/templates" subTitle="Templates" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Host Alerts</h2>
+                <h2 className="mb-0">Templates</h2>
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                <select
+                {/* <select
                   className="form-select"
                   value={selectedHostId}
                   onChange={(e) => setSelectedHostId(e.target.value)}
@@ -175,7 +168,7 @@ const HostAlerts = () => {
                       {h.name ?? h.host ?? h.hostid}
                     </option>
                   ))}
-                </select>
+                </select> */}
                 <input
                   type="text"
                   className="form-control"
@@ -202,8 +195,8 @@ const HostAlerts = () => {
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No alerts found for this host.' : 'Select a host to view alerts.'}
-        loadingMessage="Loading alerts..."
+        emptyMessage={selectedHostId ? 'No templates found for this host.' : 'Select a host to view templates.'}
+        loadingMessage="Loading templates..."
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
@@ -226,8 +219,8 @@ const HostAlerts = () => {
   );
 };
 
-HostAlerts.getLayout = (page: ReactElement) => {
+NetopsTemplates.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default HostAlerts;
+export default NetopsTemplates;

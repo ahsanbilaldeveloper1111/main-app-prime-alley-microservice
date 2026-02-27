@@ -29,6 +29,7 @@ import "@assets/scss/tabs.scss";
 
 
 import { GetDashboardCounters, GetProfitLossData, GetTopProducts, GetRecentActivity, GetAnalyticsByMonth, GetCompanyDetails } from "@utils/accounting";
+import { getCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 
 
@@ -59,6 +60,14 @@ const CustomerDashboard = () => {
 
   useEffect(() => {
     getCompanyDetails();
+  }, []);
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      const result = await getCompanies({ per_page: 1000 });
+      console.log("getCompanies (limit 1000):", result);
+    };
+    fetchCompanies();
   }, []);
   useEffect(() => {
     getDashboardCounters();

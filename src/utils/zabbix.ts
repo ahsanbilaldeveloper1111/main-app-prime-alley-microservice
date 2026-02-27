@@ -275,11 +275,11 @@ export async function getHostById(
   try {
     const ids = Array.isArray(hostids) ? hostids : [hostids];
     const params: ZabbixHostGetParams = {
-      output: "extend",
+      // output: "extend",
       hostids: ids,
-      selectInterfaces: "extend",
-      selectGroups: "extend",
-      selectParentTemplates: ["templateid", "name"],
+      // selectInterfaces: "extend",
+      // selectGroups: "extend",
+      // selectParentTemplates: ["templateid", "name"],
       ...options,
     };
     const payload = buildPayload(params);

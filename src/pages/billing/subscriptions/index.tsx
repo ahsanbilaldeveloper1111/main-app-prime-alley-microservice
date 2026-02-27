@@ -28,6 +28,7 @@ import GenericTable, { TableColumn } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import GenericSidebar from "@components/GenericSidebar";
 import { ModuleSlug } from "@utils/Helper";
+import {getCompanies} from "@utils/crm";
 
 interface Product {
   id: number;
@@ -42,6 +43,26 @@ interface Product {
 
 const ProductDetails = () => {
   const { data: session } = useSession();
+
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      setLoadingCompanies(true);
+      const response = await getCompanies(
+        {
+          page: 1,
+          per_page: 1000,
+        }
+      );
+      setCompanies(response.data || []);
+      setLoadingCompanies(false);
+    };
+    fetchCompanies();
+  }, []);
+    
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);

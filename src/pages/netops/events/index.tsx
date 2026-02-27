@@ -3,7 +3,8 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getAlerts, getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import {  getEvents } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
@@ -11,6 +12,9 @@ import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
 import { FORMAT_CLOCK } from '@utils/Helper';
+import moment from 'moment';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 const SEVERITY_LABELS: Record<string, string> = {
   '0': 'Not classified',
@@ -21,8 +25,15 @@ const SEVERITY_LABELS: Record<string, string> = {
   '5': 'Disaster',
 };
 
+// const formatClock = (clock: string) => {
+//   const num = parseInt(clock, 10);
+//   if (isNaN(num)) return clock;
+//   const d = new Date(num * 1000);
+//   return d.toLocaleString();
+// };
 
-const HostAlerts = () => {
+const NetopsEvents = () => {
+  const router = useRouter();
   const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
   const [hosts, setHosts] = useState<ZebbixHost[]>([]);
   const [selectedHostId, setSelectedHostId] = useState<string>('');
@@ -36,9 +47,17 @@ const HostAlerts = () => {
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZebbixAlert>[] = [
-    // { key: 'eventid', label: 'Event ID', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
+  const tableColumns: TableColumn<any[] | any>[] = [
+    { key: 'date_time', label: 'Date & Time', sortable: true, render: (row) => FORMAT_CLOCK(row.clock ?? '') },
+    { key: 'name', label: 'Customer', sortable: true },
+    {
+      key: 'device', label: 'Device', sortable: true,
+      render: (row) => (
+        <Link href={`/netops/hosts/${row?.hosts?.[0]?.hostid ?? ''}`} className="badge bg-warning text-dark">
+          {row?.hosts?.[0]?.host ?? '-'}
+        </Link>
+      ),
+    },
     {
       key: 'severity',
       label: 'Severity',
@@ -49,19 +68,13 @@ const HostAlerts = () => {
         </span>
       ),
     },
-    {
-      key: 'clock',
-      label: 'Time',
-      sortable: true,
-      render: (row) => FORMAT_CLOCK(row.clock ?? ''),
-    },
-    {
-      key: 'host',
-      label: 'Host',
-      sortable: true,
-      render: (row) => row.hosts?.[0]?.host ?? '-',
-    },
+    { key: 'type', label: 'Type', sortable: true, },
+    { key: 'description', label: 'Description', sortable: true,render: (row) => row?.relatedObject?.description ?? '-' },
   ];
+
+  const handleDeviceClick = (deviceId: string) => {
+    router.push(`/netops/devices/${deviceId}`);
+  };
 
   const fetchHosts = useCallback(async () => {
     try {
@@ -77,16 +90,20 @@ const HostAlerts = () => {
     }
   }, []);
 
-  const fetchAlerts = useCallback(async () => {
+  const fetchEvents = useCallback(async () => {
     if (!selectedHostId) {
       setAlerts([]);
       return;
     }
     setLoading(true);
     try {
-      const response = await getAlerts(selectedHostId);
+      const response = await getEvents({
+        //hostids: [selectedHostId],
+        output: ["eventid", "name", "severity", "clock"],
+        selectHosts: ["host"],
+      });
       if (response?.error) {
-        toast.error(response.error.message || 'Failed to fetch alerts');
+        toast.error(response.error.message || 'Failed to fetch templates');
         setAlerts([]);
         return;
       }
@@ -118,8 +135,8 @@ const HostAlerts = () => {
   }, [refreshKey]);
 
   useEffect(() => {
-    fetchAlerts();
-  }, [selectedHostId, refreshKey, fetchAlerts]);
+    fetchEvents();
+  }, [selectedHostId, refreshKey, fetchEvents]);
 
   const handleRefresh = () => setRefreshKey((k) => k + 1);
 
@@ -152,15 +169,14 @@ const HostAlerts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="NetOps" mainLink="/netops/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/hosts" subTitle="Alerts" />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/netops/events" subTitle="Events" />
 
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Host Alerts</h2>
+                <h2 className="mb-0">Events</h2>
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
                 <select
@@ -202,8 +218,8 @@ const HostAlerts = () => {
         data={paginatedData}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No alerts found for this host.' : 'Select a host to view alerts.'}
-        loadingMessage="Loading alerts..."
+        emptyMessage={selectedHostId ? 'No events found for this host.' : 'Select a host to view events.'}
+        loadingMessage="Loading events..."
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
@@ -226,8 +242,8 @@ const HostAlerts = () => {
   );
 };
 
-HostAlerts.getLayout = (page: ReactElement) => {
+NetopsEvents.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default HostAlerts;
+export default NetopsEvents;
