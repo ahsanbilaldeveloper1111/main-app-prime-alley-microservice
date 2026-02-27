@@ -542,6 +542,9 @@ const CrmDeals = () => {
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [dealsMetrics, setDealsMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
   const [dealToConvert, setDealToConvert] = useState<number | null>(null);
@@ -793,10 +796,12 @@ const CrmDeals = () => {
         const dealsArray: any[] = response?.dataList || [];
         const pagination: any = response?.meta || {};
         const summary: any = response?.summary_tiles || null;
+        const metricsFromApi: any = response?.metrics || null;
 
         setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
         setTotalDeals(pagination?.total || 0);
         setSummaryTiles(summary);
+        setDealsMetrics(metricsFromApi);
 
         // Update server pagination meta
         if (pagination && pagination.total !== undefined) {
@@ -2170,77 +2175,76 @@ const CrmDeals = () => {
 
   // Define stats cards for GenericTable
   const dealsStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Deals",
-        value: summaryTiles?.total_deals || totalDeals || 0,
-        icon: Handshake,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in pipeline",
-      },
-      {
-        title: "New",
-        value: summaryTiles?.new_deals || analyticsData.stageCounts["New"] || 0,
-        icon: PlusCircle,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh opportunities",
-          dotColor: "#2563EB",
+    () => {
+      const m = dealsMetrics || {};
+      const todaysMeetings = m.todays_meetings ?? 0;
+      const overdueMeetings = m.overdue_meetings ?? 0;
+
+      return [
+        {
+          title: "All Deals",
+          value: m.total_deals ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          subtitle: `${m.won_deals ?? 0} Won / ${m.lost_deals ?? 0} Lost`,
         },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_deals ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "Proposal",
-        value: analyticsData.stageCounts["Proposal"] || 0,
-        icon: FileText,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: "Submitted",
-          dotColor: "#7C3AED",
+        {
+          title: "High-Value Deals",
+          value: m.high_value_deals ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Client-defined threshold",
         },
-      },
-      {
-        title: "Negotiation",
-        value:
-          analyticsData.stageCounts["Negotiation"] ||
-          analyticsData.inNegotiation ||
-          0,
-        icon: Users,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "In discussion",
-      },
-      {
-        title: "Closed Won",
-        value:
-          analyticsData.stageCounts["Closed Won"] ||
-          analyticsData.stageCounts["Won"] ||
-          analyticsData.won ||
-          0,
-        icon: Target,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Success",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
+        {
+          title: "At-Risk Deals",
+          value: m.at_risk_deals ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "Expected closed date slipped.",
         },
-      },
-    ],
-    [summaryTiles, totalDeals, analyticsData],
+        {
+          title: "Deals Won",
+          value: m.won_deals ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${m.won_deals_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#6366F1",
+          },
+        },
+        {
+          title: "Today's Follow-ups",
+          value: m.todays_follow_ups ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${m.todays_follow_ups ?? 0} Follow-ups / ${todaysMeetings} Meeting${
+              todaysMeetings === 1 ? "" : "s"
+            }`,
+            dotColor: "#10B981",
+          },
+        },
+        {
+          title: "Overdue",
+          value: m.overdue_total ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
+              overdueMeetings === 1 ? "" : "s"
+            }`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [dealsMetrics],
   );
 
   // Define columns for GenericTable

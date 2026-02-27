@@ -28,9 +28,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
-import GenericStatsCards, {
-  StatsCardData,
-} from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
+import MetricsSummaryCards from "@components/MetricsSummaryCards";
 import { useRouter } from "next/router";
 
 // Type definitions
@@ -214,6 +213,9 @@ export interface ToolbarConfig {
   showTableViewDropdown?: boolean;
   tableViewLabel?: string;
   onTableViewClick?: () => void;
+  /** When set, dropdown shows only "Table view" and "Board View"; label = current, menu = other option only */
+  currentTableView?: "table" | "board";
+  onTableViewChange?: (view: "table" | "board") => void;
 
   // Pipelines/Groups dropdown
   showPipelineDropdown?: boolean;
@@ -292,6 +294,9 @@ export interface GenericTableProps<T = any> {
   
   // Remove border from table card
   noBorder?: boolean;
+
+  /** When provided (e.g. when currentTableView === 'board'), render this instead of the table */
+  customBody?: React.ReactNode;
 }
 
 const GenericTable = <T extends Record<string, any>>({
@@ -333,6 +338,7 @@ const GenericTable = <T extends Record<string, any>>({
   statsCards,
   showToolbarActions = true,
   noBorder = false,
+  customBody,
 }: GenericTableProps<T>) => {
   const router = useRouter();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
@@ -828,14 +834,46 @@ const GenericTable = <T extends Record<string, any>>({
                   className="gt-toolbar-btn"
                 >
                   <Menu size={16} className="me-1" />
-                  <span>{toolbar.tableViewLabel || "Table view"}</span>
+                  <span>
+                    {toolbar.currentTableView !== undefined
+                      ? toolbar.currentTableView === "table"
+                        ? "Table view"
+                        : "Board View"
+                      : toolbar.tableViewLabel || "Table view"}
+                  </span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
-                  <Dropdown.Item onClick={toolbar.onTableViewClick}>
-                    Table
-                  </Dropdown.Item>
-                  <Dropdown.Item>Grid</Dropdown.Item>
-                  <Dropdown.Item>List</Dropdown.Item>
+                  {toolbar.currentTableView !== undefined &&
+                  toolbar.onTableViewChange ? (
+                    <>
+                      {toolbar.currentTableView === "table" && (
+                        <Dropdown.Item
+                          onClick={() =>
+                            toolbar.onTableViewChange?.("board")
+                          }
+                        >
+                          Board View
+                        </Dropdown.Item>
+                      )}
+                      {toolbar.currentTableView === "board" && (
+                        <Dropdown.Item
+                          onClick={() =>
+                            toolbar.onTableViewChange?.("table")
+                          }
+                        >
+                          Table view
+                        </Dropdown.Item>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Dropdown.Item onClick={toolbar.onTableViewClick}>
+                        Table
+                      </Dropdown.Item>
+                      <Dropdown.Item>Grid</Dropdown.Item>
+                      <Dropdown.Item>List</Dropdown.Item>
+                    </>
+                  )}
                 </Dropdown.Menu>
               </Dropdown>
             )}
@@ -1146,17 +1184,15 @@ const GenericTable = <T extends Record<string, any>>({
           <div
             style={{
               paddingTop: "16px",
+              paddingLeft: "25px",
+              paddingRight: "25px",
               backgroundColor: "#ffffff",
               paddingBottom: "1px",
               borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #ccccccc",
+              borderRight: "1px solid #cccccc",
             }}
           >
-            <GenericStatsCards
-              data={statsCards}
-              gridMinWidth="250px"
-              valueFontSize="28px"
-            />
+            <MetricsSummaryCards data={statsCards} />
           </div>
         )}
       </div>
@@ -1333,7 +1369,14 @@ const GenericTable = <T extends Record<string, any>>({
       {/* Toolbar */}
       {renderToolbar()}
 
-      {/* Table */}
+      {/* Table or custom body (e.g. Board view) */}
+      {customBody != null ? (
+        <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
+          <Card.Body className="p-0">
+            {customBody}
+          </Card.Body>
+        </Card>
+      ) : (
       <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
         <Card.Body className="p-0">
           <div
@@ -1796,6 +1839,7 @@ const GenericTable = <T extends Record<string, any>>({
           )}
         </Card.Body>
       </Card>
+      )}
     </div>
   );
 };
