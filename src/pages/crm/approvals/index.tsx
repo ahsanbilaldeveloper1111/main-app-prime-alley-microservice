@@ -2113,77 +2113,120 @@ const CrmDeals = () => {
 
   // Define stats cards for GenericTable
   const dealsStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Deals",
-        value: summaryTiles?.total_deals || totalDeals || 0,
-        icon: Handshake,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in pipeline",
-      },
-      {
-        title: "New",
-        value: summaryTiles?.new_deals || analyticsData.stageCounts["New"] || 0,
-        icon: PlusCircle,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh opportunities",
-          dotColor: "#2563EB",
+    () => {
+      const now = moment();
+      const totalSubmitted = summaryTiles?.total_deals || totalDeals || 0;
+
+      const approval = (d: any) =>
+        (d?.approval_status ?? d?.approvalStatus ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      const submittedLast7Days = dealsData.filter((d: any) => {
+        const dt = d?.created_at;
+        if (!dt) return false;
+        const m = moment(dt);
+        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
+      }).length;
+
+      const pendingDeals = dealsData.filter((d: any) =>
+        approval(d).includes("pending"),
+      );
+      const approvedDeals = dealsData.filter((d: any) =>
+        approval(d).includes("approved"),
+      );
+      const rejectedDeals = dealsData.filter((d: any) =>
+        approval(d).includes("rejected"),
+      );
+
+      const countCreatedLast7 = (arr: any[]) =>
+        arr.filter((d: any) => {
+          const dt = d?.created_at;
+          if (!dt) return false;
+          const m = moment(dt);
+          return m.isValid()
+            ? m.isAfter(now.clone().subtract(7, "days"))
+            : false;
+        }).length;
+
+      const pendingLast7Days = countCreatedLast7(pendingDeals);
+      const approvedLast7Days = countCreatedLast7(approvedDeals);
+      const rejectedLast7Days = countCreatedLast7(rejectedDeals);
+
+      const recentlyReviewed = dealsData.filter((d: any) => {
+        const a = approval(d);
+        if (!a.includes("approved") && !a.includes("rejected")) return false;
+        const dt = d?.updated_at || d?.approved_at || d?.rejected_at;
+        if (!dt) return false;
+        const m = moment(dt);
+        return m.isValid() ? m.isAfter(now.clone().subtract(24, "hours")) : false;
+      }).length;
+
+      return [
+        {
+          title: "All deals submitted",
+          value: totalSubmitted,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${submittedLast7Days} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_deals ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "Proposal",
-        value: analyticsData.stageCounts["Proposal"] || 0,
-        icon: FileText,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: "Submitted",
-          dotColor: "#7C3AED",
+        {
+          title: "Pending Approval",
+          value: pendingDeals.length,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${pendingLast7Days} in last 7 days`,
+            dotColor: "#10B981",
+          },
         },
-      },
-      {
-        title: "Negotiation",
-        value:
-          analyticsData.stageCounts["Negotiation"] ||
-          analyticsData.inNegotiation ||
-          0,
-        icon: Users,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "In discussion",
-      },
-      {
-        title: "Closed Won",
-        value:
-          analyticsData.stageCounts["Closed Won"] ||
-          analyticsData.stageCounts["Won"] ||
-          analyticsData.won ||
-          0,
-        icon: Target,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Success",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
+        {
+          title: "Approved Deals",
+          value: approvedDeals.length,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${approvedLast7Days} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
         },
-      },
-    ],
-    [summaryTiles, totalDeals, analyticsData],
+        {
+          title: "Rejected Deals",
+          value: rejectedDeals.length,
+          icon: XCircle,
+          iconColor: "#64748B",
+          iconBgColor: "#F1F5F9",
+          metric: {
+            text: `${rejectedLast7Days} in last 7 days`,
+            dotColor: "#94A3B8",
+          },
+        },
+        {
+          title: "High-Value (Pending)",
+          value: 5,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "High-value deals still awaiting approval",
+        },
+        {
+          title: "Recently Reviewed",
+          value: recentlyReviewed,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "Deals approved or rejected in last 24 hours",
+        },
+      ];
+    },
+    [dealsData, summaryTiles, totalDeals],
   );
 
   // Define columns for GenericTable

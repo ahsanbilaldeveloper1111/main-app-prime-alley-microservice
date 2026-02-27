@@ -1,5 +1,8 @@
 import "@assets/scss/datatable-style.scss";
 import parsePhoneNumber from "libphonenumber-js";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 import React, {
   ReactElement,
@@ -650,6 +653,7 @@ const CrmProspectsManagement = () => {
     firstName: "",
     lastName: "",
     email: "",
+    phone_country_code: "",
     phoneNumber: "",
     campaign_id: null as number | null,
     contact_owner: null as string | null,
@@ -763,11 +767,27 @@ const CrmProspectsManagement = () => {
                   },
             )
           : [];
+        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
+        let phoneCountryCode = "";
+        let phoneNumber = item.phone ?? "";
+        if (typeof item.phone === "string" && item.phone.trim()) {
+          try {
+            const normalized = item.phone.replace(/\s/g, "");
+            const parsed = parsePhoneNumberInput(normalized);
+            if (parsed) {
+              phoneCountryCode = `+${parsed.countryCallingCode}`;
+              phoneNumber = parsed.nationalNumber;
+            }
+          } catch {
+            // keep phoneNumber as-is, phoneCountryCode ""
+          }
+        }
         setContactForm({
           firstName,
           lastName,
           email: d.email ?? (item as any).email ?? "",
-          phoneNumber: item.phone ?? "",
+          phone_country_code: phoneCountryCode,
+          phoneNumber,
           campaign_id: item.campaign_id ?? d.campaign_id ?? null,
           contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
@@ -868,6 +888,8 @@ const CrmProspectsManagement = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
   const [totalAllProspects, setTotalAllProspects] = useState(0);
+  /** Total count of converted prospects (has_tickets=true) for current filters */
+  const [totalConvertedProspects, setTotalConvertedProspects] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1550,6 +1572,29 @@ const CrmProspectsManagement = () => {
     setLoading(true);
     try {
       const response = await getCrmData(buildCrmDataParams());
+
+      // Fetch converted prospects count (has_tickets=true) for current filters.
+      // If we're already on the converted tab, reuse the same response total.
+      if (memoizedFilters.has_tickets === true) {
+        setTotalConvertedProspects(response.pagination.total || 0);
+      } else {
+        try {
+          const convertedParams: any = buildCrmDataParams({ page: 1, per_page: 1 });
+          convertedParams.has_tickets = true;
+          // Ensure Scheduled tab filter doesn't affect converted count
+          delete convertedParams.has_scheduled_calls;
+          const convertedResponse = await getCrmData(convertedParams);
+
+          // Only update state if this is still the latest request
+          if (currentRequestId !== requestIdRef.current) {
+            return;
+          }
+          setTotalConvertedProspects(convertedResponse.pagination.total || 0);
+        } catch (e) {
+          // Keep previous count on error (avoid flashing to 0)
+          console.error("Failed to fetch converted prospects count:", e);
+        }
+      }
 
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -2405,36 +2450,87 @@ const CrmProspectsManagement = () => {
 
   // Stats cards data for metrics
   const prospectsStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "Prospects missing Owner",
-        value: dataList.filter(
-          (p: any) => !p.user_extension || p.user_extension === "",
-        ).length,
-      },
-      {
-        title: "Prospects missing Lead Status",
-        value: dataList.filter(
-          (p: any) => !p.disposition || p.disposition === "",
-        ).length,
-      },
-      {
-        title: "Prospects never called",
-        value: dataList.filter((p: any) => !p.last_called_at).length,
-      },
-      {
-        title: "Prospects with no recent activity",
-        value: dataList.filter((p: any) => {
-          if (!p.last_called_at) return true;
-          const daysSinceActivity = moment().diff(
-            moment(p.last_called_at),
-            "days",
-          );
-          return daysSinceActivity > 30;
-        }).length,
-      },
-    ],
-    [dataList],
+    () => {
+      const overdueCount = dataList.filter((p: any) => {
+        if (!p?.scheduled_call_at) return false;
+        return moment(p.scheduled_call_at).isBefore(moment());
+      }).length;
+
+      const recentlyContactedCount = dataList.filter((p: any) => {
+        if (!p?.last_called_at) return false;
+        return moment(p.last_called_at).isAfter(moment().subtract(1, "day"));
+      }).length;
+
+      const notContactedCount = dataList.filter((p: any) => !p?.last_called_at)
+        .length;
+
+      return [
+        {
+          title: "All Prospects",
+          value: totalAllProspects || totalRecords,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`,
+        },
+        {
+          title: "Scheduled",
+          value: metrics.scheduled_records,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${metrics.scheduled_next_hour_records} in next hour`,
+            dotColor: "#F59E0B",
+          },
+        },
+        {
+          title: "Overdue",
+          value: overdueCount,
+          icon: ClockIcon,
+          iconColor: "#F97316",
+          iconBgColor: "#FFEDD5",
+          metric: {
+            text: "Based on current list",
+            dotColor: "#F97316",
+          },
+        },
+        {
+          title: "Converted Prospects",
+          value: totalConvertedProspects,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: "Has associated leads",
+            dotColor: "#8B5CF6",
+          },
+        },
+        {
+          title: "Recently Contacted",
+          value: recentlyContactedCount,
+          icon: MessageCircle,
+          iconColor: "#0EA5E9",
+          iconBgColor: "#E0F2FE",
+          metric: {
+            text: "Last 24 hours (current list)",
+            dotColor: "#0EA5E9",
+          },
+        },
+        {
+          title: "Not Contacted",
+          value: notContactedCount,
+          icon: XCircle,
+          iconColor: "#64748B",
+          iconBgColor: "#F1F5F9",
+          metric: {
+            text: "No call attempt yet (current list)",
+            dotColor: "#94A3B8",
+          },
+        },
+      ];
+    },
+    [dataList, totalAllProspects, totalRecords, metrics, totalConvertedProspects],
   );
 
   // Define columns for GenericTable - Clean declarative definitions
@@ -3217,6 +3313,7 @@ const CrmProspectsManagement = () => {
                 firstName: "",
                 lastName: "",
                 email: "",
+                phone_country_code: "",
                 phoneNumber: "",
                 campaign_id: null,
                 contact_owner: null,
@@ -3300,11 +3397,15 @@ const CrmProspectsManagement = () => {
       const assignedTo = userExtension;
       const uploadedBy = userExtension;
 
+      const phoneForPayload =
+        contactForm.phone_country_code && contactForm.phoneNumber?.trim()
+          ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
+          : contactForm.phoneNumber?.trim() ?? "";
       setCreateContactLoading(true);
       try {
         await createCrmData({
           name,
-          phone: contactForm.phoneNumber.trim(),
+          phone: phoneForPayload,
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
@@ -3331,6 +3432,7 @@ const CrmProspectsManagement = () => {
           firstName: "",
           lastName: "",
           email: "",
+          phone_country_code: "",
           phoneNumber: "",
           campaign_id: null,
           contact_owner: null,
@@ -3373,11 +3475,15 @@ const CrmProspectsManagement = () => {
       toast.error("Campaign is required");
       return;
     }
+    const phoneForPayload =
+      contactForm.phone_country_code && contactForm.phoneNumber?.trim()
+        ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
+        : contactForm.phoneNumber?.trim() ?? "";
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
         name,
-        phone: contactForm.phoneNumber.trim(),
+        phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
         source: contactForm.source?.trim() || undefined,
@@ -3702,31 +3808,50 @@ const CrmProspectsManagement = () => {
                       >
                         Phone <span style={{ color: "#f2545b" }}>*</span>
                       </label>
-                      <input
-                        type="tel"
-                        data-test-id="phone-input"
-                        value={contactForm.phoneNumber}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            phoneNumber: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
+                      <div className="phone-input-wrapper contact-form-phone-input-wrapper">
+                        <PhoneInput
+                          international
+                          defaultCountry="US"
+                          value={
+                            contactForm.phone_country_code && contactForm.phoneNumber
+                              ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
+                              : contactForm.phoneNumber || undefined
+                          }
+                          onChange={(value) => {
+                            if (value) {
+                              try {
+                                const phoneNumber = parsePhoneNumberInput(value);
+                                if (phoneNumber) {
+                                  setContactForm({
+                                    ...contactForm,
+                                    phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                    phoneNumber: phoneNumber.nationalNumber,
+                                  });
+                                } else {
+                                  setContactForm({
+                                    ...contactForm,
+                                    phone_country_code: "",
+                                    phoneNumber: value,
+                                  });
+                                }
+                              } catch {
+                                setContactForm({
+                                  ...contactForm,
+                                  phone_country_code: "",
+                                  phoneNumber: value,
+                                });
+                              }
+                            } else {
+                              setContactForm({
+                                ...contactForm,
+                                phone_country_code: "",
+                                phoneNumber: "",
+                              });
+                            }
+                          }}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -4465,6 +4590,19 @@ const CrmProspectsManagement = () => {
           flex: 1;
           overflow-y: auto;
           overflow-x: hidden;
+        }
+        /* Phone input: match other form fields - border like text inputs, no blue focus glow */
+        .contact-form-phone-input-wrapper .PhoneInput {
+          border: 1px solid #8a8a8a !important;
+          border-radius: 4px;
+          padding: 10px 12px;
+          font-size: 14px;
+          box-shadow: none !important;
+        }
+        .contact-form-phone-input-wrapper .PhoneInput:focus-within {
+          border-color: #0091ae !important;
+          outline: none;
+          box-shadow: none !important;
         }
       `,
         }}

@@ -121,6 +121,7 @@ import {
   AlertCircle,
   RotateCcw,
   CheckSquare,
+  Download,
 } from "lucide-react";
 import {
   PieChart,
@@ -614,6 +615,13 @@ const CrmLeads = () => {
   >(null);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
+  const [leadsViewMode, setLeadsViewMode] = useState<"table" | "board">("table");
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
+  const [exportFileName, setExportFileName] = useState("");
   // Sidebar states
   const [showLeadSidebar, setShowLeadSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
@@ -1035,6 +1043,19 @@ const CrmLeads = () => {
     fetchLeads,
   ]);
 
+  // Sync draft columns when column editor opens
+  useEffect(() => {
+    if (showColumnEditor) setDraftSelectedColumns([...selectedLeadsColumns]);
+  }, [showColumnEditor, selectedLeadsColumns]);
+
+  // Initialize export filters when export modal opens
+  useEffect(() => {
+    if (showExportModal) {
+      setExportFilters({ ...currentFilters });
+      setExportFileName(`leads_${moment().format("YYYY-MM-DD")}`);
+    }
+  }, [showExportModal, currentFilters]);
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
@@ -1175,6 +1196,47 @@ const CrmLeads = () => {
     });
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  // Build API params from filters for export
+  const buildLeadsExportParams = useCallback(
+    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
+      const params: Record<string, any> = { ...filters };
+      if (pagination) {
+        params.page = pagination.page;
+        params.per_page = pagination.per_page;
+      }
+      return params;
+    },
+    [],
+  );
+
+  const fetchLeadsForExport = useCallback(
+    async (filters: Record<string, any>) => {
+      const PER_PAGE = 100;
+      let page = 1;
+      const allData: any[] = [];
+      for (;;) {
+        const response: any = await getLeads(
+          buildLeadsExportParams(filters, { page, per_page: PER_PAGE }),
+        );
+        const inner = response?.data;
+        const chunk = Array.isArray(inner?.data)
+          ? inner.data
+          : Array.isArray(inner)
+            ? inner
+            : Array.isArray(response?.data)
+              ? response.data
+              : [];
+        const pagination = inner?.pagination ?? response?.pagination ?? {};
+        const lastPage = pagination?.last_page ?? response?.last_page ?? 1;
+        allData.push(...chunk);
+        if (page >= lastPage || chunk.length < PER_PAGE) break;
+        page += 1;
+      }
+      return allData;
+    },
+    [buildLeadsExportParams],
+  );
 
   const [leadFollowUps, setLeadFollowUps] = useState<any[]>([]);
   const [loadingLeadFollowUps, setLoadingLeadFollowUps] = useState(false);
@@ -2577,73 +2639,164 @@ const CrmLeads = () => {
 
   // Stats cards data for metrics
   const leadsStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Leads",
-        value: summaryTiles?.total_leads || totalLeads || 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in system",
-      },
-      {
-        title: "New",
-        value: summaryTiles?.new_leads || analyticsData.stageCounts["New"] || 0,
-        icon: UserCheck,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh leads",
-          dotColor: "#2563EB",
+    () => {
+      const now = moment();
+
+      const createdLast7Days = leadsData.filter((l: any) =>
+        l?.created_at ? moment(l.created_at).isAfter(now.clone().subtract(7, "days")) : false,
+      ).length;
+
+      const transformed = leadsData.map(transformLeadData);
+      const allFollowUps = transformed.flatMap((l) => l.followUps || []);
+      const allMeetings = transformed.flatMap((l) => l.meetings || []);
+
+      const isNotCompletedFollowUp = (fu: any) => {
+        const status = (fu?.follow_up_status ?? "").toString().toLowerCase();
+        return status !== "completed";
+      };
+
+      const parseFollowUpMoment = (fu: any) => {
+        if (!fu?.follow_up_date) return null;
+        const m = moment(fu.follow_up_date);
+        return m.isValid() ? m : null;
+      };
+
+      const parseMeetingMoment = (mtg: any) => {
+        const date = mtg?.meeting_date;
+        if (!date) return null;
+        const time = (mtg?.meeting_time ?? "").toString().trim();
+        const m = time
+          ? moment(`${date} ${time}`, ["YYYY-MM-DD HH:mm", "YYYY-MM-DD H:mm"], true)
+          : moment(date, ["YYYY-MM-DD", moment.ISO_8601], true);
+        return m.isValid() ? m : null;
+      };
+
+      const isScheduledMeeting = (mtg: any) => {
+        const status = (mtg?.status ?? "scheduled").toString().toLowerCase();
+        return status === "scheduled";
+      };
+
+      const todaysFollowUps = allFollowUps.filter((fu) => {
+        if (!isNotCompletedFollowUp(fu)) return false;
+        const m = parseFollowUpMoment(fu);
+        return m ? m.isSame(now, "day") : false;
+      }).length;
+
+      const followUpsNextHour = allFollowUps.filter((fu) => {
+        if (!isNotCompletedFollowUp(fu)) return false;
+        const m = parseFollowUpMoment(fu);
+        return m ? m.isBetween(now, now.clone().add(1, "hour"), undefined, "[)") : false;
+      }).length;
+
+      const overdueFollowUps = allFollowUps.filter((fu) => {
+        if (!isNotCompletedFollowUp(fu)) return false;
+        const m = parseFollowUpMoment(fu);
+        return m ? m.isBefore(now) : false;
+      }).length;
+
+      const todaysMeetings = allMeetings.filter((mtg) => {
+        if (!isScheduledMeeting(mtg)) return false;
+        const m = parseMeetingMoment(mtg);
+        return m ? m.isSame(now, "day") : false;
+      }).length;
+
+      const meetingsNextHour = allMeetings.filter((mtg) => {
+        if (!isScheduledMeeting(mtg)) return false;
+        const m = parseMeetingMoment(mtg);
+        return m ? m.isBetween(now, now.clone().add(1, "hour"), undefined, "[)") : false;
+      }).length;
+
+      const overdueMeetings = allMeetings.filter((mtg) => {
+        if (!isScheduledMeeting(mtg)) return false;
+        const m = parseMeetingMoment(mtg);
+        return m ? m.isBefore(now) : false;
+      }).length;
+
+      const highPriority =
+        summaryTiles?.hot_leads ??
+        transformed.filter((l) => (l.leadPotential ?? "").toString() === "Hot").length;
+
+      const converted =
+        summaryTiles?.converted_leads ??
+        summaryTiles?.converted ??
+        summaryTiles?.converted_to_deals ??
+        0;
+
+      const convertedLast7Days =
+        summaryTiles?.converted_last_7_days ??
+        summaryTiles?.converted_leads_last_7_days ??
+        summaryTiles?.converted_in_last_7_days ??
+        0;
+
+      return [
+        {
+          title: "All Leads",
+          value: summaryTiles?.total_leads || totalLeads || 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${createdLast7Days} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_leads ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "Proposal",
-        value: analyticsData.stageCounts["Proposal"] || 0,
-        icon: FileText,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: "In review",
-          dotColor: "#7C3AED",
+        {
+          title: "Today's Follow-ups",
+          value: summaryTiles?.todays_follow_ups ?? todaysFollowUps,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${summaryTiles?.follow_ups_next_hour ?? followUpsNextHour} in next hour`,
+            dotColor: "#F59E0B",
+          },
         },
-      },
-      {
-        title: "Negotiation",
-        value: analyticsData.stageCounts["Negotiation"] || 0,
-        icon: Handshake,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "Active discussions",
-      },
-      {
-        title: "Closed Won",
-        value:
-          analyticsData.stageCounts["Closed Won"] ||
-          analyticsData.stageCounts["Won"] ||
-          0,
-        icon: Target,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Success",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
+        {
+          title: "Today's Meetings",
+          value: summaryTiles?.todays_meetings ?? todaysMeetings,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${summaryTiles?.meetings_next_hour ?? meetingsNextHour} in next hour`,
+            dotColor: "#F59E0B",
+          },
         },
-      },
-    ],
-    [summaryTiles, totalLeads, analyticsData],
+        {
+          title: "Overdue",
+          value: summaryTiles?.overdue_total ?? overdueFollowUps + overdueMeetings,
+          icon: Clock,
+          iconColor: "#F97316",
+          iconBgColor: "#FFEDD5",
+          metric: {
+            text: `${summaryTiles?.overdue_follow_ups ?? overdueFollowUps} Follow-ups / ${
+              summaryTiles?.overdue_meetings ?? overdueMeetings
+            } Meeting${(summaryTiles?.overdue_meetings ?? overdueMeetings) === 1 ? "" : "s"}`,
+            dotColor: "#F97316",
+          },
+        },
+        {
+          title: "High-Priority Leads",
+          value: highPriority,
+          icon: TrendingUp,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Leads with hot potential & high probability",
+        },
+        {
+          title: "Converted Leads",
+          value: converted,
+          icon: CheckCircle,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${convertedLast7Days} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [leadsData, summaryTiles, totalLeads],
   );
 
   // Custom select styles
@@ -3648,7 +3801,9 @@ const CrmLeads = () => {
             >
               <GenericTable
                 data={filteredLeads}
-                columns={leadsColumns}
+                columns={leadsColumns.filter((c) =>
+                  selectedLeadsColumns.includes(c.key),
+                )}
                 actions={leadsActions}
                 showActions={false}
                 pagination={{
@@ -3753,17 +3908,19 @@ const CrmLeads = () => {
                     setRefreshKey((prev) => prev + 1);
                   },
 
-                  // Actions
+                  // Actions (Table view / Board View - same as prospects)
                   showTableViewDropdown: true,
-                  tableViewLabel: "Table view",
-                  showViewSwitcher: true,
+                  currentTableView: leadsViewMode,
+                  onTableViewChange: (view) => setLeadsViewMode(view),
                   showEditColumns: true,
+                  onEditColumnsClick: () => setShowColumnEditor(true),
                   showPipelineDropdown: false,
                   pipelineLabel: "All Pipelines",
                   showFiltersButton: true,
                   onFiltersClick: handleOpenFiltersSidebar,
                   showSortButton: true,
                   showExportButton: true,
+                  onExportClick: () => setShowExportModal(true),
                   showSaveButton: true,
 
                   // Filter Pills
@@ -3981,6 +4138,23 @@ const CrmLeads = () => {
                   ) : undefined,
                 }}
                 statsCards={leadsStatsCards}
+                customBody={
+                  leadsViewMode === "board" ? (
+                    <div
+                      className="d-flex align-items-center justify-content-center p-5"
+                      style={{ minHeight: "400px", background: "#f8f9fa" }}
+                    >
+                      <div className="text-center text-muted">
+                        <Layers size={48} className="mb-3 opacity-50" />
+                        <h5 className="mb-2">Board View</h5>
+                        <p className="mb-0 small">
+                          Switch to Table view from the dropdown to see the
+                          table.
+                        </p>
+                      </div>
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
           </div>
@@ -10012,6 +10186,311 @@ const CrmLeads = () => {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowTabModal(false)}>
             Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Column Editor Modal */}
+      <Modal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Customize Columns</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">
+            Select which columns to display in the table
+          </p>
+          <Row>
+            {leadsColumns.map((col) => {
+              const isChecked = draftSelectedColumns.includes(col.key);
+              const isOnlySelected =
+                isChecked && draftSelectedColumns.length === 1;
+              return (
+                <Col key={col.key} md={6} className="mb-2">
+                  <Form.Check
+                    type="checkbox"
+                    id={`column-check-${col.key}`}
+                    label={col.label}
+                    checked={isChecked}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setDraftSelectedColumns((prev) =>
+                          prev.includes(col.key) ? prev : [...prev, col.key],
+                        );
+                      } else if (!isOnlySelected) {
+                        setDraftSelectedColumns((prev) =>
+                          prev.filter((k) => k !== col.key),
+                        );
+                      }
+                    }}
+                  />
+                </Col>
+              );
+            })}
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowColumnEditor(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setSelectedLeadsColumns(draftSelectedColumns);
+              setShowColumnEditor(false);
+            }}
+          >
+            Apply Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal
+        show={showExportModal}
+        onHide={() => setShowExportModal(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Export Leads</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            Choose filters to define which leads are exported. Defaults match
+            your current table view.
+          </p>
+          <Form.Group className="mb-3">
+            <Form.Label>File name</Form.Label>
+            <Form.Control
+              type="text"
+              value={exportFileName}
+              onChange={(e) => setExportFileName(e.target.value)}
+              placeholder="leads_2025-02-27"
+            />
+          </Form.Group>
+          <hr />
+          <h6 className="mb-3">Export filters</h6>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Associate with</Form.Label>
+                <Form.Select
+                  value={
+                    exportFilters.assigned_to
+                      ? String(exportFilters.assigned_to)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.assigned_to = v;
+                      else delete next.assigned_to;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All owners</option>
+                  {extensions.map((ext) => (
+                    <option
+                      key={String(ext.id || ext.extension)}
+                      value={String(ext.id || ext.extension)}
+                    >
+                      {ext.display_name ||
+                        ext.name ||
+                        ext.id ||
+                        ext.extension ||
+                        ""}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Lead Stage</Form.Label>
+                <Form.Select
+                  value={exportFilters.stage_id || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.stage_id = v;
+                      else delete next.stage_id;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All stages</option>
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={String(stage.id)}>
+                      {stage.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Create date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.date_from;
+                    const to = exportFilters.date_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.date_from;
+                        delete next.date_to;
+                      } else {
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.date_from = today;
+                          next.date_to = today;
+                        } else if (v === "week") {
+                          next.date_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.date_to = today;
+                        } else {
+                          next.date_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.date_to = today;
+                        }
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Search</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Filter by name, company, etc."
+                  value={exportFilters.search || ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.search = v;
+                      else delete next.search;
+                      return next;
+                    });
+                  }}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowExportModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            disabled={exporting}
+            onClick={async () => {
+              const name =
+                exportFileName.trim() ||
+                `leads_${moment().format("YYYY-MM-DD")}`;
+              const ext = name.endsWith(".csv") ? "" : ".csv";
+              setExporting(true);
+              try {
+                const allData = await fetchLeadsForExport(exportFilters);
+                if (allData.length === 0) {
+                  toast.info("No leads match the selected filters.");
+                  setExporting(false);
+                  return;
+                }
+                const headers = Array.from(
+                  new Set(
+                    allData.flatMap((row) =>
+                      typeof row === "object" && row !== null
+                        ? Object.keys(row).filter(
+                            (k) =>
+                              !["campaign", "stage", "contact_persons"].includes(
+                                k,
+                              ) &&
+                              typeof (row as any)[k] !== "object",
+                          )
+                        : [],
+                    ),
+                  ),
+                ).sort();
+                const csvRows = [
+                  headers.join(","),
+                  ...allData.map((row) =>
+                    headers
+                      .map((h) => {
+                        const val = (row as any)[h];
+                        if (val == null) return "";
+                        if (typeof val === "object") return "";
+                        const s = String(val).replace(/"/g, '""');
+                        return s.includes(",") || s.includes('"')
+                          ? `"${s}"`
+                          : s;
+                      })
+                      .join(","),
+                  ),
+                ];
+                const blob = new Blob([csvRows.join("\n")], {
+                  type: "text/csv;charset=utf-8;",
+                });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = name + ext;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                setShowExportModal(false);
+                toast.success(
+                  `Exported ${allData.length} leads successfully!`,
+                );
+              } catch (err) {
+                toast.error("Failed to export leads");
+              } finally {
+                setExporting(false);
+              }
+            }}
+          >
+            {exporting ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download size={16} className="me-2" />
+                Export
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

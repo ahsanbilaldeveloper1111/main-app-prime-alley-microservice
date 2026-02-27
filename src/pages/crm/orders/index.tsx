@@ -1637,68 +1637,126 @@ const CrmOrders = () => {
 
   // Define stats cards for GenericTable
   const ordersStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "All Orders",
-        value: summaryTiles?.total_orders || totalOrders || 0,
-        icon: ShoppingBag,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: "Total in pipeline",
-      },
-      {
-        title: "New",
-        value:
-          summaryTiles?.new_orders || analyticsData.stageCounts["New"] || 0,
-        icon: PlusCircle,
-        iconColor: "#3B82F6",
-        iconBgColor: "#DBEAFE",
-        metric: {
-          text: "Fresh orders",
-          dotColor: "#2563EB",
+    () => {
+      const now = moment();
+
+      const createdLast7Days = ordersData.filter((o: any) => {
+        const dt = o?.created_at;
+        if (!dt) return false;
+        const m = moment(dt);
+        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
+      }).length;
+
+      const transformed = ordersData.map(transformOrderData);
+
+      const isCompleted = (o: any) =>
+        (o.fulfillmentStatus ?? "")
+          .toString()
+          .toLowerCase()
+          .match(/completed|delivered/) != null;
+
+      const isInProgress = (o: any) =>
+        (o.fulfillmentStatus ?? "")
+          .toString()
+          .toLowerCase()
+          .match(/progress|in_progress|in progress|active/) != null;
+
+      const isUnderReview = (o: any) =>
+        (o.approvalStatus ?? "")
+          .toString()
+          .toLowerCase()
+          .match(/pending|review/) != null;
+
+      const isCancelled = (o: any) => {
+        const f = (o.fulfillmentStatus ?? "").toString().toLowerCase();
+        const s = (o.status ?? "").toString().toLowerCase();
+        return f.includes("cancel") || s.includes("cancel");
+      };
+
+      const completedCount = transformed.filter(isCompleted).length;
+      const activeCount = transformed.filter(isInProgress).length;
+      const underReviewCount = transformed.filter(isUnderReview).length;
+      const cancelledCount = transformed.filter(isCancelled).length;
+
+      const completedLast7Days = ordersData.filter((raw: any) => {
+        const tr = transformOrderData(raw);
+        if (!isCompleted(tr)) return false;
+        const dt = raw?.actual_delivery_date || raw?.updated_at || raw?.created_at;
+        if (!dt) return false;
+        const m = moment(dt);
+        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
+      }).length;
+
+      const cancelledLast7Days = ordersData.filter((raw: any) => {
+        const tr = transformOrderData(raw);
+        if (!isCancelled(tr)) return false;
+        const dt = raw?.updated_at || raw?.created_at;
+        if (!dt) return false;
+        const m = moment(dt);
+        return m.isValid() ? m.isAfter(now.clone().subtract(7, "days")) : false;
+      }).length;
+
+      return [
+        {
+          title: "All Orders",
+          value: summaryTiles?.total_orders || totalOrders || 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${createdLast7Days} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "Qualified",
-        value:
-          summaryTiles?.qualified_orders ||
-          analyticsData.stageCounts["Qualified"] ||
-          0,
-        icon: CheckCircle,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        subtitle: "Verified & ready",
-      },
-      {
-        title: "In Progress",
-        value: analyticsData.inProgress || 0,
-        icon: Activity,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        subtitle: "Being processed",
-      },
-      {
-        title: "Delivered",
-        value: analyticsData.delivered || 0,
-        icon: Package,
-        iconColor: "#059669",
-        iconBgColor: "#D1FAE5",
-        badge: {
-          text: "Completed",
-          bgColor: "#D1FAE5",
-          textColor: "#065F46",
+        {
+          title: "High-Value Orders",
+          value: 11,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Client-defined threshold",
         },
-      },
-      {
-        title: "Pending Approval",
-        value: analyticsData.pendingApproval || 0,
-        icon: AlertCircle,
-        iconColor: "#EF4444",
-        iconBgColor: "#FEE2E2",
-        subtitle: "Requires review",
-      },
-    ],
-    [summaryTiles, totalOrders, analyticsData],
+        {
+          title: "Active Orders",
+          value: activeCount,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "In progress",
+        },
+        {
+          title: "Orders under Review",
+          value: underReviewCount,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          additionalText: "Orders paused for review",
+        },
+        {
+          title: "Completed Orders",
+          value: completedCount,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${completedLast7Days} in last 7 days`,
+            dotColor: "#10B981",
+          },
+        },
+        {
+          title: "Canceled Orders",
+          value: cancelledCount,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${cancelledLast7Days} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [ordersData, summaryTiles, totalOrders],
   );
 
   // Custom select styles
