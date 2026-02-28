@@ -64,7 +64,7 @@ import {
   Modal,
   Spinner
 } from "react-bootstrap";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,

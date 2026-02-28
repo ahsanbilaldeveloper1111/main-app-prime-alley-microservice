@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { Plus, Trash2 } from "lucide-react";
 import { Country, State, City } from "country-state-city";
 import { toast } from "react-toastify";
@@ -249,10 +249,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               classNamePrefix="select"
               placeholder={loadingDepartments ? "Loading departments…" : "Select department"}
               isClearable
+              isSearchable
               isDisabled={loadingDepartments}
               isLoading={loadingDepartments}
               options={mainAppDepartmentOptions}
               value={mainAppDepartmentOptions.find((o) => o.value === String(form.department_id ?? "")) ?? null}
+              resetSearchOnValueChange={show}
               onChange={(opt) => {
                 const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
                 setForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
@@ -279,10 +281,12 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                     : "Select user"
               }
               isClearable
+              isSearchable
               isDisabled={form.department_id == null || userOptionsLoading}
               isLoading={userOptionsLoading}
               options={mainAppUserOptions}
               value={mainAppUserOptions.find((o) => o.value === (form.user_id ?? "")) ?? null}
+              resetSearchOnValueChange={show}
               onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
               styles={selectStyles}
             />

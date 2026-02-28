@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import { Card, Form, Button } from "react-bootstrap";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { VerifyUserInfoParams } from "@models/tms/UnfidiedOp";
 import { MobileUser, DNCRCallingAccess, FacInfoCallingAccess } from "@models/tms/Company";
 

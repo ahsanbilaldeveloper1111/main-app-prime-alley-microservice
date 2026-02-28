@@ -8,7 +8,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { ClusterName } from "@models/tms/CiscoPBXResponse";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 
 import { User, UserSettingUpdate } from "@models/tms/User";
 import axiosInstance from "@utils/axios";

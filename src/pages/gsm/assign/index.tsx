@@ -22,7 +22,7 @@ import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import "@assets/scss/common.scss";
 
 import GsmCompanyFilter from "@components/filters/GsmCompanyFilter";

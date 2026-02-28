@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   FolderOpen,
   Check,
+  Info,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -776,7 +777,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           height: "100vh",
           backgroundColor: "#fff",
           boxShadow: "-4px 0 20px rgba(0,0,0,0.12)",
-          zIndex: 1001,
+          zIndex: 999999,
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -842,7 +843,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           }}
         >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
-            <Form.Group className={groupClass}>
+
+            <Row>
+
+              <Col xs={12}>
+              <Form.Group className={groupClass}>
               <Form.Label style={labelStyle}>
                 <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                 Title <span style={{ color: "#ef4444" }}>*</span>
@@ -859,11 +864,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 required
               />
             </Form.Group>
+              </Col>
 
-            <Form.Group className={groupClass}>
+              <Col xs={12} md={6}>
+              <Form.Group className={groupClass}>
               <Form.Label style={labelStyle}>
-                <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Task Type
+                Task Type <span style={{ color: "#ef4444" }}>*</span>
               </Form.Label>
               <Form.Select
                 value={formData.taskType}
@@ -881,289 +887,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 <option value="recurring">Recurring</option>
               </Form.Select>
             </Form.Group>
-
-            {formData.taskType === "recurring" && (
-              <>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Frequency
-                  </Form.Label>
-                  <Form.Select
-                    value={formData.frequency}
-                    onChange={(e) =>
-                      setFormData({ ...formData, frequency: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </Form.Select>
-                </Form.Group>
-                <Row>
-                  <Col xs={12} md={6}>
-                    <Form.Group className={groupClass}>
-                      <Form.Label style={labelStyle}>
-                        Repeat every
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={formData.repeatInterval}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            repeatInterval: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                          })
-                        }
-                        className="py-2"
-                        style={{ fontSize: "14px" }}
-                      />
-                      <Form.Text className="text-muted">
-                        {formData.frequency === "daily" && "day(s)"}
-                        {formData.frequency === "weekly" && "week(s)"}
-                        {formData.frequency === "monthly" && "month(s)"}
-                        {formData.frequency === "yearly" && "year(s)"}
-                      </Form.Text>
-                    </Form.Group>
-                  </Col>
-                  {(formData.frequency === "weekly" || formData.frequency === "monthly") && (
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          {formData.frequency === "weekly" ? "Repeat on (days)" : "Day of month"}
-                        </Form.Label>
-                        {formData.frequency === "weekly" ? (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => {
-                              const dayNum = String(idx);
-                              const isChecked = formData.repeatOn.split(",").map((s) => s.trim()).includes(dayNum);
-                              return (
-                                <Form.Check
-                                  key={day}
-                                  type="checkbox"
-                                  id={`repeat-${day}`}
-                                  label={day}
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    const current = formData.repeatOn.split(",").map((s) => s.trim()).filter(Boolean);
-                                    const next = isChecked
-                                      ? current.filter((d) => d !== dayNum)
-                                      : [...current, dayNum].sort((a, b) => Number(a) - Number(b));
-                                    setFormData({ ...formData, repeatOn: next.join(",") });
-                                  }}
-                                  style={{ fontSize: "13px" }}
-                                />
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <Form.Control
-                            type="number"
-                            min={1}
-                            max={31}
-                            placeholder="e.g. 15"
-                            value={formData.repeatOn || ""}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const num = v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
-                              setFormData({ ...formData, repeatOn: num });
-                            }}
-                            className="py-2"
-                            style={{ fontSize: "14px" }}
-                          />
-                        )}
-                      </Form.Group>
-                    </Col>
-                  )}
-                </Row>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Time (optional)
-                  </Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={formData.dueTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueTime: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-              </>
-            )}
-
-            <Form.Group className={groupClass}>
-              <Form.Label style={labelStyle}>
-                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                Description
-              </Form.Label>
-              <RichTextEditor
-                buttonSize="sm"
-                value={formData.description || ""}
-                onChange={(html: string) => {
-                  setFormData({ ...formData, description: html });
-                }}
-                placeholder="Describe the task..."
-                minHeight="100px"
-                maxHeight="200px"
-                maxLength={5000}
-              />
-            </Form.Group>
-
-            <Row className="mb-3">
-              {formData.taskType !== "todo" && (
-                <Col xs={6} className="mb-3">
-                  <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <FolderOpen size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Project
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.projectId || ""}
-                      onChange={(e) => {
-                        const newProjectId = e.target.value
-                          ? Number(e.target.value)
-                          : null;
-                        setFormData((prev) => ({
-                          ...prev,
-                          projectId: newProjectId,
-                          statusId: null,
-                        }));
-                        fetchLinkRecordsForSearch(searchQuery, newProjectId);
-                      }}
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                      disabled={loadingProjects || projects.length === 0}
-                    >
-                      {loadingProjects ? (
-                        <option value="">Loading projects...</option>
-                      ) : projects.length === 0 ? (
-                        <option value="">No projects available</option>
-                      ) : (
-                        <>
-                          <option value="">Select project</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              )}
-
-              {formData.taskType !== "todo" && (
-                <Col xs={6} className="mb-3">
-                  <Form.Group className={groupClass}>
-                    <Form.Label style={labelStyle}>
-                      <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                      Status
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.statusId ?? ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          statusId: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        })
-                      }
-                      className="py-2"
-                      style={{ fontSize: "14px" }}
-                      disabled={
-                        (formData.projectId && loadingProjects) ||
-                        (!formData.projectId && loadingGenericStatuses) ||
-                        statuses.length === 0
-                      }
-                    >
-                      {(formData.projectId && loadingProjects) ||
-                      (!formData.projectId && loadingGenericStatuses) ? (
-                        <option value="">Loading statuses...</option>
-                      ) : statuses.length === 0 ? (
-                        isEdit && formData.statusId ? (
-                          <option value={formData.statusId}>
-                            {editTask?.status?.name ||
-                              editTask?.status_name ||
-                              `Status #${formData.statusId}`}
-                          </option>
-                        ) : (
-                          <option value="">No statuses available</option>
-                        )
-                      ) : (
-                        <>
-                          <option value="">Select status</option>
-                          {isEdit &&
-                            formData.statusId &&
-                            !statuses.some(
-                              (s) => String(s.id) === String(formData.statusId)
-                            ) && (
-                              <option value={formData.statusId}>
-                                {editTask?.status?.name ||
-                                  editTask?.status_name ||
-                                  `Status #${formData.statusId}`}
-                              </option>
-                            )}
-                          {statuses.map((status) => (
-                            <option key={status.id} value={status.id}>
-                              {status.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              )}
-
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Start Date
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
               </Col>
               <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
+              <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
-                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    End Date
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDate: e.target.value })
-                    }
-                    className="py-2"
-                    style={{ fontSize: "14px" }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col xs={12} md={6}>
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <Flag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Priority
+                    Priority <span style={{ color: "#ef4444" }}>*</span>
                   </Form.Label>
                   <Form.Select
                     value={formData.priorityId || 0}
@@ -1184,419 +912,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Form.Select>
                 </Form.Group>
               </Col>
-            </Row>
 
-            {formData.taskType !== "todo" && (
+              <Col xs={12}>
               <Form.Group className={groupClass}>
-                <Form.Label style={labelStyle}>
-                  <Users size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                  Assignees
-                </Form.Label>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedAssignees.map((user) => (
-                    <div
-                      key={user.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleAssignee(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleAssignee(user.id)
-                      }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#edf6ff",
-                        border: "1px solid #bfdbfe",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
-                        {user.name}
-                      </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAssigneeDropdown(!showAssigneeDropdown);
-                      if (!showAssigneeDropdown) setAssigneeSearchQuery("");
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Assignee
-                  </button>
-                </div>
-                {showAssigneeDropdown && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 300,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search assignees..."
-                        value={assigneeSearchQuery}
-                        onChange={(e) =>
-                          setAssigneeSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
-                      />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(assigneeSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <div
-                          key={user.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleAssignee(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleAssignee(user.id)
-                          }
-                          style={{
-                            padding: "12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.assigneeIds.includes(user.id)
-                              ? "#edf6ff"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {user.name}
-                          </span>
-                          {formData.assigneeIds.includes(user.id) && (
-                            <Check
-                              size={18}
-                              className="text-primary ms-2"
-                              style={{ flexShrink: 0, display: "inline", verticalAlign: "middle" }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    <div
-                      className="p-2 border-top"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAssigneeDropdown(false);
-                          setAssigneeSearchQuery("");
-                        }}
-                        className="btn btn-primary btn-sm w-100"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Form.Group>
-            )}
-
-            {formData.taskType !== "todo" && (
-              <Form.Group className={groupClass}>
-                <Form.Label style={labelStyle}>
-                  <Eye size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                  Watchers
-                </Form.Label>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  {selectedWatchers.map((user) => (
-                    <div
-                      key={user.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleWatcher(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleWatcher(user.id)
-                      }
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#f0fdf4",
-                        border: "1px solid #bbf7d0",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
-                        {user.name}
-                      </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWatcherDropdown(!showWatcherDropdown);
-                      if (!showWatcherDropdown) setWatcherSearchQuery("");
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Watcher
-                  </button>
-                </div>
-                {showWatcherDropdown && (
-                  <div
-                    style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 4,
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 300,
-                      overflowY: "auto",
-                    }}
-                  >
-                    <div
-                      className="p-2 border-bottom"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <Form.Control
-                        type="text"
-                        placeholder="Search watchers..."
-                        value={watcherSearchQuery}
-                        onChange={(e) =>
-                          setWatcherSearchQuery(e.target.value)
-                        }
-                        className="py-2"
-                        style={{ paddingLeft: 40, fontSize: "14px" }}
-                      />
-                    </div>
-                    {users
-                      .filter((user) =>
-                        user.name
-                          .toLowerCase()
-                          .includes(watcherSearchQuery.toLowerCase())
-                      )
-                      .map((user) => (
-                        <div
-                          key={user.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleWatcher(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleWatcher(user.id)
-                          }
-                          style={{
-                            padding: "12px",
-                            cursor: "pointer",
-                            backgroundColor: formData.watcherIds.includes(user.id)
-                              ? "#f0fdf4"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              color: "#2d3748",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {user.name}
-                          </span>
-                          {formData.watcherIds.includes(user.id) && (
-                            <Check
-                              size={18}
-                              style={{
-                                flexShrink: 0,
-                                display: "inline",
-                                verticalAlign: "middle",
-                                color: "#22c55e",
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    <div
-                      className="p-2 border-top"
-                      style={{ backgroundColor: "white" }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowWatcherDropdown(false);
-                          setWatcherSearchQuery("");
-                        }}
-                        className="btn btn-primary btn-sm w-100"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Form.Group>
-            )}
-
-            {formData.taskType !== "todo" && (
-              <>
-                <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
-                    <Tag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Labels
-                  </Form.Label>
-                  {selectedLabels.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 12,
-                      }}
-                    >
-                      {selectedLabels.map((label) => (
-                        <div
-                          key={label.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleLabel(label.id)}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 12px",
-                            backgroundColor: label.color,
-                            color: "#2d3748",
-                            fontSize: "0.875rem",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            borderRadius: 6,
-                          }}
-                        >
-                          <Tag size={12} />
-                          {label.name}
-                          <X size={12} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      backgroundColor: "#f8fafc",
-                      maxHeight: 140,
-                      overflowY: "auto",
-                      padding: 12,
-                      borderRadius: 4,
-                      border: "1px solid #e2e8f0",
-                    }}
-                  >
-                    {labels.length === 0 ? (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          color: "#718096",
-                          fontSize: "14px",
-                        }}
-                      >
-                        No labels available
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 6,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {labels.map((label) => (
-                          <div
-                            key={label.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => toggleLabel(label.id)}
-                            style={{
-                              backgroundColor: formData.labelIds.includes(
-                                label.id
-                              )
-                                ? label.color
-                                : "#ffffff",
-                              color: "#2d3748",
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              padding: "6px 12px",
-                              cursor: "pointer",
-                              border: formData.labelIds.includes(label.id)
-                                ? "2px solid #3b82f6"
-                                : "1px solid #e2e8f0",
-                              borderRadius: 6,
-                            }}
-                          >
-                            {label.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Form.Group>
-
-                <Form.Group className={groupClass}>
-                  <Form.Label style={labelStyle}>
-                    <LinkIcon size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    Link Records
+                    Associate with records 
                   </Form.Label>
                   <div style={{ marginBottom: 8 }}>
                     <Form.Control
@@ -1738,8 +1058,714 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     )}
                   </div>
                 </Form.Group>
+              </Col>
+
+              <Col xs={12}>
+              {formData.taskType !== "todo" && (
+              <Form.Group className={groupClass}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Form.Label style={{ ...labelStyle, marginBottom: 0 }}>
+                    <Users size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Assigned To
+                  </Form.Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssigneeDropdown(!showAssigneeDropdown);
+                      if (!showAssigneeDropdown) setAssigneeSearchQuery("");
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 12px",
+                      fontSize: "0.875rem",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Plus size={14} />
+                    Add Assignee
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginBottom: 8,
+                  }}
+                >
+                  {selectedAssignees.map((user) => (
+                    <div
+                      key={user.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleAssignee(user.id)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && toggleAssignee(user.id)
+                      }
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        backgroundColor: "#edf6ff",
+                        border: "1px solid #bfdbfe",
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
+                        {user.name}
+                      </span>
+                      <X size={14} style={{ color: "#64748b" }} />
+                    </div>
+                  ))}
+                </div>
+                {showAssigneeDropdown && (
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 4,
+                      backgroundColor: "#f8fafc",
+                      maxHeight: 250,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <div
+                      className="p-2 border-bottom"
+                      style={{ backgroundColor: "white" }}
+                    >
+                      <Form.Control
+                        type="text"
+                        placeholder="Search assignees..."
+                        value={assigneeSearchQuery}
+                        onChange={(e) =>
+                          setAssigneeSearchQuery(e.target.value)
+                        }
+                        className="py-2"
+                        style={{ paddingLeft: 40, fontSize: "14px" }}
+                      />
+                    </div>
+                    {users
+                      .filter((user) =>
+                        user.name
+                          .toLowerCase()
+                          .includes(assigneeSearchQuery.toLowerCase())
+                      )
+                      .map((user) => (
+                        <div
+                          key={user.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleAssignee(user.id)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && toggleAssignee(user.id)
+                          }
+                          style={{
+                            padding: "7px 12px",
+                            cursor: "pointer",
+                            backgroundColor: formData.assigneeIds.includes(user.id)
+                              ? "#edf6ff"
+                              : "white",
+                              borderBottom: "1px solid #d5d5d5",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "13px",
+                              color: "#2d3748",
+                              // fontWeight: 500,
+                            }}
+                          >
+                            {user.name}
+                          </span>
+                          {formData.assigneeIds.includes(user.id) && (
+                            <Check
+                              size={18}
+                              className="text-primary ms-2"
+                              style={{ flexShrink: 0, display: "inline", verticalAlign: "middle" }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    
+                  </div>
+                )}
+              </Form.Group>
+            )}
+              </Col>
+
+              <Col xs={12}>
+              {formData.taskType !== "todo" && (
+              <Form.Group className={groupClass}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Form.Label style={{ ...labelStyle, marginBottom: 0 }}>
+                    <Eye size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Watchers
+                  </Form.Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowWatcherDropdown(!showWatcherDropdown);
+                      if (!showWatcherDropdown) setWatcherSearchQuery("");
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 12px",
+                      fontSize: "0.875rem",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 6,
+                      background: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Plus size={14} />
+                    Add Watcher
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    marginBottom: 8,
+                  }}
+                >
+                  {selectedWatchers.map((user) => (
+                    <div
+                      key={user.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleWatcher(user.id)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && toggleWatcher(user.id)
+                      }
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        backgroundColor: "#f0fdf4",
+                        border: "1px solid #bbf7d0",
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
+                        {user.name}
+                      </span>
+                      <X size={14} style={{ color: "#64748b" }} />
+                    </div>
+                  ))}
+                </div>
+                {showWatcherDropdown && (
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 4,
+                      backgroundColor: "#f8fafc",
+                      maxHeight: 250,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <div
+                      className="p-2 border-bottom"
+                      style={{ backgroundColor: "white" }}
+                    >
+                      <Form.Control
+                        type="text"
+                        placeholder="Search watchers..."
+                        value={watcherSearchQuery}
+                        onChange={(e) =>
+                          setWatcherSearchQuery(e.target.value)
+                        }
+                        className="py-2"
+                        style={{ paddingLeft: 40, fontSize: "14px" }}
+                      />
+                    </div>
+                    {users
+                      .filter((user) =>
+                        user.name
+                          .toLowerCase()
+                          .includes(watcherSearchQuery.toLowerCase())
+                      )
+                      .map((user) => (
+                        <div
+                          key={user.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleWatcher(user.id)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && toggleWatcher(user.id)
+                          }
+                          style={{
+                            padding: "7px 12px",
+                            cursor: "pointer",
+                            backgroundColor: formData.watcherIds.includes(user.id)
+                              ? "#f0fdf4"
+                              : "white",
+                            borderBottom: "1px solid #d5d5d5",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "13px",
+                              color: "#2d3748",
+                              // fontWeight: 500,
+                            }}
+                          >
+                            {user.name}
+                          </span>
+                          {formData.watcherIds.includes(user.id) && (
+                            <Check
+                              size={18}
+                              style={{
+                                flexShrink: 0,
+                                display: "inline",
+                                verticalAlign: "middle",
+                                color: "#22c55e",
+                              }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    
+                  </div>
+                )}
+              </Form.Group>
+            )}
+
+              </Col>
+
+              <Col xs={12} md={6}>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>
+                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Start Date
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startDate: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: "14px" }}
+                  />
+                </Form.Group>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>
+                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    End Date
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dueDate: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: "14px" }}
+                  />
+                </Form.Group>
+              </Col>
+
+            </Row>
+
+
+            {formData.taskType === "recurring" && (
+              <>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>
+                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Frequency
+                  </Form.Label>
+                  <Form.Select
+                    value={formData.frequency}
+                    onChange={(e) =>
+                      setFormData({ ...formData, frequency: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: "14px" }}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </Form.Select>
+                </Form.Group>
+                <Row>
+                  <Col xs={12} md={6}>
+                    <Form.Group className={groupClass}>
+                      <Form.Label style={labelStyle}>
+                        Repeat every
+                      </Form.Label>
+                      <Form.Control
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={formData.repeatInterval}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            repeatInterval: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                          })
+                        }
+                        className="py-2"
+                        style={{ fontSize: "14px" }}
+                      />
+                      <Form.Text className="text-muted">
+                        {formData.frequency === "daily" && "day(s)"}
+                        {formData.frequency === "weekly" && "week(s)"}
+                        {formData.frequency === "monthly" && "month(s)"}
+                        {formData.frequency === "yearly" && "year(s)"}
+                      </Form.Text>
+                    </Form.Group>
+                  </Col>
+                  {(formData.frequency === "weekly" || formData.frequency === "monthly") && (
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          {formData.frequency === "weekly" ? "Repeat on (days)" : "Day of month"}
+                        </Form.Label>
+                        {formData.frequency === "weekly" ? (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => {
+                              const dayNum = String(idx);
+                              const isChecked = formData.repeatOn.split(",").map((s) => s.trim()).includes(dayNum);
+                              return (
+                                <Form.Check
+                                  key={day}
+                                  type="checkbox"
+                                  id={`repeat-${day}`}
+                                  label={day}
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    const current = formData.repeatOn.split(",").map((s) => s.trim()).filter(Boolean);
+                                    const next = isChecked
+                                      ? current.filter((d) => d !== dayNum)
+                                      : [...current, dayNum].sort((a, b) => Number(a) - Number(b));
+                                    setFormData({ ...formData, repeatOn: next.join(",") });
+                                  }}
+                                  style={{ fontSize: "13px" }}
+                                />
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <Form.Control
+                            type="number"
+                            min={1}
+                            max={31}
+                            placeholder="e.g. 15"
+                            value={formData.repeatOn || ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const num = v === "" ? "" : String(Math.max(1, Math.min(31, Number(v) || 1)));
+                              setFormData({ ...formData, repeatOn: num });
+                            }}
+                            className="py-2"
+                            style={{ fontSize: "14px" }}
+                          />
+                        )}
+                      </Form.Group>
+                    </Col>
+                  )}
+                </Row>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>
+                    <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Time (optional)
+                  </Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={formData.dueTime}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dueTime: e.target.value })
+                    }
+                    className="py-2"
+                    style={{ fontSize: "14px" }}
+                  />
+                </Form.Group>
               </>
             )}
+
+
+
+
+            
+
+            
+
+            
+
+            <Form.Group className={groupClass}>
+              <Form.Label style={labelStyle}>
+                <FileText size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                Description
+              </Form.Label>
+              <RichTextEditor
+                buttonSize="sm"
+                value={formData.description || ""}
+                onChange={(html: string) => {
+                  setFormData({ ...formData, description: html });
+                }}
+                placeholder="Describe the task..."
+                minHeight="100px"
+                maxHeight="200px"
+                maxLength={5000}
+              />
+            </Form.Group>
+
+            <Row className="mb-3">
+              {formData.taskType !== "todo" && (
+                <Col xs={12} className="mb-3">
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <FolderOpen size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                      Project
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.projectId || ""}
+                      onChange={(e) => {
+                        const newProjectId = e.target.value
+                          ? Number(e.target.value)
+                          : null;
+                        setFormData((prev) => ({
+                          ...prev,
+                          projectId: newProjectId,
+                          statusId: null,
+                        }));
+                        fetchLinkRecordsForSearch(searchQuery, newProjectId);
+                      }}
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                      disabled={loadingProjects || projects.length === 0}
+                    >
+                      {loadingProjects ? (
+                        <option value="">Loading projects...</option>
+                      ) : projects.length === 0 ? (
+                        <option value="">No projects available</option>
+                      ) : (
+                        <>
+                          <option value="">Select project</option>
+                          {projects.map((project) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
+
+              {formData.taskType !== "todo" && (
+                <Col xs={6} className="mb-3">
+                  <Form.Group className={groupClass}>
+                    <Form.Label style={labelStyle}>
+                      <ListTodo size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                      Status
+                    </Form.Label>
+                    <Form.Select
+                      value={formData.statusId ?? ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          statusId: e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        })
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                      disabled={
+                        (formData.projectId && loadingProjects) ||
+                        (!formData.projectId && loadingGenericStatuses) ||
+                        statuses.length === 0
+                      }
+                    >
+                      {(formData.projectId && loadingProjects) ||
+                      (!formData.projectId && loadingGenericStatuses) ? (
+                        <option value="">Loading statuses...</option>
+                      ) : statuses.length === 0 ? (
+                        isEdit && formData.statusId ? (
+                          <option value={formData.statusId}>
+                            {editTask?.status?.name ||
+                              editTask?.status_name ||
+                              `Status #${formData.statusId}`}
+                          </option>
+                        ) : (
+                          <option value="">No statuses available</option>
+                        )
+                      ) : (
+                        <>
+                          <option value="">Select status</option>
+                          {isEdit &&
+                            formData.statusId &&
+                            !statuses.some(
+                              (s) => String(s.id) === String(formData.statusId)
+                            ) && (
+                              <option value={formData.statusId}>
+                                {editTask?.status?.name ||
+                                  editTask?.status_name ||
+                                  `Status #${formData.statusId}`}
+                              </option>
+                            )}
+                          {statuses.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.name}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
+
+{formData.taskType !== "todo" && (
+              <>
+                <Col xs={12} md={6}>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>
+                    <Tag size={16} className="me-2" style={{ verticalAlign: "middle" }} />
+                    Labels
+                  </Form.Label>
+                  {selectedLabels.length > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 12,
+                      }}
+                    >
+                      {selectedLabels.map((label) => (
+                        <div
+                          key={label.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleLabel(label.id)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 12px",
+                            backgroundColor: label.color,
+                            color: "#2d3748",
+                            fontSize: "0.875rem",
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Tag size={12} />
+                          {label.name}
+                          <X size={12} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      maxHeight: 140,
+                      overflowY: "auto",
+                      padding: 12,
+                      borderRadius: 4,
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    {labels.length === 0 ? (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          color: "#718096",
+                          fontSize: "14px",
+                        }}
+                      >
+                        No labels available
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {labels.map((label) => (
+                          <div
+                            key={label.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => toggleLabel(label.id)}
+                            style={{
+                              backgroundColor: formData.labelIds.includes(
+                                label.id
+                              )
+                                ? label.color
+                                : "#ffffff",
+                              color: "#2d3748",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              padding: "6px 12px",
+                              cursor: "pointer",
+                              border: formData.labelIds.includes(label.id)
+                                ? "2px solid #3b82f6"
+                                : "1px solid #e2e8f0",
+                              borderRadius: 6,
+                            }}
+                          >
+                            {label.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Form.Group>
+                </Col>
+
+               
+              </>
+            )}
+
+             
+              
+            </Row>
+
+            
+
+            
+            
           </Form>
         </div>
 
