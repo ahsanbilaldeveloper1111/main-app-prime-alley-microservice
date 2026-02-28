@@ -11,6 +11,7 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import AuditLogSidebar, { AuditSidebarField } from "@components/AuditLogSidebar";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -48,6 +49,7 @@ function changesSummaryColumn(): TableColumn<Record<string, unknown>> {
     emptyValue: "—",
   };
 }
+
 
 /** Columns per module name. Use these when a module is selected. */
 const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown>>[]> = {
@@ -481,6 +483,29 @@ const AuditLogsNewPage = () => {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
+  const sidebarFields: AuditSidebarField[] = selectedRow ? [
+  { label: "Category",       value: formatLabel(selectedRow.resource_type as string) },
+  { label: "Subcategory",    value: formatLabel(selectedRow.formatted_action as string) },
+  { label: "Action",         value: "Perform" },
+  {
+    label: "Date of change",
+    value: selectedRow.formatted_timestamp as string,
+  },
+  {
+    label: "Modified by",
+    value: "",
+    isUser: true,
+    userName: (selectedRow.user as any)?.display_name || "Unknown",
+    userEmail: (selectedRow.user as any)?.email || "",
+    sectionBreakAfter: true,
+  },
+  { label: "Country",        value: (selectedRow.country as string) || "—" },
+  { label: "Region",         value: (selectedRow.region as string) || "—" },
+  { label: "Login Type",     value: (selectedRow.login_type as string) || "—" },
+  { label: "User Agent",     value: (selectedRow.user_agent as string) || "—" },
+  { label: "IP Address",     value: (selectedRow.ip_address as string) || "—" },
+] : [];
+
   const visibleAuditModules = useMemo(() => {
     const perms = session?.user?.permissions ?? [];
     return AuditFilterConfig.filter((n) => perms.includes(n.isShow));
@@ -833,35 +858,15 @@ const AuditLogsNewPage = () => {
       </div>
 
       {showSidebar && selectedRow && (
-          <GenericSidebar
-            isOpen={showSidebar}
-            onClose={handleCloseSidebar}
-            
-            title={selectedRow?.formatted_action ? `Audit: ${selectedRow.formatted_action}` : "Audit log"}
-            subtitle={(selectedRow?.formatted_timestamp as string) || ""}
-            quickActions={[]}
-            sections={[
-              {
-                id: "audit-details",
-                title: "Audit log details",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [],
-                fields: getSidebarFieldsForModule(selectedAuditModule?.moduleName ?? null, selectedRow),
-              },
-              {
-                id: "audit-changes",
-                title: "Changes",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [],
-                customContent: <ChangesSummaryTable changes={changesSummary} />,
-              },
-            ]}
-          />
-        )}
+  <AuditLogSidebar
+    isOpen={showSidebar}
+    onClose={handleCloseSidebar}
+    title="Additional details"
+    subtitle={selectedRow.formatted_timestamp as string}
+    fields={sidebarFields}
+    onSaveComment={(comment) => console.log("Comment:", comment)}
+  />
+)}
 
       <Modal show={showAuditDateCustomModal} onHide={() => setShowAuditDateCustomModal(false)} centered>
         <Modal.Header closeButton>

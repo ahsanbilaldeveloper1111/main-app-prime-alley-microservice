@@ -29,7 +29,7 @@ import AssociateTaskModal from "@components/AssociateTaskModal";
 import CreateTaskSidebar from "@components/CreateTaskSidebar";
 import UserActivityByCategory from "@components/UserActivityByCategory";
 import TwoCharts from "@components/TwoCharts";
-
+import SchedulePage from "@components/SchedulePage";
 
 // ─── Styles (inline via style tag approach using className strings) ───────────
 
@@ -684,15 +684,16 @@ const SalesDashboard: NextPageWithLayout = () => {
         )}
 
         {activeTab === "Schedule" && (
-          <div style={styles.section}>
-            <SectionHeader title="Schedule" />
-            <div style={styles.emptyState}>
-              <div style={styles.emptyTitle}>Schedule View</div>
-              <p style={styles.emptyText}>
-                This is the Schedule tab content. Calendar and scheduling features will be displayed here.
-              </p>
-            </div>
-          </div>
+          <SchedulePage />
+          // <div style={styles.section}>
+          //   <SectionHeader title="Schedule" />
+          //   <div style={styles.emptyState}>
+          //     <div style={styles.emptyTitle}>Schedule View</div>
+          //     <p style={styles.emptyText}>
+          //       This is the Schedule tab content. Calendar and scheduling features will be displayed here.
+          //     </p>
+          //   </div>
+          // </div>
         )}
 
         {/* {activeTab === "Dashboard" && (
