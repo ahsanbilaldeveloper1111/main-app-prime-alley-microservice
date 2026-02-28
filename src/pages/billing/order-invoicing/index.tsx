@@ -52,6 +52,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
+  getMinifiedCompanies,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -452,6 +453,8 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
+  const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -554,6 +557,18 @@ const CrmOrders = () => {
     fetchExtensions(ModuleSlug.CRM_ORDERS);
   }, []);
 
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        setCompanies(result ?? []);
+      } catch (e) {
+        console.error("Error fetching companies:", e);
+      }
+    };
+    fetchCompanies();
+  }, []);
+
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
     async (page = 1, perPage = 15) => {
@@ -612,6 +627,9 @@ const CrmOrders = () => {
         if (currentFilters.date_to) {
           params.date_to = currentFilters.date_to;
         }
+        if (selectedCompanyId) {
+          params.crm_company_id = selectedCompanyId;
+        }
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -629,7 +647,7 @@ const CrmOrders = () => {
         setLoading(false);
       }
     },
-    [currentFilters],
+    [currentFilters, selectedCompanyId],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -1900,14 +1918,22 @@ const CrmOrders = () => {
               </ol>
             </nav>
           </div>
-          <div className="d-flex flex-wrap gap-2">
-            {/* <Button
-              variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
+          <div className="d-flex flex-wrap gap-2 align-items-center">
+            <Form.Select
+              size="sm"
+              style={{ width: "220px" }}
+              value={String(selectedCompanyId)}
+              onChange={(e) =>
+                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+              }
             >
-              <BarChart3 size={16} className="me-2" />
-              {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button> */}
+              <option value="">All companies</option>
+              {companies.map((c: { id: string | number; name?: string }) => (
+                <option key={c.id} value={c.id}>
+                  {c.name ?? c.id}
+                </option>
+              ))}
+            </Form.Select>
             <Button
               variant={showFilterBar ? "secondary" : "outline-secondary"}
               onClick={() => setShowFilterBar(!showFilterBar)}

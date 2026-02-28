@@ -1091,3 +1091,26 @@ export const FORMAT_CLOCK = (clock: string) => {
 
   return `${day} ${month} ${year} ${hourStr}:${minutes}:${seconds} ${ampm}`;
 };
+
+/**
+ * Find company name by id from a list of { id, name } objects.
+ * @param id - Company id (e.g. 1)
+ * @param companiesObject - Array of objects with at least { id, name }
+ * @returns The matching company name or undefined
+ */
+export function getCompanyByCrmId(
+  id: string | number | null | undefined,
+  companiesObject: { id?: string | number; name?: string }[] | null | undefined
+): string | undefined {
+  console.log('id', id);
+  console.log('companiesObject', companiesObject);
+  if (id == null || id === '' || !Array.isArray(companiesObject) || companiesObject.length === 0) {
+    return undefined;
+  }
+  const idStr = String(id);
+  const idNum = Number(id);
+  const found = companiesObject.find(
+    (c) => String(c.id) === idStr || Number(c.id) === idNum
+  );
+  return found?.name;
+}

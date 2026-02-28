@@ -116,7 +116,8 @@ const transformApiResponse = (apiResponse: any): TransformedResponse => {
 
 export const GetProducts = async (params: PaginationParams = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-products', { params});
+   // const response = await axiosInstance.get('accounting/get-products', { params });//products/all'
+    const response = await axiosInstance.get('accounting/products/all', { params });
     const formattedResponse = transformApiResponse(response.data);
     console.log('formattedResponse', formattedResponse);
     return formattedResponse;
@@ -137,9 +138,9 @@ export const GetProductCategories = async (): Promise<any[]> => {
   }
 };
 
-export const GetPaymentMethods = async () => {
+export const GetPaymentMethods = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-payment-methods');
+    const response = await axiosInstance.get('accounting/get-payment-methods', { params });
     const formattedResponse = extractData(response.data);
     return formattedResponse;
   } catch (error: any) {
@@ -250,9 +251,9 @@ export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string
   }
 };
 //Dashboard apis end
-export const GetCompanyDetails = async () => {
+export const GetCompanyDetails = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-company-details');
+    const response = await axiosInstance.get('accounting/get-company-details', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch company details");

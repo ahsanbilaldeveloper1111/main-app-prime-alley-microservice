@@ -51,6 +51,7 @@ export interface CompanyData {
   reseller_id?: string | null;
   country?: string;
   stripe_customer_id?: string | null;
+  crm_company_id?: number | string | null;
   profile?: {
     id: number;
     company_id: string;

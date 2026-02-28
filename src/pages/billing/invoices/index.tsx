@@ -26,9 +26,6 @@ import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import {
   getInvoices,
-  createInvoice,
-  updateInvoice,
-  deleteInvoice,
   getInvoice,
   getProductsWithCompanyPricing,
   payInvoice,
@@ -45,9 +42,10 @@ import {
   CreateDirectPaymentData,
   PaymentIntentResponse,
   getCompanies
-} from "@utils/accountingOld";
+} from "@utils/accounts";
 import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
-import { formatNumber, GlobalDateFormat } from "@utils/Helper";
+import { getMinifiedCompanies } from "@utils/crm";
+import { formatNumber, GlobalDateFormat, getCompanyByCrmId } from "@utils/Helper";
 
 import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
 import { Col } from "react-bootstrap";
@@ -794,8 +792,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+    date_to?: string;
   }>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
@@ -805,8 +803,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+  date_to?: string;
   }>({});
   const [showDescriptionModal, setShowDescriptionModal] = useState<boolean>(false);
   const [selectedDescription, setSelectedDescription] = useState<string>('');
@@ -814,7 +812,9 @@ const InvoiceList = () => {
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
   const [isLoadingCompanyProducts, setIsLoadingCompanyProducts] = useState<boolean>(false);
-  
+  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<InvoiceData | null>(null);
@@ -1015,29 +1015,29 @@ const InvoiceList = () => {
         onChange: (value) =>
           setPendingFilters((prev) => ({ ...prev, invoice_date_from: value || undefined })),
       },
-      {
-        id: "invoice_date_to",
-        label: "Invoice Date To",
-        type: "date",
-        value: pendingFilters.invoice_date_to ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, invoice_date_to: value || undefined })),
-      },
+      // {
+      //   id: "invoice_date_to",
+      //   label: "Invoice Date To",
+      //   type: "date",
+      //   value: pendingFilters.invoice_date_to ?? "",
+      //   onChange: (value) =>
+      //     setPendingFilters((prev) => ({ ...prev, invoice_date_to: value || undefined })),
+      // },
       {
         id: "due_date_from",
-        label: "Due Date From",
+        label: "Date From",
         type: "date",
-        value: pendingFilters.due_date_from ?? "",
+        value: pendingFilters.date_from ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, due_date_from: value || undefined })),
+          setPendingFilters((prev) => ({ ...prev, date_from: value || undefined })),
       },
       {
         id: "due_date_to",
-        label: "Due Date To",
+        label: "Date To",
         type: "date",
-        value: pendingFilters.due_date_to ?? "",
+        value: pendingFilters.date_to ?? "",
         onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, due_date_to: value || undefined })),
+          setPendingFilters((prev) => ({ ...prev, date_to: value || undefined })),
       },
     ],
     [
@@ -1045,8 +1045,8 @@ const InvoiceList = () => {
       pendingFilters.status,
       pendingFilters.invoice_date_from,
       pendingFilters.invoice_date_to,
-      pendingFilters.due_date_from,
-      pendingFilters.due_date_to,
+      pendingFilters.date_from,
+      pendingFilters.date_to,
     ]
   );
 
@@ -1386,14 +1386,23 @@ const InvoiceList = () => {
         // Load products for the first company if available
         if (companiesData.data && companiesData.data.length > 0) {
           const firstCompany = companiesData.data[0];
-          await loadCompanyProducts(firstCompany.id);
+         // await loadCompanyProducts(firstCompany.id);
         }
       } catch (error) {
         console.error("Error fetching companies:", error);
       }
     };
+    const fetchCompanyOptions = async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        setCompanyOptions(result ?? []);
+      } catch (e) {
+        console.error("Error fetching company options:", e);
+      }
+    };
 
     fetchCompanies();
+    fetchCompanyOptions();
     loadStripePublishableKey();
     
     // Load exchange rates on initial mount with USD as default base
@@ -1474,6 +1483,7 @@ const InvoiceList = () => {
         per_page: pagination.rowsPerPage,
         search: memoizedFilters.search || "",
         ...memoizedFilters,
+        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
       });
       if (currentRequestId !== invoiceRequestIdRef.current) return;
       const data = response?.data || [];
@@ -1493,7 +1503,7 @@ const InvoiceList = () => {
         setInvoiceLoading(false);
       }
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey]);
+  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey, selectedCompanyId]);
 
   React.useEffect(() => {
     loadInvoices();
@@ -1507,6 +1517,7 @@ const InvoiceList = () => {
           per_page: perPage,
           search,
           ...memoizedFilters,
+          ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
         });
 
         const summary = response?.summary;
@@ -1526,7 +1537,7 @@ const InvoiceList = () => {
         throw error;
       }
     },
-    [memoizedFilters]
+    [memoizedFilters, selectedCompanyId]
   );
 
   const handleFiltersChange = useCallback((filters: any) => {
@@ -2418,8 +2429,20 @@ const InvoiceList = () => {
             </ol>
           </nav>
         </div>
-        <div className="d-flex flex-wrap gap-2">
-          
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <Form.Select
+            size="sm"
+            style={{ width: '220px' }}
+            value={String(selectedCompanyId)}
+            onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
+          >
+            <option value="">All companies</option>
+            {companyOptions.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
           <Button
             variant={showFilterTabs ? "secondary" : "outline-secondary"}
             onClick={() => setShowFilterTabs(!showFilterTabs)}
@@ -2687,7 +2710,7 @@ const InvoiceList = () => {
               <div className="card-body">
                 <div className="row">
                   <div className="col-md-6">
-                    <p><strong>Company:</strong> {selectedInvoiceForPayment.company?.name}</p>
+                    <p><strong>Company:</strong>{getCompanyByCrmId(selectedInvoiceForPayment?.company?.crm_company_id, companyOptions) ?? ''}</p>
                     <p><strong>Invoice Date:</strong> {moment(selectedInvoiceForPayment.invoice_date).format('DD-MMM-YYYY')}</p>
                     <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD-MMM-YYYY') : 'N/A'}</p>
                   </div>
@@ -2890,10 +2913,17 @@ const InvoiceList = () => {
 
               <Row>
                 <Col md={6}>
-                  <h3 className="mb-2">{selectedInvoiceForView?.company?.reseller?.name || ''}</h3>
-                  <h5 className="mb-3 fw-bold" style={{ color: '#14509e' }}>TAX INVOICE {selectedInvoiceForView?.company?.reseller?.profile?.tax_id || ''}</h5>
+                  <h3 className="mb-2">{session?.user?.company_name || ''}</h3>
+                    
+                    {selectedInvoiceForView?.company?.reseller?.profile?.tax_id && selectedInvoiceForView?.company?.reseller?.profile?.tax_id > 0 && (
+                    <h5 className="mb-3 fw-bold" style={{ color: '#14509e' }}>TAX INVOICE {selectedInvoiceForView?.company?.reseller?.profile?.tax_id || ''}</h5>
+                    )}
+                    
                   <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.address || ''}</p>
-                  <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.city || ''}, {selectedInvoiceForView?.company?.reseller?.profile?.country || ''}</p>
+                    {selectedInvoiceForView?.company?.reseller?.profile?.city && selectedInvoiceForView?.company?.reseller?.profile?.city > 0 && (
+                    <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.city || ''}, {selectedInvoiceForView?.company?.reseller?.profile?.country || ''}</p>
+                    )}
+                    
                   <p className="mb-2"><b>Phone:</b>{selectedInvoiceForView?.company?.reseller?.phone || ''}</p>
                   <p className="mb-3"><b>Email:</b> {selectedInvoiceForView?.company?.reseller?.email || ''}</p>
                 </Col>
@@ -2915,7 +2945,7 @@ const InvoiceList = () => {
                 <Col md={6}>
                 <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Bill To</h5>
                   <div className="border p-3 rounded bg-light mb-3">
-                    <p className="mb-2 fw-bold">{selectedInvoiceForView?.company?.name || ''}</p>
+                    <p className="mb-2 fw-bold">{getCompanyByCrmId(selectedInvoiceForView?.company?.crm_company_id, companyOptions) ?? ''}</p>
                     <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
                     <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
 
