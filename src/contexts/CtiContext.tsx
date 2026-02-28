@@ -318,7 +318,11 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     const latestEvent = ctiStomp.eventLog[ctiStomp.eventLog.length - 1];
     if (!latestEvent || !latestEvent.parties || latestEvent.parties.length === 0) return;
     
-    const eventData = latestEvent.parties[0];
+    // For multi-party (e.g. transfer) events, prefer the CONNECTED/active leg so transfer hold uses the right party.
+    const activeStatuses = ['CONNECTED', 'ANSWERED', 'RETRIEVED', 'RINGING', 'ON_HOLD'];
+    const eventData =
+      latestEvent.parties.find((p: any) => p.callStatus && activeStatuses.includes(p.callStatus)) ||
+      latestEvent.parties[0];
     const { callId, callingAddress, calledAddress, callStatus, callingDeviceName, callingDeviceType } = eventData;
     
     if (!callId || !callingAddress || !calledAddress) return;
@@ -899,43 +903,44 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorDeviceName = transferInitiatorDeviceName || deviceInfo.callingDeviceName;
     }
 
-    // Before transfer: put the active call (e.g. 532–514) on hold, then perform transfer (e.g. to 531).
-    // Hold payload: calling = other party (514, device CSFusmanah), called = initiator (532), controller = initiator.
-    // Derive the other party from the call so we never use initiator (532) as the calling party.
+    // Before transfer: put the active call on hold. Hold payload must use the logged-in user as controller
+    // so it's correct whether 531 or 532 is the user: callingAddress = current user, calledAddress = other party.
     const initiator = transferInitiatorAddress!;
+    const controllerAddress = ctiStomp.userAddress;
+    const controllerDevice = getCallingDeviceInfo(controllerAddress, ctiStomp.dnsMap);
+    if (!controllerDevice) {
+      return {
+        success: false,
+        error: 'No device information for current user. Cannot put call on hold for transfer.',
+      };
+    }
     const callEntry = Array.from(activeCalls.values()).find((c) => c.callId === params.callId);
+    // Other party = the leg in the call that is not the current user (so hold works for both 531 and 532).
     let otherPartyAddress: string = params.transferAddress;
     if (callEntry) {
-      if (callEntry.callingAddress && callEntry.callingAddress !== initiator) {
+      if (callEntry.callingAddress && callEntry.callingAddress !== controllerAddress) {
         otherPartyAddress = callEntry.callingAddress;
-      } else if (callEntry.calledAddress && callEntry.calledAddress !== initiator) {
+      } else if (callEntry.calledAddress && callEntry.calledAddress !== controllerAddress) {
         otherPartyAddress = callEntry.calledAddress;
-      } else if (callEntry.number && callEntry.number !== initiator) {
+      } else if (callEntry.number && callEntry.number !== controllerAddress) {
         otherPartyAddress = callEntry.number;
       }
     }
-    if (otherPartyAddress === initiator) {
+    if (otherPartyAddress === controllerAddress) {
       return {
         success: false,
-        error: 'Cannot determine the other party in the call for hold. The call\'s other party (e.g. 514) must not be the transfer initiator (532).',
-      };
-    }
-    const otherPartyDevice = getCallingDeviceInfo(otherPartyAddress, ctiStomp.dnsMap);
-    if (!otherPartyDevice) {
-      return {
-        success: false,
-        error: `No device information for ${otherPartyAddress}. Cannot put call on hold.`,
+        error: 'Cannot determine the other party in the call for hold.',
       };
     }
     const holdResult = await holdCallAPI({
       callId: params.callId,
-      callingAddress: otherPartyAddress,
-      calledAddress: initiator,
-      callingDeviceType: otherPartyDevice.callingDeviceType,
-      callingDeviceName: otherPartyDevice.callingDeviceName,
-      controllerAddress: initiator,
-      controllerDeviceName: transferInitiatorDeviceName!,
-      controllerDeviceType: transferInitiatorDeviceType!,
+      callingAddress: controllerAddress,
+      calledAddress: otherPartyAddress,
+      callingDeviceType: controllerDevice.callingDeviceType,
+      callingDeviceName: controllerDevice.callingDeviceName,
+      controllerAddress,
+      controllerDeviceName: controllerDevice.callingDeviceName,
+      controllerDeviceType: controllerDevice.callingDeviceType,
     });
     if (!holdResult.success) {
       return holdResult;

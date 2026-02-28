@@ -461,9 +461,12 @@ class TokenService {
         clearAllLocalStorage();
         clearSessionCookiesClient(true);
         const callbackUrl = getLogoutCallbackUrl();
-        signOut({ callbackUrl, redirect: false });
-        window.location.href = callbackUrl;
-        toast.error('Session expired - Please login again');
+        // Await signOut so NextAuth session cookie is cleared before redirect.
+        // Otherwise signin page may still see "authenticated" and redirect to dashboard, causing a loop.
+        signOut({ callbackUrl, redirect: false }).then(() => {
+          toast.error('Session expired - Please login again');
+          window.location.href = callbackUrl;
+        });
       }
     // } else {
       // console.log('Token refresh failed but not an auth error, keeping session active:', error?.response?.status);

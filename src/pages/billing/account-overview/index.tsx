@@ -153,43 +153,63 @@ const AccountOverview = () => {
     fetchCompanies();
   }, []);
 
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const apiPayload = selectedCompanyId ? { crm_company_id: selectedCompanyId } : {};
-  useEffect(() => {
-    getPaymentMethods(apiPayload);
+
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const getPaymentMethods = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setPaymentMethods([]);
+      return;
+    }
+    try {
+      const response = await GetPaymentMethods({ crm_company_id: selectedCompanyId }) as any;
+      setPaymentMethods(response?.payment_methods || []);
+    } catch {
+      setPaymentMethods([]);
+    }
   }, [selectedCompanyId]);
-  const getPaymentMethods = async (params: { crm_company_id?: string | number } = {}) => {
-    const response = await GetPaymentMethods(params) as any;
-    setPaymentMethods(response?.payment_methods || []);
-  };
+
+  useEffect(() => {
+    getPaymentMethods();
+  }, [getPaymentMethods]);
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
-  useEffect(() => {
-    getPaymentHistory();
-  }, [selectedCompanyId]);
-  const getPaymentHistory = async () => {
+  const getPaymentHistory = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setPaymentHistory([]);
+      return;
+    }
     try {
-      const response = await GetPayments({ page: 1, per_page: 3, limit: 3, ...apiPayload }) as any;
-     // console.log('response payment history', response);
+      const response = await GetPayments({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setPaymentHistory(response?.dataList || []);
     } catch (error) {
       console.error('Error fetching payment history:', error);
+      setPaymentHistory([]);
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    getPaymentHistory();
+  }, [getPaymentHistory]);
 
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
-  useEffect(() => {
-    getRecentInvoices();
-  }, [selectedCompanyId]);
-  const getRecentInvoices = async () => {
+  const getRecentInvoices = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setRecentInvoices([]);
+      return;
+    }
     try {
-      const response = await getInvoices({ page: 1, per_page: 3, limit: 3, ...apiPayload }) as any;
-      console.log('response recent invoices', response);
+      const response = await getInvoices({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setRecentInvoices(response?.data || []);
     } catch (error) {
       console.error('Error fetching recent invoices:', error);
+      setRecentInvoices([]);
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    getRecentInvoices();
+  }, [getRecentInvoices]);
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
   const [showManageAccountModal, setShowManageAccountModal] = useState(false);
@@ -236,7 +256,9 @@ const AccountOverview = () => {
 
   const [dashboardCounters, setDashboardCounters] = useState<any>(null);
   useEffect(() => {
-    getDashboardCounters(apiPayload);
+    if(selectedCompanyId){
+      getDashboardCounters(apiPayload);
+    }
   }, [selectedCompanyId]);
   const getDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
     const response = await GetDashboardCounters(params) as any;
@@ -468,7 +490,7 @@ const AccountOverview = () => {
               <div className="d-flex align-items-center gap-2 py-1 border-bottom">
                 <User size={12} style={{ color: '#3b82f6' }} />
                 <p className="mb-0 text-truncate flex-grow-1 text-capitalize" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
-                {companyDetails?.name}
+                {selectedCompanyName}
                 </p>
               </div>
               
