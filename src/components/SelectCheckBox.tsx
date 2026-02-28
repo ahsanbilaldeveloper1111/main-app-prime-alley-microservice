@@ -1,5 +1,6 @@
 import React from 'react';
-import Select, { MultiValue, components } from 'react-select';
+import Select, { MultiValue } from '@components/AppSelect';
+import { components } from 'react-select';
 
 // Custom Option component with checkbox for multi-select
 const OptionWithCheckbox = (props: any) => {

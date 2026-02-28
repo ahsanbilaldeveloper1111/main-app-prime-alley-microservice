@@ -28,7 +28,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
-    {path:'/billing',permissions: ['']},
+    {path:'/billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
     {path:'/dialpad-use',permissions: ['']},
     {path:'/crm-new-dashboard',permissions: ['']},
     {path:'/help-center-new',permissions: ['']},

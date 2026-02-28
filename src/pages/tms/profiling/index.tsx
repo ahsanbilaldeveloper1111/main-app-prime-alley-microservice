@@ -16,7 +16,7 @@ import { toast } from "react-toastify";
 import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 
 interface SelectOption {
   value: number;

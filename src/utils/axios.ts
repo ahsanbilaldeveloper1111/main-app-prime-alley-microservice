@@ -132,6 +132,7 @@ axiosInstance.interceptors.response.use(
               clearSessionCookiesClient(true);
               sessionStorage.clear();
               const callbackUrl = getLogoutCallbackUrl();
+              // Await signOut so NextAuth cookie is cleared before redirect (prevents signin/dashboard loop)
               signOut({ callbackUrl, redirect: false }).then(() => {
                 window.location.href = callbackUrl;
               });
