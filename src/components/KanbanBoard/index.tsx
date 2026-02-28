@@ -1,20 +1,18 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 
+const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
+const TEAL = "#00818a";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface KanbanCardData {
   id: string | number;
-  /** Primary title – shown as teal link */
   name: string;
-  /** Contact email */
   email?: string;
-  /** Initials for mini avatar – omit to show dash placeholder */
   avatarInitials?: string;
   avatarColor?: string;
-  /** Extra text lines shown below email (e.g. deal count, value) */
   metaLines?: string[];
-  /** Raw source record – returned in callbacks */
   raw?: any;
 }
 
@@ -27,68 +25,39 @@ export interface KanbanColumnDef {
 export interface KanbanBoardProps {
   columns: KanbanColumnDef[];
   onCardClick?: (card: KanbanCardData) => void;
-  /** Called when an action icon is clicked */
   onCardAction?: (
     action: "view" | "pin" | "email" | "external",
     card: KanbanCardData
   ) => void;
-  /** Called after a drag-drop moves a card between columns */
   onCardMove?: (
     cardId: string | number,
     fromColumnId: string,
     toColumnId: string
   ) => void;
-  /** Filters card names + emails live */
   searchValue?: string;
 }
 
-// ─── Tiny avatar / dash placeholder ──────────────────────────────────────────
+// ─── Mini avatar ──────────────────────────────────────────────────────────────
 
-const MiniAvatar: React.FC<{ initials: string; color: string }> = ({
-  initials,
-  color,
-}) => (
-  <div
-    style={{
-      width: 17,
-      height: 17,
-      borderRadius: "50%",
-      background: color,
-      color: "#fff",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 7,
-      fontWeight: 700,
-      flexShrink: 0,
-      userSelect: "none",
-    }}
-  >
+const MiniAvatar: React.FC<{ initials: string; color: string }> = ({ initials, color }) => (
+  <div style={{
+    width: 18, height: 18, borderRadius: "50%", background: color,
+    color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 7, fontWeight: 700, flexShrink: 0, userSelect: "none", fontFamily: FONT,
+  }}>
     {initials}
   </div>
 );
 
 const DashAvatar: React.FC = () => (
-  <div
-    style={{
-      width: 17,
-      height: 17,
-      borderRadius: "50%",
-      background: "#e0e0e0",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 10,
-      color: "#999",
-      fontWeight: 600,
-      flexShrink: 0,
-    }}
-  >
-    –
-  </div>
+  <div style={{
+    width: 18, height: 18, borderRadius: "50%", background: "#e0e0e0",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 10, color: "#999", fontWeight: 500, flexShrink: 0,
+  }}>–</div>
 );
 
-// ─── Icon action button ───────────────────────────────────────────────────────
+// ─── Action icon button ───────────────────────────────────────────────────────
 
 const ActBtn: React.FC<{
   icon: React.ReactNode;
@@ -103,15 +72,10 @@ const ActBtn: React.FC<{
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        padding: "3px 4px",
-        borderRadius: 3,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: hov ? "#444" : "#b0b0b0",
+        background: "none", border: "none", cursor: "pointer",
+        padding: "3px 4px", borderRadius: 3,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: hov ? "#555" : "#bbb",
         transition: "color .1s",
       }}
     >
@@ -139,17 +103,20 @@ const Card: React.FC<{
       onMouseLeave={() => setHov(false)}
       style={{
         background: "#fff",
-        border: "1px solid #e0e0e0",
-        borderRadius: 3,
-        padding: "8px 10px 6px",
-        marginBottom: 5,
+        border: "1px solid #e2e2e2",
+        borderRadius: 4,
+        padding: "9px 10px 6px",
+        marginBottom: 6,
         cursor: "grab",
-        boxShadow: hov ? "0 2px 7px rgba(0,0,0,.10)" : "0 1px 1px rgba(0,0,0,.04)",
+        boxShadow: hov
+          ? "0 2px 8px rgba(0,0,0,.10)"
+          : "0 1px 2px rgba(0,0,0,.05)",
         transition: "box-shadow .12s",
+        fontFamily: FONT,
       }}
     >
-      {/* Name */}
-      <div style={{ marginBottom: 3 }}>
+      {/* Name link */}
+      <div style={{ marginBottom: 2 }}>
         <span
           onClick={(e) => { e.stopPropagation(); onCardClick?.(card); }}
           onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
@@ -157,9 +124,10 @@ const Card: React.FC<{
           style={{
             fontSize: 12.5,
             fontWeight: 600,
-            color: "#1a6e6e",
+            color: TEAL,
             cursor: "pointer",
-            fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+            fontFamily: FONT,
+            lineHeight: "18px",
           }}
         >
           {card.name || "--"}
@@ -168,22 +136,17 @@ const Card: React.FC<{
 
       {/* Email row */}
       {card.email && (
-        <div style={{ display: "flex", alignItems: "center", gap: 5, margin: "5px 0 7px" }}>
-          {card.avatarInitials && card.avatarColor ? (
-            <MiniAvatar initials={card.avatarInitials} color={card.avatarColor} />
-          ) : (
-            <DashAvatar />
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, margin: "5px 0 6px" }}>
+          {card.avatarInitials && card.avatarColor
+            ? <MiniAvatar initials={card.avatarInitials} color={card.avatarColor} />
+            : <DashAvatar />
+          }
           <span
             title={card.email}
             style={{
-              fontSize: 11.5,
-              color: "#555",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              maxWidth: 175,
-              fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+              fontSize: 11.5, color: "#555", fontFamily: FONT,
+              overflow: "hidden", textOverflow: "ellipsis",
+              whiteSpace: "nowrap", maxWidth: 180, lineHeight: "18px",
             }}
           >
             {card.email}
@@ -193,41 +156,113 @@ const Card: React.FC<{
 
       {/* Meta lines */}
       {card.metaLines && card.metaLines.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
+        <div style={{ marginBottom: 5 }}>
           {card.metaLines.map((line, i) => (
-            <div
-              key={i}
-              style={{
-                fontSize: 11.5,
-                color: "#555",
-                lineHeight: 1.6,
-                fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
-              }}
-            >
+            <div key={i} style={{ fontSize: 11.5, color: "#555", lineHeight: "18px", fontFamily: FONT }}>
               {line}
             </div>
           ))}
         </div>
       )}
 
-      {/* Action icons */}
+      {/* Action row */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 1,
-          borderTop: "1px solid #f0f0f0",
-          paddingTop: 5,
-          marginTop: 2,
+          display: "flex", alignItems: "center", justifyContent: "flex-end",
+          gap: 0, borderTop: "1px solid #f0f0f0", paddingTop: 4, marginTop: 4,
         }}
       >
-        <ActBtn icon={<FileText size={13} />} title="View record"   onClick={() => onCardAction?.("view",     card)} />
-        <ActBtn icon={<MapPin    size={13} />} title="Pin"          onClick={() => onCardAction?.("pin",      card)} />
-        <ActBtn icon={<Mail      size={13} />} title="Send email"   onClick={() => onCardAction?.("email",    card)} />
-        <ActBtn icon={<ExternalLink size={13}/>} title="Open record" onClick={() => onCardAction?.("external", card)} />
+        <ActBtn icon={<FileText    size={13} />} title="View record"  onClick={() => onCardAction?.("view",     card)} />
+        <ActBtn icon={<MapPin      size={13} />} title="Pin"          onClick={() => onCardAction?.("pin",      card)} />
+        <ActBtn icon={<Mail        size={13} />} title="Send email"   onClick={() => onCardAction?.("email",    card)} />
+        <ActBtn icon={<ExternalLink size={13} />} title="Open record" onClick={() => onCardAction?.("external", card)} />
       </div>
+    </div>
+  );
+};
+
+// ─── Column header with arrow/chevron shape ───────────────────────────────────
+// The header is a full-width bar with a right-pointing arrow clip-path.
+// We achieve the "arrow" shape using an absolutely-positioned right-side
+// triangle that overlaps the next column, exactly as in the design image.
+
+const HEADER_H = 36;
+const ARROW_W  = 16; // width of the arrow tip that overlaps next column
+
+const ColumnHeader: React.FC<{
+  title: string;
+  count: number;
+  isCollapsed: boolean;
+  isLast: boolean;
+  onToggle: () => void;
+}> = ({ title, count, isCollapsed, isLast, onToggle }) => {
+  const [hov, setHov] = useState(false);
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        height: HEADER_H,
+        flexShrink: 0,
+        backgroundColor: "#f7f2f7",
+        borderTopLeftRadius: 4,
+        display: "flex",
+        alignItems: "center",
+        paddingLeft: 10,
+        paddingRight: isLast ? 8 : ARROW_W + 6,
+        clipPath: isLast
+          ? "none"
+          : `polygon(0px 0px, calc(100% - ${ARROW_W}px) 0px, 100% 50%, calc(100% - ${ARROW_W}px) 100%, 0px 100%)`,
+        zIndex: 1,
+        cursor: "default",
+        userSelect: "none",
+        // drop-shadow follows the clipped polygon shape — gives us the border effect
+        filter: "drop-shadow(0px 0px 0.5px #ccc) drop-shadow(1px 0px 0px #ccc) drop-shadow(0px 1px 0px #ccc) drop-shadow(0px -1px 0px #ccc) drop-shadow(-1px 0px 0px #ccc)",
+      }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+    >
+      <span style={{
+        fontSize: 12,
+        fontStyle: "normal",
+        fontWeight: 600,
+        textTransform: "unset",
+        margin: 0,
+        padding: 0,
+        backgroundColor: "unset",
+        fontFamily: FONT,
+        letterSpacing: 0,
+        lineHeight: "18px",
+        color: "#141414",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        flex: 1,
+      }}>
+        {title}
+      </span>
+
+      <span style={{
+        fontSize: 12, fontWeight: 400, color: "#888",
+        fontFamily: FONT, marginLeft: 5, marginRight: 4, flexShrink: 0, width: 27, height: 20, borderRadius: 20, background: "#fff", textAlign: "center"
+      }}>
+        {count}
+      </span>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        title={isCollapsed ? "Expand" : "Collapse"}
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          padding: "2px 3px", borderRadius: 3,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: hov ? "#555" : "#aaa", flexShrink: 0,
+          transition: "color .12s",
+        }}
+      >
+        {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+      </button>
     </div>
   );
 };
@@ -238,13 +273,19 @@ const Column: React.FC<{
   col: KanbanColumnDef;
   filteredCards: KanbanCardData[];
   isCollapsed: boolean;
+  isLast: boolean;
   onToggle: () => void;
   onCardClick?: (c: KanbanCardData) => void;
   onCardAction?: (a: "view" | "pin" | "email" | "external", c: KanbanCardData) => void;
   onDragStart?: (e: React.DragEvent, id: string | number, colId: string) => void;
   onDrop?: (e: React.DragEvent, colId: string) => void;
-}> = ({ col, filteredCards, isCollapsed, onToggle, onCardClick, onCardAction, onDragStart, onDrop }) => {
+}> = ({
+  col, filteredCards, isCollapsed, isLast,
+  onToggle, onCardClick, onCardAction, onDragStart, onDrop,
+}) => {
   const [dragOver, setDragOver] = useState(false);
+
+  const COL_W = 280;
 
   return (
     <div
@@ -252,101 +293,57 @@ const Column: React.FC<{
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
-        width: isCollapsed ? "auto" : 252,
-        minWidth: isCollapsed ? 0 : 252,
-        background: "#ebebeb",
-        borderRight: "1px solid #dcdcdc",
+        width: isCollapsed ? 36 : COL_W,
+        minWidth: isCollapsed ? 36 : COL_W,
         maxHeight: "100%",
         overflow: "hidden",
+        transition: "width .15s ease",
+        backgroundColor: "#ffffff",
+        
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          padding: "0 8px 0 10px",
-          height: 34,
-          flexShrink: 0,
-          borderBottom: "1px solid #dcdcdc",
-          background: "#ebebeb",
-          whiteSpace: "nowrap",
-          userSelect: "none",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 12.5,
-            fontWeight: 600,
-            color: "#1a1a1a",
-            fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
-          }}
-        >
-          {col.title}
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-            color: "#888",
-            fontWeight: 400,
-            fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
-          }}
-        >
-          {filteredCards.length}
-        </span>
-        <button
-          onClick={onToggle}
-          title={isCollapsed ? "Expand" : "Collapse"}
-          style={{
-            marginLeft: "auto",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "#999",
-            padding: "2px 3px",
-            borderRadius: 3,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-        </button>
+      {/* White top bar that contains the arrow header */}
+      <div style={{
+        backgroundColor: "#ffffff",
+        flexShrink: 0,
+        padding: "5px 5px 0 5px",
+      }}>
+        <ColumnHeader
+          title={col.title}
+          count={filteredCards.length}
+          isCollapsed={isCollapsed}
+          isLast={isLast}
+          onToggle={onToggle}
+        />
       </div>
 
-      {/* Cards */}
+      {/* Cards area with 5px margin on all sides */}
       {!isCollapsed && (
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={(e) => {
-            // only clear if leaving the column entirely
-            const col = e.currentTarget;
-            if (!col.contains(e.relatedTarget as Node)) setDragOver(false);
+            const el = e.currentTarget;
+            if (!el.contains(e.relatedTarget as Node)) setDragOver(false);
           }}
           onDrop={(e) => { setDragOver(false); onDrop?.(e, col.id); }}
           style={{
             flex: 1,
             overflowY: "auto",
             overflowX: "hidden",
-            padding: "6px 6px 10px",
-            background: dragOver ? "#e3edf7" : "#ebebeb",
+            margin: "5px",
+            padding: "4px 4px 10px",
+            borderRadius: 3,
+            background: dragOver ? "#dde8f3" : "#ebebeb",
             transition: "background .12s",
             scrollbarWidth: "thin",
             scrollbarColor: "#c8c8c8 transparent",
           }}
         >
           {filteredCards.length === 0 ? (
-            <div
-              style={{
-                padding: "24px 8px",
-                textAlign: "center",
-                color: "#ccc",
-                fontSize: 12,
-                fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
-              }}
-            >
+            <div style={{
+              padding: "28px 8px", textAlign: "center",
+              color: "#ccc", fontSize: 12, fontFamily: FONT,
+            }}>
               No records
             </div>
           ) : (
@@ -376,7 +373,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onCardMove,
   searchValue,
 }) => {
-  const [columns, setColumns]   = useState<KanbanColumnDef[]>(initialColumns);
+  const [columns, setColumns]     = useState<KanbanColumnDef[]>(initialColumns);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const drag = useRef<{ cardId: string | number; fromColId: string } | null>(null);
 
@@ -423,56 +420,51 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        height: "100%",
-        width: "100%",
-        overflowX: "auto",
-        overflowY: "hidden",
-        background: "#ebebeb",
-        scrollbarWidth: "thin",
-        scrollbarColor: "#c4c4c4 transparent",
-      }}
-    >
-      {columns.map((col, idx) => {
-        const filteredCards = getFiltered(col.cards);
-        const isCollapsed   = !!collapsed[col.id];
+    <>
+      <style>{`
+        .kb-scroll::-webkit-scrollbar { height: 6px; }
+        .kb-scroll::-webkit-scrollbar-track { background: transparent; }
+        .kb-scroll::-webkit-scrollbar-thumb { background: #c4c4c4; border-radius: 3px; }
+        .kb-col-cards::-webkit-scrollbar { width: 4px; }
+        .kb-col-cards::-webkit-scrollbar-track { background: transparent; }
+        .kb-col-cards::-webkit-scrollbar-thumb { background: #c8c8c8; border-radius: 3px; }
+      `}</style>
+      <div
+        className="kb-scroll"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          height: "100%",
+          width: "100%",
+          overflowX: "auto",
+          overflowY: "hidden",
+          background: "#ffffff",
+          // Columns sit flush against each other — the arrow header creates the visual separation
+          gap: 0,
+        }}
+      >
+        {columns.map((col, idx) => {
+          const filteredCards = getFiltered(col.cards);
+          const isCollapsed   = !!collapsed[col.id];
+          const isLast        = idx === columns.length - 1;
 
-        return (
-          <React.Fragment key={col.id}>
-            {/* Chevron separator */}
-            {idx > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "center",
-                  paddingTop: 10,
-                  width: 12,
-                  flexShrink: 0,
-                  pointerEvents: "none",
-                }}
-              >
-                <ChevronRight size={11} color="#b8b8b8" />
-              </div>
-            )}
-
+          return (
             <Column
+              key={col.id}
               col={col}
               filteredCards={filteredCards}
               isCollapsed={isCollapsed}
+              isLast={isLast}
               onToggle={() => setCollapsed((p) => ({ ...p, [col.id]: !p[col.id] }))}
               onCardClick={onCardClick}
               onCardAction={onCardAction}
               onDragStart={handleDragStart}
               onDrop={handleDrop}
             />
-          </React.Fragment>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 };
 
@@ -480,7 +472,6 @@ export default KanbanBoard;
 
 // ─── Data transformer ─────────────────────────────────────────────────────────
 
-/** Pipeline stages – edit to match your app's lifecycle_stage values */
 export const LIFECYCLE_COLUMNS: { id: string; title: string }[] = [
   { id: "subscriber",               title: "Subscriber"               },
   { id: "lead",                     title: "Lead"                     },
@@ -489,6 +480,7 @@ export const LIFECYCLE_COLUMNS: { id: string; title: string }[] = [
   { id: "opportunity",              title: "Opportunity"              },
   { id: "customer",                 title: "Customer"                 },
   { id: "evangelist",               title: "Evangelist"               },
+  { id: "other",                    title: "Other"                    },
 ];
 
 const STAGE_MAP: Record<string, string> = {
@@ -502,15 +494,9 @@ const STAGE_MAP: Record<string, string> = {
   opportunity:                  "opportunity",
   customer:                     "customer",
   evangelist:                   "evangelist",
+  other:                        "other",
 };
 
-/**
- * Convert your raw CRM prospect array into KanbanColumnDef[].
- *
- * @param prospects  - raw records from your API / dataList
- * @param getInitials - same helper you use on the prospects page
- * @param getColor    - same colour helper you use on the prospects page
- */
 export function prospectsToKanbanColumns(
   prospects: any[],
   getInitials: (name: string) => string,
@@ -521,11 +507,10 @@ export function prospectsToKanbanColumns(
 
   for (const p of prospects) {
     const rawStage = (p.data?.lifecycle_stage ?? p.lifecycle_stage ?? "lead")
-      .toLowerCase()
-      .trim();
+      .toLowerCase().trim();
     const colId = STAGE_MAP[rawStage] ?? "lead";
 
-    const name  = p.name  || "--";
+    const name  = p.name || "--";
     const email: string = p.data?.email ?? p.email ?? "";
 
     buckets[colId].push({
