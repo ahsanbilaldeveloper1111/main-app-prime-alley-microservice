@@ -38,6 +38,10 @@ export const CUSTOM_STYLES = `
   .btn:hover i {
     background-color: #fff;
   }
+   /* .live-calls-wrapper,
+.live-calls-wrapper * {
+  font-size: 99% !important;
+}*/
   .kebab-menu-button {
     background: none;
     border: none;
