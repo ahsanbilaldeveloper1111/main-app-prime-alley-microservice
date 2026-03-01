@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
-const TEAL = "#00818a";
+const TEAL = "#006162";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ const ActBtn: React.FC<{
         background: "none", border: "none", cursor: "pointer",
         padding: "3px 4px", borderRadius: 3,
         display: "flex", alignItems: "center", justifyContent: "center",
-        color: hov ? "#555" : "#bbb",
+        color: hov ? "#000" : "#141414",
         transition: "color .1s",
       }}
     >
@@ -103,10 +103,10 @@ const Card: React.FC<{
       onMouseLeave={() => setHov(false)}
       style={{
         background: "#fff",
-        border: "1px solid #e2e2e2",
-        borderRadius: 4,
-        padding: "9px 10px 6px",
-        marginBottom: 6,
+        border: "1px solid #ccc",
+        borderRadius: 8,
+        padding: "11px 13px 12px",
+        marginBottom: 11,
         cursor: "grab",
         boxShadow: hov
           ? "0 2px 8px rgba(0,0,0,.10)"
@@ -122,7 +122,7 @@ const Card: React.FC<{
           onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
           onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
           style={{
-            fontSize: 12.5,
+            fontSize: 14,
             fontWeight: 600,
             color: TEAL,
             cursor: "pointer",
@@ -144,7 +144,7 @@ const Card: React.FC<{
           <span
             title={card.email}
             style={{
-              fontSize: 11.5, color: "#555", fontFamily: FONT,
+              fontSize: 11.5, color: TEAL, fontFamily: FONT,
               overflow: "hidden", textOverflow: "ellipsis",
               whiteSpace: "nowrap", maxWidth: 180, lineHeight: "18px",
             }}
@@ -170,7 +170,7 @@ const Card: React.FC<{
         onClick={(e) => e.stopPropagation()}
         style={{
           display: "flex", alignItems: "center", justifyContent: "flex-end",
-          gap: 0, borderTop: "1px solid #f0f0f0", paddingTop: 4, marginTop: 4,
+          gap: 0, paddingTop: 4, marginTop: 4,
         }}
       >
         <ActBtn icon={<FileText    size={13} />} title="View record"  onClick={() => onCardAction?.("view",     card)} />
@@ -187,8 +187,8 @@ const Card: React.FC<{
 // We achieve the "arrow" shape using an absolutely-positioned right-side
 // triangle that overlaps the next column, exactly as in the design image.
 
-const HEADER_H = 36;
-const ARROW_W  = 16; // width of the arrow tip that overlaps next column
+const HEADER_H = 34;
+const ARROW_W  = 10; // width of the arrow tip that overlaps next column
 
 const ColumnHeader: React.FC<{
   title: string;
@@ -199,70 +199,86 @@ const ColumnHeader: React.FC<{
 }> = ({ title, count, isCollapsed, isLast, onToggle }) => {
   const [hov, setHov] = useState(false);
 
+  const clipPathValue = isLast
+    ? `polygon(0px 0px, 100% 0px, 100% 100%, 0px 100%, ${ARROW_W}px 50%)`
+    : `polygon(0px 0px, calc(100% - ${ARROW_W}px) 0px, 100% 50%, calc(100% - ${ARROW_W}px) 100%, 0px 100%, ${ARROW_W}px 50%)`;
+
   return (
     <div
       style={{
         position: "relative",
         height: HEADER_H,
         flexShrink: 0,
-        backgroundColor: "#f7f2f7",
-        borderTopLeftRadius: 4,
-        display: "flex",
-        alignItems: "center",
-        paddingLeft: 10,
-        paddingRight: isLast ? 8 : ARROW_W + 6,
-        clipPath: isLast
-          ? "none"
-          : `polygon(0px 0px, calc(100% - ${ARROW_W}px) 0px, 100% 50%, calc(100% - ${ARROW_W}px) 100%, 0px 100%)`,
+        backgroundColor: "#ccc",
+        borderTopLeftRadius: 0,
+        clipPath: clipPathValue,
         zIndex: 1,
-        cursor: "default",
-        userSelect: "none",
-        // drop-shadow follows the clipped polygon shape — gives us the border effect
-        filter: "drop-shadow(0px 0px 0.5px #ccc) drop-shadow(1px 0px 0px #ccc) drop-shadow(0px 1px 0px #ccc) drop-shadow(0px -1px 0px #ccc) drop-shadow(-1px 0px 0px #ccc)",
+        width: "102%",
       }}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
     >
-      <span style={{
-        fontSize: 12,
-        fontStyle: "normal",
-        fontWeight: 600,
-        textTransform: "unset",
-        margin: 0,
-        padding: 0,
-        backgroundColor: "unset",
-        fontFamily: FONT,
-        letterSpacing: 0,
-        lineHeight: "18px",
-        color: "#141414",
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        flex: 1,
-      }}>
-        {title}
-      </span>
-
-      <span style={{
-        fontSize: 12, fontWeight: 400, color: "#888",
-        fontFamily: FONT, marginLeft: 5, marginRight: 4, flexShrink: 0, width: 27, height: 20, borderRadius: 20, background: "#fff", textAlign: "center"
-      }}>
-        {count}
-      </span>
-
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        title={isCollapsed ? "Expand" : "Collapse"}
+      <div
         style={{
-          background: "none", border: "none", cursor: "pointer",
-          padding: "2px 3px", borderRadius: 3,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: hov ? "#555" : "#aaa", flexShrink: 0,
-          transition: "color .12s",
+          position: "absolute",
+          top: 1,
+          left: 1,
+          right: isLast ? 1 : 0,
+          bottom: 1,
+          backgroundColor: "#f7f2f7",
+          borderTopLeftRadius: 0,
+          display: "flex",
+          alignItems: "center",
+          paddingLeft: ARROW_W + 6,
+          paddingRight: isLast ? 7 : ARROW_W + 5,
+          clipPath: isLast
+            ? `polygon(1px 0px, 100% 0px, 100% 100%, 1px 100%, ${ARROW_W}px 50%)`
+            : `polygon(1px 0px, calc(100% - ${ARROW_W}px) 0px, calc(100% - 1px) 50%, calc(100% - ${ARROW_W}px) 100%, 1px 100%, ${ARROW_W}px 50%)`,
+          cursor: "default",
+          userSelect: "none",
         }}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
       >
-        {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-      </button>
+        <span style={{
+          fontSize: 12,
+          fontStyle: "normal",
+          fontWeight: 600,
+          textTransform: "unset",
+          margin: 0,
+          padding: 0,
+          backgroundColor: "unset",
+          fontFamily: FONT,
+          letterSpacing: 0,
+          lineHeight: "18px",
+          color: "#141414",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          flex: 1,
+        }}>
+          {title}
+        </span>
+
+        <span style={{
+          fontSize: 12, fontWeight: 400, color: "#888",
+          fontFamily: FONT, marginLeft: 5, marginRight: 4, flexShrink: 0, width: 27, height: 20, borderRadius: 20, background: "#fff", textAlign: "center"
+        }}>
+          {count}
+        </span>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          title={isCollapsed ? "Expand" : "Collapse"}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            padding: "2px 3px", borderRadius: 3,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: hov ? "#555" : "#141414", flexShrink: 0,
+            transition: "color .12s",
+          }}
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      </div>
     </div>
   );
 };
@@ -331,12 +347,13 @@ const Column: React.FC<{
             overflowY: "auto",
             overflowX: "hidden",
             margin: "5px",
-            padding: "4px 4px 10px",
+            padding: "9px 10px 10px",
             borderRadius: 3,
-            background: dragOver ? "#dde8f3" : "#ebebeb",
+            background: dragOver ? "#dde8f3" : "whitesmoke",
             transition: "background .12s",
             scrollbarWidth: "thin",
             scrollbarColor: "#c8c8c8 transparent",
+            borderTop: "1px solid #cccccc",
           }}
         >
           {filteredCards.length === 0 ? (
@@ -434,7 +451,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         style={{
           display: "flex",
           flexDirection: "row",
-          height: "100%",
+          height: "80vh",
           width: "100%",
           overflowX: "auto",
           overflowY: "hidden",

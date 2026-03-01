@@ -258,7 +258,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_DEALS,
           url: '/crm/approvals', 
         },
-        
+        {
+          id: 'crm-separator-1',
+          title: '---',
+          icon: null,
+          url: ''
+        },
         {
           id: 'crm-company',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
@@ -1131,6 +1136,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-left: none;
       animation: flyoutFade 0.15s ease;
+      padding: 6px 10px
     }
 
     @keyframes flyoutFade {
@@ -1141,7 +1147,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     .submenu-flyout-header {
       padding: 12px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(0, 0, 0, 0.15);
+      /*background: rgba(0, 0, 0, 0.15);*/
       font-size: 14px;
       font-weight: 600;
       color: #fff;
@@ -1213,6 +1219,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       font-weight: 600;
       color: rgba(255, 255, 255, 0.85);
       cursor: default;
+    }
+
+    .submenu-flyout-item.separator {
+      padding: 0;
+      margin: 8px 0px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .submenu-flyout-item.separator:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .menu-item-button {
@@ -1751,8 +1770,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           >
             <div className="submenu-flyout-header">{flyoutModule.title}</div>
             <div className="submenu-flyout-content">
-              {flyoutModule.subItems.map((subItem: SubMenuItem) => (
-                subItem.subItems && subItem.subItems.length > 0 ? (
+              {flyoutModule.subItems.map((subItem: SubMenuItem) => {
+                // Handle separator
+                if (subItem.title === '---') {
+                  return <div key={subItem.id} className="submenu-flyout-item separator" />;
+                }
+                
+                return subItem.subItems && subItem.subItems.length > 0 ? (
                   <div key={subItem.id}>
                     <div className="submenu-flyout-item submenu-flyout-item-label">
                       <span className="flyout-item-icon">{subItem.icon}</span>
@@ -1790,8 +1814,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                     <span className="flyout-item-icon">{subItem.icon}</span>
                     {subItem.title}
                   </Link>
-                )
-              ))}
+                );
+              })}
             </div>
           </div>
         );
