@@ -226,7 +226,7 @@ const WorkPlannerStatuses = () => {
 
 <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
         <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
+  {/* <nav aria-label="breadcrumb">
     <ol className="breadcrumb mb-0">
       <li className="breadcrumb-item">
         <a href="/dashboard" className="text-decoration-none">
@@ -237,12 +237,11 @@ const WorkPlannerStatuses = () => {
       Statuses
       </li>
     </ol>
-  </nav>
+  </nav> */}
 </div>
 <div className="d-flex flex-wrap gap-2">
 <Button
               variant="primary"
-              size="sm"
               onClick={() => setShowCreateModal(true)}
               className="d-flex align-items-center gap-2"
             >

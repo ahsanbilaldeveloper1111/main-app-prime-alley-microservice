@@ -1030,7 +1030,7 @@ const Settings = () => {
 
           {/* Account Management */}
           <>
-            <div className="settings-sidebar-group-heading">Account Management</div>
+            <div className="settings-sidebar-group-heading">Services</div>
             {mainTabs
               .filter((tab) => {
                 if (!session?.user?.permissions?.includes(tab.permission)) return false;

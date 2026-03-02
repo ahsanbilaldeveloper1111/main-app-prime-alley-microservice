@@ -1,6 +1,47 @@
 import React, { ReactElement, useState } from 'react'
 import { Search, ChevronLeft } from 'lucide-react'
 import Layout from '@layout/index'
+import Users from '@pages/controlhub/users'
+import Teams from '@pages/controlhub/teams'
+import Groups from '@pages/controlhub/groups'
+import Ranks from '@pages/controlhub/ranks'
+import Campaigns from '@pages/crm/campaigns'
+import Industries from '@pages/crm/industries'
+import Products from '@pages/crm/products'
+import Stages from '@pages/crm/stages'
+import DealTemplates from '@pages/crm/deal-templates'
+import BusinessTypes from '@pages/crm/business-types'
+import ManageExtensions from '@pages/ai-ml/manage-extensions'
+import BackendOperations from '@pages/ai-ml/backend-operations'
+import ManualAnalysis from '@pages/ai-ml/analysis'
+import WorkPlannerStatuses from '@pages/planner/statuses'
+import OutboundTrunkProfiles from '@pages/ai-agent/outbound/trunk-profiles'
+import AIMLProfiles from '@pages/agents/outbound-agent'
+import InboundTrunkProfiles from '@pages/ai-agent/inbound/trunk-profiles'
+import InboundBotProfiles from '@pages/agents/inbound-agent'
+import InboundFAQs from '@pages/ai-agent/inbound/faqs'
+import Hosts from '@pages/pulse/hosts'
+import HostGroups from '@pages/pulse/host-groups'
+import Events from '@pages/pulse/events'
+import RequestCategories from '@pages/workforce/request-categories'
+import RequestSubCategories from '@pages/workforce/sub-categories'
+import PaymentMethods from '@pages/billing/payment-methods'
+import TicketStatuses from '@pages/tickets/statuses'
+import TicketModules from '@pages/tickets/modules'
+import ModuleCategories from '@pages/tickets/modules/categories'
+import ModuleSubCategories from '@pages/tickets/modules/sub-categories'
+import TicketTypes from '@pages/tickets/types'
+import FAQModules from '@pages/faqs/modules'
+import FAQTopics from '@pages/faqs/topics'
+import FAQItems from '@pages/faqs/items'
+import FAQTypes from '@pages/faqs/types'
+import ToolProfiles from '@pages/chat/tools-profiles'
+import FaqProfiles from '@pages/chat/faq-profiles'
+import AIChatFAQsTenant from '@pages/chat/ai-faqs/tenant'
+import AIChatFAQsGlobal from '@pages/chat/ai-faqs/global'
+import GsmAssign from '@pages/gsm/assign'
+import GsmSync from '@pages/gsm/sync'
+import CompanyPO from '@pages/gsm/company/po'
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SidebarItem = {
   id: string
@@ -24,22 +65,38 @@ const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
-    heading: 'Account Management',
+    heading: 'Services',
     items: [
       { id: 'account-defaults', label: 'Account Defaults' },
-      { id: 'account-cleanup', label: 'Account Cleanup', badge: 'Beta' },
-      { id: 'audit-log', label: 'Audit Log' },
+
       { id: 'users-teams', label: 'Users & Teams' },
-      { id: 'product-updates', label: 'Product Updates', externalLink: true },
-      { id: 'integrations', label: 'Integrations' },
-      { id: 'marketplace', label: 'Marketplace Downloads' },
-      { id: 'tracking-analytics', label: 'Tracking & Analytics' },
-      { id: 'privacy-consent', label: 'Privacy & Consent' },
-      { id: 'sandboxes', label: 'Sandboxes' },
-      { id: 'security', label: 'Security' },
-      { id: 'approvals', label: 'Approvals' },
-      { id: 'ai', label: 'AI' },
-      { id: 'payments-account', label: 'Payments Account' },
+      { id: 'smart-crm', label: 'Smart CRM' },
+      { id: 'communications', label: 'Communications' },
+      { id: 'planner', label: 'Planner' },
+      { id: 'virtual-agents', label: 'Virtual Agents' },
+      { id: 'pulse', label: 'Pulse' },
+      { id: 'compliance', label: 'Compliance', badge: 'Beta' },
+      { id: 'workforce', label: 'Workforce' },
+      { id: 'billing', label: 'Billing' },
+
+      { id: 'tickets', label: 'Tickets' },
+      { id: 'help-center', label: 'Help Center' },
+      { id: 'ai-chat', label: 'AI Chat' },
+      { id: 'gsm', label: 'Telco Gateway' },
+
+      
+      // { id: 'account-cleanup', label: 'Account Cleanup', badge: 'Beta' },
+      // { id: 'audit-log', label: 'Audit Log' },
+      // { id: 'product-updates', label: 'Product Updates', externalLink: true },
+      // { id: 'integrations', label: 'Integrations' },
+      // { id: 'marketplace', label: 'Marketplace Downloads' },
+      // { id: 'tracking-analytics', label: 'Tracking & Analytics' },
+      // { id: 'privacy-consent', label: 'Privacy & Consent' },
+      // { id: 'sandboxes', label: 'Sandboxes' },
+      // { id: 'security', label: 'Security' },
+      // { id: 'approvals', label: 'Approvals' },
+      // { id: 'ai', label: 'AI' },
+      // { id: 'payments-account', label: 'Payments Account' },
     ],
   },
 ]
@@ -332,7 +389,7 @@ const AccountDefaultsPage: React.FC = () => {
         style={{
           fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
           fontSize: '24px',
-          fontWeight: 300,
+          fontWeight: 'bold',
           color: '#141414',
           marginBottom: '24px',
           letterSpacing: 0,
@@ -387,6 +444,757 @@ const AccountDefaultsPage: React.FC = () => {
   )
 }
 
+// ─── Users & Teams (from settings: User Directory, Teams, Groups, Ranks) ────────
+const usersTeamsTabs: Tab[] = [
+  { id: 'user-directory', label: 'User Directory' },
+  { id: 'supervisor-teams', label: 'Supervisor Teams' },
+  { id: 'management-groups', label: 'Management Groups' },
+  { id: 'ranks-and-permissions', label: 'Ranks and Permissions' },
+]
+
+const UsersTeamsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('user-directory')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'user-directory': <Users />,
+    'supervisor-teams': <Teams />,
+    'management-groups': <Groups />,
+    'ranks-and-permissions': <Ranks />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Users &amp; Teams
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {usersTeamsTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === usersTeamsTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Smart CRM (from settings: Campaigns, Industries, Products, Stages, etc.) ───
+const smartCrmTabs: Tab[] = [
+  { id: 'stages', label: 'Stages' },
+  { id: 'product-groups', label: 'Product Groups' },
+  { id: 'products', label: 'Products' },
+  { id: 'deal-templates', label: 'Deal Templates' },
+  { id: 'business-types', label: 'Business Types' },
+  { id: 'campaigns', label: 'Campaigns' },
+]
+
+const SmartCrmPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('stages')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    stages: <Stages />,
+    'product-groups': <Industries />,
+    products: <Products />,
+    'deal-templates': <DealTemplates />,
+    'business-types': <BusinessTypes />,
+    campaigns: <Campaigns />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Smart CRM
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {smartCrmTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === smartCrmTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Communications (from settings: Manage Extensions, Backend Operations, Manual Analysis) ───
+const communicationsTabs: Tab[] = [
+  { id: 'manage-extensions', label: 'Manage Analysis' },
+  { id: 'manual-analysis', label: 'Manual Analysis' },
+]
+
+const CommunicationsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('manage-extensions')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'manage-extensions': <ManageExtensions />,
+    'manual-analysis': <ManualAnalysis />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Communications
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {communicationsTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === communicationsTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Planner (from settings: Work Planner Statuses) ───────────────────────────
+const PlannerPage: React.FC = () => (
+  <div style={{ padding: '32px 40px', flex: 1 }}>
+    <h1
+      style={{
+        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+        fontSize: '24px',
+        fontWeight: 'bold',
+        color: '#141414',
+        marginBottom: '24px',
+        letterSpacing: 0,
+      }}
+    >
+      Planner
+    </h1>
+    <WorkPlannerStatuses />
+  </div>
+)
+
+// ─── Workforce (from settings: Request Categories, Sub Categories) ────────────
+const workforceTabs: Tab[] = [
+  { id: 'request-categories', label: 'Request Categories' },
+  // { id: 'sub-categories', label: 'Sub Categories' },
+]
+
+const WorkforcePage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('request-categories')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'request-categories': <RequestCategories />,
+    // 'sub-categories': <RequestSubCategories />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Workforce
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {workforceTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === workforceTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Billing (from settings: Payment Methods) ───────────────────────────────────
+const billingTabs: Tab[] = [
+  { id: 'payment-methods', label: 'Payment Methods' },
+]
+
+const BillingPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('payment-methods')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'payment-methods': <PaymentMethods />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Billing
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {billingTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === billingTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Tickets (from settings: Statuses, Modules, Categories, Sub Categories, Types) ───
+const ticketsTabs: Tab[] = [
+  { id: 'statuses', label: 'Statuses' },
+  { id: 'modules', label: 'Modules' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'sub-categories', label: 'Sub Categories' },
+  { id: 'types', label: 'Types' },
+]
+
+const TicketsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('statuses')
+  const tabContentMap: Record<string, React.ReactNode> = {
+    statuses: <TicketStatuses />,
+    modules: <TicketModules />,
+    categories: <ModuleCategories />,
+    'sub-categories': <ModuleSubCategories />,
+    types: <TicketTypes />,
+  }
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Tickets</h1>
+      <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
+        {ticketsTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === ticketsTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Help Center (from settings: FAQ Modules, Topics, Items, Types) ───────────
+const helpCenterTabs: Tab[] = [
+  { id: 'modules', label: 'FAQ Modules' },
+  { id: 'topics', label: 'FAQ Topics' },
+  { id: 'items', label: 'FAQ Items' },
+  { id: 'types', label: 'FAQ Types' },
+]
+
+const HelpCenterPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('modules')
+  const tabContentMap: Record<string, React.ReactNode> = {
+    modules: <FAQModules />,
+    topics: <FAQTopics />,
+    items: <FAQItems />,
+    types: <FAQTypes />,
+  }
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Help Center</h1>
+      <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
+        {helpCenterTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === helpCenterTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── AI Chat (from settings: Tools Profiles, FAQ Profiles, Tenant Profile, Global FAQs) ───
+const aiChatTabs: Tab[] = [
+  { id: 'tools-profiles', label: 'Tools Profiles' },
+  { id: 'faq-profiles', label: 'FAQ Profiles' },
+  { id: 'tenant-profile', label: 'Tenant Profile' },
+  { id: 'global-faqs', label: 'Global FAQs' },
+]
+
+const AIChatPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('tools-profiles')
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'tools-profiles': <ToolProfiles />,
+    'faq-profiles': <FaqProfiles />,
+    'tenant-profile': <AIChatFAQsTenant />,
+    'global-faqs': <AIChatFAQsGlobal />,
+  }
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>AI Chat</h1>
+      <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
+        {aiChatTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === aiChatTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Virtual Agents (from settings: Outbound AI Agent – Trunk Profiles, Bot Profiles) ───
+const virtualAgentsTabs: Tab[] = [
+  { id: 'trunk-profiles', label: 'Outbound Trunks' },
+  { id: 'bot-profiles', label: 'Outbound Bots' },
+
+  { id: 'inbound-trunks', label: 'Inbound Trunks' },
+  { id: 'inbound-bots', label: 'Inbound Bots' },
+  { id: 'inbound-faqs', label: 'Inbound FAQs' },
+]
+
+const VirtualAgentsPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('trunk-profiles')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'trunk-profiles': <OutboundTrunkProfiles />,
+    'bot-profiles': <AIMLProfiles />,
+    'inbound-trunks': <InboundTrunkProfiles />,
+    'inbound-bots': <InboundBotProfiles />,
+    'inbound-faqs': <InboundFAQs />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Virtual Agents
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {virtualAgentsTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === virtualAgentsTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── Pulse (Host Groups, Alerts) ───
+const pulseTabs: Tab[] = [
+  { id: 'hosts', label: 'Hosts' },
+  { id: 'host-groups', label: 'Host Groups' },
+  { id: 'events', label: 'Events' },
+]
+
+const PulsePage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('host-groups')
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'hosts': <Hosts />,
+    'host-groups': <HostGroups />,
+    events: <Events />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Pulse
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {pulseTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === pulseTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
+// ─── GSM / Telco Gateway (from settings: Assign Devices, Sync GSM, Company Profiling) ───
+const gsmTabs: Tab[] = [
+  { id: 'assign-devices', label: 'Assign Devices' },
+  { id: 'sync-gsm', label: 'Sync GSM' },
+  { id: 'company-profiling', label: 'Company Profiling' },
+]
+
+const GsmPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('assign-devices')
+  const tabContentMap: Record<string, React.ReactNode> = {
+    'assign-devices': <GsmAssign />,
+    'sync-gsm': <GsmSync />,
+    'company-profiling': <CompanyPO />,
+  }
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Telco Gateway</h1>
+      <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
+        {gsmTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === gsmTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+      <div>{tabContentMap[activeTab]}</div>
+    </div>
+  )
+}
+
 // Other section pages (dummy)
 const GenericPage: React.FC<{ title: string }> = ({ title }) => (
   <div style={{ padding: '32px 40px', flex: 1 }}>
@@ -394,7 +1202,7 @@ const GenericPage: React.FC<{ title: string }> = ({ title }) => (
       style={{
         fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
         fontSize: '24px',
-        fontWeight: 300,
+        fontWeight: 'bold',
         color: '#141414',
         marginBottom: '24px',
       }}
@@ -427,7 +1235,19 @@ const sectionPageMap: Record<string, React.ReactNode> = {
   'account-defaults': <AccountDefaultsPage />,
   'account-cleanup': <GenericPage title="Account Cleanup" />,
   'audit-log': <GenericPage title="Audit Log" />,
-  'users-teams': <GenericPage title="Users & Teams" />,
+  'users-teams': <UsersTeamsPage />,
+  'smart-crm': <SmartCrmPage />,
+  'communications': <CommunicationsPage />,
+  'planner': <PlannerPage />,
+  'workforce': <WorkforcePage />,
+  'billing': <BillingPage />,
+  'tickets': <TicketsPage />,
+  'help-center': <HelpCenterPage />,
+  'ai-chat': <AIChatPage />,
+  'gsm': <GsmPage />,
+  'virtual-agents': <VirtualAgentsPage />,
+  'pulse': <PulsePage />,
+  'compliance': <GenericPage title="Compliance" />,
   'product-updates': <GenericPage title="Product Updates" />,
   integrations: <GenericPage title="Integrations" />,
   marketplace: <GenericPage title="Marketplace Downloads" />,

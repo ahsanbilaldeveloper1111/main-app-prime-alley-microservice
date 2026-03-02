@@ -326,7 +326,7 @@ const ModuleCategories = () => {
       />
 
       <PageHeader
-        title="Categories"
+        title=""
         buttons={
           <>
          <Button 

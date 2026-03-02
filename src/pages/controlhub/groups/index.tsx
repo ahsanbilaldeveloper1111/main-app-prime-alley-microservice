@@ -508,7 +508,7 @@ const Groups = () => {
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
                       
-                      <h2 className="mb-0">Groups</h2>
+                      {/* <h2 className="mb-0">Groups</h2> */}
                     </Col>
 
 

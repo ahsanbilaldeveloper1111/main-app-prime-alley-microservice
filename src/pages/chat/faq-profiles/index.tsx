@@ -90,10 +90,10 @@ const FaqProfiles = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Faq Profiles" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
 
       <PageHeader
-        title="Faq Profiles"
+        title=""
         showSearch={false}
         buttons={
           <Button 

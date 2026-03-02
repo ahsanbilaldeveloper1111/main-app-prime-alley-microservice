@@ -371,11 +371,11 @@ const DealTemplatesPage = () => {
           <Card.Body className="p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h5 className="mb-0 fw-bold">Deal Templates</h5>
+                {/* <h5 className="mb-0 fw-bold">Deal Templates</h5>
                 <p className="text-muted mb-0 small">
                   Manage deal templates with custom fields for different
                   Business Types
-                </p>
+                </p> */}
               </div>
               {session?.user?.permissions?.includes(
                 "add-crm-deal-templates",

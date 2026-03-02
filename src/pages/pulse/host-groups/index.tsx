@@ -101,7 +101,7 @@ const HostGroups = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Host Groups</h2>
+                {/* <h2 className="mb-0">Host Groups</h2> */}
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
                 <input

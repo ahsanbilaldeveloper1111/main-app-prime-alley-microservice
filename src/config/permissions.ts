@@ -281,7 +281,7 @@ export const routePermissions: RoutePermission[] = [
 
     //netops services start
     {
-        path: '/netops',
+        path: '/pulse',
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
             {path: '/dashboard',   permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]},
