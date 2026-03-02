@@ -3083,7 +3083,8 @@ const CrmDeals = () => {
               onClick: () => {
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
-                  router.push(`/crm/deals/${dealId}/edit`);
+                  setShowDealSidebar(false);
+                  router.push(`/crm/deals/deals-detailpage?id=${dealId}`);
                 }
               },
             }}
@@ -3096,7 +3097,8 @@ const CrmDeals = () => {
                     const dealId =
                       selectedDeal?.id || selectedDeal?.rawData?.id;
                     if (dealId) {
-                      router.push(`/crm/deals/${dealId}/edit`);
+                      setShowDealSidebar(false);
+                      handleEditDeal(dealId);
                     }
                   },
                 },
@@ -3141,82 +3143,6 @@ const CrmDeals = () => {
                 },
               ],
             }}
-            quickActions={[
-              {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {}, // This is handled internally now
-                disabled: false,
-              },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {
-                  const phone =
-                    selectedDeal?.phone ||
-                    selectedDeal?.rawData?.phone ||
-                    relatedLead?.phone;
-                  if (phone) {
-                    handleCallClick(selectedDeal);
-                  }
-                },
-                disabled: !(
-                  selectedDeal?.phone ||
-                  selectedDeal?.rawData?.phone ||
-                  relatedLead?.phone
-                ),
-              },
-              {
-                id: "email",
-                label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                disabled: !(
-                  selectedDeal?.email ||
-                  selectedDeal?.rawData?.email ||
-                  relatedLead?.email
-                ),
-              },
-              {
-                id: "task",
-                label: "Task",
-                icon: CheckSquare,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {
-                  const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                  if (dealId) {
-                    setMeetingData({
-                      dealId: Number(dealId),
-                      dealName: selectedDeal?.name || "",
-                      meetingName: "",
-                      meetingType: "Online",
-                      meetingDate: "",
-                      meetingTime: "",
-                      meetingOutcome: "",
-                      extensions: [],
-                    });
-                    setMeetingAttendees([]);
-                    setShowAddMeetingModal(true);
-                  }
-                },
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
-              },
-            ]}
             sections={[
               {
                 id: "about-deal",
@@ -3231,7 +3157,8 @@ const CrmDeals = () => {
                       const dealId =
                         selectedDeal?.id || selectedDeal?.rawData?.id;
                       if (dealId) {
-                        router.push(`/crm/deals/${dealId}/edit`);
+                        setShowDealSidebar(false);
+                        handleEditDeal(dealId);
                       }
                     },
                   },
