@@ -19,10 +19,10 @@ const BotProfiles = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Bot Profiles" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Bot Profiles"
         showSearch={false}
-      />
+      /> */}
 
       <div
         className="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center"

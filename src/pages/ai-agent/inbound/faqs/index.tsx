@@ -180,8 +180,8 @@ const InboundFAQs = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Inbound FAQs" />
 
       <PageHeader
-        title="Inbound FAQs"
-        description="Manage inbound FAQs for voicebot."
+        title=""
+        description=""
         showSearch={false}
         buttons={
          <>

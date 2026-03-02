@@ -15,8 +15,11 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import ColumnEditorModal from "@components/ColumnEditorModal";
+import CrmExportModal from "@components/CrmExportModal";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
@@ -570,6 +573,10 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
+  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
+  const [exportFileName, setExportFileName] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [showCreateDealSidebar, setShowCreateDealSidebar] = useState(false);
   const [editingDealIdInSidebar, setEditingDealIdInSidebar] = useState<
     number | null
@@ -703,6 +710,14 @@ const CrmDeals = () => {
     industry: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
+    includeConverted: false as boolean,
+    includeLost: false as boolean,
+    includeArchived: false as boolean,
+    createdAtFrom: null as string | null,
+    createdAtTo: null as string | null,
+    created_at_month: null as string | null,
+    ticketId: null as string | null,
+    hasMeetings: false as boolean,
   });
 
   // Fetch stages and extensions on component mount
@@ -729,6 +744,129 @@ const CrmDeals = () => {
     }
   }, [showAddDealsDropdown]);
 
+  // Sync export modal filters from current table filters when modal opens
+  useEffect(() => {
+    if (showExportModal) {
+      setExportFilters({ ...currentFilters });
+      if (!exportFileName) {
+        setExportFileName(`deals_${moment().format("YYYY-MM-DD")}`);
+      }
+    }
+  }, [showExportModal, currentFilters]);
+
+  // Build API params from filters for export (same shape as fetchDeals)
+  const buildDealsExportParams = useCallback(
+    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
+      const params: Record<string, any> = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.include_converted !== undefined) params.include_converted = filters.include_converted;
+      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
+      if (filters.user_extensions?.length) {
+        params.user_extensions = filters.user_extensions;
+      } else if (filters.assigned_to) {
+        params.user_extensions = [filters.assigned_to];
+      }
+      if (filters.stage_id) params.stage_id = filters.stage_id;
+      if (filters.probability_min != null && filters.probability_min !== "") params.probability_min = Number(filters.probability_min);
+      if (filters.probability_max != null && filters.probability_max !== "") params.probability_max = Number(filters.probability_max);
+      if (filters.deal_type) params.deal_type = filters.deal_type;
+      if (filters.industry) params.industry = filters.industry;
+      if (filters.expected_close_date_from) params.expected_close_date_from = filters.expected_close_date_from;
+      if (filters.expected_close_date_to) params.expected_close_date_to = filters.expected_close_date_to;
+      if (filters.follow_up_date_from) params.follow_up_date_from = filters.follow_up_date_from;
+      if (filters.follow_up_date_to) params.follow_up_date_to = filters.follow_up_date_to;
+      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
+      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
+      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
+      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
+      if (filters.has_meetings !== undefined) params.has_meetings = filters.has_meetings;
+      if (filters.approval_status) params.approval_status = filters.approval_status;
+      if (filters.sort_by) params.sort_by = filters.sort_by;
+      if (filters.sort_order) params.sort_order = filters.sort_order;
+      if (pagination) {
+        params.page = pagination.page;
+        params.per_page = pagination.per_page;
+      }
+      return params;
+    },
+    [],
+  );
+
+  const fetchDealsForExport = useCallback(
+    async (filters: Record<string, any>) => {
+      const PER_PAGE = 100;
+      let page = 1;
+      const allData: any[] = [];
+      for (;;) {
+        const response: any = await getDeals(
+          buildDealsExportParams(filters, { page, per_page: PER_PAGE }),
+        );
+        const dealsArray: any[] = response?.dataList || [];
+        const pagination: any = response?.meta || {};
+        const lastPage = pagination?.last_page ?? 1;
+        allData.push(...dealsArray);
+        if (page >= lastPage || dealsArray.length < PER_PAGE) break;
+        page += 1;
+      }
+      return allData;
+    },
+    [buildDealsExportParams],
+  );
+
+  const handleDealsExport = useCallback(async () => {
+    const name = exportFileName.trim() || `deals_${moment().format("YYYY-MM-DD")}`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const allData = await fetchDealsForExport(exportFilters);
+      if (allData.length === 0) {
+        toast.info("No deals match the selected filters.");
+        return;
+      }
+      const headers = Array.from(
+        new Set(
+          allData.flatMap((row) =>
+            typeof row === "object" && row !== null
+              ? Object.keys(row).filter(
+                  (k) => typeof (row as any)[k] !== "object",
+                )
+              : [],
+          ),
+        ),
+      ).sort();
+      const csvRows = [
+        headers.join(","),
+        ...allData.map((row) =>
+          headers
+            .map((h) => {
+              const val = (row as any)[h];
+              if (val == null) return "";
+              if (typeof val === "object") return "";
+              const s = String(val).replace(/"/g, '""');
+              return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+            })
+            .join(","),
+        ),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+      toast.success(`Exported ${allData.length} deals successfully!`);
+    } catch (err) {
+      toast.error("Failed to export deals");
+    } finally {
+      setExporting(false);
+    }
+  }, [exportFileName, exportFilters, fetchDealsForExport]);
+
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
     async (page = 1, perPage = 15) => {
@@ -744,15 +882,12 @@ const CrmDeals = () => {
           params.search = currentFilters.search;
         }
 
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
+        // Add filter parameters per API: include_converted, include_lost, include_archived,
+        // user_extensions, assigned_to, probability_min/max, stage_id, deal_type, industry,
+        // expected_close_date_from/to, follow_up_date_from/to, created_at_from/to, created_at_month,
+        // ticket_id, has_meetings, search, approval_status, sort_by, sort_order
+        if (currentFilters.include_converted !== undefined) {
+          params.include_converted = currentFilters.include_converted;
         }
         if (currentFilters.include_lost !== undefined) {
           params.include_lost = currentFilters.include_lost;
@@ -760,17 +895,19 @@ const CrmDeals = () => {
         if (currentFilters.include_archived !== undefined) {
           params.include_archived = currentFilters.include_archived;
         }
-        if (currentFilters.follow_up_date_from) {
-          params.follow_up_date_from = currentFilters.follow_up_date_from;
+        if (currentFilters.user_extensions?.length) {
+          params.user_extensions = currentFilters.user_extensions;
+        } else if (currentFilters.assigned_to) {
+          params.user_extensions = [currentFilters.assigned_to];
         }
-        if (currentFilters.follow_up_date_to) {
-          params.follow_up_date_to = currentFilters.follow_up_date_to;
+        if (currentFilters.stage_id) {
+          params.stage_id = currentFilters.stage_id;
         }
-        if (currentFilters.probability_min) {
-          params.probability_min = currentFilters.probability_min;
+        if (currentFilters.probability_min != null && currentFilters.probability_min !== "") {
+          params.probability_min = Number(currentFilters.probability_min);
         }
-        if (currentFilters.probability_max) {
-          params.probability_max = currentFilters.probability_max;
+        if (currentFilters.probability_max != null && currentFilters.probability_max !== "") {
+          params.probability_max = Number(currentFilters.probability_max);
         }
         if (currentFilters.deal_type) {
           params.deal_type = currentFilters.deal_type;
@@ -785,9 +922,35 @@ const CrmDeals = () => {
         if (currentFilters.expected_close_date_to) {
           params.expected_close_date_to = currentFilters.expected_close_date_to;
         }
-
+        if (currentFilters.follow_up_date_from) {
+          params.follow_up_date_from = currentFilters.follow_up_date_from;
+        }
+        if (currentFilters.follow_up_date_to) {
+          params.follow_up_date_to = currentFilters.follow_up_date_to;
+        }
+        if (currentFilters.created_at_from) {
+          params.created_at_from = currentFilters.created_at_from;
+        }
+        if (currentFilters.created_at_to) {
+          params.created_at_to = currentFilters.created_at_to;
+        }
+        if (currentFilters.created_at_month) {
+          params.created_at_month = currentFilters.created_at_month;
+        }
+        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") {
+          params.ticket_id = currentFilters.ticket_id;
+        }
+        if (currentFilters.has_meetings !== undefined) {
+          params.has_meetings = currentFilters.has_meetings;
+        }
         if (currentFilters.approval_status) {
           params.approval_status = currentFilters.approval_status;
+        }
+        if (currentFilters.sort_by) {
+          params.sort_by = currentFilters.sort_by;
+        }
+        if (currentFilters.sort_order) {
+          params.sort_order = currentFilters.sort_order;
         }
 
         const response: any = await getDeals(params);
@@ -1162,6 +1325,63 @@ const CrmDeals = () => {
           newFilters.expected_close_date_to = filters.expected_close_date_to;
         } else {
           delete newFilters.expected_close_date_to;
+        }
+      }
+
+      // Handle include_converted filter
+      if ("include_converted" in filters) {
+        if (filters.include_converted) {
+          newFilters.include_converted = true;
+        } else {
+          delete newFilters.include_converted;
+        }
+      }
+
+      // Handle created_at_from / created_at_to / created_at_month
+      if ("created_at_from" in filters) {
+        if (filters.created_at_from) {
+          newFilters.created_at_from = filters.created_at_from;
+        } else {
+          delete newFilters.created_at_from;
+        }
+      }
+      if ("created_at_to" in filters) {
+        if (filters.created_at_to) {
+          newFilters.created_at_to = filters.created_at_to;
+        } else {
+          delete newFilters.created_at_to;
+        }
+      }
+      if ("created_at_month" in filters) {
+        if (filters.created_at_month) {
+          newFilters.created_at_month = filters.created_at_month;
+        } else {
+          delete newFilters.created_at_month;
+        }
+      }
+
+      // Handle ticket_id and has_meetings
+      if ("ticket_id" in filters) {
+        if (filters.ticket_id != null && filters.ticket_id !== "") {
+          newFilters.ticket_id = filters.ticket_id;
+        } else {
+          delete newFilters.ticket_id;
+        }
+      }
+      if ("has_meetings" in filters) {
+        if (filters.has_meetings) {
+          newFilters.has_meetings = true;
+        } else {
+          delete newFilters.has_meetings;
+        }
+      }
+
+      // Handle user_extensions (array for assignee/creator)
+      if ("user_extensions" in filters) {
+        if (Array.isArray(filters.user_extensions) && filters.user_extensions.length > 0) {
+          newFilters.user_extensions = filters.user_extensions;
+        } else {
+          delete newFilters.user_extensions;
         }
       }
 
@@ -2341,14 +2561,14 @@ const CrmDeals = () => {
       },
       {
         key: "owner",
-        label: "Associate with",
+        label: "Owner",
         sortable: true,
         type: "text",
         emptyValue: "-",
       },
       {
         key: "assignedUser",
-        label: "Assigned To",
+        label: "Owner",
         sortable: true,
         type: "text",
         emptyValue: "-",
@@ -2505,6 +2725,38 @@ const CrmDeals = () => {
     handleDeleteDeal,
     handleMarkLost,
   ]);
+
+  const dealsToolbarConfig = useCrmToolbarConfig({
+    entity: "deals",
+    searchValue: dealsSearch,
+    searchPlaceholder: "Search deals by name, company, value...",
+    onSearchChange: setDealsSearch,
+    onSearch: () => {},
+    currentFilters,
+    handleFiltersChange,
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    activeTab: activeFilter,
+    onTabChange: handleFilterChange,
+    tabs: [
+      { id: "all", label: "All deals", count: filterCounts.all, removable: false },
+      ...customTabs,
+    ],
+    onTabAdd: () => setShowTabModal(true),
+    onTabRemove: (tabId) => {
+      setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+      if (activeFilter === tabId) handleFilterChange("all");
+    },
+    tabsDropdownLabel: "Deals",
+    onFiltersClick: handleOpenFiltersSidebar,
+    onExportClick: () => setShowExportModal(true),
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    showImport: false,
+    currentTableView: dealsViewMode,
+    onTableViewChange: setDealsViewMode,
+    extensions,
+    onPaginationReset: () =>
+      setDealsPagination((prev) => ({ ...prev, currentPage: 1 })),
+  });
 
   if (!session?.user?.permissions?.includes("list-crm-deals")) {
     return null;
@@ -2702,7 +2954,9 @@ const CrmDeals = () => {
             >
               <GenericTable
                 data={filteredDeals}
-                columns={dealsColumns}
+                columns={dealsColumns.filter((c) =>
+                  selectedDealsColumns.includes(c.key),
+                )}
                 actions={dealsActions}
                 showActions={false}
                 // customizableColumns={true}
@@ -2760,113 +3014,26 @@ const CrmDeals = () => {
                 maxHeight="calc(100vh - 380px)"
                 // Toolbar
                 showToolbar={true}
-                toolbar={{
-                  // Tabs
-                  showTabs: true,
-                  showImport: false,
-                  onImportClick: () => {
-                    console.log("Import prospects");
-                  },
-                  tabsDropdownLabel: "Deals",
-                  tabs: [
-                    {
-                      id: "all",
-                      label: "All deals",
-                      count: filterCounts.all,
-                      removable: false,
-                    },
-                    ...customTabs,
-                  ],
-                  activeTab: activeFilter,
-                  onTabChange: handleFilterChange,
-                  onTabAdd: () => setShowTabModal(true),
-                  onTabRemove: (tabId) => {
-                    setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
-                    if (activeFilter === tabId) {
-                      handleFilterChange("all");
-                    }
-                  },
-
-                  // Search
-                  showSearch: true,
-                  searchValue: dealsSearch,
-                  searchPlaceholder: "Search deals by name, company, value...",
-                  onSearchChange: (value) => {
-                    setDealsSearch(value);
-                    // Clear search on empty value
-                    if (!value) {
-                      const newFilters = { ...currentFilters };
-                      delete newFilters.search;
-                      handleFiltersChange(newFilters);
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-                  onSearch: () => {
-                    if (dealsSearch) {
-                      handleFiltersChange({
-                        ...currentFilters,
-                        search: dealsSearch,
-                      });
-                      setDealsPagination({
-                        ...dealsPagination,
-                        currentPage: 1,
-                      });
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-
-                  // Actions
-                  showTableViewDropdown: true,
-                  tableViewLabel: "Table view",
-                  showViewSwitcher: true,
-                  showEditColumns: true,
-                  onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: false,
-                  pipelineLabel: "All Pipelines",
-                  showFiltersButton: true,
-                  onFiltersClick: handleOpenFiltersSidebar,
-                  showSortButton: true,
-                  showExportButton: true,
-                  onExportClick: () => setShowExportModal(true),
-                  showSaveButton: true,
-                  onSaveClick: () => console.log("Save view"),
-
-                  // Filter Pills
-                  filterPills: [
-                    {
-                      id: "contact_owner",
-                      label: "Associate with",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Owners",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.assigned_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        ...extensions.map((ext) => ({
-                          label: ext.display_name || ext.name || ext.extension,
-                          value: ext.id || ext.extension,
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              assigned_to: ext.id || ext.extension,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        })),
-                      ],
-                    },
-                  ],
-                  showAdvancedFilters: true,
-                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
-                }}
+                toolbar={dealsToolbarConfig}
                 // Stats cards for metrics
                 statsCards={dealsStatsCards}
+                customBody={
+                  dealsViewMode === "board" ? (
+                    <div
+                      className="d-flex align-items-center justify-content-center p-5"
+                      style={{ minHeight: "400px", background: "#f8f9fa" }}
+                    >
+                      <div className="text-center text-muted">
+                        <Layers size={48} className="mb-3 opacity-50" />
+                        <h5 className="mb-2">Board View</h5>
+                        <p className="mb-0 small">
+                          Switch to Table view from the dropdown to see the
+                          table.
+                        </p>
+                      </div>
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
           </div>
@@ -3165,7 +3332,7 @@ const CrmDeals = () => {
                     show: !!(selectedDeal?.dealType || selectedDeal?.deal_type),
                   },
                   {
-                    label: "Assigned To",
+                    label: "Owner",
                     value:
                       selectedDeal?.assigned_user?.display_name ||
                       selectedDeal?.assigned_user?.name ||
@@ -3872,7 +4039,7 @@ const CrmDeals = () => {
                                     marginBottom: "4px",
                                   }}
                                 >
-                                  Assigned To
+                                  Owner
                                 </div>
                                 <div
                                   style={{
@@ -4442,7 +4609,7 @@ const CrmDeals = () => {
                                         marginBottom: "6px",
                                       }}
                                     >
-                                      Assigned To
+                                      Owner
                                     </div>
                                     <div
                                       style={{
@@ -5738,7 +5905,7 @@ const CrmDeals = () => {
                         marginBottom: "4px",
                       }}
                     >
-                      Associate with
+                      Owner
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 600 }}>
                       {extensions.find(
@@ -6996,6 +7163,87 @@ const CrmDeals = () => {
         </Modal.Footer>
       </Modal>
 
+      {/* Column Editor Modal */}
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedDealsColumns}
+        onApply={(keys) => {
+          setSelectedDealsColumns(keys);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "dealsSelectedColumns",
+              JSON.stringify(keys),
+            );
+          }
+        }}
+      />
+
+      {/* Export Modal */}
+      <CrmExportModal
+        show={showExportModal}
+        onHide={() => setShowExportModal(false)}
+        title="Export Deals"
+        subtitle="Choose filters to define which deals are exported. Defaults match your current table view."
+        fileNameValue={exportFileName}
+        onFileNameChange={setExportFileName}
+        fileNamePlaceholder={`deals_${moment().format("YYYY-MM-DD")}`}
+        onExportClick={handleDealsExport}
+        exporting={exporting}
+        exportButtonLabel="Export"
+      >
+        <hr />
+        <h6 className="mb-3">Export filters</h6>
+        <Row>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Owner</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All owners" },
+                  ...extensions.map((ext: any) => ({
+                    value: String(ext.id ?? ext.extension),
+                    label:
+                      ext.display_name || ext.name || ext.id || ext.extension || "",
+                  })),
+                ]}
+                value={
+                  exportFilters.assigned_to
+                    ? (() => {
+                        const id = exportFilters.assigned_to;
+                        const ext = extensions.find(
+                          (e: any) => (e.id || e.extension) === id,
+                        );
+                        return {
+                          value: id,
+                          label: ext
+                            ? ext.display_name || ext.name || id
+                            : id,
+                        };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.assigned_to = v;
+                    else delete next.assigned_to;
+                    return next;
+                  });
+                }}
+                placeholder="Select owner..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+        </Row>
+      </CrmExportModal>
+
       {/* Filters Sidebar */}
       <GenericFilterSidebar
         isOpen={showFiltersSidebar}
@@ -7006,7 +7254,7 @@ const CrmDeals = () => {
         filters={[
           {
             id: "assignedTo",
-            label: "Assigned To",
+            label: "Owner",
             type: "select" as const,
             value: dealsFilters.assignedTo
               ? (() => {
@@ -7183,6 +7431,100 @@ const CrmDeals = () => {
                 expectedCloseDateTo: value,
               })),
           },
+          {
+            id: "includeConverted",
+            label: "Include converted",
+            type: "dropdown" as const,
+            value: dealsFilters.includeConverted ? "true" : "false",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                includeConverted: value === "true",
+              })),
+            options: [
+              { value: "false", label: "No (exclude deals with orders)" },
+              { value: "true", label: "Yes" },
+            ],
+          },
+          {
+            id: "includeLost",
+            label: "Include lost",
+            type: "dropdown" as const,
+            value: dealsFilters.includeLost ? "true" : "false",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                includeLost: value === "true",
+              })),
+            options: [
+              { value: "false", label: "No" },
+              { value: "true", label: "Yes (show only lost deals)" },
+            ],
+          },
+          {
+            id: "includeArchived",
+            label: "Include archived",
+            type: "dropdown" as const,
+            value: dealsFilters.includeArchived ? "true" : "false",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                includeArchived: value === "true",
+              })),
+            options: [
+              { value: "false", label: "No" },
+              { value: "true", label: "Yes (show only archived/trashed)" },
+            ],
+          },
+          {
+            id: "createdAtFrom",
+            label: "Created date from",
+            type: "date" as const,
+            value: dealsFilters.createdAtFrom || "",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                createdAtFrom: value || null,
+              })),
+          },
+          {
+            id: "createdAtTo",
+            label: "Created date to",
+            type: "date" as const,
+            value: dealsFilters.createdAtTo || "",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                createdAtTo: value || null,
+              })),
+          },
+          {
+            id: "ticketId",
+            label: "Ticket ID (source)",
+            type: "text" as const,
+            value: dealsFilters.ticketId || "",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                ticketId: value || null,
+              })),
+            placeholder: "Filter by source ticket ID",
+          },
+          {
+            id: "hasMeetings",
+            label: "Has meetings",
+            type: "dropdown" as const,
+            value: dealsFilters.hasMeetings ? "true" : "false",
+            onChange: (value) =>
+              setDealsFilters((prev) => ({
+                ...prev,
+                hasMeetings: value === "true",
+              })),
+            options: [
+              { value: "false", label: "No" },
+              { value: "true", label: "Yes (only deals with meetings)" },
+            ],
+          },
         ]}
         onApply={() => {
           // Map dealsFilters to the format expected by handleFiltersChange
@@ -7226,6 +7568,23 @@ const CrmDeals = () => {
             filtersToApply.expected_close_date_to =
               dealsFilters.expectedCloseDateTo;
           }
+          // Booleans: send explicitly so unchecking clears the filter
+          filtersToApply.include_converted = dealsFilters.includeConverted || undefined;
+          filtersToApply.include_lost = dealsFilters.includeLost || undefined;
+          filtersToApply.include_archived = dealsFilters.includeArchived || undefined;
+          filtersToApply.has_meetings = dealsFilters.hasMeetings || undefined;
+          if (dealsFilters.createdAtFrom) {
+            filtersToApply.created_at_from = dealsFilters.createdAtFrom;
+          }
+          if (dealsFilters.createdAtTo) {
+            filtersToApply.created_at_to = dealsFilters.createdAtTo;
+          }
+          if (dealsFilters.created_at_month) {
+            filtersToApply.created_at_month = dealsFilters.created_at_month;
+          }
+          if (dealsFilters.ticketId) {
+            filtersToApply.ticket_id = dealsFilters.ticketId;
+          }
 
           handleFiltersChange(filtersToApply);
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
@@ -7246,6 +7605,14 @@ const CrmDeals = () => {
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,
             approvalStatus: null,
+            includeConverted: false,
+            includeLost: false,
+            includeArchived: false,
+            createdAtFrom: null,
+            createdAtTo: null,
+            created_at_month: null,
+            ticketId: null,
+            hasMeetings: false,
           });
           handleFiltersChange({});
           setCurrentFilters({});

@@ -38,7 +38,8 @@ import {
   BarChart2,
   Settings as SettingsCogIcon,
   PhoneOutgoing,
-  PhoneIncoming
+  PhoneIncoming,
+  Search
 } from 'lucide-react';
 
 import "@assets/scss/common.scss";
@@ -108,6 +109,8 @@ import InboundTrunkProfiles from "@pages/ai-agent/inbound/trunk-profiles";
 import InboundBotProfiles from "@pages/agents/inbound-agent";
 import InboundFAQs from "@pages/ai-agent/inbound/faqs";
 
+import NotificationsPage from "@pages/notifications";
+
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
 // Destructure constants for easier use
@@ -146,6 +149,9 @@ const Settings = () => {
   const [visitedAIAnalysisTabs, setVisitedAIAnalysisTabs] = useState<Set<string>>(new Set(["manage-extensions"]));
   const [visitedOutboundAIAgentTabs, setVisitedOutboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
   const [visitedInboundAIAgentTabs, setVisitedInboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
+
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Initialize tabs from URL on mount
   useEffect(() => {
@@ -284,7 +290,7 @@ const Settings = () => {
     
     // Update URL
     const defaultSubTab = getDefaultSubTab(tabKey);
-    if (tabKey === "billing") {
+    if (tabKey === "billing" || tabKey === "general-prefs" || tabKey === "notifications") {
       router.replace({
         pathname: router.pathname,
         query: { ...router.query, tab: tabKey }
@@ -470,12 +476,21 @@ const Settings = () => {
           return visitedOutboundAIAgentTabs.has(subTab) && activeOutboundAIAgentTab === subTab;
         case "inbound-ai-agent":
           return visitedInboundAIAgentTabs.has(subTab) && activeInboundAIAgentTab === subTab;
+        case "general-prefs":
+        case "notifications":
+          return true;
         default:
           return false;
       }
     }
     return true;
   };
+
+  // Your Preferences (same as main-settings sidebar)
+  const preferenceSidebarItems = [
+    { id: 'general-prefs', label: 'General' },
+    { id: 'notifications', label: 'Notifications' },
+  ];
 
   // Define main tabs with icons and colors
   const mainTabs = [
@@ -676,89 +691,195 @@ const Settings = () => {
     }
   };
 
+  // Build search suggestions (all items + filter by query)
+  const searchSuggestions = React.useMemo(() => {
+    const list: Array<{ label: string; mainKey: string; subKey?: string; section: string }> = [];
+    preferenceSidebarItems.forEach((item) => {
+      list.push({ label: item.label, mainKey: item.id, section: 'Your Preferences' });
+    });
+    mainTabs.forEach((tab) => {
+      if (!session?.user?.permissions?.includes(tab.permission)) return;
+      if (tab.key === 'help-center' && Number(session?.user?.is_admin) !== 1) return;
+      list.push({ label: tab.title, mainKey: tab.key, section: 'Account Management' });
+      const subs = subTabsConfig[tab.key];
+      subs?.forEach((sub) => {
+        if (!session?.user?.permissions?.includes(sub.permission)) return;
+        list.push({ label: sub.title, mainKey: tab.key, subKey: sub.key, section: tab.title });
+      });
+    });
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return list.filter((item) => item.label.toLowerCase().includes(q));
+  }, [searchQuery, session?.user?.permissions, session?.user?.is_admin]);
+
+  const handleSuggestionSelect = (item: { label: string; mainKey: string; subKey?: string }) => {
+    handleMainTabChange(item.mainKey);
+    if (item.subKey) {
+      handleSubTabClick(item.mainKey, item.subKey);
+    }
+    setSearchQuery('');
+    setShowSearch(false);
+  };
+
   return (
     <React.Fragment>
       <style>{`
-        .settings-filter-buttons {
+        /* Left sidebar – main tabs (aligned with main-settings sidebar) */
+        .settings-sidebar {
+          width: 255px;
+          min-width: 255px;
+          background: #ffffff;
+          border-right: 1px solid #e8e8e8;
+          padding: 21px;
           display: flex;
-          flex-direction: row;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-          margin-bottom: 0;
-          padding: 0;
-          width: 100%;
+          flex-direction: column;
+          gap: 0;
+          height: 100%;
+          position: sticky;
+          top: 0;
+          overflow-y: auto;
         }
 
-        .settings-filter-button {
+        .settings-sidebar-item {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 10px 20px;
-          border-radius: 8px;
-          border: 1px solid;
-          font-weight: 500;
-          font-size: 14px;
+          padding: 8px 20px;
           cursor: pointer;
-          transition: all 0.2s ease;
-          background: white;
-          white-space: nowrap;
+          background: transparent;
+          border: none;
+          border-left: 3px solid transparent;
+          width: 100%;
+          text-align: left;
+          font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+          font-size: 14px;
+          font-weight: 300;
+          color: #141414;
+          line-height: 24px;
+          transition: background 0.12s, border-color 0.12s;
         }
 
-        .settings-filter-button:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        .settings-sidebar-item:hover {
+          background: #f5f5f5;
         }
 
-        .settings-filter-button.active {
-          color: white;
+        .settings-sidebar-item.active {
+          background: whitesmoke;
+          border-left-color: #141414;
+          font-weight: 400;
         }
 
-        .settings-filter-button.active .filter-icon {
-          color: white;
+        .settings-sidebar-item.search-match {
+          background: #f0f7ff;
         }
 
-        .settings-filter-button:not(.active) .filter-icon {
+        .settings-sidebar-item .filter-icon {
           color: inherit;
+          flex-shrink: 0;
         }
 
+        .settings-sidebar-group-heading {
+          font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+          font-weight: 600;
+          font-size: 16px;
+          color: #141414;
+          line-height: 20px;
+          padding: 12px 20px 6px;
+          margin-bottom: 0;
+        }
+
+        .settings-search-suggestions {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 100%;
+          margin-top: 4px;
+          background: #fff;
+          border: 1px solid #e0e0e0;
+          border-radius: 4px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          max-height: 280px;
+          overflow-y: auto;
+          z-index: 100;
+        }
+        .settings-search-suggestion-item {
+          display: block;
+          width: 100%;
+          padding: 10px 12px;
+          text-align: left;
+          border: none;
+          background: none;
+          cursor: pointer;
+          font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+          font-size: 13px;
+          color: #141414;
+          transition: background 0.1s;
+        }
+        .settings-search-suggestion-item:hover {
+          background: #f0f7ff;
+        }
+        .settings-search-suggestion-item .suggestion-section {
+          font-size: 11px;
+          color: #888;
+          margin-top: 2px;
+        }
+
+        /* Sub-tabs – horizontal bar (same design language as main-settings tabs) */
         .settings-sub-filter-buttons {
           display: flex;
           flex-direction: row;
           align-items: center;
-          gap: 12px;
           flex-wrap: wrap;
-          margin-bottom: 0;
+          margin-bottom: 32px;
           padding: 0;
           width: 100%;
+          overflow: hidden;
         }
 
         .settings-sub-filter-button {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 16px;
-          border-radius: 8px;
-          border: 1px solid;
-          font-weight: 500;
-          font-size: 13px;
+          padding: 12px 24px;
+          border: 1px solid #e0e0e0;
+          border-right: none;
+          font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+          font-weight: 300;
+          font-size: 14px;
+          color: #141414;
           cursor: pointer;
-          transition: all 0.2s ease;
-          background: white;
+          transition: background 0.15s;
+          background: whitesmoke;
           white-space: nowrap;
+          position: relative;
+          top: 1px;
+          box-sizing: border-box;
         }
 
-        .settings-sub-filter-button:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        .settings-sub-filter-button:last-child {
+          border-right: 1px solid #e0e0e0;
+        }
+
+        .settings-sub-filter-button:hover:not(.active) {
+          background: #f0f0f0;
         }
 
         .settings-sub-filter-button.active {
-          color: white;
+          background: #ffffff;
+          border-bottom: 2px solid #ffffff;
+          font-weight: 400;
+        }
+
+        .settings-sub-filter-button:not(.active) {
+          border-bottom: 2px solid #e0e0e0;
+        }
+
+        .settings-sub-filter-button.search-match {
+          background: #f0f7ff;
         }
 
         .settings-sub-filter-button.active .filter-icon {
-          color: white;
+          color: inherit;
         }
 
         .settings-sub-filter-button:not(.active) .filter-icon {
@@ -766,6 +887,7 @@ const Settings = () => {
         }
 
         .filter-icon {
+          display: none;
           width: 18px;
           height: 18px;
           flex-shrink: 0;
@@ -773,73 +895,224 @@ const Settings = () => {
       `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Settings" />
 
-      <PageHeader
-        title="Settings"
-        showSearch={false}
-      />
+    
 
-      <Row>
-        <Col md={12}>
-          <Card className="shadow-sm border-0">
-            <Card.Body style={{ padding: 0 }}>
-              {/* Main Filter Buttons - At the top */}
-              <div >
-                <div className="settings-filter-buttons shadow px-3 py-3">
-                {mainTabs.map((tab) => {
-                  if (!session?.user?.permissions?.includes(tab.permission)) return null;
-                  // Show Help Center tab only if user is admin
-                  if (tab.key === "help-center" && Number(session?.user?.is_admin) !== 1) return null;
-                  const IconComponent = tab.icon;
-                  const isActive = activeTab === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      className={`settings-filter-button ${isActive ? 'active' : ''}`}
-                      onClick={() => handleMainTabChange(tab.key)}
-                      style={{
-                        backgroundColor: isActive ? tab.color : 'white',
-                        borderColor: isActive ? tab.color : tab.color,
-                        color: isActive ? 'white' : tab.color
-                      }}
-                    >
-                      <IconComponent className="filter-icon" size={18} />
-                      <span>{tab.title}</span>
-                    </button>
-                  );
-                })}
-                </div>
-              </div>
+      <div
+        style={{
+          display: 'flex',
+          minHeight: 'calc(100vh - 120px)',
+          background: '#ffffff',
+          fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
+        }}
+      >
+        {/* Left sidebar – main tabs */}
+        <aside className="settings-sidebar">
+          {/* Settings heading + search icon */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingLeft: '20px',
+              paddingRight: '20px',
+              marginBottom: '20px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '20px',
+                fontStyle: 'normal',
+                fontWeight: 600,
+                textTransform: 'none',
+                fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
+                letterSpacing: '0px',
+                lineHeight: '24px',
+                color: '#141414',
+              }}
+            >
+              Settings
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowSearch(!showSearch)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                color: '#555',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Search settings"
+            >
+              <Search size={18} />
+            </button>
+          </div>
 
-              {/* Sub Filter Buttons */}
-              {subTabsConfig[activeTab] && subTabsConfig[activeTab].length > 0 && (
-                <div >
-                  <div className="settings-sub-filter-buttons px-3 py-3 shadow">
-                  {subTabsConfig[activeTab].map((subTab) => {
-                    if (!session?.user?.permissions?.includes(subTab.permission)) return null;
-                    const SubIconComponent = subTab.icon;
-                    const isActive = getActiveSubTab(activeTab) === subTab.key;
-                    return (
+          {/* Search Input + Suggestions */}
+          {showSearch && (
+            <div style={{ paddingLeft: '20px', paddingRight: '20px', marginBottom: '16px' }}>
+              <div style={{ position: 'relative' }}>
+                <Search
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#888',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search settings..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 34px',
+                    fontSize: '13px',
+                    fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif",
+                    color: '#141414',
+                    border: '1px solid #d0d0d0',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    background: '#fff',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
+                />
+                {searchQuery.trim() && searchSuggestions.length > 0 && (
+                  <div className="settings-search-suggestions">
+                    {searchSuggestions.map((item, idx) => (
                       <button
-                        key={subTab.key}
-                        className={`settings-sub-filter-button ${isActive ? 'active' : ''}`}
-                        onClick={() => handleSubTabClick(activeTab, subTab.key)}
-                        style={{
-                          backgroundColor: isActive ? subTab.color : 'white',
-                          borderColor: isActive ? subTab.color : subTab.color,
-                          color: isActive ? 'white' : subTab.color
+                        key={`${item.mainKey}-${item.subKey ?? 'main'}-${idx}`}
+                        type="button"
+                        className="settings-search-suggestion-item"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSuggestionSelect(item);
                         }}
                       >
-                        <SubIconComponent className="filter-icon" size={16} />
-                        <span>{subTab.title}</span>
+                        <div>{item.label}</div>
+                        <div className="suggestion-section">{item.section}</div>
                       </button>
-                    );
-                  })}
+                    ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+          )}
 
-              {/* Tab Content */}
-              <div style={{ padding: '24px' }}>
+          {/* Your Preferences */}
+          <>
+            <div className="settings-sidebar-group-heading">Your Preferences</div>
+            {preferenceSidebarItems.map((item) => {
+              const isActive = activeTab === item.id;
+              const matchesSearch = searchQuery.trim() && item.label.toLowerCase().includes(searchQuery.trim().toLowerCase());
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`settings-sidebar-item ${isActive ? 'active' : ''} ${matchesSearch ? 'search-match' : ''}`}
+                  onClick={() => handleMainTabChange(item.id)}
+                >
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </>
+
+          {/* Account Management */}
+          <>
+            <div className="settings-sidebar-group-heading">Services</div>
+            {mainTabs
+              .filter((tab) => {
+                if (!session?.user?.permissions?.includes(tab.permission)) return false;
+                if (tab.key === "help-center" && Number(session?.user?.is_admin) !== 1) return false;
+                return true;
+              })
+              .map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = activeTab === tab.key;
+                const q = searchQuery.trim().toLowerCase();
+                const mainMatches = q && tab.title.toLowerCase().includes(q);
+                const subTabs = subTabsConfig[tab.key];
+                const subMatches = q && subTabs?.some(
+                  (sub) =>
+                    session?.user?.permissions?.includes(sub.permission) &&
+                    sub.title.toLowerCase().includes(q)
+                );
+                const matchesSearch = !!(mainMatches || subMatches);
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={`settings-sidebar-item ${isActive ? 'active' : ''} ${matchesSearch ? 'search-match' : ''}`}
+                    onClick={() => handleMainTabChange(tab.key)}
+                  >
+                    <IconComponent className="filter-icon" size={18} style={{ color: isActive ? tab.color : undefined }} />
+                    <span>{tab.title}</span>
+                  </button>
+                );
+              })}
+          </>
+        </aside>
+
+        {/* Right content area */}
+        <main
+          style={{
+            flex: 1,
+            background: '#ffffff',
+            overflowY: 'auto',
+            minWidth: 0,
+          }}
+        >
+          <Row>
+            <Col md={12}>
+              <Card className="shadow-sm border-0">
+                <Card.Body style={{ padding: 0 }}>
+                  {/* Sub-tabs (horizontal bar) */}
+                  {subTabsConfig[activeTab] && subTabsConfig[activeTab].length > 0 && (
+                    <div>
+                      <div className="settings-sub-filter-buttons px-3 py-3 shadow">
+                  {subTabsConfig[activeTab]
+                    .filter((subTab) => session?.user?.permissions?.includes(subTab.permission))
+                    .map((subTab) => {
+                      const SubIconComponent = subTab.icon;
+                      const isActive = getActiveSubTab(activeTab) === subTab.key;
+                      const matchesSearch = searchQuery.trim() && subTab.title.toLowerCase().includes(searchQuery.trim().toLowerCase());
+                      return (
+                        <button
+                          key={subTab.key}
+                          className={`settings-sub-filter-button ${isActive ? 'active' : ''} ${matchesSearch ? 'search-match' : ''}`}
+                          onClick={() => handleSubTabClick(activeTab, subTab.key)}
+                        >
+                          <SubIconComponent className="filter-icon" size={16} style={{ color: isActive ? subTab.color : undefined }} />
+                          <span>{subTab.title}</span>
+                        </button>
+                      );
+                    })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tab Content */}
+                  <div style={{ padding: '24px' }}>
+                {/* Your Preferences – placeholder content */}
+                {activeTab === "general-prefs" && (
+                  <div>
+                    <h2 style={{ fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '16px' }}>General</h2>
+                    <p style={{ fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", fontSize: '14px', color: '#555' }}>Content for this section goes here.</p>
+                  </div>
+                )}
+                {activeTab === "notifications" && <NotificationsPage />}
+
                 {/* User Management Content */}
                 {activeTab === "user-management" && shouldRenderTab("user-management", activeUserManagementTab) && (
                   <div>
@@ -959,11 +1232,13 @@ const Settings = () => {
                     {activeInboundAIAgentTab === "faqs" && <InboundFAQs />}
                   </div>
                 )}
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </main>
+      </div>
     </React.Fragment>
   );
 };

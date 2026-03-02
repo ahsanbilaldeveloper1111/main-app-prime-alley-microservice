@@ -496,7 +496,7 @@ const RequestCategories = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
       <PageHeader
-        title="Request Categories"
+        title=""
         showSearch={false}
         buttons={
           <>

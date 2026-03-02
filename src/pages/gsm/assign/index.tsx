@@ -570,7 +570,7 @@ const GsmAssign = () => {
             <Row className="align-items-center">
               <Col md={5}>
                 <h2 className="mb-0 d-flex align-items-center">
-                  Telco Gateway Assign
+                  {/* Telco Gateway Assign */}
                   {/* {session?.user?.permissions?.includes('company-link-gsm-assignment') && (
                           <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => handleCreateAssignement()}>New Assign</Button>
                       )} */}

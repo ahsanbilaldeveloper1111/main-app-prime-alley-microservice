@@ -152,6 +152,9 @@ import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import ColumnEditorModal from "@components/ColumnEditorModal";
+import CrmExportModal from "@components/CrmExportModal";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -893,9 +896,6 @@ const CrmProspectsManagement = () => {
   const [selectedColumns, setSelectedColumns] = useState<string[]>(
     () => defaultSelectedColumns,
   );
-  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>(
-    [],
-  );
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -1260,6 +1260,95 @@ const CrmProspectsManagement = () => {
     [buildExportParams],
   );
 
+  const handleProspectsExport = useCallback(async () => {
+    const name =
+      exportFileName.trim() || `prospects_${moment().format("YYYY-MM-DD")}`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const allData = await fetchCrmDataForExport(exportFilters);
+      if (allData.length === 0) {
+        toast.info("No prospects match the selected filters.");
+        return;
+      }
+      const topLevelKeys = new Set<string>();
+      const nestedDataKeys = new Set<string>();
+      for (const row of allData as any[]) {
+        if (!row || typeof row !== "object") continue;
+        for (const k of Object.keys(row)) {
+          if (k === "data" && row.data && typeof row.data === "object") {
+            for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
+          } else if (k !== "campaign" && k !== "company") {
+            topLevelKeys.add(k);
+          }
+        }
+      }
+      const preferredTopLevelOrder = [
+        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
+        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
+        "note", "company_name", "company_domain", "company_id", "created_at",
+        "updated_at", "tags", "crm_summary",
+      ];
+      const orderedTopLevel = [
+        ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
+        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
+      ];
+      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
+      const nestedDataKeysSet = new Set(orderedNestedData);
+      const headers = [
+        ...orderedTopLevel,
+        ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
+      ];
+      const getCellValue = (row: any, header: string) => {
+        if (header === "campaign_id") {
+          const label = row?.campaign?.name;
+          if (label != null) return label;
+          return row?.campaign_id != null ? String(row.campaign_id) : "";
+        }
+        if (header === "company_name") {
+          const name = row?.company?.name;
+          if (name != null) return name;
+          return row?.company_name != null ? String(row.company_name) : "";
+        }
+        if (header === "crm_summary") {
+          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
+        }
+        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
+        if (raw == null) return "";
+        if (typeof raw === "string") return raw;
+        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+        try {
+          return JSON.stringify(raw);
+        } catch {
+          return String(raw);
+        }
+      };
+      const escapeCsv = (val: string) => {
+        const s = String(val);
+        if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      };
+      const csvContent = [
+        headers.map((h) => escapeCsv(h)).join(","),
+        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
+      ].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+      toast.success(`Exported ${allData.length} prospects successfully!`);
+    } catch (err) {
+      toast.error("Failed to export prospects");
+    } finally {
+      setExporting(false);
+    }
+  }, [exportFileName, exportFilters, fetchCrmDataForExport]);
+
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
     const sources = new Set<string>();
@@ -1275,11 +1364,6 @@ const CrmProspectsManagement = () => {
         label: source,
       }));
   }, [dataList]);
-
-  // Set draft selected columns when column editor is shown
-  useEffect(() => {
-    if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
-  }, [showColumnEditor]);
 
   // Initialize export filters when export modal opens (default to current table filters)
   useEffect(() => {
@@ -4239,6 +4323,7 @@ const CrmProspectsManagement = () => {
                           })
                         }
                         placeholder="e.g. example.com"
+                        data-no-capitalize
                         style={{
                           width: "100%",
                           padding: "10px 12px",
@@ -4658,6 +4743,50 @@ const CrmProspectsManagement = () => {
       </>
     );
   };
+
+  const prospectsToolbarConfig = useCrmToolbarConfig({
+    entity: "prospects",
+    searchValue: prospectsSearch,
+    searchPlaceholder: "Search prospects...",
+    onSearchChange: setProspectsSearch,
+    onSearch: () => {},
+    currentFilters,
+    handleFiltersChange,
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    activeTab: activeFilter,
+    onTabChange: handleFilterChange,
+    tabs: [
+      {
+        id: "all",
+        label: "All prospects",
+        count: totalAllProspects,
+        removable: false,
+      },
+      ...customTabs,
+    ],
+    onTabAdd: () => setShowTabModal(true),
+    onTabRemove: (tabId) => {
+      setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+      if (activeFilter === tabId) handleFilterChange("all");
+    },
+    tabsDropdownLabel: "Prospects",
+    onFiltersClick: handleOpenFiltersSidebar,
+    onExportClick: () => setShowExportModal(true),
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    showImport: true,
+    onImportClick: () => {},
+    currentTableView: prospectsViewMode,
+    onTableViewChange: setProspectsViewMode,
+    extensions,
+    onPaginationReset: () =>
+      setPagination((prev) => ({ ...prev, currentPage: 1 })),
+    rightActions: renderAddContactsButton(),
+    prospectsTabCountOverrides: {
+      loading,
+      totalRecords,
+      activeFilter,
+    },
+  });
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
@@ -5462,300 +5591,7 @@ const CrmProspectsManagement = () => {
                 maxHeight="calc(100vh - 345px)"
                 // Toolbar
                 showToolbar={true}
-                toolbar={{
-                  // Tabs
-                  showTabs: true,
-                  showImport: true,
-                  onImportClick: () => {
-                    console.log("Import prospects");
-                  },
-                  tabsDropdownLabel: "Prospects",
-                  tabs: [
-                    {
-                      id: "all",
-                      label: "All prospects",
-                      count: totalAllProspects,
-                      removable: false,
-                    },
-                    ...customTabs.map((tab) =>
-                      tab.id === "has_leads"
-                        ? {
-                            ...tab,
-                            count:
-                              activeFilter === "has_leads" && !loading
-                                ? totalRecords
-                                : undefined,
-                          }
-                        : tab,
-                    ),
-                  ],
-                  activeTab: activeFilter,
-                  onTabChange: handleFilterChange,
-                  onTabAdd: () => setShowTabModal(true),
-                  onTabRemove: (tabId) => {
-                    setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
-                    if (activeFilter === tabId) {
-                      handleFilterChange("all");
-                    }
-                  },
-
-                  // Search
-                  showSearch: true,
-                  searchValue: prospectsSearch,
-                  searchPlaceholder: "Search prospects...",
-                  onSearchChange: (value) => {
-                    setProspectsSearch(value);
-                    // Clear search on empty value
-                    if (!value) {
-                      const newFilters = { ...currentFilters };
-                      delete newFilters.search;
-                      handleFiltersChange(newFilters);
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-                  onSearch: () => {
-                    if (prospectsSearch) {
-                      handleFiltersChange({
-                        ...currentFilters,
-                        search: prospectsSearch,
-                      });
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  },
-
-                  // Actions (Table view / Board View only; dropdown shows other option)
-                  showTableViewDropdown: true,
-                  currentTableView: prospectsViewMode,
-                  onTableViewChange: (view) => setProspectsViewMode(view),
-                  showEditColumns: true,
-                  onEditColumnsClick: () => setShowColumnEditor(true),
-                  showPipelineDropdown: false,
-                  pipelineLabel: "All Pipelines",
-                  showFiltersButton: true,
-                  onFiltersClick: handleOpenFiltersSidebar,
-                  showSortButton: true,
-                  showExportButton: true,
-                  onExportClick: () => setShowExportModal(true),
-                  showSaveButton: true,
-                  onSaveClick: () => console.log("Save view"),
-
-                  // Filter Pills (active/activeLabel from currentFilters so applied filters are visible)
-                  filterPills: [
-                    {
-                      id: "contact_owner",
-                      label: "Owner",
-                      showDropdown: true,
-                      searchable: true,
-                      active: !!(currentFilters.user_extension && (Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension.length > 0 : true)),
-                      activeLabel: (() => {
-                        const extId = Array.isArray(currentFilters.user_extension) ? currentFilters.user_extension[0] : currentFilters.user_extension;
-                        if (!extId) return undefined;
-                        const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
-                        return ext ? (ext.display_name || ext.name || ext.extension) : String(extId);
-                      })(),
-                      onClear: () => {
-                        const newFilters = { ...currentFilters };
-                        delete newFilters.user_extension;
-                        handleFiltersChange(newFilters);
-                        setRefreshKey((prev) => prev + 1);
-                      },
-                      dropdownOptions: [
-                        {
-                          label: "All Owners",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.user_extension;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        ...extensions.map((ext) => ({
-                          label: ext.display_name || ext.name || ext.extension,
-                          value: ext.extension,
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              user_extension: [ext.id || ext.extension],
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        })),
-                      ],
-                    },
-                    {
-                      id: "create_date",
-                      label: "Create date",
-                      showDropdown: true,
-                      active: !!(currentFilters.created_at_from || currentFilters.created_at_to),
-                      activeLabel: (() => {
-                        if (!currentFilters.created_at_from && !currentFilters.created_at_to) return undefined;
-                        const from = currentFilters.created_at_from;
-                        const to = currentFilters.created_at_to;
-                        const today = moment().format("YYYY-MM-DD");
-                        if (from === today && to === today) return "Today";
-                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
-                        if (from === weekStart && to === today) return "Last 7 Days";
-                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
-                        if (from === monthStart && to === today) return "Last 30 Days";
-                        return "Custom";
-                      })(),
-                      onClear: () => {
-                        const newFilters = { ...currentFilters };
-                        delete newFilters.created_at_from;
-                        delete newFilters.created_at_to;
-                        handleFiltersChange(newFilters);
-                        setRefreshKey((prev) => prev + 1);
-                      },
-                      dropdownOptions: [
-                        {
-                          label: "All Time",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.created_at_from;
-                            delete newFilters.created_at_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Today",
-                          value: "today",
-                          onClick: () => {
-                            const today = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: today,
-                              created_at_to: today,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 7 Days",
-                          value: "week",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(7, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: from,
-                              created_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 30 Days",
-                          value: "month",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(30, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: from,
-                              created_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
-                    {
-                      id: "last_activity",
-                      label: "Last activity date",
-                      showDropdown: true,
-                      active: !!(currentFilters.last_called_at_from || currentFilters.last_called_at_to),
-                      activeLabel: (() => {
-                        if (!currentFilters.last_called_at_from && !currentFilters.last_called_at_to) return undefined;
-                        const from = currentFilters.last_called_at_from;
-                        const to = currentFilters.last_called_at_to;
-                        const today = moment().format("YYYY-MM-DD");
-                        if (from === today && to === today) return "Today";
-                        const weekStart = moment().subtract(7, "days").format("YYYY-MM-DD");
-                        if (from === weekStart && to === today) return "Last 7 Days";
-                        const monthStart = moment().subtract(30, "days").format("YYYY-MM-DD");
-                        if (from === monthStart && to === today) return "Last 30 Days";
-                        return "Custom";
-                      })(),
-                      onClear: () => {
-                        const newFilters = { ...currentFilters };
-                        delete newFilters.last_called_at_from;
-                        delete newFilters.last_called_at_to;
-                        handleFiltersChange(newFilters);
-                        setRefreshKey((prev) => prev + 1);
-                      },
-                      dropdownOptions: [
-                        {
-                          label: "All Time",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.last_called_at_from;
-                            delete newFilters.last_called_at_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Today",
-                          value: "today",
-                          onClick: () => {
-                            const today = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: today,
-                              last_called_at_to: today,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 7 Days",
-                          value: "week",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(7, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: from,
-                              last_called_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 30 Days",
-                          value: "month",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(30, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: from,
-                              last_called_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
-                  ],
-                  showAdvancedFilters: true,
-                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
-
-                  // Right-aligned custom actions
-                  rightActions: renderAddContactsButton(),
-                }}
+                toolbar={prospectsToolbarConfig}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
                 // When Board View is selected, show board content instead of table
@@ -8926,91 +8762,37 @@ const CrmProspectsManagement = () => {
         crmDataId={convertingProspectId ?? undefined}
       />
       {/* Column Editor Modal */}
-      <Modal
+      <ColumnEditorModal
         show={showColumnEditor}
         onHide={() => setShowColumnEditor(false)}
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Customize Columns</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3">
-            Select which columns to display in the table
-          </p>
-          <Row>
-            {prospectsColumns.map((col) => {
-              const isChecked = draftSelectedColumns.includes(col.key);
-              const isOnlySelected =
-                isChecked && draftSelectedColumns.length === 1;
-              return (
-                <Col key={col.key} md={6} className="mb-2">
-                  <Form.Check
-                    type="checkbox"
-                    id={`column-check-${col.key}`}
-                    label={col.label}
-                    checked={isChecked}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      if (checked) {
-                        setDraftSelectedColumns((prev) =>
-                          prev.includes(col.key) ? prev : [...prev, col.key],
-                        );
-                      } else if (!isOnlySelected) {
-                        setDraftSelectedColumns((prev) =>
-                          prev.filter((k) => k !== col.key),
-                        );
-                      }
-                    }}
-                  />
-                </Col>
-              );
-            })}
-          </Row>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowColumnEditor(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setSelectedColumns(draftSelectedColumns);
-              setShowColumnEditor(false);
-            }}
-          >
-            Apply Changes
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        title="Customize Columns"
+        columns={prospectsColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedColumns}
+        onApply={(keys) => {
+          setSelectedColumns(keys);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "crmDataSelectedColumns",
+              JSON.stringify(keys),
+            );
+          }
+        }}
+      />
       {/* Export Modal */}
-      <Modal
+      <CrmExportModal
         show={showExportModal}
         onHide={() => setShowExportModal(false)}
-        size="lg"
+        title="Export Prospects"
+        subtitle="Choose filters to define which prospects are exported. Defaults match your current table view."
+        fileNameValue={exportFileName}
+        onFileNameChange={setExportFileName}
+        fileNamePlaceholder="prospects_2025-02-24"
+        onExportClick={handleProspectsExport}
+        exporting={exporting}
+        exportButtonLabel="Export"
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Export Prospects</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted small mb-3">
-            Choose filters to define which prospects are exported. Defaults
-            match your current table view.
-          </p>
-          <Form.Group className="mb-3">
-            <Form.Label>File name</Form.Label>
-            <Form.Control
-              type="text"
-              value={exportFileName}
-              onChange={(e) => setExportFileName(e.target.value)}
-              placeholder="prospects_2025-02-24"
-            />
-          </Form.Group>
-          <hr />
-          <h6 className="mb-3">Export filters</h6>
+        <hr />
+        <h6 className="mb-3">Export filters</h6>
           <Row>
             <Col md={6}>
               <Form.Group className="mb-3">
@@ -9192,169 +8974,7 @@ const CrmProspectsManagement = () => {
               }}
             />
           </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowExportModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={exporting}
-            onClick={async () => {
-              const name =
-                exportFileName.trim() ||
-                `prospects_${moment().format("YYYY-MM-DD")}`;
-              const ext = name.endsWith(".csv") ? "" : ".csv";
-              setExporting(true);
-              try {
-                const allData = await fetchCrmDataForExport(exportFilters);
-                if (allData.length === 0) {
-                  toast.info("No prospects match the selected filters.");
-                  return;
-                }
-
-                // Export ALL fields present in the API response rows.
-                // - Top-level keys become columns (excluding campaign/company objects).
-                // - Nested `data` object expands into columns by field name only (no "data." prefix).
-                // - campaign_id shows campaign name (from campaign object); company_name from company object.
-                // - crm_summary column shows crm_summary.summary only.
-                const topLevelKeys = new Set<string>();
-                const nestedDataKeys = new Set<string>();
-                for (const row of allData as any[]) {
-                  if (!row || typeof row !== "object") continue;
-                  for (const k of Object.keys(row)) {
-                    if (k === "data" && row.data && typeof row.data === "object") {
-                      for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
-                    } else if (k !== "campaign" && k !== "company") {
-                      topLevelKeys.add(k);
-                    }
-                  }
-                }
-
-                const preferredTopLevelOrder = [
-                  "id",
-                  "name",
-                  "phone",
-                  "user_extension",
-                  "campaign_id",
-                  "source_file",
-                  "directory",
-                  "is_viewed",
-                  "scheduled_call_at",
-                  "uploaded_by",
-                  "created_by",
-                  "note",
-                  "company_name",
-                  "company_domain",
-                  "company_id",
-                  "created_at",
-                  "updated_at",
-                  "tags",
-                  "crm_summary",
-                ];
-
-                const orderedTopLevel = [
-                  ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-                  ...Array.from(topLevelKeys)
-                    .filter((k) => !preferredTopLevelOrder.includes(k))
-                    .sort((a, b) => a.localeCompare(b)),
-                ];
-                const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
-                  a.localeCompare(b),
-                );
-                const nestedDataKeysSet = new Set(orderedNestedData);
-
-                // Headers: top-level keys + data field names only (no "data." prefix); dedupe so shared keys appear once
-                const headers = [
-                  ...orderedTopLevel,
-                  ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
-                ];
-
-                const getCellValue = (row: any, header: string) => {
-                  // campaign_id: show campaign label (name) from campaign object
-                  if (header === "campaign_id") {
-                    const label = row?.campaign?.name;
-                    if (label != null) return label;
-                    const id = row?.campaign_id;
-                    return id != null ? String(id) : "";
-                  }
-                  // company_name: show name from company object
-                  if (header === "company_name") {
-                    const name = row?.company?.name;
-                    if (name != null) return name;
-                    const fallback = row?.company_name;
-                    return fallback != null ? String(fallback) : "";
-                  }
-                  // crm_summary: show summary text only, not the full object
-                  if (header === "crm_summary") {
-                    const summary =
-                      row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-                    if (summary != null) return typeof summary === "string" ? summary : String(summary);
-                    return "";
-                  }
-                  // Nested data fields: use field name only (read from row.data; if key exists in both, prefer data)
-                  let raw: any;
-                  if (nestedDataKeysSet.has(header)) {
-                    raw = row?.data?.[header] ?? row?.[header];
-                  } else {
-                    raw = row?.[header];
-                  }
-                  if (raw == null) return "";
-                  if (typeof raw === "string") return raw;
-                  if (typeof raw === "number" || typeof raw === "boolean")
-                    return String(raw);
-                  try {
-                    return JSON.stringify(raw);
-                  } catch {
-                    return String(raw);
-                  }
-                };
-                const escapeCsv = (val: string) => {
-                  const s = String(val);
-                  if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-                  return s;
-                };
-                const csvContent = [
-                  headers.map((h) => escapeCsv(h)).join(","),
-                  ...allData.map((row) =>
-                    headers
-                      .map((h) => escapeCsv(getCellValue(row, h)))
-                      .join(","),
-                  ),
-                ].join("\n");
-
-                const blob = new Blob([csvContent], { type: "text/csv" });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = name + ext;
-                a.click();
-                window.URL.revokeObjectURL(url);
-                setShowExportModal(false);
-                toast.success(
-                  `Exported ${allData.length} prospects successfully!`,
-                );
-              } catch (err) {
-                toast.error("Failed to export prospects");
-              } finally {
-                setExporting(false);
-              }
-            }}
-          >
-            {exporting ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-2" />
-                Exporting...
-              </>
-            ) : (
-              <>
-                <Download size={16} className="me-2" />
-                Export
-              </>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      </CrmExportModal>
       {/* Add Tab Modal */}
       <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
         <Modal.Header closeButton>

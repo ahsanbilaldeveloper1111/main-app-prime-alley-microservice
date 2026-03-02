@@ -348,6 +348,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
   };
 
   const validateForm = (): boolean => {
+    const dataForValidation = { ...formData, contract_document: contractDocument };
     const requiredFields = [
       { field: "customer_name" as const, name: "Company Name" },
       { field: "customer_email" as const, name: "Company Email", type: ValidationType.EMAIL },
@@ -355,8 +356,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       { field: "order_date" as const, name: "Order Date" },
       { field: "order_stage_id" as const, name: "Stage" },
       { field: "currency" as const, name: "Currency" },
+      { field: "contract_document" as const, name: "Contract document" },
     ];
-    if (!checkRequiredFields(formData, requiredFields)) return false;
+    if (!checkRequiredFields(dataForValidation, requiredFields)) return false;
     if (!formData.items?.length) {
       toast.error("Please add at least one item to the order (from deal estimate).");
       return false;
@@ -928,7 +930,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 )}
               </div>
 
-              <h3 style={sectionHeadingNext}>DOCUMENT UPLOAD (OPTIONAL)</h3>
+              <h3 style={sectionHeadingNext}>DOCUMENT UPLOAD <span style={{ color: "#f2545b" }}>*</span></h3>
               <div style={fieldWrap}>
                 <div
                   onClick={() => document.getElementById("convert-deal-order-file")?.click()}
@@ -1008,7 +1010,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 >
                   <AlertCircle size={18} style={{ flexShrink: 0, marginTop: "2px" }} />
                   <div>
-                    You can skip this and attach the contract later. Accepted: PDF, DOC, DOCX (max 5MB).
+                    Accepted: PDF, DOC, DOCX (max 5MB).
                   </div>
                 </div>
               </div>
@@ -1031,7 +1033,7 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
           <Button
             variant="primary"
             onClick={handleSubmit}
-            disabled={loading || loadingDeal || !formData.items?.length}
+            disabled={loading || loadingDeal || !formData.items?.length || !contractDocument}
           >
             {loading ? (
               <>
