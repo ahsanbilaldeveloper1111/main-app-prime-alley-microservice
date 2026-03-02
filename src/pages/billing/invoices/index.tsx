@@ -114,6 +114,25 @@ const formatCurrency = (amount: number, currency: string): string => {
   }).format(amount);
 };
 
+// Extract payment ID from payment result (handles both response structures)
+const getPaymentIdFromResult = (
+  result: Record<string, unknown>,
+): string | number | undefined => {
+  const p = result?.payment as { id?: string | number } | undefined;
+  const d = result?.data as
+    | {
+        payment?: { id?: string | number };
+        payment_id?: string | number;
+      }
+    | undefined;
+  return (
+    p?.id ??
+    d?.payment?.id ??
+    (result?.payment_id as string | number) ??
+    d?.payment_id
+  );
+};
+
 // Exchange rate interface
 interface ExchangeRate {
   from: string;
@@ -160,6 +179,380 @@ const useCreateInvoicePayment = (): UseCreateInvoicePaymentReturn => {
     isCreateInvoicePaymentError: isError,
     createInvoicePaymentError: error,
   };
+};
+
+// --- Payment success handler helpers (keep Cognitive Complexity low) ---
+
+type PaymentSuccessContext = {
+  setIsProcessing: (v: boolean) => void;
+  onPaymentSuccess: () => void;
+};
+
+function parsePaymentResult(paymentResult: any) {
+  const gatewayResponse =
+    paymentResult?.payment?.gateway_response ||
+    paymentResult?.data?.payment?.gateway_response;
+  const clientSecret =
+    paymentResult?.client_secret ||
+    paymentResult?.data?.client_secret ||
+    gatewayResponse?.client_secret ||
+    paymentResult?.payment_data?.client_secret;
+  const paymentStatus =
+    gatewayResponse?.status || paymentResult?.status;
+  const confirmationMethod = gatewayResponse?.confirmation_method;
+  const requiresAction = paymentStatus === "requires_action";
+  return {
+    gatewayResponse,
+    clientSecret,
+    paymentStatus,
+    confirmationMethod,
+    requiresAction,
+  };
+}
+
+async function completePaymentAndNotify(
+  paymentId: string | number | undefined,
+  ctx: PaymentSuccessContext,
+  successMsg: string,
+  fallbackMsg: string,
+  fallbackToast: "success" | "info" = "success",
+) {
+  if (!paymentId) {
+    ctx.setIsProcessing(false);
+    ctx.onPaymentSuccess();
+    toast.success(successMsg);
+    return;
+  }
+  try {
+    await CompletePayment({
+      payment_id: paymentId,
+      payment_method: "stripe",
+    });
+    ctx.setIsProcessing(false);
+    ctx.onPaymentSuccess();
+    toast.success(successMsg);
+  } catch (error: any) {
+    console.error("Failed to update payment status:", error);
+    ctx.setIsProcessing(false);
+    ctx.onPaymentSuccess();
+    if (fallbackToast === "info") {
+      toast.info(fallbackMsg, { autoClose: 3000 });
+    } else {
+      toast.success(fallbackMsg);
+    }
+  }
+}
+
+async function applyDuplicatePaymentIntentStatus(
+  paymentIntent: { status?: string } | null,
+  paymentId: string | number | undefined,
+  ctx: PaymentSuccessContext,
+  onIncomplete: () => void,
+): Promise<void> {
+  if (paymentIntent?.status === "succeeded") {
+    await completePaymentAndNotify(
+      paymentId,
+      ctx,
+      "Payment authenticated and processed successfully!",
+      "Payment authenticated successfully! Status update may be delayed.",
+    );
+    return;
+  }
+  if (paymentIntent?.status === "requires_confirmation") {
+    await completePaymentAndNotify(
+      paymentId,
+      ctx,
+      "3D Secure authentication completed! Payment is being processed...",
+      "3D Secure authentication completed! Payment is being processed...",
+      "info",
+    );
+    return;
+  }
+  onIncomplete();
+}
+
+function getDuplicateStripeResult(
+  stripe: any,
+  clientSecret: string,
+  confirmationMethod: string | undefined,
+  requiresAction: boolean,
+) {
+  if (confirmationMethod === "manual" && requiresAction) {
+    return stripe.handleCardAction(clientSecret);
+  }
+  return stripe.confirmCardPayment(clientSecret);
+}
+
+async function runDuplicatePaymentFlow(
+  stripe: any,
+  paymentResult: any,
+  parsed: ReturnType<typeof parsePaymentResult>,
+  ctx: PaymentSuccessContext,
+): Promise<void> {
+  const {
+    clientSecret,
+    confirmationMethod,
+    requiresAction,
+  } = parsed;
+
+  const stripeResult = await getDuplicateStripeResult(
+    stripe,
+    clientSecret,
+    confirmationMethod,
+    requiresAction,
+  );
+  const confirmError = stripeResult.error;
+  const paymentIntent = stripeResult.paymentIntent;
+
+  if (confirmError) {
+    ctx.setIsProcessing(false);
+    toast.error(
+      confirmError.message ||
+        "Authentication failed. Please try again or use a different card.",
+    );
+    return;
+  }
+
+  const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
+  await applyDuplicatePaymentIntentStatus(
+    paymentIntent,
+    paymentId,
+    ctx,
+    () => {
+      ctx.setIsProcessing(false);
+      toast.error("Payment authentication incomplete. Please try again.");
+    },
+  );
+}
+
+function getDuplicateEarlyExit(
+  parsed: ReturnType<typeof parsePaymentResult>,
+  stripe: any,
+): { exit: true; useInfoToast: boolean } | { exit: false } {
+  const { clientSecret, confirmationMethod, requiresAction } = parsed;
+  if (!clientSecret || !stripe) {
+    return { exit: true, useInfoToast: false };
+  }
+  const manualNoAction =
+    confirmationMethod === "manual" && !requiresAction;
+  if (manualNoAction) {
+    return { exit: true, useInfoToast: true };
+  }
+  return { exit: false };
+}
+
+function finishDuplicateEarly(
+  ctx: PaymentSuccessContext,
+  useInfoToast: boolean,
+) {
+  ctx.setIsProcessing(false);
+  ctx.onPaymentSuccess();
+  if (useInfoToast) {
+    toast.info(
+      "Payment is being processed by the backend. Please wait...",
+      { autoClose: 3000 },
+    );
+  } else {
+    toast.success("Payment processed successfully!");
+  }
+}
+
+async function handleDuplicatePayment(
+  stripe: any,
+  paymentResult: any,
+  parsed: ReturnType<typeof parsePaymentResult>,
+  ctx: PaymentSuccessContext,
+): Promise<void> {
+  const early = getDuplicateEarlyExit(parsed, stripe);
+  if (early.exit) {
+    finishDuplicateEarly(ctx, early.useInfoToast);
+    return;
+  }
+
+  try {
+    await runDuplicatePaymentFlow(stripe, paymentResult, parsed, ctx);
+  } catch (authError: any) {
+    ctx.setIsProcessing(false);
+    toast.error(
+      authError.message ||
+        "Authentication process failed. Please try again.",
+    );
+  }
+}
+
+async function applyHandleCardActionResult(
+  paymentIntent: { status?: string } | undefined,
+  paymentId: string | number | undefined,
+  ctx: PaymentSuccessContext,
+): Promise<void> {
+  if (paymentIntent?.status === "succeeded") {
+    await completePaymentAndNotify(
+      paymentId,
+      ctx,
+      "Payment authenticated and processed successfully!",
+      "Payment authenticated successfully! Status update may be delayed.",
+    );
+    return;
+  }
+  if (paymentIntent?.status === "requires_confirmation") {
+    await completePaymentAndNotify(
+      paymentId,
+      ctx,
+      "3D Secure authentication completed! Payment is being processed...",
+      "3D Secure authentication completed! Payment is being processed...",
+      "info",
+    );
+    return;
+  }
+  if (paymentIntent?.status === "requires_action") {
+    ctx.setIsProcessing(false);
+    toast.error(
+      "Payment requires additional verification. Please try again.",
+    );
+    return;
+  }
+  ctx.setIsProcessing(false);
+  toast.error(
+    `Payment status after 3D Secure: ${paymentIntent?.status}`,
+  );
+}
+
+async function applyConfirmCardPaymentResult(
+  paymentIntent: { status?: string } | undefined,
+  paymentId: string | number | undefined,
+  ctx: PaymentSuccessContext,
+): Promise<void> {
+  if (paymentIntent?.status === "succeeded") {
+    await completePaymentAndNotify(
+      paymentId,
+      ctx,
+      "Payment authenticated and processed successfully!",
+      "Payment authenticated successfully! Status will be updated shortly.",
+    );
+    return;
+  }
+  if (paymentIntent?.status === "requires_action") {
+    ctx.setIsProcessing(false);
+    toast.error(
+      "Payment requires additional authentication. Please try again.",
+    );
+    return;
+  }
+  ctx.setIsProcessing(false);
+  ctx.onPaymentSuccess();
+  toast.success("Payment processed successfully!");
+}
+
+async function handle3DSOrConfirm(
+  stripe: any,
+  paymentResult: any,
+  parsed: ReturnType<typeof parsePaymentResult>,
+  ctx: PaymentSuccessContext,
+  confirmOptions?: any,
+): Promise<void> {
+  const {
+    clientSecret,
+    confirmationMethod,
+    requiresAction,
+  } = parsed;
+
+  try {
+    if (confirmationMethod === "manual" && requiresAction) {
+      const { error: handleError, paymentIntent } =
+        await stripe.handleCardAction(clientSecret);
+      if (handleError) {
+        ctx.setIsProcessing(false);
+        toast.error(
+          handleError.message ||
+            "3D Secure authentication failed. Please try again.",
+        );
+        return;
+      }
+      const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
+      await applyHandleCardActionResult(paymentIntent, paymentId, ctx);
+      return;
+    }
+
+    if (confirmationMethod === "manual" && !requiresAction) {
+      ctx.setIsProcessing(false);
+      ctx.onPaymentSuccess();
+      toast.info(
+        "Payment is being processed by the backend. Please wait...",
+        { autoClose: 3000 },
+      );
+      return;
+    }
+
+    const { error: confirmError, paymentIntent } =
+      await stripe.confirmCardPayment(clientSecret, confirmOptions);
+    if (confirmError) {
+      ctx.setIsProcessing(false);
+      toast.error(
+        confirmError.message ||
+          "Authentication failed. Please try again or use a different card.",
+      );
+      return;
+    }
+    const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
+    await applyConfirmCardPaymentResult(paymentIntent, paymentId, ctx);
+  } catch (authError: any) {
+    ctx.setIsProcessing(false);
+    toast.error(
+      authError.message ||
+        "Authentication process failed. Please try again.",
+    );
+  }
+}
+
+async function handlePaymentSuccess(
+  paymentResult: any,
+  stripe: any,
+  ctx: PaymentSuccessContext,
+  confirmOptions?: any,
+): Promise<void> {
+  if (paymentResult?.already_completed) {
+    ctx.setIsProcessing(false);
+    ctx.onPaymentSuccess();
+    toast.success("Payment was already completed successfully!");
+    return;
+  }
+
+  const parsed = parsePaymentResult(paymentResult);
+
+  if (paymentResult?.duplicate) {
+    await handleDuplicatePayment(stripe, paymentResult, parsed, ctx);
+    return;
+  }
+
+  if (parsed.clientSecret && stripe) {
+    await handle3DSOrConfirm(stripe, paymentResult, parsed, ctx, confirmOptions);
+    return;
+  }
+
+  ctx.setIsProcessing(false);
+  ctx.onPaymentSuccess();
+  toast.success("Payment processed successfully!");
+}
+
+const getStripeInstanceForKey = async (
+  publishableKey: string | null | undefined,
+  setIsProcessing: (value: boolean) => void,
+  onError: (message: string) => void,
+) => {
+  if (!publishableKey) {
+    onError("Stripe is not initialized");
+    setIsProcessing(false);
+    return null;
+  }
+
+  const stripeInstance = await loadStripe(publishableKey);
+  if (!stripeInstance) {
+    onError("Failed to load Stripe");
+    setIsProcessing(false);
+    return null;
+  }
+
+  return stripeInstance;
 };
 
 // Direct Card Payment Form Component
@@ -243,438 +636,10 @@ const DirectCardPaymentForm: React.FC<{
         },
         {
           onSuccess: (paymentResult: any) => {
-            void (async () => {
-              // Handle payment result based on status
-              console.log(paymentResult, "Payment Intent Response");
-
-              // Check if payment was already completed
-              if (paymentResult?.already_completed) {
-                setIsProcessing(false);
-                onPaymentSuccess();
-                toast.success("Payment was already completed successfully!");
-                return;
-              }
-
-              // Extract payment intent from nested structure
-              // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
-              const gatewayResponse =
-                paymentResult?.payment?.gateway_response ||
-                paymentResult?.data?.payment?.gateway_response;
-              const clientSecret =
-                paymentResult?.client_secret ||
-                paymentResult?.data?.client_secret ||
-                gatewayResponse?.client_secret ||
-                paymentResult?.payment_data?.client_secret;
-              const paymentStatus =
-                gatewayResponse?.status || paymentResult?.status;
-
-              console.log("Payment Status:", paymentStatus);
-              console.log("Client Secret:", clientSecret);
-              console.log("Gateway Response:", gatewayResponse);
-
-              // Check if this is a duplicate/reused payment
-              if (paymentResult?.duplicate) {
-                // This is a reused existing payment - extract client_secret and handle 3D Secure
-                if (clientSecret && stripe) {
-                  // Check if confirmation_method is manual AND status is requires_action
-                  // handleCardAction can only be used when payment is in requires_action state
-                  const confirmationMethod =
-                    gatewayResponse?.confirmation_method;
-                  const requiresAction = paymentStatus === "requires_action";
-
-                  // Handle 3D Secure for the reused payment
-                  try {
-                    let paymentIntent;
-                    let confirmError;
-
-                    if (confirmationMethod === "manual" && requiresAction) {
-                      // For manual confirmation with requires_action status, use handleCardAction
-                      console.log(
-                        "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
-                      );
-                      const result =
-                        await stripe.handleCardAction(clientSecret);
-                      confirmError = result.error;
-                      paymentIntent = result.paymentIntent;
-                    } else if (
-                      confirmationMethod === "manual" &&
-                      !requiresAction
-                    ) {
-                      // Manual confirmation but not in requires_action state
-                      // Backend will handle confirmation, just wait and refresh
-                      console.log(
-                        "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
-                      );
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.info(
-                        "Payment is being processed by the backend. Please wait...",
-                        {
-                          autoClose: 3000,
-                        },
-                      );
-                      return;
-                    } else {
-                      // For automatic confirmation, use confirmCardPayment
-                      const result =
-                        await stripe.confirmCardPayment(clientSecret);
-                      confirmError = result.error;
-                      paymentIntent = result.paymentIntent;
-                    }
-
-                    if (confirmError) {
-                      setIsProcessing(false);
-                      toast.error(
-                        confirmError.message ||
-                          "Authentication failed. Please try again or use a different card.",
-                      );
-                      return;
-                    }
-
-                    // Check payment intent status
-                    if (paymentIntent?.status === "succeeded") {
-                      // Payment succeeded, update status
-                      const paymentId =
-                        paymentResult?.payment?.id ||
-                        paymentResult?.payment_id ||
-                        paymentResult?.data?.payment?.id ||
-                        paymentResult?.data?.payment_id;
-                      if (paymentId) {
-                        try {
-                          await CompletePayment({
-                            payment_id: paymentId,
-                            payment_method: "stripe",
-                          });
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated and processed successfully!",
-                          );
-                        } catch (error: any) {
-                          console.error(
-                            "Failed to update payment status:",
-                            error,
-                          );
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated successfully! Status update may be delayed.",
-                          );
-                        }
-                      } else {
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      }
-                    } else if (
-                      paymentIntent?.status === "requires_confirmation"
-                    ) {
-                      // 3D Secure completed successfully, but payment needs backend confirmation
-                      // Challenge is complete, so we should call CompletePayment
-                      console.log(
-                        "Payment requires backend confirmation after 3D Secure (duplicate payment)",
-                      );
-
-                      const paymentId =
-                        paymentResult?.payment?.id ||
-                        paymentResult?.payment_id ||
-                        paymentResult?.data?.payment?.id ||
-                        paymentResult?.data?.payment_id;
-
-                      if (paymentId) {
-                        try {
-                          await CompletePayment({
-                            payment_id: paymentId,
-                            payment_method: "stripe",
-                          });
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "3D Secure authentication completed! Payment is being processed...",
-                          );
-                        } catch (error: any) {
-                          console.error(
-                            "Failed to update payment status:",
-                            error,
-                          );
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.info(
-                            "3D Secure authentication completed! Payment is being processed...",
-                            {
-                              autoClose: 3000,
-                            },
-                          );
-                        }
-                      } else {
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.info(
-                          "3D Secure authentication completed! Payment is being processed...",
-                          {
-                            autoClose: 3000,
-                          },
-                        );
-                      }
-                    } else {
-                      setIsProcessing(false);
-                      toast.error(
-                        "Payment authentication incomplete. Please try again.",
-                      );
-                    }
-                  } catch (authError: any) {
-                    setIsProcessing(false);
-                    toast.error(
-                      authError.message ||
-                        "Authentication process failed. Please try again.",
-                    );
-                  }
-                } else {
-                  // No client_secret for duplicate payment, just refresh
-                  setIsProcessing(false);
-                  onPaymentSuccess();
-                  toast.success("Payment processed successfully!");
-                }
-                return; // Exit early for duplicate payments
-              }
-
-              // Check if payment requires 3D Secure authentication
-              if (clientSecret && stripe) {
-                try {
-                  // Check if confirmation_method is manual AND status is requires_action
-                  // handleCardAction can only be used when payment is in requires_action state
-                  const confirmationMethod =
-                    gatewayResponse?.confirmation_method;
-                  const requiresAction = paymentStatus === "requires_action";
-
-                  if (confirmationMethod === "manual" && requiresAction) {
-                    // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
-                    // After customer completes 3D Secure, backend will confirm the payment
-                    console.log(
-                      "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
-                    );
-
-                    const { error: handleError, paymentIntent } =
-                      await stripe.handleCardAction(clientSecret);
-
-                    if (handleError) {
-                      setIsProcessing(false);
-                      toast.error(
-                        handleError.message ||
-                          "3D Secure authentication failed. Please try again.",
-                      );
-                      return;
-                    }
-
-                    console.log(
-                      "3D Secure completed, payment intent status:",
-                      paymentIntent?.status,
-                    );
-
-                    // After 3D Secure, check the payment intent status
-                    if (paymentIntent?.status === "succeeded") {
-                      // Payment succeeded, update status
-                      const paymentId =
-                        paymentResult?.payment?.id ||
-                        paymentResult?.payment_id ||
-                        paymentResult?.data?.payment?.id ||
-                        paymentResult?.data?.payment_id;
-
-                      if (paymentId) {
-                        try {
-                          await CompletePayment({
-                            payment_id: paymentId,
-                            payment_method: "stripe",
-                          });
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated and processed successfully!",
-                          );
-                        } catch (error: any) {
-                          console.error(
-                            "Failed to update payment status:",
-                            error,
-                          );
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated successfully! Status update may be delayed.",
-                          );
-                        }
-                      } else {
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      }
-                    } else if (
-                      paymentIntent?.status === "requires_confirmation"
-                    ) {
-                      // 3D Secure completed successfully, but payment needs backend confirmation
-                      // Challenge is complete, so we should call CompletePayment
-                      console.log(
-                        "Payment requires backend confirmation after 3D Secure",
-                      );
-
-                      const paymentId =
-                        paymentResult?.payment?.id ||
-                        paymentResult?.payment_id ||
-                        paymentResult?.data?.payment?.id ||
-                        paymentResult?.data?.payment_id;
-
-                      if (paymentId) {
-                        try {
-                          await CompletePayment({
-                            payment_id: paymentId,
-                            payment_method: "stripe",
-                          });
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "3D Secure authentication completed! Payment is being processed...",
-                          );
-                        } catch (error: any) {
-                          console.error(
-                            "Failed to update payment status:",
-                            error,
-                          );
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.info(
-                            "3D Secure authentication completed! Payment is being processed...",
-                            {
-                              autoClose: 3000,
-                            },
-                          );
-                        }
-                      } else {
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.info(
-                          "3D Secure authentication completed! Payment is being processed...",
-                          {
-                            autoClose: 3000,
-                          },
-                        );
-                      }
-                    } else if (paymentIntent?.status === "requires_action") {
-                      // Still requires action - might need another challenge
-                      setIsProcessing(false);
-                      toast.error(
-                        "Payment requires additional verification. Please try again.",
-                      );
-                    } else {
-                      setIsProcessing(false);
-                      toast.error(
-                        `Payment status after 3D Secure: ${paymentIntent?.status}`,
-                      );
-                    }
-                  } else if (
-                    confirmationMethod === "manual" &&
-                    !requiresAction
-                  ) {
-                    // Manual confirmation but not in requires_action state
-                    // Backend will handle confirmation, just wait and refresh
-                    console.log(
-                      "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
-                    );
-                    setIsProcessing(false);
-                    onPaymentSuccess();
-                    toast.info(
-                      "Payment is being processed by the backend. Please wait...",
-                      {
-                        autoClose: 3000,
-                      },
-                    );
-                  } else {
-                    // For automatic confirmation or when not manual, use confirmCardPayment
-                    const { error: confirmError, paymentIntent } =
-                      await stripe.confirmCardPayment(clientSecret);
-
-                    if (confirmError) {
-                      setIsProcessing(false);
-                      toast.error(
-                        confirmError.message ||
-                          "Authentication failed. Please try again or use a different card.",
-                      );
-                      return;
-                    }
-
-                    // Check payment intent status
-                    if (paymentIntent?.status === "succeeded") {
-                      // Payment succeeded on Stripe, now update our database
-                      // Extract payment ID from response (could be nested)
-                      const paymentId =
-                        paymentResult?.payment?.id ||
-                        paymentResult?.payment_id ||
-                        paymentResult?.data?.payment?.id ||
-                        paymentResult?.data?.payment_id;
-
-                      if (paymentId) {
-                        try {
-                          await CompletePayment({
-                            payment_id: paymentId,
-                            payment_method: "stripe",
-                          });
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated and processed successfully!",
-                          );
-                        } catch (error: any) {
-                          // Even if completePayment fails, payment succeeded on Stripe
-                          // Log error but still show success to user
-                          console.error(
-                            "Failed to update payment status:",
-                            error,
-                          );
-                          setIsProcessing(false);
-                          onPaymentSuccess();
-                          toast.success(
-                            "Payment authenticated successfully! Status update may be delayed.",
-                          );
-                        }
-                      } else {
-                        // No payment ID found, just refresh and let webhook handle it
-                        console.warn(
-                          "Payment ID not found in response, webhook will update status",
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated successfully! Status will be updated shortly.",
-                        );
-                      }
-                    } else if (paymentIntent?.status === "requires_action") {
-                      // Should not happen after confirmCardPayment, but handle just in case
-                      setIsProcessing(false);
-                      toast.error(
-                        "Payment requires additional authentication. Please try again.",
-                      );
-                    } else {
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.success("Payment processed successfully!");
-                    }
-                  }
-                } catch (authError: any) {
-                  setIsProcessing(false);
-                  toast.error(
-                    authError.message ||
-                      "Authentication process failed. Please try again.",
-                  );
-                }
-              } else {
-                // No 3D Secure required, payment completed
-                setIsProcessing(false);
-                onPaymentSuccess();
-                toast.success("Payment processed successfully!");
-              }
-            })();
+            void handlePaymentSuccess(paymentResult, stripe, {
+              setIsProcessing,
+              onPaymentSuccess,
+            });
           },
           onError: (error) => {
             onPaymentError(error.message || "Payment processing failed");
@@ -775,6 +740,435 @@ const DirectCardPaymentForm: React.FC<{
   );
 };
 
+const EXCHANGE_RATE_CURRENCIES = ["USD", "EUR", "GBP", "AED", "PKR"] as const;
+
+type ExchangeRateRatesMap = Record<string, number>;
+
+const buildExchangeRatesForCurrencies = (
+  invoiceCurrency: string,
+  ratesMap: ExchangeRateRatesMap,
+  currencies: readonly string[],
+): ExchangeRate[] => {
+  const result: ExchangeRate[] = [];
+  const now = Date.now();
+
+  currencies.forEach((currency) => {
+    if (currency === invoiceCurrency) return;
+    const rate = ratesMap[currency];
+    if (!rate) return;
+
+    result.push(
+      {
+        from: invoiceCurrency,
+        to: currency,
+        rate,
+        timestamp: now,
+      },
+      {
+        from: currency,
+        to: invoiceCurrency,
+        rate: 1 / rate,
+        timestamp: now,
+      },
+    );
+  });
+
+  result.push({
+    from: invoiceCurrency,
+    to: invoiceCurrency,
+    rate: 1,
+    timestamp: now,
+  });
+
+  return result;
+};
+
+const augmentWithUsdBasedRates = async (
+  invoiceCurrency: string,
+  existingRates: ExchangeRate[],
+): Promise<ExchangeRate[]> => {
+  try {
+    console.log("Loading USD-based rates for better coverage...");
+    const usdResponse = await fetch(
+      "https://api.exchangerate-api.com/v4/latest/USD",
+    );
+
+    if (!usdResponse.ok) {
+      return existingRates;
+    }
+
+    const usdData = await usdResponse.json();
+    if (!usdData.rates) {
+      return existingRates;
+    }
+
+    const now = Date.now();
+    const updatedRates = [...existingRates];
+
+    const pushIfMissing = (from: string, to: string, rate: number) => {
+      const exists = updatedRates.some(
+        (r) => r.from === from && r.to === to,
+      );
+      if (!exists) {
+        updatedRates.push({ from, to, rate, timestamp: now });
+      }
+    };
+
+    const rateToInvoice = usdData.rates[invoiceCurrency];
+    if (rateToInvoice) {
+      pushIfMissing("USD", invoiceCurrency, rateToInvoice);
+      pushIfMissing(invoiceCurrency, "USD", 1 / rateToInvoice);
+    }
+
+    EXCHANGE_RATE_CURRENCIES.forEach((currency) => {
+      if (currency === "USD" || currency === invoiceCurrency) return;
+      const rateToCurrency = usdData.rates[currency];
+      if (!rateToCurrency) return;
+      pushIfMissing(currency, "USD", 1 / rateToCurrency);
+      pushIfMissing("USD", currency, rateToCurrency);
+    });
+
+    return updatedRates;
+  } catch (usdError) {
+    console.warn("Failed to load USD-based rates:", usdError);
+    return existingRates;
+  }
+};
+
+const loadPrimaryExchangeRates = async (
+  invoiceCurrency: string,
+): Promise<ExchangeRate[]> => {
+  console.log(
+    "Fetching exchange rates from free API with base:",
+    invoiceCurrency,
+  );
+
+  const response = await fetch(
+    `https://api.exchangerate-api.com/v4/latest/${invoiceCurrency}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Exchange rate API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.rates) {
+    return [];
+  }
+
+  const baseRates = buildExchangeRatesForCurrencies(
+    invoiceCurrency,
+    data.rates,
+    EXCHANGE_RATE_CURRENCIES,
+  );
+
+  if (invoiceCurrency === "USD") {
+    return baseRates;
+  }
+
+  return augmentWithUsdBasedRates(invoiceCurrency, baseRates);
+};
+
+const loadFallbackExchangeRates = async (
+  invoiceCurrency: string,
+): Promise<ExchangeRate[]> => {
+  console.log("Falling back to alternative exchange rate API");
+  const response = await fetch(
+    `https://api.fxratesapi.com/latest?base=${invoiceCurrency}`,
+  );
+  const data = await response.json();
+
+  const rates: ExchangeRate[] = data?.rates
+    ? buildExchangeRatesForCurrencies(
+        invoiceCurrency,
+        data.rates,
+        EXCHANGE_RATE_CURRENCIES,
+      )
+    : [];
+
+  console.log(
+    "Fallback rates loaded for base currency:",
+    invoiceCurrency,
+    rates,
+  );
+
+  return rates;
+};
+
+const getDefaultExchangeRates = (): ExchangeRate[] => {
+  const now = Date.now();
+  return [
+    { from: "USD", to: "EUR", rate: 0.85, timestamp: now },
+    { from: "EUR", to: "USD", rate: 1.18, timestamp: now },
+    { from: "USD", to: "GBP", rate: 0.73, timestamp: now },
+    { from: "GBP", to: "USD", rate: 1.37, timestamp: now },
+    { from: "USD", to: "AED", rate: 3.67, timestamp: now },
+    { from: "AED", to: "USD", rate: 0.27, timestamp: now },
+    { from: "USD", to: "PKR", rate: 280, timestamp: now },
+    { from: "PKR", to: "USD", rate: 0.0036, timestamp: now },
+  ];
+};
+
+const handleFallbackExchangeRates = async (
+  invoiceCurrency: string,
+  setExchangeRates: (rates: ExchangeRate[]) => void,
+  setBaseCurrency: (currency: string) => void,
+  setIsInitialLoad: (value: boolean) => void,
+): Promise<void> => {
+  try {
+    const fallbackRates = await loadFallbackExchangeRates(invoiceCurrency);
+    if (fallbackRates.length) {
+      setExchangeRates(fallbackRates);
+    } else {
+      setExchangeRates(getDefaultExchangeRates());
+    }
+  } catch (fallbackError) {
+    console.error(
+      "Fallback exchange rate API also failed:",
+      fallbackError,
+    );
+    setExchangeRates(getDefaultExchangeRates());
+  }
+
+  setBaseCurrency(invoiceCurrency);
+  setIsInitialLoad(false);
+};
+
+const getInvoiceStatusBadgeVariant = (status: string): string => {
+  switch (status) {
+    case STATUS_DRAFT:
+      return "secondary";
+    case STATUS_SENT:
+      return "info";
+    case STATUS_PAID:
+      return "success";
+    case STATUS_OVERDUE:
+      return "danger";
+    case STATUS_CANCELLED:
+      return "dark";
+    case STATUS_PARTIALLY_PAID:
+      return "warning";
+    case STATUS_FAILED:
+      return "danger";
+    case STATUS_REFUNDED:
+      return "danger";
+    case STATUS_PENDING:
+      return "warning";
+    default:
+      return "secondary";
+  }
+};
+
+const getInvoiceStatusLabel = (status: string): string => {
+  switch (status) {
+    case STATUS_DRAFT:
+      return "Draft";
+    case STATUS_SENT:
+      return "Sent";
+    case STATUS_PAID:
+      return "Paid";
+    case STATUS_OVERDUE:
+      return "Overdue";
+    case STATUS_CANCELLED:
+      return "Cancelled";
+    case STATUS_PARTIALLY_PAID:
+      return "Partially Paid";
+    case STATUS_FAILED:
+      return "Failed";
+    case STATUS_REFUNDED:
+      return "Refunded";
+    case STATUS_PENDING:
+      return "Pending";
+    default:
+      return status || "Draft";
+  }
+};
+
+const computeExchangeRate = (
+  fromCurrency: string,
+  toCurrency: string,
+  exchangeRates: ExchangeRate[],
+  baseCurrency: string,
+  isLoadingExchangeRates: boolean,
+): number => {
+  if (fromCurrency === toCurrency) return 1;
+
+  const directRate = exchangeRates.find(
+    (r) => r.from === fromCurrency && r.to === toCurrency,
+  );
+  if (directRate) return directRate.rate;
+
+  const baseToTarget = exchangeRates.find(
+    (r) => r.from === baseCurrency && r.to === toCurrency,
+  );
+  const fromToBase = exchangeRates.find(
+    (r) => r.from === fromCurrency && r.to === baseCurrency,
+  );
+
+  if (baseToTarget && fromToBase) {
+    return fromToBase.rate * baseToTarget.rate;
+  }
+
+  if (
+    baseCurrency !== "USD" &&
+    fromCurrency !== "USD" &&
+    toCurrency !== "USD"
+  ) {
+    const fromUSD = exchangeRates.find(
+      (r) => r.from === "USD" && r.to === toCurrency,
+    );
+    const toUSD = exchangeRates.find(
+      (r) => r.from === fromCurrency && r.to === "USD",
+    );
+
+    if (fromUSD && toUSD) {
+      return toUSD.rate * fromUSD.rate;
+    }
+  }
+
+  if (isLoadingExchangeRates) return 1;
+
+  console.warn(
+    `Exchange rate not found for ${fromCurrency} to ${toCurrency}, baseCurrency: ${baseCurrency}`,
+  );
+  return 1;
+};
+
+const computeEffectiveProductPrice = (
+  productId: string,
+  companyId: string | undefined,
+  companyProducts: ProductData[],
+): { price: string; currency: string; includesVat: boolean } => {
+  const companyProduct = companyProducts.find(
+    (p) => p.id.toString() === productId,
+  );
+  if (companyProduct) {
+    if (
+      companyProduct.pricing_type === "company_specific" &&
+      companyProduct.company_pricing &&
+      (!companyId ||
+        companyProduct.company_pricing.company_id === companyId)
+    ) {
+      return {
+        price: companyProduct.company_pricing.selling_price || "0",
+        currency: companyProduct.currency || "USD",
+        includesVat: false,
+      };
+    }
+
+    const basePrice = Number.parseFloat(companyProduct.base_price || "0");
+    const effectivePrice = Number.parseFloat(
+      companyProduct.effective_price || "0",
+    );
+    const includesVat = effectivePrice > basePrice && basePrice > 0;
+
+    return {
+      price:
+        companyProduct.effective_price || companyProduct.base_price || "0",
+      currency: companyProduct.currency || "USD",
+      includesVat,
+    };
+  }
+
+  return {
+    price: "0",
+    currency: "USD",
+    includesVat: false,
+  };
+};
+
+const calculateTotalsForItems = (
+  items: InvoiceItemCreateUpdatePayload[],
+  companyVatRate: number,
+  isVatExempt: boolean,
+  toCurrency: string,
+  companyId: string | undefined,
+  companyProducts: ProductData[],
+  exchangeRates: ExchangeRate[],
+  baseCurrency: string,
+  isLoadingExchangeRates: boolean,
+) => {
+  let subtotal = 0;
+  let totalTaxAmount = 0;
+
+  const processedItems = items.map((item) => {
+    const quantity = Number.parseFloat(item.quantity) || 0;
+    const unitPrice = Number.parseFloat(item.unit_price) || 0;
+
+    const productInfo = computeEffectiveProductPrice(
+      item.product_id,
+      companyId,
+      companyProducts,
+    );
+    const productCurrency = productInfo.currency || "USD";
+
+    const exchangeRate = computeExchangeRate(
+      productCurrency,
+      toCurrency || "USD",
+      exchangeRates,
+      baseCurrency,
+      isLoadingExchangeRates,
+    );
+    const convertedUnitPrice = unitPrice * exchangeRate;
+
+    const lineSubtotal = quantity * convertedUnitPrice;
+
+    let effectiveVatRate = companyVatRate;
+
+    if (item.tax_rate && Number.parseFloat(item.tax_rate) >= 0) {
+      effectiveVatRate = Number.parseFloat(item.tax_rate);
+    } else if (item.product_id) {
+      const product = companyProducts.find(
+        (p) => p.id.toString() === item.product_id,
+      );
+      if (product?.vat_rate) {
+        effectiveVatRate = Number.parseFloat(product.vat_rate);
+      }
+    }
+
+    let lineVatAmount = 0;
+    let lineTotal = lineSubtotal;
+
+    if (!isVatExempt && effectiveVatRate > 0) {
+      if (productInfo.includesVat) {
+        lineVatAmount =
+          (lineSubtotal * effectiveVatRate) / (100 + effectiveVatRate);
+        lineTotal = lineSubtotal;
+      } else {
+        lineVatAmount = lineSubtotal * (effectiveVatRate / 100);
+        lineTotal = lineSubtotal + lineVatAmount;
+      }
+    }
+
+    if (productInfo.includesVat && !isVatExempt && effectiveVatRate > 0) {
+      const netAmount = lineSubtotal - lineVatAmount;
+      subtotal += netAmount;
+    } else {
+      subtotal += lineSubtotal;
+    }
+    totalTaxAmount += lineVatAmount;
+
+    return {
+      ...item,
+      tax_rate: effectiveVatRate.toString(),
+      tax_amount: lineVatAmount.toString(),
+      line_subtotal: lineSubtotal,
+      line_vat_amount: lineVatAmount,
+      line_total: lineTotal,
+    };
+  });
+
+  const totalAmount = subtotal + totalTaxAmount;
+
+  return {
+    subtotal: Number.parseFloat(subtotal.toFixed(2)),
+    tax_amount: Number.parseFloat(totalTaxAmount.toFixed(2)),
+    total_amount: Number.parseFloat(totalAmount.toFixed(2)),
+    processedItems,
+  };
+};
+
 const InvoiceList = () => {
   const { data: session } = useSession();
 
@@ -804,9 +1198,6 @@ const InvoiceList = () => {
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
-  const [_isLoadingCompanyProducts, setIsLoadingCompanyProducts] =
-    useState<boolean>(false);
-
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] =
@@ -831,60 +1222,8 @@ const InvoiceList = () => {
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] =
     useState<boolean>(false);
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
-  const [exchangeRateTimeout, setExchangeRateTimeout] =
-    useState<NodeJS.Timeout | null>(null);
-
   // Custom VAT states
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
-
-  const getStatusBadgeVariant = (status: string): string => {
-    switch (status) {
-      case STATUS_DRAFT:
-        return "secondary";
-      case STATUS_SENT:
-        return "info";
-      case STATUS_PAID:
-        return "success";
-      case STATUS_OVERDUE:
-        return "danger";
-      case STATUS_CANCELLED:
-        return "dark";
-      case STATUS_PARTIALLY_PAID:
-        return "warning";
-      case STATUS_FAILED:
-        return "danger";
-      case STATUS_REFUNDED:
-        return "danger";
-      case STATUS_PENDING:
-        return "warning";
-      default:
-        return "secondary";
-    }
-  };
-  const getStatusLabel = (status: string): string => {
-    switch (status) {
-      case STATUS_DRAFT:
-        return "Draft";
-      case STATUS_SENT:
-        return "Sent";
-      case STATUS_PAID:
-        return "Paid";
-      case STATUS_OVERDUE:
-        return "Overdue";
-      case STATUS_CANCELLED:
-        return "Cancelled";
-      case STATUS_PARTIALLY_PAID:
-        return "Partially Paid";
-      case STATUS_FAILED:
-        return "Failed";
-      case STATUS_REFUNDED:
-        return "Refunded";
-      case STATUS_PENDING:
-        return "Pending";
-      default:
-        return status || "Draft";
-    }
-  };
 
   const openInvoiceSidebar = useCallback((row: InvoiceData) => {
     setSelectedInvoiceSidebar(row);
@@ -927,10 +1266,13 @@ const InvoiceList = () => {
         label: "Status",
         sortable: true,
         type: "badge",
-        accessor: (row) => getStatusLabel(row.status || STATUS_DRAFT),
+        accessor: (row) =>
+          getInvoiceStatusLabel(row.status || STATUS_DRAFT),
         badge: {
           getVariant: (row) =>
-            getStatusBadgeVariant(row.status || STATUS_DRAFT) as any,
+            getInvoiceStatusBadgeVariant(
+              row.status || STATUS_DRAFT,
+            ) as any,
         },
       },
       {
@@ -1104,7 +1446,6 @@ const InvoiceList = () => {
       return;
     }
 
-    setIsLoadingCompanyProducts(true);
     try {
       const response = await getProductsWithCompanyPricing(companyId);
 
@@ -1112,8 +1453,6 @@ const InvoiceList = () => {
     } catch (error) {
       console.error("Error loading company products:", error);
       setCompanyProducts([]);
-    } finally {
-      setIsLoadingCompanyProducts(false);
     }
   }, []);
 
@@ -1131,56 +1470,14 @@ const InvoiceList = () => {
 
   // Get exchange rate for a specific currency pair with caching
   const getExchangeRate = useCallback(
-    (fromCurrency: string, toCurrency: string): number => {
-      if (fromCurrency === toCurrency) return 1;
-
-      // Direct rate lookup
-      const directRate = exchangeRates.find(
-        (r) => r.from === fromCurrency && r.to === toCurrency,
-      );
-      if (directRate) return directRate.rate;
-
-      // Try to find rates via the base currency
-      const baseToTarget = exchangeRates.find(
-        (r) => r.from === baseCurrency && r.to === toCurrency,
-      );
-      const fromToBase = exchangeRates.find(
-        (r) => r.from === fromCurrency && r.to === baseCurrency,
-      );
-
-      if (baseToTarget && fromToBase) {
-        // Convert: fromCurrency -> baseCurrency -> toCurrency
-        return fromToBase.rate * baseToTarget.rate;
-      }
-
-      // If we have USD as base, calculate via USD as fallback
-      if (
-        baseCurrency !== "USD" &&
-        fromCurrency !== "USD" &&
-        toCurrency !== "USD"
-      ) {
-        const fromUSD = exchangeRates.find(
-          (r) => r.from === "USD" && r.to === toCurrency,
-        );
-        const toUSD = exchangeRates.find(
-          (r) => r.from === fromCurrency && r.to === "USD",
-        );
-
-        if (fromUSD && toUSD) {
-          // Convert: fromCurrency -> USD -> toCurrency
-          return toUSD.rate * fromUSD.rate;
-        }
-      }
-
-      // If no rate found and we're loading, return 1 to avoid showing wrong amounts
-      if (isLoadingExchangeRates) return 1;
-
-      // If no rate found, return 1 (no conversion)
-      console.warn(
-        `Exchange rate not found for ${fromCurrency} to ${toCurrency}, baseCurrency: ${baseCurrency}`,
-      );
-      return 1;
-    },
+    (fromCurrency: string, toCurrency: string): number =>
+      computeExchangeRate(
+        fromCurrency,
+        toCurrency,
+        exchangeRates,
+        baseCurrency,
+        isLoadingExchangeRates,
+      ),
     [exchangeRates, isLoadingExchangeRates, baseCurrency],
   );
 
@@ -1189,77 +1486,14 @@ const InvoiceList = () => {
     (
       productId: string,
       companyId?: string,
-    ): { price: string; currency: string; includesVat: boolean } => {
-      // Find the product in company products
-      const companyProduct = companyProducts.find(
-        (p) => p.id.toString() === productId,
-      );
-      if (companyProduct) {
-        console.log("Found company product:", companyProduct);
-        console.log("Pricing type:", companyProduct.pricing_type);
-        console.log("Company pricing:", companyProduct.company_pricing);
-
-        // Check if this is company-specific pricing
-        if (
-          companyProduct.pricing_type === "company_specific" &&
-          companyProduct.company_pricing
-        ) {
-          // Verify company_id matches if provided
-          if (
-            !companyId ||
-            companyProduct.company_pricing.company_id === companyId
-          ) {
-            console.log(
-              "Using company-specific pricing:",
-              companyProduct.company_pricing.selling_price,
-            );
-            return {
-              price: companyProduct.company_pricing.selling_price || "0",
-              currency: companyProduct.currency || "USD",
-              includesVat: false, // Assume company pricing is base price without VAT
-            };
-          }
-        }
-
-        // Use effective_price from the API response, which already handles company-specific pricing
-        // If effective_price is different from base_price, it likely includes VAT
-        const basePrice = Number.parseFloat(companyProduct.base_price || "0");
-        const effectivePrice = Number.parseFloat(
-          companyProduct.effective_price || "0",
-        );
-        const includesVat = effectivePrice > basePrice && basePrice > 0;
-
-        console.log(
-          "Using effective price:",
-          companyProduct.effective_price,
-          "includesVat:",
-          includesVat,
-        );
-        return {
-          price:
-            companyProduct.effective_price || companyProduct.base_price || "0",
-          currency: companyProduct.currency || "USD", // Default to USD if currency not found
-          includesVat: includesVat,
-        };
-      }
-
-      // If no product found, return default values
-      console.warn(
-        `Product with ID ${productId} not found in company products`,
-      );
-      return {
-        price: "0",
-        currency: "USD",
-        includesVat: false,
-      };
-    },
+    ): { price: string; currency: string; includesVat: boolean } =>
+      computeEffectiveProductPrice(productId, companyId, companyProducts),
     [companyProducts],
   );
 
   // Load exchange rates directly from free API
   const loadExchangeRates = useCallback(
     async (invoiceCurrency: string) => {
-      // If we already have rates loaded for this currency, don't reload
       if (
         exchangeRates.length > 0 &&
         baseCurrency === invoiceCurrency &&
@@ -1272,204 +1506,18 @@ const InvoiceList = () => {
       setIsLoadingExchangeRates(true);
 
       try {
-        const rates: ExchangeRate[] = [];
-        const currencies = ["USD", "EUR", "GBP", "AED", "PKR"];
-
-        // Use free exchange rate API with the selected currency as base
-        console.log(
-          "Fetching exchange rates from free API with base:",
-          invoiceCurrency,
-        );
-        const response = await fetch(
-          `https://api.exchangerate-api.com/v4/latest/${invoiceCurrency}`,
-        );
-
-        if (!response.ok) {
-          throw new Error(`Exchange rate API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Process all currency pairs from the API response
-        if (data.rates) {
-          for (const currency of currencies) {
-            if (currency !== invoiceCurrency && data.rates[currency]) {
-              rates.push(
-                {
-                  from: invoiceCurrency,
-                  to: currency,
-                  rate: data.rates[currency],
-                  timestamp: Date.now(),
-                },
-                {
-                  from: currency,
-                  to: invoiceCurrency,
-                  rate: 1 / data.rates[currency],
-                  timestamp: Date.now(),
-                },
-              );
-            }
-          }
-
-          // Add self-conversion rate
-          rates.push({
-            from: invoiceCurrency,
-            to: invoiceCurrency,
-            rate: 1,
-            timestamp: Date.now(),
-          });
-
-          // If the selected currency is not USD, also load USD-based rates for better coverage
-          if (invoiceCurrency !== "USD") {
-            try {
-              console.log("Loading USD-based rates for better coverage...");
-              const usdResponse = await fetch(
-                "https://api.exchangerate-api.com/v4/latest/USD",
-              );
-              if (usdResponse.ok) {
-                const usdData = await usdResponse.json();
-                if (usdData.rates) {
-                  // Add USD to selected currency rate
-                  if (usdData.rates[invoiceCurrency]) {
-                    rates.push(
-                      {
-                        from: "USD",
-                        to: invoiceCurrency,
-                        rate: usdData.rates[invoiceCurrency],
-                        timestamp: Date.now(),
-                      },
-                      {
-                        from: invoiceCurrency,
-                        to: "USD",
-                        rate: 1 / usdData.rates[invoiceCurrency],
-                        timestamp: Date.now(),
-                      },
-                    );
-                  }
-
-                  // Add other currencies to USD rates for cross-conversion
-                  for (const currency of currencies) {
-                    if (
-                      currency !== "USD" &&
-                      currency !== invoiceCurrency &&
-                      usdData.rates[currency]
-                    ) {
-                      // Only add if we don't already have this rate
-                      const existingRate = rates.find(
-                        (r) => r.from === currency && r.to === "USD",
-                      );
-                      const toPush: ExchangeRate[] = [];
-                      if (!existingRate) {
-                        toPush.push({
-                          from: currency,
-                          to: "USD",
-                          rate: 1 / usdData.rates[currency],
-                          timestamp: Date.now(),
-                        });
-                      }
-                      const existingRateReverse = rates.find(
-                        (r) => r.from === "USD" && r.to === currency,
-                      );
-                      if (!existingRateReverse) {
-                        toPush.push({
-                          from: "USD",
-                          to: currency,
-                          rate: usdData.rates[currency],
-                          timestamp: Date.now(),
-                        });
-                      }
-                      if (toPush.length) rates.push(...toPush);
-                    }
-                  }
-                }
-              }
-            } catch (usdError) {
-              console.warn("Failed to load USD-based rates:", usdError);
-            }
-          }
-        }
-
-        // Update state with all rates
+        const rates = await loadPrimaryExchangeRates(invoiceCurrency);
         setExchangeRates(rates);
         setBaseCurrency(invoiceCurrency);
         setIsInitialLoad(false);
       } catch (error) {
         console.error("Error loading exchange rates:", error);
-
-        // Fallback to another free API
-        try {
-          console.log("Falling back to alternative exchange rate API");
-          const fallbackResponse = await fetch(
-            `https://api.fxratesapi.com/latest?base=${invoiceCurrency}`,
-          );
-          const fallbackData = await fallbackResponse.json();
-
-          const fallbackRates: ExchangeRate[] = [];
-          const currencies = ["USD", "EUR", "GBP", "AED", "PKR"];
-
-          if (fallbackData.rates) {
-            for (const currency of currencies) {
-              if (
-                currency !== invoiceCurrency &&
-                fallbackData.rates[currency]
-              ) {
-                // Selected currency to other currencies and inverse
-                fallbackRates.push(
-                  {
-                    from: invoiceCurrency,
-                    to: currency,
-                    rate: fallbackData.rates[currency],
-                    timestamp: Date.now(),
-                  },
-                  {
-                    from: currency,
-                    to: invoiceCurrency,
-                    rate: 1 / fallbackData.rates[currency],
-                    timestamp: Date.now(),
-                  },
-                );
-              }
-            }
-
-            // Add self-conversion rate
-            fallbackRates.push({
-              from: invoiceCurrency,
-              to: invoiceCurrency,
-              rate: 1,
-              timestamp: Date.now(),
-            });
-          }
-
-          console.log(
-            "Fallback rates loaded for base currency:",
-            invoiceCurrency,
-            fallbackRates,
-          );
-
-          // Update state with fallback rates
-          setExchangeRates(fallbackRates);
-          setBaseCurrency(invoiceCurrency);
-          setIsInitialLoad(false);
-        } catch (fallbackError) {
-          console.error(
-            "Fallback exchange rate API also failed:",
-            fallbackError,
-          );
-          // Set default rates if all APIs fail
-          const defaultRates: ExchangeRate[] = [
-            { from: "USD", to: "EUR", rate: 0.85, timestamp: Date.now() },
-            { from: "EUR", to: "USD", rate: 1.18, timestamp: Date.now() },
-            { from: "USD", to: "GBP", rate: 0.73, timestamp: Date.now() },
-            { from: "GBP", to: "USD", rate: 1.37, timestamp: Date.now() },
-            { from: "USD", to: "AED", rate: 3.67, timestamp: Date.now() },
-            { from: "AED", to: "USD", rate: 0.27, timestamp: Date.now() },
-            { from: "USD", to: "PKR", rate: 280, timestamp: Date.now() },
-            { from: "PKR", to: "USD", rate: 0.0036, timestamp: Date.now() },
-          ];
-          setExchangeRates(defaultRates);
-          setBaseCurrency(invoiceCurrency);
-          setIsInitialLoad(false);
-        }
+        await handleFallbackExchangeRates(
+          invoiceCurrency,
+          setExchangeRates,
+          setBaseCurrency,
+          setIsInitialLoad,
+        );
       } finally {
         setIsLoadingExchangeRates(false);
       }
@@ -1543,17 +1591,7 @@ const InvoiceList = () => {
   const { createInvoicePayment, isCreateInvoicePaymentPending } =
     useCreateInvoicePayment();
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (exchangeRateTimeout) {
-        clearTimeout(exchangeRateTimeout);
-      }
-    };
-  }, [exchangeRateTimeout]);
-
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-  const [_summary, setSummary] = useState<Record<string, unknown> | null>(null);
 
   const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -1585,7 +1623,6 @@ const InvoiceList = () => {
       setInvoiceList(data);
       setTotalRecords(total);
       setPagination((prev) => ({ ...prev, totalRows: total }));
-      if (response?.summary) setSummary(response.summary);
     } catch (error) {
       if (currentRequestId !== invoiceRequestIdRef.current) return;
       console.error("Error fetching invoices:", error);
@@ -1617,9 +1654,6 @@ const InvoiceList = () => {
           search,
           ...memoizedFilters,
         });
-
-        const summary = response?.summary;
-        setSummary(summary);
 
         // The getInvoices function returns PaginationWrapper<InvoiceData>
         // which has the structure: { data: InvoiceData[], pagination: {...} }
@@ -1760,94 +1794,18 @@ const InvoiceList = () => {
     isVatExempt: boolean = false,
     toCurrency: string = "USD",
     companyId?: string,
-  ) => {
-    let subtotal = 0;
-    let totalTaxAmount = 0;
-
-    // Process each item individually to calculate VAT per product
-    const processedItems = items.map((item) => {
-      const quantity = Number.parseFloat(item.quantity) || 0;
-      const unitPrice = Number.parseFloat(item.unit_price) || 0;
-
-      // Get the product's original currency with company context
-      const productInfo = getEffectiveProductPrice(item.product_id, companyId);
-      const productCurrency = productInfo.currency || "USD"; // Default to USD if null
-
-      // Convert the unit price from product currency to target currency
-      const exchangeRate = getExchangeRate(
-        productCurrency,
-        toCurrency || "USD",
-      );
-      const convertedUnitPrice = unitPrice * exchangeRate;
-
-      // Calculate line subtotal
-      const lineSubtotal = quantity * convertedUnitPrice;
-
-      // Use the tax_rate from the item (this is already set per product)
-      // Priority: 1. Item tax_rate (already set), 2. Product-specific VAT rate, 3. Company VAT rate
-      let effectiveVatRate = companyVatRate;
-
-      // Use the tax_rate from the item if it's already set
-      if (item.tax_rate && Number.parseFloat(item.tax_rate) >= 0) {
-        effectiveVatRate = Number.parseFloat(item.tax_rate);
-      } else if (item.product_id) {
-        // Fallback to product-specific VAT rate if item tax_rate is not set
-        const product = companyProducts.find(
-          (p) => p.id.toString() === item.product_id,
-        );
-        if (product?.vat_rate) {
-          effectiveVatRate = Number.parseFloat(product.vat_rate);
-        }
-      }
-
-      // Calculate VAT for this line item
-      // If product price already includes VAT, we need to extract the VAT amount
-      let lineVatAmount = 0;
-      let lineTotal = lineSubtotal;
-
-      if (!isVatExempt && effectiveVatRate > 0) {
-        if (productInfo.includesVat) {
-          // Price already includes VAT, so we need to calculate the VAT amount from the total
-          // VAT amount = (lineSubtotal * vatRate) / (100 + vatRate)
-          lineVatAmount =
-            (lineSubtotal * effectiveVatRate) / (100 + effectiveVatRate);
-          lineTotal = lineSubtotal; // Total remains the same since VAT is already included
-        } else {
-          // Price doesn't include VAT, so we add VAT on top
-          lineVatAmount = lineSubtotal * (effectiveVatRate / 100);
-          lineTotal = lineSubtotal + lineVatAmount;
-        }
-      }
-
-      // Update totals
-      // If price includes VAT, subtotal should be the net amount (without VAT)
-      if (productInfo.includesVat && !isVatExempt && effectiveVatRate > 0) {
-        const netAmount = lineSubtotal - lineVatAmount;
-        subtotal += netAmount;
-      } else {
-        subtotal += lineSubtotal;
-      }
-      totalTaxAmount += lineVatAmount;
-
-      return {
-        ...item,
-        tax_rate: effectiveVatRate.toString(),
-        tax_amount: lineVatAmount.toString(),
-        line_subtotal: lineSubtotal,
-        line_vat_amount: lineVatAmount,
-        line_total: lineTotal,
-      };
-    });
-
-    const totalAmount = subtotal + totalTaxAmount;
-
-    return {
-      subtotal: Number.parseFloat(subtotal.toFixed(2)),
-      tax_amount: Number.parseFloat(totalTaxAmount.toFixed(2)),
-      total_amount: Number.parseFloat(totalAmount.toFixed(2)),
-      processedItems, // Return processed items with individual VAT calculations
-    };
-  };
+  ) =>
+    calculateTotalsForItems(
+      items,
+      companyVatRate,
+      isVatExempt,
+      toCurrency,
+      companyId,
+      companyProducts,
+      exchangeRates,
+      baseCurrency,
+      isLoadingExchangeRates,
+    );
 
   // Payment handlers
   const handlePayInvoice = useCallback(async (invoice: InvoiceData) => {
@@ -1903,7 +1861,6 @@ const InvoiceList = () => {
       {
         onSuccess: (paymentResult: any) => {
           void (async () => {
-            // Check if payment was already completed
             if (paymentResult?.already_completed) {
               setIsProcessingPayment(false);
               handleDirectPaymentSuccess();
@@ -1911,385 +1868,30 @@ const InvoiceList = () => {
               return;
             }
 
-            // Helper function to extract payment ID from payment result (handles both response structures)
-            const getPaymentId = (
-              result: Record<string, unknown>,
-            ): string | number | undefined => {
-              const p = result?.payment as { id?: string | number } | undefined;
-              const d = result?.data as
-                | {
-                    payment?: { id?: string | number };
-                    payment_id?: string | number;
-                  }
-                | undefined;
-              return (
-                p?.id ??
-                d?.payment?.id ??
-                (result?.payment_id as string | number) ??
-                d?.payment_id
-              );
+            const stripeInstance = await getStripeInstanceForKey(
+              stripePublishableKey,
+              setIsProcessingPayment,
+              handleDirectPaymentError,
+            );
+            if (!stripeInstance) {
+              return;
+            }
+
+            const ctx: PaymentSuccessContext = {
+              setIsProcessing: setIsProcessingPayment,
+              onPaymentSuccess: handleDirectPaymentSuccess,
             };
 
-            // Extract payment intent from nested structure
-            // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
-            const gatewayResponse =
-              paymentResult?.payment?.gateway_response ||
-              paymentResult?.data?.payment?.gateway_response;
-            const clientSecret =
-              paymentResult?.client_secret ||
-              paymentResult?.data?.client_secret ||
-              gatewayResponse?.client_secret ||
-              paymentResult?.payment_data?.client_secret;
-            const paymentStatus =
-              gatewayResponse?.status || paymentResult?.status;
+            const confirmOptions = selectedCardId
+              ? { payment_method: selectedCardId }
+              : undefined;
 
-            // Check if this is a duplicate/reused payment
-            if (paymentResult?.duplicate) {
-              // This is a reused existing payment - extract client_secret and handle 3D Secure
-              if (clientSecret) {
-                // Load Stripe to confirm payment
-                if (!stripePublishableKey) {
-                  handleDirectPaymentError("Stripe is not initialized");
-                  setIsProcessingPayment(false);
-                  return;
-                }
-
-                const stripeInstance = await loadStripe(stripePublishableKey);
-                if (!stripeInstance) {
-                  handleDirectPaymentError("Failed to load Stripe");
-                  setIsProcessingPayment(false);
-                  return;
-                }
-
-                // Check if confirmation_method is manual AND status is requires_action
-                // handleCardAction can only be used when payment is in requires_action state
-                const confirmationMethod = gatewayResponse?.confirmation_method;
-                const requiresAction = paymentStatus === "requires_action";
-
-                // Handle 3D Secure for the reused payment
-                try {
-                  let paymentIntent;
-                  let confirmError;
-
-                  if (confirmationMethod === "manual" && requiresAction) {
-                    // For manual confirmation with requires_action status, use handleCardAction
-                    console.log(
-                      "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
-                    );
-                    const result =
-                      await stripeInstance.handleCardAction(clientSecret);
-                    confirmError = result.error;
-                    paymentIntent = result.paymentIntent;
-                  } else if (
-                    confirmationMethod === "manual" &&
-                    !requiresAction
-                  ) {
-                    // Manual confirmation but not in requires_action state
-                    // Backend will handle confirmation, just wait and refresh
-                    console.log(
-                      "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
-                    );
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.info(
-                      "Payment is being processed by the backend. Please wait...",
-                      {
-                        autoClose: 3000,
-                      },
-                    );
-                    return;
-                  } else {
-                    // For automatic confirmation, use confirmCardPayment
-                    const result =
-                      await stripeInstance.confirmCardPayment(clientSecret);
-                    confirmError = result.error;
-                    paymentIntent = result.paymentIntent;
-                  }
-
-                  if (confirmError) {
-                    setIsProcessingPayment(false);
-                    toast.error(
-                      confirmError.message ||
-                        "Authentication failed. Please try again or use a different card.",
-                    );
-                    return;
-                  }
-
-                  // Check payment intent status
-                  if (paymentIntent?.status === "succeeded") {
-                    // Payment succeeded, update status
-                    const paymentId = getPaymentId(paymentResult);
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessingPayment(false);
-                        handleDirectPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessingPayment(false);
-                        handleDirectPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated successfully! Status update may be delayed.",
-                        );
-                      }
-                    } else {
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated and processed successfully!",
-                      );
-                    }
-                  } else if (
-                    paymentIntent?.status === "requires_confirmation"
-                  ) {
-                    // 3D Secure completed successfully, but payment needs backend confirmation
-                    // Challenge is complete, so we should call CompletePayment
-                    console.log(
-                      "Payment requires backend confirmation after 3D Secure (duplicate payment - saved card)",
-                    );
-
-                    const paymentId = getPaymentId(paymentResult);
-
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessingPayment(false);
-                        handleDirectPaymentSuccess();
-                        toast.success(
-                          "3D Secure authentication completed! Payment is being processed...",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessingPayment(false);
-                        handleDirectPaymentSuccess();
-                        toast.info(
-                          "3D Secure authentication completed! Payment is being processed...",
-                          {
-                            autoClose: 3000,
-                          },
-                        );
-                      }
-                    } else {
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.info(
-                        "3D Secure authentication completed! Payment is being processed...",
-                        {
-                          autoClose: 3000,
-                        },
-                      );
-                    }
-                  } else {
-                    setIsProcessingPayment(false);
-                    toast.error(
-                      "Payment authentication incomplete. Please try again.",
-                    );
-                  }
-                } catch (authError: any) {
-                  setIsProcessingPayment(false);
-                  toast.error(
-                    authError.message ||
-                      "Authentication process failed. Please try again.",
-                  );
-                }
-              } else {
-                // No client_secret for duplicate payment, just refresh
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.success("Payment processed successfully!");
-              }
-              return; // Exit early for duplicate payments
-            }
-
-            // Check if payment requires 3D Secure authentication
-            if (clientSecret) {
-              // Load Stripe to confirm payment
-              if (!stripePublishableKey) {
-                handleDirectPaymentError("Stripe is not initialized");
-                setIsProcessingPayment(false);
-                return;
-              }
-
-              const stripeInstance = await loadStripe(stripePublishableKey);
-              if (!stripeInstance) {
-                handleDirectPaymentError("Failed to load Stripe");
-                setIsProcessingPayment(false);
-                return;
-              }
-
-              try {
-                // Check if confirmation_method is manual AND status is requires_action
-                // handleCardAction can only be used when payment is in requires_action state
-                const confirmationMethod = gatewayResponse?.confirmation_method;
-                const requiresAction = paymentStatus === "requires_action";
-
-                let paymentIntent;
-                let confirmError;
-
-                if (confirmationMethod === "manual" && requiresAction) {
-                  // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
-                  console.log(
-                    "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
-                  );
-
-                  const result =
-                    await stripeInstance.handleCardAction(clientSecret);
-                  confirmError = result.error;
-                  paymentIntent = result.paymentIntent;
-                } else if (confirmationMethod === "manual" && !requiresAction) {
-                  // Manual confirmation but not in requires_action state
-                  // Backend will handle confirmation, just wait and refresh
-                  console.log(
-                    "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
-                  );
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.info(
-                    "Payment is being processed by the backend. Please wait...",
-                    {
-                      autoClose: 3000,
-                    },
-                  );
-                  return;
-                } else {
-                  // For automatic confirmation or when not manual, use confirmCardPayment
-                  const result = await stripeInstance.confirmCardPayment(
-                    clientSecret,
-                    {
-                      payment_method: selectedCardId,
-                    },
-                  );
-                  confirmError = result.error;
-                  paymentIntent = result.paymentIntent;
-                }
-
-                if (confirmError) {
-                  setIsProcessingPayment(false);
-                  toast.error(
-                    confirmError.message ||
-                      "Authentication failed. Please try again or use a different card.",
-                  );
-                  return;
-                }
-
-                // Check payment intent status
-                if (paymentIntent?.status === "succeeded") {
-                  // Payment succeeded on Stripe, now update our database
-                  // Extract payment ID from response (could be nested)
-                  const paymentId = getPaymentId(paymentResult);
-
-                  if (paymentId) {
-                    try {
-                      await CompletePayment({
-                        payment_id: paymentId,
-                        payment_method: "stripe",
-                      });
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated and processed successfully!",
-                      );
-                    } catch (error: any) {
-                      // Even if completePayment fails, payment succeeded on Stripe
-                      // Log error but still show success to user
-                      console.error("Failed to update payment status:", error);
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated successfully! Status update may be delayed.",
-                      );
-                    }
-                  } else {
-                    // No payment ID found, just refresh and let webhook handle it
-                    console.warn(
-                      "Payment ID not found in response, webhook will update status",
-                    );
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success(
-                      "Payment authenticated successfully! Status will be updated shortly.",
-                    );
-                  }
-                } else if (paymentIntent?.status === "requires_confirmation") {
-                  // 3D Secure completed successfully, but payment needs backend confirmation
-                  // Challenge is complete, so we should call CompletePayment
-                  console.log(
-                    "Payment requires backend confirmation after 3D Secure (saved card)",
-                  );
-
-                  const paymentId = getPaymentId(paymentResult);
-
-                  if (paymentId) {
-                    try {
-                      await CompletePayment({
-                        payment_id: paymentId,
-                        payment_method: "stripe",
-                      });
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.success(
-                        "3D Secure authentication completed! Payment is being processed...",
-                      );
-                    } catch (error: any) {
-                      console.error("Failed to update payment status:", error);
-                      setIsProcessingPayment(false);
-                      handleDirectPaymentSuccess();
-                      toast.info(
-                        "3D Secure authentication completed! Payment is being processed...",
-                        {
-                          autoClose: 3000,
-                        },
-                      );
-                    }
-                  } else {
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.info(
-                      "3D Secure authentication completed! Payment is being processed...",
-                      {
-                        autoClose: 3000,
-                      },
-                    );
-                  }
-                } else if (paymentIntent?.status === "requires_action") {
-                  // Should not happen after confirmCardPayment/handleCardAction, but handle just in case
-                  setIsProcessingPayment(false);
-                  toast.error(
-                    "Payment requires additional authentication. Please try again.",
-                  );
-                } else {
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success("Payment processed successfully!");
-                }
-              } catch (authError: any) {
-                setIsProcessingPayment(false);
-                toast.error(
-                  authError.message ||
-                    "Authentication process failed. Please try again.",
-                );
-              }
-            } else {
-              // No 3D Secure required, payment completed
-              setIsProcessingPayment(false);
-              handleDirectPaymentSuccess();
-              toast.success("Payment processed successfully!");
-            }
+            await handlePaymentSuccess(
+              paymentResult,
+              stripeInstance,
+              ctx,
+              confirmOptions,
+            );
           })();
         },
         onError: (error) => {
@@ -2883,13 +2485,13 @@ const InvoiceList = () => {
               {
                 label: "Status",
                 value: selectedInvoiceSidebar
-                  ? getStatusLabel(
+                  ? getInvoiceStatusLabel(
                       selectedInvoiceSidebar.status || STATUS_DRAFT,
                     )
                   : "N/A",
                 type: "badge",
                 badgeVariant: selectedInvoiceSidebar
-                  ? getStatusBadgeVariant(
+                  ? getInvoiceStatusBadgeVariant(
                       selectedInvoiceSidebar.status || STATUS_DRAFT,
                     )
                   : "secondary",
