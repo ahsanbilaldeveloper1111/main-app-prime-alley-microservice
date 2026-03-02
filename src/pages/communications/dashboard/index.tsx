@@ -2,9 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { ListCallLogs, ExportCallLogs } from "@utils/calls";
+import { ListCallLogs } from "@utils/calls";
 import { Button, Modal, Row, Form, Col } from "react-bootstrap";
-import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import EmptyState from "@components/EmptyState";
 import { ModuleSlug } from "@utils/Helper";
@@ -17,7 +16,6 @@ import Link from "next/link";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 
-import { SummaryCard } from "@components/PageSummaryGrid";
 import {
   Phone,
   PhoneIncoming,
@@ -26,13 +24,6 @@ import {
   PhoneOff,
 } from "lucide-react";
 import StatsCards from "@components/GenericStatsCards";
-
-interface Summary {
-  users: number;
-  extensions: number;
-  inbound: number;
-  outbound: number;
-}
 
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
@@ -68,17 +59,10 @@ interface TrendByCountry {
   AvgCost: string;
 }
 
-// Helper function to format seconds to HH:MM:SS
-const formatSecondsToTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-};
+const DATETIME_LOCAL_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
 const CallDashboard = () => {
-  const { data: session, status } = useSession();
+  useSession();
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [showCountryChartModal, setShowCountryChartModal] = useState(false);
   const [showDepartmentChartModal, setShowDepartmentChartModal] =
@@ -87,7 +71,6 @@ const CallDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [showDateRange, setShowDateRange] = useState(false);
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
   // Initialize with local time, then convert to UTC for API
   const getInitialFilters = () => {
     const now = moment();
@@ -152,95 +135,8 @@ const CallDashboard = () => {
     },
   ];
 
-  // Create cards data for PageSummaryGrid
-  const summaryCards: SummaryCard[] = [
-    {
-      id: "total-calls",
-      title: "Total Calls",
-      value: generalStats.totalCalls,
-      description: "Total calls in the system",
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "inbound-calls",
-      title: "Inbound",
-      value: generalStats.totalInbound,
-      description: "Inbound calls in the system",
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "outbound-calls",
-      title: "Outbound",
-      value: generalStats.totalOutbound,
-      description: "Outbound calls in the system",
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "missed-incoming",
-      title: "Missed Incoming",
-      value: generalStats.totalMissedIncoming,
-      description: "Missed incoming calls in the system",
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "missed-outgoing",
-      title: "Missed Outgoing",
-      value: generalStats.totalMissedOutgoing,
-      description: "Missed outgoing calls in the system",
-      delay: 0.9,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    // {
-    //     id: 'avg-ring-time',
-    //     title: 'Avg Ring Time',
-    //     value: generalStats.totalAvgRingTime,
-    //     description: 'Avg ring time in the system',
-    //     delay: 1.1,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     valueType: 'seconds',
-    // },
-    // {
-    //     id: 'avg-duration',
-    //     title: 'Avg Duration',
-    //     value: generalStats.totalAvgDuration,
-    //     description: 'Avg duration in the system',
-    //     delay: 1.3,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     valueType: 'seconds',
-    // },
-    // {
-    //     id: 'avg-cost',
-    //     title: 'Avg Cost',
-    //     value: generalStats.totalAvgCost,
-    //     description: 'Avg cost in the system',
-    //     delay: 1.5,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     prefix: '$',
-    // }
-  ];
-
-  const [perPage, setPerPage] = useState(5);
-  const [page, setPage] = useState(1);
+  const [perPage] = useState(5);
+  const [page] = useState(1);
 
   const [showExtensionChart, setShowExtensionChart] = useState(true);
   const [showDepartmentChart, setShowDepartmentChart] = useState(true);
@@ -250,8 +146,6 @@ const CallDashboard = () => {
   const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
   const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
 
-  const [startDateTime, setStartDateTime] = useState<string>("");
-  const [endDateTime, setEndDateTime] = useState<string>("");
   const [pendingDateStart, setPendingDateStart] = useState<string>("");
   const [pendingDateEnd, setPendingDateEnd] = useState<string>("");
 
@@ -291,7 +185,6 @@ const CallDashboard = () => {
 
     if (response.success) {
       const responseData = response.data;
-      const dataFilters = response?.filters;
       setShowDateRange(true);
 
       setGeneralStats({
@@ -305,10 +198,6 @@ const CallDashboard = () => {
         totalAvgCost: responseData.avg_cost,
       });
 
-      setStartDateTime(dataFilters?.start_datetime);
-      setEndDateTime(dataFilters?.end_datetime);
-      console.log(dataFilters?.start_datetime, dataFilters?.end_datetime);
-
       // Extract and map chart data
       const chartExtension = responseData?.chart_data?.extension;
       if (chartExtension) {
@@ -320,7 +209,7 @@ const CallDashboard = () => {
           (item: any) => item.label || "Unknown",
         );
         const values = chartExtension.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setExtensionChart({
@@ -361,7 +250,7 @@ const CallDashboard = () => {
           (item: any) => item.label || "Unknown",
         );
         const values = chartDepartment.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setDepartmentChart({
@@ -425,7 +314,7 @@ const CallDashboard = () => {
           (item: any) => item.label || "Unknown",
         );
         const values = chartCountry.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setCountryChart({
@@ -623,8 +512,7 @@ const CallDashboard = () => {
     },
   });
 
-  const [showStatsByExtensionTable, setShowStatsByExtensionTable] =
-    useState(true);
+  const [showStatsByExtensionTable] = useState(true);
   const [trendByCountryData, setTrendByCountryData] = useState<
     TrendByCountry[]
   >([]);
@@ -654,7 +542,7 @@ const CallDashboard = () => {
     }
   };
 
-  const [showTrendByCountryTable, setShowTrendByCountryTable] = useState(true);
+  const [showTrendByCountryTable] = useState(true);
   useEffect(() => {
     fetchTrendByCountryStats();
   }, []);
@@ -679,107 +567,12 @@ const CallDashboard = () => {
     }
   };
 
-  const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
-    const formattedFilters: any = { ...filters };
-
-    if (formattedFilters.start_datetime) {
-      let startMoment;
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm from datetime-local input
-        // datetime-local always returns values in local timezone
-        // Parse the string and create moment in local time explicitly
-        const dateTimeStr = formattedFilters.start_datetime + ":00";
-        // Split the datetime string to extract components
-        const [datePart, timePart] = dateTimeStr.split("T");
-        const [year, month, day] = datePart.split("-").map(Number);
-        const [hour, minute, second] = timePart.split(":").map(Number);
-        // Create moment object explicitly in local timezone
-        startMoment = moment([year, month - 1, day, hour, minute, second]);
-      } else if (formattedFilters.start_datetime.endsWith("Z")) {
-        // Already in UTC format - convert to local first
-        startMoment = moment.utc(formattedFilters.start_datetime).local();
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00 in local time
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      } else {
-        // Default: parse as local time
-        startMoment = moment(formattedFilters.start_datetime);
-      }
-
-      // Convert local time to UTC for API
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    if (formattedFilters.end_datetime) {
-      let endMoment;
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm from datetime-local input
-        // datetime-local always returns values in local timezone
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        const seconds = timePart === "23:59" ? "59" : "00";
-        const dateTimeStr = formattedFilters.end_datetime + ":" + seconds;
-        // Split the datetime string to extract components
-        const [datePart, timePartFull] = dateTimeStr.split("T");
-        const [year, month, day] = datePart.split("-").map(Number);
-        const [hour, minute, second] = timePartFull.split(":").map(Number);
-        // Create moment object explicitly in local timezone
-        endMoment = moment([year, month - 1, day, hour, minute, second]);
-      } else if (formattedFilters.end_datetime.endsWith("Z")) {
-        // Already in UTC format - convert to local first
-        endMoment = moment.utc(formattedFilters.end_datetime).local();
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59 in local time
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      } else {
-        // Default: parse as local time
-        endMoment = moment(formattedFilters.end_datetime);
-      }
-
-      // Convert local time to UTC for API
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    // Remove timezone key from payload if present
-    delete formattedFilters.timezone;
-
-    setCurrentFilters(formattedFilters);
-  };
-
-  const handleExport = async (
-    exportType: string,
-    filters: Record<string, any>,
-  ) => {
-    try {
-      const response = await ExportCallLogs({
-        page: 1,
-        perPage: 15,
-        search: "",
-        filters,
-        isExport: true,
-        exportType,
-      });
-      //console.log(response);
-    } catch (error) {
-      //console.error('Export error:', error);
-      toast.error("Export failed. Please try again.");
-    }
-  };
-
   const formatDateRangeToUtc = (
     startLocal: string,
     endLocal: string,
   ): { start_datetime: string; end_datetime: string } => {
     let startMoment;
-    if (startLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+    if (startLocal && DATETIME_LOCAL_REGEX.exec(startLocal)) {
       const dateTimeStr = startLocal + ":00";
       const [datePart, timePart] = dateTimeStr.split("T");
       const [year, month, day] = datePart.split("-").map(Number);
@@ -789,7 +582,7 @@ const CallDashboard = () => {
       startMoment = moment(startLocal || undefined).startOf("day");
     }
     let endMoment;
-    if (endLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+    if (endLocal && DATETIME_LOCAL_REGEX.exec(endLocal)) {
       const timePart = endLocal.split("T")[1];
       const seconds = timePart === "23:59" ? "59" : "00";
       const dateTimeStr = endLocal + ":" + seconds;
@@ -815,8 +608,6 @@ const CallDashboard = () => {
     await fetchTrendByCountryStats(filtersToUse);
     if (overrideFilters) {
       setCurrentFilters(overrideFilters);
-      setStartDateTime(overrideFilters.start_datetime);
-      setEndDateTime(overrideFilters.end_datetime);
     }
     setLoading(false);
     NProgress.done();
@@ -911,14 +702,16 @@ const CallDashboard = () => {
                         >
                           Apply
                         </Button>
-                        <i
-                          className="material-icons-two-tone"
+                        <button
+                          type="button"
+                          className="btn-light p-0 border-0"
                           style={{ cursor: "pointer" }}
                           onClick={() => refreshData()}
                           title="Refresh"
+                          aria-label="Refresh"
                         >
-                          refresh
-                        </i>
+                          <i className="material-icons-two-tone">refresh</i>
+                        </button>
                       </>
                     )}
                   </div>
@@ -1075,8 +868,10 @@ const CallDashboard = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {extensionData.map((item, index) => (
-                            <tr key={index}>
+                          {extensionData.map((item) => (
+                            <tr
+                              key={`extension-${item.Extension}-${item.Calls}-${item.TotalDuration}`}
+                            >
                               <td>{item.Extension}</td>
                               <td>{item.Calls}</td>
                               <td>{item.Answered}</td>
@@ -1134,8 +929,10 @@ const CallDashboard = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {trendByCountryData.map((item, index) => (
-                            <tr key={index}>
+                          {trendByCountryData.map((item) => (
+                            <tr
+                              key={`country-${item.Country}-${item.Calls}-${item.TotalDuration}`}
+                            >
                               <td>{item.Country}</td>
                               <td>{item.Calls}</td>
                               <td>{item.Answered}</td>

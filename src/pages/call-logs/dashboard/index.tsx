@@ -1,5 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useState, useCallback } from "react";
+import React, {
+  ReactElement,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { ListCallLogs, ExportCallLogs } from "@utils/calls";
@@ -17,7 +23,6 @@ import Link from "next/link";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 
-import { SummaryCard } from "@components/PageSummaryGrid";
 import {
   Phone,
   PhoneIncoming,
@@ -26,13 +31,6 @@ import {
   PhoneOff,
 } from "lucide-react";
 import StatsCards from "@components/GenericStatsCards";
-
-interface Summary {
-  users: number;
-  extensions: number;
-  inbound: number;
-  outbound: number;
-}
 
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
@@ -68,17 +66,13 @@ interface TrendByCountry {
   AvgCost: string;
 }
 
-// Helper function to format seconds to HH:MM:SS
-const formatSecondsToTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-};
+interface ChartDataItem {
+  label?: string;
+  value?: string | number;
+}
 
 const CallDashboard = () => {
-  const { data: session, status } = useSession();
+  useSession();
   const [showPageLoader, setShowPageLoader] = useState(false);
   const [showCountryChartModal, setShowCountryChartModal] = useState(false);
   const [showDepartmentChartModal, setShowDepartmentChartModal] =
@@ -87,7 +81,6 @@ const CallDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [showDateRange, setShowDateRange] = useState(false);
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
   // Initialize with local time, then convert to UTC for API
   const getInitialFilters = () => {
     const now = moment();
@@ -150,101 +143,6 @@ const CallDashboard = () => {
       iconBgColor: "#FEE2E2",
       subtitle: "Missed outgoing calls in the system",
     },
-    {
-      title: "Missed Outgoing",
-      value: generalStats.totalMissedOutgoing,
-      icon: PhoneOff,
-      iconColor: "#EF4444",
-      iconBgColor: "#FEE2E2",
-      subtitle: "Missed outgoing calls in the system",
-    },
-  ];
-
-  // Create cards data for PageSummaryGrid
-  const summaryCards: SummaryCard[] = [
-    {
-      id: "total-calls",
-      title: "Total Calls",
-      value: generalStats.totalCalls,
-      description: "Total calls in the system",
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "inbound-calls",
-      title: "Inbound",
-      value: generalStats.totalInbound,
-      description: "Inbound calls in the system",
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "outbound-calls",
-      title: "Outbound",
-      value: generalStats.totalOutbound,
-      description: "Outbound calls in the system",
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "missed-incoming",
-      title: "Missed Incoming",
-      value: generalStats.totalMissedIncoming,
-      description: "Missed incoming calls in the system",
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "missed-outgoing",
-      title: "Missed Outgoing",
-      value: generalStats.totalMissedOutgoing,
-      description: "Missed outgoing calls in the system",
-      delay: 0.9,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    // {
-    //     id: 'avg-ring-time',
-    //     title: 'Avg Ring Time',
-    //     value: generalStats.totalAvgRingTime,
-    //     description: 'Avg ring time in the system',
-    //     delay: 1.1,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     valueType: 'seconds',
-    // },
-    // {
-    //     id: 'avg-duration',
-    //     title: 'Avg Duration',
-    //     value: generalStats.totalAvgDuration,
-    //     description: 'Avg duration in the system',
-    //     delay: 1.3,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     valueType: 'seconds',
-    // },
-    // {
-    //     id: 'avg-cost',
-    //     title: 'Avg Cost',
-    //     value: generalStats.totalAvgCost,
-    //     description: 'Avg cost in the system',
-    //     delay: 1.5,
-    //     showAnimatedNumber: true,
-    //     animationDuration: 1000,
-    //     fontStyle: 'style-2',
-    //     prefix: '$',
-    // }
   ];
 
   const [perPage, setPerPage] = useState(5);
@@ -254,12 +152,14 @@ const CallDashboard = () => {
   const [showDepartmentChart, setShowDepartmentChart] = useState(true);
   const [showCountryChart, setShowCountryChart] = useState(true);
 
-  const [countryChartData, setCountryChartData] = useState<any[]>([]);
-  const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
-  const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
+  const [countryChartData, setCountryChartData] = useState<ChartDataItem[]>([]);
+  const [departmentChartData, setDepartmentChartData] = useState<
+    ChartDataItem[]
+  >([]);
+  const [extensionChartData, setExtensionChartData] = useState<ChartDataItem[]>(
+    [],
+  );
 
-  const [startDateTime, setStartDateTime] = useState<string>("");
-  const [endDateTime, setEndDateTime] = useState<string>("");
   const [pendingDateStart, setPendingDateStart] = useState<string>("");
   const [pendingDateEnd, setPendingDateEnd] = useState<string>("");
 
@@ -299,7 +199,6 @@ const CallDashboard = () => {
 
     if (response.success) {
       const responseData = response.data;
-      const dataFilters = response?.filters;
       setShowDateRange(true);
 
       setGeneralStats({
@@ -313,10 +212,6 @@ const CallDashboard = () => {
         totalAvgCost: responseData.avg_cost,
       });
 
-      setStartDateTime(dataFilters?.start_datetime);
-      setEndDateTime(dataFilters?.end_datetime);
-      console.log(dataFilters?.start_datetime, dataFilters?.end_datetime);
-
       // Extract and map chart data
       const chartExtension = responseData?.chart_data?.extension;
       if (chartExtension) {
@@ -325,10 +220,10 @@ const CallDashboard = () => {
 
         // Map extension data to chart format
         const extensionLabels = chartExtension.map(
-          (item: any) => item.label || "Unknown",
+          (item: ChartDataItem) => item.label ?? "Unknown",
         );
-        const values = chartExtension.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+        const values = chartExtension.map((item: ChartDataItem) =>
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setExtensionChart({
@@ -366,10 +261,10 @@ const CallDashboard = () => {
 
         // Map department data to chart format
         const departmentLabels = chartDepartment.map(
-          (item: any) => item.label || "Unknown",
+          (item: ChartDataItem) => item.label ?? "Unknown",
         );
-        const values = chartDepartment.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+        const values = chartDepartment.map((item: ChartDataItem) =>
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setDepartmentChart({
@@ -430,10 +325,10 @@ const CallDashboard = () => {
 
         // Map country data to chart format
         const countryLabels = chartCountry.map(
-          (item: any) => item.label || "Unknown",
+          (item: ChartDataItem) => item.label ?? "Unknown",
         );
-        const values = chartCountry.map((item: any) =>
-          item.value ? parseInt(item.value) : 0,
+        const values = chartCountry.map((item: ChartDataItem) =>
+          item.value ? Number.parseInt(String(item.value), 10) : 0,
         );
 
         setCountryChart({
@@ -633,10 +528,20 @@ const CallDashboard = () => {
 
   const [showStatsByExtensionTable, setShowStatsByExtensionTable] =
     useState(true);
+  const setShowStatsByExtensionTableRef = useRef(setShowStatsByExtensionTable);
+  setShowStatsByExtensionTableRef.current = setShowStatsByExtensionTable;
   const [trendByCountryData, setTrendByCountryData] = useState<
     TrendByCountry[]
   >([]);
-  const [extensionData, setExtensionData] = useState<any[]>([]);
+  const [extensionData, setExtensionData] = useState<
+    Array<{
+      Extension?: string;
+      Calls?: string | number;
+      Answered?: string | number;
+      Unanswered?: string | number;
+      TotalDuration?: string | number;
+    }>
+  >([]);
   useEffect(() => {
     fetchExtensionStats();
   }, []);
@@ -663,6 +568,8 @@ const CallDashboard = () => {
   };
 
   const [showTrendByCountryTable, setShowTrendByCountryTable] = useState(true);
+  const setShowTrendByCountryTableRef = useRef(setShowTrendByCountryTable);
+  setShowTrendByCountryTableRef.current = setShowTrendByCountryTable;
   useEffect(() => {
     fetchTrendByCountryStats();
   }, []);
@@ -683,91 +590,18 @@ const CallDashboard = () => {
       "call-logs/statsByCountry",
     );
     if (response?.dataList?.length > 0) {
-      setTrendByCountryData(response?.dataList);
+      setTrendByCountryData(response.dataList);
+    } else {
+      setTrendByCountryData([]);
     }
   };
 
-  const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
-    const formattedFilters: any = { ...filters };
-
-    if (formattedFilters.start_datetime) {
-      let startMoment;
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm from datetime-local input
-        // datetime-local always returns values in local timezone
-        // Parse the string and create moment in local time explicitly
-        const dateTimeStr = formattedFilters.start_datetime + ":00";
-        // Split the datetime string to extract components
-        const [datePart, timePart] = dateTimeStr.split("T");
-        const [year, month, day] = datePart.split("-").map(Number);
-        const [hour, minute, second] = timePart.split(":").map(Number);
-        // Create moment object explicitly in local timezone
-        startMoment = moment([year, month - 1, day, hour, minute, second]);
-      } else if (formattedFilters.start_datetime.endsWith("Z")) {
-        // Already in UTC format - convert to local first
-        startMoment = moment.utc(formattedFilters.start_datetime).local();
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00 in local time
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      } else {
-        // Default: parse as local time
-        startMoment = moment(formattedFilters.start_datetime);
-      }
-
-      // Convert local time to UTC for API
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    if (formattedFilters.end_datetime) {
-      let endMoment;
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm from datetime-local input
-        // datetime-local always returns values in local timezone
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        const seconds = timePart === "23:59" ? "59" : "00";
-        const dateTimeStr = formattedFilters.end_datetime + ":" + seconds;
-        // Split the datetime string to extract components
-        const [datePart, timePartFull] = dateTimeStr.split("T");
-        const [year, month, day] = datePart.split("-").map(Number);
-        const [hour, minute, second] = timePartFull.split(":").map(Number);
-        // Create moment object explicitly in local timezone
-        endMoment = moment([year, month - 1, day, hour, minute, second]);
-      } else if (formattedFilters.end_datetime.endsWith("Z")) {
-        // Already in UTC format - convert to local first
-        endMoment = moment.utc(formattedFilters.end_datetime).local();
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59 in local time
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      } else {
-        // Default: parse as local time
-        endMoment = moment(formattedFilters.end_datetime);
-      }
-
-      // Convert local time to UTC for API
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    // Remove timezone key from payload if present
-    delete formattedFilters.timezone;
-
-    setCurrentFilters(formattedFilters);
-  };
-
-  const handleExport = async (
+  const _handleExport = async (
     exportType: string,
-    filters: Record<string, any>,
+    filters: Record<string, string>,
   ) => {
     try {
-      const response = await ExportCallLogs({
+      await ExportCallLogs({
         page: 1,
         perPage: 15,
         search: "",
@@ -775,9 +609,7 @@ const CallDashboard = () => {
         isExport: true,
         exportType,
       });
-      //console.log(response);
-    } catch (error) {
-      //console.error('Export error:', error);
+    } catch {
       toast.error("Export failed. Please try again.");
     }
   };
@@ -786,18 +618,21 @@ const CallDashboard = () => {
     startLocal: string,
     endLocal: string,
   ): { start_datetime: string; end_datetime: string } => {
+    const dateTimeLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
     let startMoment;
-    if (startLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+    if (dateTimeLocalRegex.exec(startLocal ?? "") === null) {
+      startMoment = moment(startLocal || undefined).startOf("day");
+    } else {
       const dateTimeStr = startLocal + ":00";
       const [datePart, timePart] = dateTimeStr.split("T");
       const [year, month, day] = datePart.split("-").map(Number);
       const [hour, minute, second] = timePart.split(":").map(Number);
       startMoment = moment([year, month - 1, day, hour, minute, second]);
-    } else {
-      startMoment = moment(startLocal || undefined).startOf("day");
     }
     let endMoment;
-    if (endLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+    if (dateTimeLocalRegex.exec(endLocal ?? "") === null) {
+      endMoment = moment(endLocal || undefined).endOf("day");
+    } else {
       const timePart = endLocal.split("T")[1];
       const seconds = timePart === "23:59" ? "59" : "00";
       const dateTimeStr = endLocal + ":" + seconds;
@@ -805,8 +640,6 @@ const CallDashboard = () => {
       const [year, month, day] = datePart.split("-").map(Number);
       const [hour, minute, second] = timePartFull.split(":").map(Number);
       endMoment = moment([year, month - 1, day, hour, minute, second]);
-    } else {
-      endMoment = moment(endLocal || undefined).endOf("day");
     }
     return {
       start_datetime: startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z",
@@ -823,8 +656,8 @@ const CallDashboard = () => {
     await fetchTrendByCountryStats(filtersToUse);
     if (overrideFilters) {
       setCurrentFilters(overrideFilters);
-      setStartDateTime(overrideFilters.start_datetime);
-      setEndDateTime(overrideFilters.end_datetime);
+      setPage(1);
+      setPerPage(5);
     }
     setLoading(false);
     NProgress.done();
@@ -871,12 +704,6 @@ const CallDashboard = () => {
                   <div className="d-flex align-items-center gap-2">
                     {showDateRange && (
                       <>
-                        {/* <p className="mb-0 d-flex align-items-center gap-2 flex-wrap">
-                                Date Range:{' '}
-                                <span className="status-badge primary">{startDateTime ? moment.utc(startDateTime).local().format('DD MMM YYYY hh:mm:ss A') : ''}</span>
-                                {' '}to{' '}
-                                <span className="status-badge primary">{endDateTime ? moment.utc(endDateTime).local().format('DD MMM YYYY hh:mm:ss A') : ''}</span>
-                              </p> */}
                         Date Range:{" "}
                         <span className="status-badge primary">
                           <Form.Control
@@ -919,14 +746,22 @@ const CallDashboard = () => {
                         >
                           Apply
                         </Button>
-                        <i
-                          className="material-icons-two-tone"
+                        <button
+                          type="button"
+                          className="btn btn-link p-0 border-0 bg-transparent"
                           style={{ cursor: "pointer" }}
                           onClick={() => refreshData()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              refreshData();
+                            }
+                          }}
                           title="Refresh"
+                          aria-label="Refresh data"
                         >
-                          refresh
-                        </i>
+                          <i className="material-icons-two-tone">refresh</i>
+                        </button>
                       </>
                     )}
                   </div>
@@ -937,9 +772,6 @@ const CallDashboard = () => {
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid 
-              cards={summaryCards} 
-            /> */}
       <div className="mb-4">
         <StatsCards data={statsCardsData} gridMinWidth="180px" />
       </div>
@@ -1084,7 +916,7 @@ const CallDashboard = () => {
                         </thead>
                         <tbody>
                           {extensionData.map((item, index) => (
-                            <tr key={index}>
+                            <tr key={item.Extension ?? `ext-${index}`}>
                               <td>{item.Extension}</td>
                               <td>{item.Calls}</td>
                               <td>{item.Answered}</td>
@@ -1143,7 +975,9 @@ const CallDashboard = () => {
                         </thead>
                         <tbody>
                           {trendByCountryData.map((item, index) => (
-                            <tr key={index}>
+                            <tr
+                              key={`${item.Country}-${item.CallDate ?? index}`}
+                            >
                               <td>{item.Country}</td>
                               <td>{item.Calls}</td>
                               <td>{item.Answered}</td>
@@ -1222,7 +1056,8 @@ const CallDashboard = () => {
               options={{
                 ...(DepartmentChart.options as ApexOptions),
                 chart: {
-                  ...(DepartmentChart.options.chart as ApexChart),
+                  ...DepartmentChart.options.chart,
+                  type: "bar",
                   height: 500,
                   toolbar: {
                     show: true,
@@ -1252,9 +1087,10 @@ const CallDashboard = () => {
           <div className="chart-container" style={{ minHeight: "500px" }}>
             <ReactApexChart
               options={{
-                ...ExtensionChart.options,
+                ...(ExtensionChart.options as ApexOptions),
                 chart: {
-                  ...(ExtensionChart.options.chart as ApexChart),
+                  ...ExtensionChart.options.chart,
+                  type: "bar",
                   height: 500,
                   toolbar: {
                     show: true,

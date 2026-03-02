@@ -1,31 +1,10 @@
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import {
-  Card,
-  Row,
-  Col,
-  Button,
-  Badge,
-  Spinner,
-  ListGroup,
-} from "react-bootstrap";
+import { Card, Row, Col, Button, Spinner, ListGroup } from "react-bootstrap";
 import { useSession } from "next-auth/react";
+import { getCrmDashboard } from "@utils/crm";
 import {
-  getCrmDashboard,
-  getCrmDashboardOverview,
-  getLeads,
-  getDeals,
-  getOrders,
-  DashboardData as CrmDashboardData,
-  LeadData,
-  DealData,
-  OrderData,
-} from "@utils/crm";
-import {
-  Target,
-  Handshake,
-  ShoppingBag,
   TrendingUp,
   Calendar,
   Users,
@@ -58,260 +37,22 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { GlobalDateTimeFormat, formatNumber } from "@utils/Helper";
 
-// KPI Card Component
-interface KPICardData {
-  title: string;
-  value: string;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  monthlyValue?: number;
-}
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  monthlyValue,
-}) => {
-  return (
-    <Card
-      className="h-100"
-      style={{
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-        {monthlyValue !== undefined && (
-          <div className="mt-3 pt-3 border-top d-flex align-items-center gap-2">
-            <Calendar size={16} className={`text-${color}`} />
-            <div>
-              <span className="text-muted small">This Month: </span>
-              <span className={`fw-semibold text-${color}`}>
-                {monthlyValue}
-              </span>
-            </div>
-          </div>
-        )}
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Helper functions for badge colors
-const getDealBadgeColor = (deal: DealData): string => {
-  if (deal.is_lost) return "danger";
-  if (deal.stage?.is_won) return "success";
-  return "secondary";
-};
-
-const getOrderBadgeColor = (order: OrderData): string => {
-  if (order.status === "delivered") return "success";
-  if (order.status === "in_progress") return "info";
-  if (order.status === "approved") return "primary";
-  return "warning";
-};
-
-// Chart color palette - 15 colors for handling large datasets
-const CHART_COLORS = [
-  "#ffc107", // Yellow
-  "#0dcaf0", // Cyan
-  "#6c757d", // Gray
-  "#198754", // Green
-  "#dc3545", // Red
-  "#0d6efd", // Blue
-  "#6610f2", // Purple
-  "#e83e8c", // Pink
-  "#fd7e14", // Orange
-  "#20c997", // Teal
-  "#ff6b6b", // Coral Red
-  "#4ecdc4", // Turquoise
-  "#95e1d3", // Mint
-  "#f38181", // Salmon
-  "#aa96da", // Lavender
-];
-
-// Helper function to format numbers with commas
-// const formatNumber = (value: number | undefined | null): string => {
-//   const num = value || 0;
-//   return num.toLocaleString('en-US');
-// };
-
 const CrmDashboard = () => {
   const { data: session } = useSession();
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
-  const [recentDeals, setRecentDeals] = useState<DealData[]>([]);
-  const [recentOrders, setRecentOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Chart data states
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [dealsByStage, setDealsByStage] = useState<any[]>([]);
-  const [ordersByStage, setOrdersByStage] = useState<any[]>([]);
-
-  // Conversion percentages
-  const [leadToDealPercent, setLeadToDealPercent] = useState(0);
-  const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
-
-  const [dashboardOverview, setDashboardOverview] = useState<any>(null);
-
-  // Header search and date range state - moved to top to avoid hooks order violation
-  const [searchText, setSearchText] = useState<string>("");
-  const today = new Date().toISOString().slice(0, 10);
-  const prior = new Date();
-  prior.setDate(prior.getDate() - 30);
-  const [fromDate, setFromDate] = useState<string>(
-    prior.toISOString().slice(0, 10),
-  );
-  const [toDate, setToDate] = useState<string>(today);
-  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const datePickerRef = React.useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    fetchDashboardOverview();
-  }, []);
-
-  const fetchDashboardOverview = useCallback(async () => {
-    try {
-      const data = await getCrmDashboardOverview();
-      console.log("Dashboard Overview", data);
-      setDashboardOverview(data);
-    } catch (error) {
-      console.error("Failed to fetch dashboard overview data:", error);
-    }
-  }, []);
   // Fetch all dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch dashboard data and recent items in parallel
-      const [dashboard, leadsResponse, dealsResponse, ordersResponse] =
-        await Promise.all([
-          getCrmDashboard().then((res: any) => res.data.data),
-          getLeads({ per_page: 5 }),
-          getDeals({ per_page: 5 }),
-          getOrders({ per_page: 5 }),
-        ]);
-      console.log("dashboard data", dashboard);
+      const dashboard = await getCrmDashboard().then(
+        (res: any) => res.data.data,
+      );
       setDashboardData(dashboard);
-
-      // Set conversion percentages from API
-      setLeadToDealPercent(dashboard?.conversion_ratios?.lead_to_deal || 0);
-      setDealToOrderPercent(dashboard?.conversion_ratios?.deal_to_order || 0);
-
-      // Set campaign performance chart data
-      if (dashboard?.campaign_performance?.chart_data) {
-        const chartData = dashboard.campaign_performance.chart_data.map(
-          (item: any) => ({
-            name: item.month_label || item.month,
-            leads: Number(item.leads) || 0,
-            deals: Number(item.deals) || 0,
-            orders: Number(item.orders) || 0,
-          }),
-        );
-        setMonthlyData(chartData);
-      }
-
-      // Set task statuses data
-      if (dashboard?.task_statuses) {
-        const taskData = [
-          {
-            name: "Completed",
-            value: dashboard.task_statuses.completed || 0,
-            color: "#20C997",
-          },
-          {
-            name: "Pending",
-            value: dashboard.task_statuses.pending || 0,
-            color: "#FFC107",
-          },
-          {
-            name: "Overdue",
-            value: dashboard.task_statuses.overdue || 0,
-            color: "#FD7E14",
-          },
-        ];
-        // Update tasksData will be done in render
-      }
-
-      // Get recent items
-      console.log("ZEZEZE", leadsResponse);
-      setRecentLeads((leadsResponse?.data as any)?.data?.slice(0, 5) || []);
-      setRecentDeals(dealsResponse?.dataList?.slice(0, 5) || []);
-      setRecentOrders(ordersResponse?.dataList?.slice(0, 5) || []);
-
-      // Process monthly data from API - convert string numbers to numbers
-      const monthlyDataArray =
-        (dashboard as CrmDashboardData)?.monthly_data || [];
-      const processedMonthlyData = monthlyDataArray.map(
-        (item: {
-          month: string;
-          month_label: string;
-          leads: number | string;
-          deals: number | string;
-          orders: number | string;
-        }) => ({
-          month: item.month_label || item.month,
-          leads: Number(item.leads) || 0,
-          deals: Number(item.deals) || 0,
-          orders: Number(item.orders) || 0,
-        }),
-      );
-      setMonthlyData(processedMonthlyData);
-
-      // Process deals by stage from API
-      const dealsDistribution =
-        (dashboard as CrmDashboardData)?.stage_distribution?.deals || [];
-      const dealsByStageData = dealsDistribution.map(
-        (
-          item: { stage_name: string; count: number; color: string },
-          index: number,
-        ) => ({
-          name: item.stage_name,
-          value: item.count,
-          color: item.color || CHART_COLORS[index % CHART_COLORS.length],
-        }),
-      );
-      setDealsByStage(dealsByStageData);
-
-      // Process orders by stage from API
-      const ordersDistribution =
-        (dashboard as CrmDashboardData)?.stage_distribution?.orders || [];
-      const ordersByStageData = ordersDistribution.map(
-        (
-          item: { stage_name: string; count: number; color: string },
-          index: number,
-        ) => ({
-          name: item.stage_name,
-          value: item.count,
-          color: item.color || CHART_COLORS[index % CHART_COLORS.length],
-        }),
-      );
-      setOrdersByStage(ordersByStageData);
 
       setLoading(false);
     } catch (error: any) {
@@ -354,52 +95,6 @@ const CrmDashboard = () => {
       </div>
     );
   }
-
-  const stats = dashboardData?.stats;
-
-  const kpiData: KPICardData[] = [
-    {
-      title: "Total Leads (All Time)",
-      value: (stats?.leads?.total || 0).toString(),
-      icon: <Target size={24} />,
-      color: "primary",
-      monthlyValue: stats?.leads?.this_month,
-    },
-    {
-      title: "Total Deals (All Time)",
-      value: (stats?.deals?.total || 0).toString(),
-      icon: <Handshake size={24} />,
-      color: "success",
-      monthlyValue: stats?.deals?.this_month,
-    },
-    {
-      title: "Total Orders (All Time)",
-      value: (stats?.orders?.total || 0).toString(),
-      icon: <ShoppingBag size={24} />,
-      color: "info",
-      monthlyValue: stats?.orders?.this_month,
-    },
-    {
-      title: "Lead to Deal Conversion (Past 30 Days)",
-      value: `${leadToDealPercent}%`,
-      icon: <TrendingUp size={24} />,
-      color: "warning",
-    },
-    {
-      title: "Deal to Order Conversion (Past 30 Days)",
-      value: `${dealToOrderPercent}%`,
-      icon: <TrendingUp size={24} />,
-      color: "secondary",
-    },
-  ];
-
-  // Calculate max count for progress bars
-  const leadsByStage = dashboardData?.stage_distribution?.leads || [];
-  const maxLeadCount =
-    leadsByStage.reduce(
-      (max: number, stage: any) => Math.max(max, stage.count || 0),
-      0,
-    ) || 1;
 
   // Campaign Performance data from API
   const campaignData =
@@ -466,136 +161,9 @@ const CrmDashboard = () => {
               <h4 style={{ margin: 0, fontWeight: 600, color: "#1E293B" }}>
                 CRM Dashboard
               </h4>
-              {/* <div style={{ flex: 1, maxWidth: '420px', position: 'relative' }}>
-                <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
-                <Form.Control
-                  type="text"
-                  placeholder="Search here..."
-                  className="ps-5"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  style={{ height: '40px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
-                />
-              </div> */}
             </div>
           </Col>
-
-          {/* <Col xs={12} md={5} className="d-flex justify-content-md-end align-items-center">
-            <div ref={datePickerRef} style={{ position: 'relative' }}>
-              <div onClick={() => setShowDatePicker((s) => !s)} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 12px', display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer', minWidth: '160px' }}>
-                <Calendar size={16} color="#64748B" />
-                <div style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600 }}>{fromDate} — {toDate}</div>
-                <div style={{ marginLeft: '8px', marginRight: '-4px' }}>
-                  <ChevronDown size={16} color="#64748B" />
-                </div>
-              </div>
-
-              {showDatePicker && (
-                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '12px', boxShadow: '0 6px 18px rgba(0,0,0,0.08)', zIndex: 1060 }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <Form.Control type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ height: '40px', borderRadius: '6px' }} />
-                    <Form.Control type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ height: '40px', borderRadius: '6px' }} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </Col> */}
         </Row>
-
-        {/* Top Stats */}
-        {/* <Row className="g-3 mb-4">
-          <Col xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Users size={20} color="#0EA5E9" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0, true)}</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Prospects</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col  xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <UserPlus size={20} color="#3B82F6" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0, true)}</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col  xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <DollarSign size={20} color="#F59E0B" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0, true)}</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col  xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#FED7AA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <ShoppingCart size={20} color="#F97316" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0, true)}</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Orders</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col  xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#E0F2FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <TrendingUp size={20} color="#0EA5E9" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_ratios?.lead_to_deal?.toFixed(2) || 0}%</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads to Deals Conversion</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xxl={2}  xl={4} lg={4} md={4} sm={6}>
-            <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <Card.Body>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <TrendingUp size={20} color="#10B981" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_ratios?.deal_to_order?.toFixed(2) || 0}%</h3>
-                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals to Orders Conversion</p>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row> */}
-
         <div className="mb-4">
           <StatsCards
             gridMinWidth="180px"
@@ -1378,8 +946,11 @@ const CrmDashboard = () => {
                           paddingAngle={2}
                           dataKey="value"
                         >
-                          {tasksData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          {tasksData.map((entry) => (
+                            <Cell
+                              key={`cell-${entry.name}`}
+                              fill={entry.color}
+                            />
                           ))}
                         </Pie>
                         <text
@@ -1415,9 +986,9 @@ const CrmDashboard = () => {
                       justifyContent: "center",
                     }}
                   >
-                    {tasksData.map((item, index) => (
+                    {tasksData.map((item) => (
                       <div
-                        key={index}
+                        key={item.name}
                         style={{
                           display: "flex",
                           justifyContent: "space-between",

@@ -39,8 +39,166 @@ interface DeviceWithStatus extends Device {
   uptime_percentage?: number;
 }
 
+function DeviceStatusCell(
+  props: Readonly<{ status?: "UP" | "DOWN" }>,
+) {
+  const { status } = props;
+  return (
+    <span
+      className={`status-badge ${status === "UP" ? "success" : "danger"}`}
+    >
+      <i
+        className={`fas ${status === "UP" ? "fa-check-circle" : "fa-times-circle"} me-1`}
+      ></i>
+      {status}
+    </span>
+  );
+}
+
+function DeviceCreatedAtCell(
+  props: Readonly<{ created_at?: string }>,
+) {
+  const { created_at } = props;
+  if (created_at == null || created_at === "") {
+    return null;
+  }
+  const formattedDate = convertUTCToUserTimezone(created_at, {
+    outputFormat: "DD-MM-YYYY hh:mm:ss A",
+  });
+  return <>{formattedDate}</>;
+}
+
+interface DeviceActionsCellProps {
+  device: Device;
+  onEdit: (device: Device) => void;
+  onDelete: (id: number, hostname: string) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+function DeviceActionsCell({
+  device,
+  onEdit,
+  onDelete,
+  canEdit,
+  canDelete,
+}: Readonly<DeviceActionsCellProps>) {
+  return (
+    <DatatableActionButton
+      actions={[
+        ...(canEdit
+          ? [
+              {
+                label: "Edit",
+                icon: <FiEdit />,
+                onClick: () => onEdit(device),
+                className: "gap-2",
+              },
+            ]
+          : []),
+        ...(canDelete
+          ? [
+              {
+                label: "Delete",
+                icon: <FiTrash2 />,
+                onClick: () => onDelete(device.id, device.hostname),
+                className: "text-danger gap-2",
+              },
+            ]
+          : []),
+      ]}
+    />
+  );
+}
+
+function renderStatusCell(
+  props: { monitoring_status?: "UP" | "DOWN"; status?: "UP" | "DOWN" },
+) {
+  return (
+    <DeviceStatusCell status={props.monitoring_status ?? props.status} />
+  );
+}
+
+function renderCreatedAtCell(props: { created_at?: string }) {
+  return <DeviceCreatedAtCell created_at={props.created_at} />;
+}
+
+function makeActionsCell(
+  onEdit: (device: Device) => void,
+  onDelete: (id: number, hostname: string) => void,
+  canEdit: boolean,
+  canDelete: boolean,
+) {
+  return (props: Device) => (
+    <DeviceActionsCell
+      device={props}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      canEdit={canEdit}
+      canDelete={canDelete}
+    />
+  );
+}
+
 const Devices = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [currentFilters, setCurrentFilters] = useState({});
+  const [summary, setSummary] = useState<Summary>({
+    total_devices: 0,
+    devices_up: 0,
+    devices_down: 0,
+    active_alerts: 0,
+  });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<{
+    id: number;
+    hostname: string;
+  } | null>(null);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [devicesWithStatus, setDevicesWithStatus] =
+    useState<DeviceWithStatus[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState<boolean>(false);
+  const [statusProgress, setStatusProgress] = useState<{
+    loaded: number;
+    total: number;
+  }>({ loaded: 0, total: 0 });
+  const hasInitialLoad = useRef<boolean>(false);
+  const devicesRef = useRef<DeviceWithStatus[]>([]);
+  const [editFormData, setEditFormData] = useState({
+    hostname: "",
+    ip_address: "",
+    username: "",
+    password: "",
+    protocol: "SSH" as "SSH" | "TELNET" | "HTTP" | "HTTPS",
+    port: 22,
+    customer_name: "",
+    device_type: null as "cisco_ios" | "cisco_ios_telnet" | "generic" | null,
+    enable_password: "",
+  });
+
+  const handleDeleteDevice = (deviceId: number, hostname: string) => {
+    setDeviceToDelete({ id: deviceId, hostname });
+    setShowDeleteModal(true);
+  };
+
+  const handleEditDevice = (device: Device) => {
+    setEditingDevice(device);
+    setEditFormData({
+      hostname: device.hostname,
+      ip_address: device.ip_address,
+      username: device.username,
+      password: "",
+      protocol: device.protocol,
+      port: device.port,
+      customer_name: device.customer_name,
+      device_type: device.device_type || null,
+      enable_password: "",
+    });
+    setShowEditModal(true);
+  };
 
   const columns: Column[] = [
     {
@@ -84,40 +242,14 @@ const Devices = () => {
       name: "Status",
       selector: (row: any) => row.monitoring_status,
       sortable: true,
-      cell: (props: any) => {
-        // if (props.monitoring_status === undefined) {
-        //     return (
-        //         <span className="status-badge loading">
-        //             <i className="fas fa-spinner fa-spin me-1"></i>
-        //             Checking...
-        //         </span>
-        //     );
-        // }
-        const status = props.status;
-        return (
-          <span
-            className={`status-badge ${status === "UP" ? "success" : "danger"}`}
-          >
-            <i
-              className={`fas ${status === "UP" ? "fa-check-circle" : "fa-times-circle"} me-1`}
-            ></i>
-            {status}
-            {/* {status === 'UP' ? 'Online' : 'Offline'} */}
-          </span>
-        );
-      },
+      cell: renderStatusCell,
     },
     {
       key: "created_at",
       name: "Created At",
       selector: (row: any) => row.created_at,
       sortable: true,
-      cell: (props: any) => {
-        const formattedDate = convertUTCToUserTimezone(props.created_at, {
-          outputFormat: "DD-MM-YYYY hh:mm:ss A",
-        });
-        return formattedDate;
-      },
+      cell: renderCreatedAtCell,
     },
     ...(session?.user?.permissions?.includes("edit-device-netops") ||
     session?.user?.permissions?.includes("delete-device-netops")
@@ -127,71 +259,17 @@ const Devices = () => {
             name: "Actions",
             selector: (row: any) => row.id,
             sortable: false,
-            cell: (props: any) => {
-              return (
-                <DatatableActionButton
-                  actions={[
-                    ...(session?.user?.permissions?.includes(
-                      "edit-device-netops",
-                    )
-                      ? [
-                          {
-                            label: "Edit",
-                            icon: <FiEdit />,
-                            onClick: () => handleEditDevice(props),
-                            className: "gap-2",
-                          },
-                        ]
-                      : []),
-
-                    ...(session?.user?.permissions?.includes(
-                      "delete-device-netops",
-                    )
-                      ? [
-                          {
-                            label: "Delete",
-                            icon: <FiTrash2 />,
-                            onClick: () =>
-                              handleDeleteDevice(props.id, props.hostname),
-                            className: "text-danger gap-2",
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
-              );
-            },
+            cell: makeActionsCell(
+              handleEditDevice,
+              handleDeleteDevice,
+              session?.user?.permissions?.includes("edit-device-netops") ?? false,
+              session?.user?.permissions?.includes("delete-device-netops") ??
+                false,
+            ),
           },
         ]
       : []),
   ];
-
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
-  const [summary, setSummary] = useState<Summary>({
-    total_devices: 0,
-    devices_up: 0,
-    devices_down: 0,
-    active_alerts: 0,
-  });
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [deviceToDelete, setDeviceToDelete] = useState<{
-    id: number;
-    hostname: string;
-  } | null>(null);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
-  const [devicesWithStatus, setDevicesWithStatus] = useState<
-    DeviceWithStatus[]
-  >([]);
-  const [loadingStatuses, setLoadingStatuses] = useState<boolean>(false);
-  const [statusProgress, setStatusProgress] = useState<{
-    loaded: number;
-    total: number;
-  }>({ loaded: 0, total: 0 });
-  const hasInitialLoad = useRef<boolean>(false);
-  const devicesRef = useRef<DeviceWithStatus[]>([]);
 
   // Function to handle refresh - clears cache and forces refetch
   const handleRefresh = useCallback(() => {
@@ -202,79 +280,70 @@ const Devices = () => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const loadMonitoringStatuses = useCallback(
+  const updateDeviceInList = useCallback(
+    (
+      deviceId: number,
+      updatedDevice: DeviceWithStatus,
+      prevDevices: DeviceWithStatus[],
+    ) => {
+      const updatedDevices = [...prevDevices];
+      const index = updatedDevices.findIndex((d) => d.id === deviceId);
+      if (index !== -1) {
+        updatedDevices[index] = updatedDevice;
+      }
+      devicesRef.current = updatedDevices;
+      return updatedDevices;
+    },
+    [],
+  );
+
+  const _loadMonitoringStatuses = useCallback(
     async (devices: DeviceWithStatus[]) => {
       setLoadingStatuses(true);
       setStatusProgress({ loaded: 0, total: devices.length });
 
+      const fetchOneStatus = async (device: DeviceWithStatus) => {
+        try {
+          const monitoringStatus = await getDeviceMonitoringStatus(device.id);
+          const updatedDevice: DeviceWithStatus = {
+            ...device,
+            monitoring_status: monitoringStatus.status,
+            last_check: monitoringStatus.last_check,
+            uptime_percentage: monitoringStatus.uptime_percentage,
+          };
+          setDevicesWithStatus((prev) =>
+            updateDeviceInList(device.id, updatedDevice, prev),
+          );
+          setStatusProgress((prev) => ({ ...prev, loaded: prev.loaded + 1 }));
+          return updatedDevice;
+        } catch (error) {
+          console.warn(
+            `Failed to fetch monitoring status for device ${device.id}:`,
+            error,
+          );
+          const updatedDevice: DeviceWithStatus = {
+            ...device,
+            monitoring_status: "DOWN",
+            last_check: null,
+            uptime_percentage: 0,
+          };
+          setDevicesWithStatus((prev) =>
+            updateDeviceInList(device.id, updatedDevice, prev),
+          );
+          setStatusProgress((prev) => ({ ...prev, loaded: prev.loaded + 1 }));
+          return updatedDevice;
+        }
+      };
+
       try {
-        // Create promises for all devices in parallel
-        const statusPromises = devices.map(async (device) => {
-          try {
-            const monitoringStatus = await getDeviceMonitoringStatus(device.id);
-            const updatedDevice = {
-              ...device,
-              monitoring_status: monitoringStatus.status,
-              last_check: monitoringStatus.last_check,
-              uptime_percentage: monitoringStatus.uptime_percentage,
-            };
-
-            // Update state immediately as each status is fetched
-            setDevicesWithStatus((prevDevices) => {
-              const updatedDevices = [...prevDevices];
-              const index = updatedDevices.findIndex((d) => d.id === device.id);
-              if (index !== -1) {
-                updatedDevices[index] = updatedDevice;
-              }
-              // Also update the ref
-              devicesRef.current = updatedDevices;
-              return updatedDevices;
-            });
-
-            // Update progress
-            setStatusProgress((prev) => ({ ...prev, loaded: prev.loaded + 1 }));
-
-            return updatedDevice;
-          } catch (error) {
-            console.warn(
-              `Failed to fetch monitoring status for device ${device.id}:`,
-              error,
-            );
-            const updatedDevice = {
-              ...device,
-              monitoring_status: "DOWN" as "UP" | "DOWN",
-              last_check: null,
-              uptime_percentage: 0,
-            };
-
-            // Update state immediately even for failed requests
-            setDevicesWithStatus((prevDevices) => {
-              const updatedDevices = [...prevDevices];
-              const index = updatedDevices.findIndex((d) => d.id === device.id);
-              if (index !== -1) {
-                updatedDevices[index] = updatedDevice;
-              }
-              // Also update the ref
-              devicesRef.current = updatedDevices;
-              return updatedDevices;
-            });
-
-            // Update progress even for failed requests
-            setStatusProgress((prev) => ({ ...prev, loaded: prev.loaded + 1 }));
-
-            return updatedDevice;
-          }
-        });
-
-        // Wait for all promises to complete (though individual updates happen immediately)
-        await Promise.all(statusPromises);
+        await Promise.all(devices.map(fetchOneStatus));
       } catch (error) {
         console.error("Error loading monitoring statuses:", error);
       } finally {
         setLoadingStatuses(false);
       }
     },
-    [],
+    [updateDeviceInList],
   );
 
   const fetchDevices = useCallback(
@@ -282,12 +351,14 @@ const Devices = () => {
       try {
         // If we already have devices with status, return them to avoid refetching
         if (hasInitialLoad.current && devicesRef.current.length > 0) {
+          const cached =
+            devicesWithStatus.length > 0 ? devicesWithStatus : devicesRef.current;
           return {
-            data: devicesRef.current || [],
-            total: devicesRef.current?.length || 0,
+            data: cached || [],
+            total: cached?.length || 0,
             current_page: page,
             per_page: perPage,
-            last_page: Math.ceil((devicesRef.current?.length || 0) / perPage),
+            last_page: Math.ceil((cached?.length || 0) / perPage),
           };
         }
 
@@ -311,7 +382,7 @@ const Devices = () => {
         });
 
         // Convert devices to DeviceWithStatus format without monitoring status initially
-        const devicesWithStatus: DeviceWithStatus[] = (
+        const mappedDevices: DeviceWithStatus[] = (
           devicesResponse || []
         ).map((device: Device) => ({
           ...device,
@@ -321,20 +392,17 @@ const Devices = () => {
         }));
 
         // Store devices in state and ref for progressive loading
-        setDevicesWithStatus(devicesWithStatus);
-        devicesRef.current = devicesWithStatus;
+        setDevicesWithStatus(mappedDevices);
+        devicesRef.current = mappedDevices;
         hasInitialLoad.current = true;
-
-        // Start loading monitoring statuses in the background
-        // loadMonitoringStatuses(devicesWithStatus);
 
         // Return devices data in the format expected by GenericListPage
         return {
-          data: devicesWithStatus || [],
-          total: devicesWithStatus?.length || 0,
+          data: mappedDevices || [],
+          total: mappedDevices?.length || 0,
           current_page: page,
           per_page: perPage,
-          last_page: Math.ceil((devicesWithStatus?.length || 0) / perPage),
+          last_page: Math.ceil((mappedDevices?.length || 0) / perPage),
         };
       } catch (error) {
         console.error("Error fetching devices:", error);
@@ -348,7 +416,7 @@ const Devices = () => {
         };
       }
     },
-    [currentFilters],
+    [currentFilters, devicesWithStatus],
   );
 
   // Create cards data for PageSummaryGrid
@@ -395,12 +463,7 @@ const Devices = () => {
     },
   ];
 
-  const handleDeleteDevice = (deviceId: number, hostname: string) => {
-    setDeviceToDelete({ id: deviceId, hostname });
-    setShowDeleteModal(true);
-  };
-
-  const confirmDeleteDevice = async (confirmationText: string) => {
+  const confirmDeleteDevice = async (_confirmationText: string) => {
     if (!deviceToDelete) return;
 
     try {
@@ -419,18 +482,6 @@ const Devices = () => {
     setShowCreateModal(true);
   };
 
-  const [editFormData, setEditFormData] = useState({
-    hostname: "",
-    ip_address: "",
-    username: "",
-    password: "",
-    protocol: "SSH" as "SSH" | "TELNET" | "HTTP" | "HTTPS",
-    port: 22,
-    customer_name: "",
-    device_type: null as "cisco_ios" | "cisco_ios_telnet" | "generic" | null,
-    enable_password: "",
-  });
-
   const handleEditInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -439,24 +490,8 @@ const Devices = () => {
     const { name, value } = e.target;
     setEditFormData((prev) => ({
       ...prev,
-      [name]: name === "port" ? parseInt(value) || 22 : value,
+      [name]: name === "port" ? Number.parseInt(value, 10) || 22 : value,
     }));
-  };
-
-  const handleEditDevice = (device: Device) => {
-    setEditingDevice(device);
-    setEditFormData({
-      hostname: device.hostname,
-      ip_address: device.ip_address,
-      username: device.username,
-      password: "", // Don't pre-fill password for security
-      protocol: device.protocol,
-      port: device.port,
-      customer_name: device.customer_name,
-      device_type: device.device_type || null,
-      enable_password: "", // Don't pre-fill enable password for security
-    });
-    setShowEditModal(true);
   };
 
   const [createFormData, setCreateFormData] = useState({
@@ -477,7 +512,7 @@ const Devices = () => {
     const { name, value } = e.target;
     setCreateFormData((prev) => ({
       ...prev,
-      [name]: name === "port" ? parseInt(value) || 22 : value,
+      [name]: name === "port" ? Number.parseInt(value, 10) || 22 : value,
     }));
   };
 
@@ -529,17 +564,16 @@ const Devices = () => {
     }
   };
 
-  const handleFiltersChange = (filters: any) => {
+  const _handleFiltersChange = (filters: any) => {
     setCurrentFilters(filters);
   };
 
-  const handleExport = async (
-    exportType: string,
-    filters: Record<string, any>,
+  const _handleExport = async (
+    _exportType: string,
+    _filters: Record<string, any>,
   ) => {
     try {
-      // TODO: Implement export functionality
-      toast.info("Export functionality will be implemented soon");
+      toast.info("Export is not yet implemented.");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Export failed");
@@ -575,27 +609,24 @@ const Devices = () => {
                   </div>
                 )}
                 <div className="action-buttons gap-2">
-                  <>
-                    {session?.user?.permissions?.includes(
-                      "add-device-netops",
-                    ) && (
-                      <Button
-                        variant="primary"
-                        className="me-2"
-                        onClick={handleCreateDevice}
-                      >
-                        <FiPlus size={14} /> Add Device
-                      </Button>
-                    )}
-
+                  {session?.user?.permissions?.includes(
+                    "add-device-netops",
+                  ) && (
                     <Button
-                      variant="info"
+                      variant="primary"
                       className="me-2"
-                      onClick={handleRefresh}
+                      onClick={handleCreateDevice}
                     >
-                      <FiRefreshCw size={14} /> Refresh
+                      <FiPlus size={14} /> Add Device
                     </Button>
-                  </>
+                  )}
+                  <Button
+                    variant="info"
+                    className="me-2"
+                    onClick={handleRefresh}
+                  >
+                    <FiRefreshCw size={14} /> Refresh
+                  </Button>
                 </div>
               </Col>
             </Row>
@@ -628,8 +659,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Hostname *</label>
+                  <label className="form-label" htmlFor="create-hostname">Hostname *</label>
                   <input
+                    id="create-hostname"
                     type="text"
                     name="hostname"
                     value={createFormData.hostname}
@@ -642,8 +674,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">IP Address *</label>
+                  <label className="form-label" htmlFor="create-ip_address">IP Address *</label>
                   <input
+                    id="create-ip_address"
                     type="text"
                     name="ip_address"
                     value={createFormData.ip_address}
@@ -658,8 +691,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Username *</label>
+                  <label className="form-label" htmlFor="create-username">Username *</label>
                   <input
+                    id="create-username"
                     type="text"
                     name="username"
                     value={createFormData.username}
@@ -672,8 +706,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Password *</label>
+                  <label className="form-label" htmlFor="create-password">Password *</label>
                   <input
+                    id="create-password"
                     type="password"
                     name="password"
                     value={createFormData.password}
@@ -688,8 +723,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Protocol *</label>
+                  <label className="form-label" htmlFor="create-protocol">Protocol *</label>
                   <select
+                    id="create-protocol"
                     name="protocol"
                     value={createFormData.protocol}
                     onChange={handleCreateInputChange}
@@ -705,8 +741,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Port *</label>
+                  <label className="form-label" htmlFor="create-port">Port *</label>
                   <input
+                    id="create-port"
                     type="number"
                     name="port"
                     value={createFormData.port}
@@ -722,8 +759,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Customer Name *</label>
+                  <label className="form-label" htmlFor="create-customer_name">Customer Name *</label>
                   <input
+                    id="create-customer_name"
                     type="text"
                     name="customer_name"
                     value={createFormData.customer_name}
@@ -736,8 +774,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Device Type</label>
+                  <label className="form-label" htmlFor="create-device_type">Device Type</label>
                   <select
+                    id="create-device_type"
                     name="device_type"
                     value={createFormData.device_type || ""}
                     onChange={handleCreateInputChange}
@@ -754,8 +793,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-12">
                 <div className="form-group mb-3">
-                  <label className="form-label">Enable Password</label>
+                  <label className="form-label" htmlFor="create-enable_password">Enable Password</label>
                   <input
+                    id="create-enable_password"
                     type="password"
                     name="enable_password"
                     value={createFormData.enable_password}
@@ -784,8 +824,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Hostname *</label>
+                  <label className="form-label" htmlFor="edit-hostname">Hostname *</label>
                   <input
+                    id="edit-hostname"
                     type="text"
                     name="hostname"
                     value={editFormData.hostname}
@@ -798,8 +839,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">IP Address *</label>
+                  <label className="form-label" htmlFor="edit-ip_address">IP Address *</label>
                   <input
+                    id="edit-ip_address"
                     type="text"
                     name="ip_address"
                     value={editFormData.ip_address}
@@ -814,8 +856,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Username *</label>
+                  <label className="form-label" htmlFor="edit-username">Username *</label>
                   <input
+                    id="edit-username"
                     type="text"
                     name="username"
                     value={editFormData.username}
@@ -828,8 +871,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Password</label>
+                  <label className="form-label" htmlFor="edit-password">Password</label>
                   <input
+                    id="edit-password"
                     type="password"
                     name="password"
                     value={editFormData.password}
@@ -843,8 +887,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Protocol *</label>
+                  <label className="form-label" htmlFor="edit-protocol">Protocol *</label>
                   <select
+                    id="edit-protocol"
                     name="protocol"
                     value={editFormData.protocol}
                     onChange={handleEditInputChange}
@@ -860,8 +905,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Port *</label>
+                  <label className="form-label" htmlFor="edit-port">Port *</label>
                   <input
+                    id="edit-port"
                     type="number"
                     name="port"
                     value={editFormData.port}
@@ -877,8 +923,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Customer Name *</label>
+                  <label className="form-label" htmlFor="edit-customer_name">Customer Name *</label>
                   <input
+                    id="edit-customer_name"
                     type="text"
                     name="customer_name"
                     value={editFormData.customer_name}
@@ -891,8 +938,9 @@ const Devices = () => {
               </div>
               <div className="col-md-6">
                 <div className="form-group mb-3">
-                  <label className="form-label">Device Type</label>
+                  <label className="form-label" htmlFor="edit-device_type">Device Type</label>
                   <select
+                    id="edit-device_type"
                     name="device_type"
                     value={editFormData.device_type || ""}
                     onChange={handleEditInputChange}
@@ -909,8 +957,9 @@ const Devices = () => {
             <div className="row">
               <div className="col-md-12">
                 <div className="form-group mb-3">
-                  <label className="form-label">Enable Password</label>
+                  <label className="form-label" htmlFor="edit-enable_password">Enable Password</label>
                   <input
+                    id="edit-enable_password"
                     type="password"
                     name="enable_password"
                     value={editFormData.enable_password}

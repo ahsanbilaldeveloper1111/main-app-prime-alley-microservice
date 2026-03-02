@@ -208,29 +208,6 @@ const DirectCardPaymentForm: React.FC<{
     hidePostalCode: true,
   };
 
-  // Helper function to extract payment ID from payment result (handles both response structures)
-  const getPaymentId = (paymentResult: any): string | number | undefined => {
-    return paymentResult?.payment?.id || paymentResult?.data?.payment?.id;
-  };
-
-  // Helper function to mark payment as complete
-  const markPaymentComplete = async (paymentResult: any): Promise<void> => {
-    console.log("Marking payment as complete:", paymentResult);
-    const paymentId = getPaymentId(paymentResult);
-    if (paymentId) {
-      try {
-        await CompletePayment({
-          payment_id: paymentId,
-          payment_method: "stripe",
-        });
-      } catch (error: any) {
-        console.error("Error marking payment as complete:", error);
-        // Don't throw - payment succeeded on Stripe, just failed to update our DB
-        // The webhook or polling will eventually update the status
-      }
-    }
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -265,57 +242,337 @@ const DirectCardPaymentForm: React.FC<{
           customer_id: customerId,
         },
         {
-          onSuccess: async (paymentResult: any) => {
-            // Handle payment result based on status
-            console.log(paymentResult, "Payment Intent Response");
+          onSuccess: (paymentResult: any) => {
+            void (async () => {
+              // Handle payment result based on status
+              console.log(paymentResult, "Payment Intent Response");
 
-            // Check if payment was already completed
-            if (paymentResult?.already_completed) {
-              setIsProcessing(false);
-              onPaymentSuccess();
-              toast.success("Payment was already completed successfully!");
-              return;
-            }
+              // Check if payment was already completed
+              if (paymentResult?.already_completed) {
+                setIsProcessing(false);
+                onPaymentSuccess();
+                toast.success("Payment was already completed successfully!");
+                return;
+              }
 
-            // Extract payment intent from nested structure
-            // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
-            const gatewayResponse =
-              paymentResult?.payment?.gateway_response ||
-              paymentResult?.data?.payment?.gateway_response;
-            const clientSecret =
-              paymentResult?.client_secret ||
-              paymentResult?.data?.client_secret ||
-              gatewayResponse?.client_secret ||
-              paymentResult?.payment_data?.client_secret;
-            const paymentStatus =
-              gatewayResponse?.status || paymentResult?.status;
+              // Extract payment intent from nested structure
+              // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
+              const gatewayResponse =
+                paymentResult?.payment?.gateway_response ||
+                paymentResult?.data?.payment?.gateway_response;
+              const clientSecret =
+                paymentResult?.client_secret ||
+                paymentResult?.data?.client_secret ||
+                gatewayResponse?.client_secret ||
+                paymentResult?.payment_data?.client_secret;
+              const paymentStatus =
+                gatewayResponse?.status || paymentResult?.status;
 
-            console.log("Payment Status:", paymentStatus);
-            console.log("Client Secret:", clientSecret);
-            console.log("Gateway Response:", gatewayResponse);
+              console.log("Payment Status:", paymentStatus);
+              console.log("Client Secret:", clientSecret);
+              console.log("Gateway Response:", gatewayResponse);
 
-            // Check if this is a duplicate/reused payment
-            if (paymentResult?.duplicate) {
-              // This is a reused existing payment - extract client_secret and handle 3D Secure
+              // Check if this is a duplicate/reused payment
+              if (paymentResult?.duplicate) {
+                // This is a reused existing payment - extract client_secret and handle 3D Secure
+                if (clientSecret && stripe) {
+                  // Check if confirmation_method is manual AND status is requires_action
+                  // handleCardAction can only be used when payment is in requires_action state
+                  const confirmationMethod =
+                    gatewayResponse?.confirmation_method;
+                  const requiresAction = paymentStatus === "requires_action";
+
+                  // Handle 3D Secure for the reused payment
+                  try {
+                    let paymentIntent;
+                    let confirmError;
+
+                    if (confirmationMethod === "manual" && requiresAction) {
+                      // For manual confirmation with requires_action status, use handleCardAction
+                      console.log(
+                        "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
+                      );
+                      const result =
+                        await stripe.handleCardAction(clientSecret);
+                      confirmError = result.error;
+                      paymentIntent = result.paymentIntent;
+                    } else if (
+                      confirmationMethod === "manual" &&
+                      !requiresAction
+                    ) {
+                      // Manual confirmation but not in requires_action state
+                      // Backend will handle confirmation, just wait and refresh
+                      console.log(
+                        "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
+                      );
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.info(
+                        "Payment is being processed by the backend. Please wait...",
+                        {
+                          autoClose: 3000,
+                        },
+                      );
+                      return;
+                    } else {
+                      // For automatic confirmation, use confirmCardPayment
+                      const result =
+                        await stripe.confirmCardPayment(clientSecret);
+                      confirmError = result.error;
+                      paymentIntent = result.paymentIntent;
+                    }
+
+                    if (confirmError) {
+                      setIsProcessing(false);
+                      toast.error(
+                        confirmError.message ||
+                          "Authentication failed. Please try again or use a different card.",
+                      );
+                      return;
+                    }
+
+                    // Check payment intent status
+                    if (paymentIntent?.status === "succeeded") {
+                      // Payment succeeded, update status
+                      const paymentId =
+                        paymentResult?.payment?.id ||
+                        paymentResult?.payment_id ||
+                        paymentResult?.data?.payment?.id ||
+                        paymentResult?.data?.payment_id;
+                      if (paymentId) {
+                        try {
+                          await CompletePayment({
+                            payment_id: paymentId,
+                            payment_method: "stripe",
+                          });
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated and processed successfully!",
+                          );
+                        } catch (error: any) {
+                          console.error(
+                            "Failed to update payment status:",
+                            error,
+                          );
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated successfully! Status update may be delayed.",
+                          );
+                        }
+                      } else {
+                        setIsProcessing(false);
+                        onPaymentSuccess();
+                        toast.success(
+                          "Payment authenticated and processed successfully!",
+                        );
+                      }
+                    } else if (
+                      paymentIntent?.status === "requires_confirmation"
+                    ) {
+                      // 3D Secure completed successfully, but payment needs backend confirmation
+                      // Challenge is complete, so we should call CompletePayment
+                      console.log(
+                        "Payment requires backend confirmation after 3D Secure (duplicate payment)",
+                      );
+
+                      const paymentId =
+                        paymentResult?.payment?.id ||
+                        paymentResult?.payment_id ||
+                        paymentResult?.data?.payment?.id ||
+                        paymentResult?.data?.payment_id;
+
+                      if (paymentId) {
+                        try {
+                          await CompletePayment({
+                            payment_id: paymentId,
+                            payment_method: "stripe",
+                          });
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "3D Secure authentication completed! Payment is being processed...",
+                          );
+                        } catch (error: any) {
+                          console.error(
+                            "Failed to update payment status:",
+                            error,
+                          );
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.info(
+                            "3D Secure authentication completed! Payment is being processed...",
+                            {
+                              autoClose: 3000,
+                            },
+                          );
+                        }
+                      } else {
+                        setIsProcessing(false);
+                        onPaymentSuccess();
+                        toast.info(
+                          "3D Secure authentication completed! Payment is being processed...",
+                          {
+                            autoClose: 3000,
+                          },
+                        );
+                      }
+                    } else {
+                      setIsProcessing(false);
+                      toast.error(
+                        "Payment authentication incomplete. Please try again.",
+                      );
+                    }
+                  } catch (authError: any) {
+                    setIsProcessing(false);
+                    toast.error(
+                      authError.message ||
+                        "Authentication process failed. Please try again.",
+                    );
+                  }
+                } else {
+                  // No client_secret for duplicate payment, just refresh
+                  setIsProcessing(false);
+                  onPaymentSuccess();
+                  toast.success("Payment processed successfully!");
+                }
+                return; // Exit early for duplicate payments
+              }
+
+              // Check if payment requires 3D Secure authentication
               if (clientSecret && stripe) {
-                // Check if confirmation_method is manual AND status is requires_action
-                // handleCardAction can only be used when payment is in requires_action state
-                const confirmationMethod = gatewayResponse?.confirmation_method;
-                const requiresAction = paymentStatus === "requires_action";
-
-                // Handle 3D Secure for the reused payment
                 try {
-                  let paymentIntent;
-                  let confirmError;
+                  // Check if confirmation_method is manual AND status is requires_action
+                  // handleCardAction can only be used when payment is in requires_action state
+                  const confirmationMethod =
+                    gatewayResponse?.confirmation_method;
+                  const requiresAction = paymentStatus === "requires_action";
 
                   if (confirmationMethod === "manual" && requiresAction) {
-                    // For manual confirmation with requires_action status, use handleCardAction
+                    // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
+                    // After customer completes 3D Secure, backend will confirm the payment
                     console.log(
-                      "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
+                      "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
                     );
-                    const result = await stripe.handleCardAction(clientSecret);
-                    confirmError = result.error;
-                    paymentIntent = result.paymentIntent;
+
+                    const { error: handleError, paymentIntent } =
+                      await stripe.handleCardAction(clientSecret);
+
+                    if (handleError) {
+                      setIsProcessing(false);
+                      toast.error(
+                        handleError.message ||
+                          "3D Secure authentication failed. Please try again.",
+                      );
+                      return;
+                    }
+
+                    console.log(
+                      "3D Secure completed, payment intent status:",
+                      paymentIntent?.status,
+                    );
+
+                    // After 3D Secure, check the payment intent status
+                    if (paymentIntent?.status === "succeeded") {
+                      // Payment succeeded, update status
+                      const paymentId =
+                        paymentResult?.payment?.id ||
+                        paymentResult?.payment_id ||
+                        paymentResult?.data?.payment?.id ||
+                        paymentResult?.data?.payment_id;
+
+                      if (paymentId) {
+                        try {
+                          await CompletePayment({
+                            payment_id: paymentId,
+                            payment_method: "stripe",
+                          });
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated and processed successfully!",
+                          );
+                        } catch (error: any) {
+                          console.error(
+                            "Failed to update payment status:",
+                            error,
+                          );
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated successfully! Status update may be delayed.",
+                          );
+                        }
+                      } else {
+                        setIsProcessing(false);
+                        onPaymentSuccess();
+                        toast.success(
+                          "Payment authenticated and processed successfully!",
+                        );
+                      }
+                    } else if (
+                      paymentIntent?.status === "requires_confirmation"
+                    ) {
+                      // 3D Secure completed successfully, but payment needs backend confirmation
+                      // Challenge is complete, so we should call CompletePayment
+                      console.log(
+                        "Payment requires backend confirmation after 3D Secure",
+                      );
+
+                      const paymentId =
+                        paymentResult?.payment?.id ||
+                        paymentResult?.payment_id ||
+                        paymentResult?.data?.payment?.id ||
+                        paymentResult?.data?.payment_id;
+
+                      if (paymentId) {
+                        try {
+                          await CompletePayment({
+                            payment_id: paymentId,
+                            payment_method: "stripe",
+                          });
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "3D Secure authentication completed! Payment is being processed...",
+                          );
+                        } catch (error: any) {
+                          console.error(
+                            "Failed to update payment status:",
+                            error,
+                          );
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.info(
+                            "3D Secure authentication completed! Payment is being processed...",
+                            {
+                              autoClose: 3000,
+                            },
+                          );
+                        }
+                      } else {
+                        setIsProcessing(false);
+                        onPaymentSuccess();
+                        toast.info(
+                          "3D Secure authentication completed! Payment is being processed...",
+                          {
+                            autoClose: 3000,
+                          },
+                        );
+                      }
+                    } else if (paymentIntent?.status === "requires_action") {
+                      // Still requires action - might need another challenge
+                      setIsProcessing(false);
+                      toast.error(
+                        "Payment requires additional verification. Please try again.",
+                      );
+                    } else {
+                      setIsProcessing(false);
+                      toast.error(
+                        `Payment status after 3D Secure: ${paymentIntent?.status}`,
+                      );
+                    }
                   } else if (
                     confirmationMethod === "manual" &&
                     !requiresAction
@@ -323,7 +580,7 @@ const DirectCardPaymentForm: React.FC<{
                     // Manual confirmation but not in requires_action state
                     // Backend will handle confirmation, just wait and refresh
                     console.log(
-                      "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
+                      "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
                     );
                     setIsProcessing(false);
                     onPaymentSuccess();
@@ -333,116 +590,76 @@ const DirectCardPaymentForm: React.FC<{
                         autoClose: 3000,
                       },
                     );
-                    return;
                   } else {
-                    // For automatic confirmation, use confirmCardPayment
-                    const result =
+                    // For automatic confirmation or when not manual, use confirmCardPayment
+                    const { error: confirmError, paymentIntent } =
                       await stripe.confirmCardPayment(clientSecret);
-                    confirmError = result.error;
-                    paymentIntent = result.paymentIntent;
-                  }
 
-                  if (confirmError) {
-                    setIsProcessing(false);
-                    toast.error(
-                      confirmError.message ||
-                        "Authentication failed. Please try again or use a different card.",
-                    );
-                    return;
-                  }
+                    if (confirmError) {
+                      setIsProcessing(false);
+                      toast.error(
+                        confirmError.message ||
+                          "Authentication failed. Please try again or use a different card.",
+                      );
+                      return;
+                    }
 
-                  // Check payment intent status
-                  if (paymentIntent?.status === "succeeded") {
-                    // Payment succeeded, update status
-                    const paymentId =
-                      paymentResult?.payment?.id ||
-                      paymentResult?.payment_id ||
-                      paymentResult?.data?.payment?.id ||
-                      paymentResult?.data?.payment_id;
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
+                    // Check payment intent status
+                    if (paymentIntent?.status === "succeeded") {
+                      // Payment succeeded on Stripe, now update our database
+                      // Extract payment ID from response (could be nested)
+                      const paymentId =
+                        paymentResult?.payment?.id ||
+                        paymentResult?.payment_id ||
+                        paymentResult?.data?.payment?.id ||
+                        paymentResult?.data?.payment_id;
+
+                      if (paymentId) {
+                        try {
+                          await CompletePayment({
+                            payment_id: paymentId,
+                            payment_method: "stripe",
+                          });
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated and processed successfully!",
+                          );
+                        } catch (error: any) {
+                          // Even if completePayment fails, payment succeeded on Stripe
+                          // Log error but still show success to user
+                          console.error(
+                            "Failed to update payment status:",
+                            error,
+                          );
+                          setIsProcessing(false);
+                          onPaymentSuccess();
+                          toast.success(
+                            "Payment authenticated successfully! Status update may be delayed.",
+                          );
+                        }
+                      } else {
+                        // No payment ID found, just refresh and let webhook handle it
+                        console.warn(
+                          "Payment ID not found in response, webhook will update status",
+                        );
                         setIsProcessing(false);
                         onPaymentSuccess();
                         toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated successfully! Status update may be delayed.",
+                          "Payment authenticated successfully! Status will be updated shortly.",
                         );
                       }
+                    } else if (paymentIntent?.status === "requires_action") {
+                      // Should not happen after confirmCardPayment, but handle just in case
+                      setIsProcessing(false);
+                      toast.error(
+                        "Payment requires additional authentication. Please try again.",
+                      );
                     } else {
                       setIsProcessing(false);
                       onPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated and processed successfully!",
-                      );
+                      toast.success("Payment processed successfully!");
                     }
-                  } else if (
-                    paymentIntent?.status === "requires_confirmation"
-                  ) {
-                    // 3D Secure completed successfully, but payment needs backend confirmation
-                    // Challenge is complete, so we should call CompletePayment
-                    console.log(
-                      "Payment requires backend confirmation after 3D Secure (duplicate payment)",
-                    );
-
-                    const paymentId =
-                      paymentResult?.payment?.id ||
-                      paymentResult?.payment_id ||
-                      paymentResult?.data?.payment?.id ||
-                      paymentResult?.data?.payment_id;
-
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "3D Secure authentication completed! Payment is being processed...",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.info(
-                          "3D Secure authentication completed! Payment is being processed...",
-                          {
-                            autoClose: 3000,
-                          },
-                        );
-                      }
-                    } else {
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.info(
-                        "3D Secure authentication completed! Payment is being processed...",
-                        {
-                          autoClose: 3000,
-                        },
-                      );
-                    }
-                  } else {
-                    setIsProcessing(false);
-                    toast.error(
-                      "Payment authentication incomplete. Please try again.",
-                    );
                   }
                 } catch (authError: any) {
                   setIsProcessing(false);
@@ -452,244 +669,12 @@ const DirectCardPaymentForm: React.FC<{
                   );
                 }
               } else {
-                // No client_secret for duplicate payment, just refresh
+                // No 3D Secure required, payment completed
                 setIsProcessing(false);
                 onPaymentSuccess();
                 toast.success("Payment processed successfully!");
               }
-              return; // Exit early for duplicate payments
-            }
-
-            // Check if payment requires 3D Secure authentication
-            if (clientSecret && stripe) {
-              try {
-                // Check if confirmation_method is manual AND status is requires_action
-                // handleCardAction can only be used when payment is in requires_action state
-                const confirmationMethod = gatewayResponse?.confirmation_method;
-                const requiresAction = paymentStatus === "requires_action";
-
-                if (confirmationMethod === "manual" && requiresAction) {
-                  // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
-                  // After customer completes 3D Secure, backend will confirm the payment
-                  console.log(
-                    "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
-                  );
-
-                  const { error: handleError, paymentIntent } =
-                    await stripe.handleCardAction(clientSecret);
-
-                  if (handleError) {
-                    setIsProcessing(false);
-                    toast.error(
-                      handleError.message ||
-                        "3D Secure authentication failed. Please try again.",
-                    );
-                    return;
-                  }
-
-                  console.log(
-                    "3D Secure completed, payment intent status:",
-                    paymentIntent?.status,
-                  );
-
-                  // After 3D Secure, check the payment intent status
-                  if (paymentIntent?.status === "succeeded") {
-                    // Payment succeeded, update status
-                    const paymentId =
-                      paymentResult?.payment?.id ||
-                      paymentResult?.payment_id ||
-                      paymentResult?.data?.payment?.id ||
-                      paymentResult?.data?.payment_id;
-
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated successfully! Status update may be delayed.",
-                        );
-                      }
-                    } else {
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated and processed successfully!",
-                      );
-                    }
-                  } else if (
-                    paymentIntent?.status === "requires_confirmation"
-                  ) {
-                    // 3D Secure completed successfully, but payment needs backend confirmation
-                    // Challenge is complete, so we should call CompletePayment
-                    console.log(
-                      "Payment requires backend confirmation after 3D Secure",
-                    );
-
-                    const paymentId =
-                      paymentResult?.payment?.id ||
-                      paymentResult?.payment_id ||
-                      paymentResult?.data?.payment?.id ||
-                      paymentResult?.data?.payment_id;
-
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "3D Secure authentication completed! Payment is being processed...",
-                        );
-                      } catch (error: any) {
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.info(
-                          "3D Secure authentication completed! Payment is being processed...",
-                          {
-                            autoClose: 3000,
-                          },
-                        );
-                      }
-                    } else {
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.info(
-                        "3D Secure authentication completed! Payment is being processed...",
-                        {
-                          autoClose: 3000,
-                        },
-                      );
-                    }
-                  } else if (paymentIntent?.status === "requires_action") {
-                    // Still requires action - might need another challenge
-                    setIsProcessing(false);
-                    toast.error(
-                      "Payment requires additional verification. Please try again.",
-                    );
-                  } else {
-                    setIsProcessing(false);
-                    toast.error(
-                      `Payment status after 3D Secure: ${paymentIntent?.status}`,
-                    );
-                  }
-                } else if (confirmationMethod === "manual" && !requiresAction) {
-                  // Manual confirmation but not in requires_action state
-                  // Backend will handle confirmation, just wait and refresh
-                  console.log(
-                    "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
-                  );
-                  setIsProcessing(false);
-                  onPaymentSuccess();
-                  toast.info(
-                    "Payment is being processed by the backend. Please wait...",
-                    {
-                      autoClose: 3000,
-                    },
-                  );
-                } else {
-                  // For automatic confirmation or when not manual, use confirmCardPayment
-                  const { error: confirmError, paymentIntent } =
-                    await stripe.confirmCardPayment(clientSecret);
-
-                  if (confirmError) {
-                    setIsProcessing(false);
-                    toast.error(
-                      confirmError.message ||
-                        "Authentication failed. Please try again or use a different card.",
-                    );
-                    return;
-                  }
-
-                  // Check payment intent status
-                  if (paymentIntent?.status === "succeeded") {
-                    // Payment succeeded on Stripe, now update our database
-                    // Extract payment ID from response (could be nested)
-                    const paymentId =
-                      paymentResult?.payment?.id ||
-                      paymentResult?.payment_id ||
-                      paymentResult?.data?.payment?.id ||
-                      paymentResult?.data?.payment_id;
-
-                    if (paymentId) {
-                      try {
-                        await CompletePayment({
-                          payment_id: paymentId,
-                          payment_method: "stripe",
-                        });
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated and processed successfully!",
-                        );
-                      } catch (error: any) {
-                        // Even if completePayment fails, payment succeeded on Stripe
-                        // Log error but still show success to user
-                        console.error(
-                          "Failed to update payment status:",
-                          error,
-                        );
-                        setIsProcessing(false);
-                        onPaymentSuccess();
-                        toast.success(
-                          "Payment authenticated successfully! Status update may be delayed.",
-                        );
-                      }
-                    } else {
-                      // No payment ID found, just refresh and let webhook handle it
-                      console.warn(
-                        "Payment ID not found in response, webhook will update status",
-                      );
-                      setIsProcessing(false);
-                      onPaymentSuccess();
-                      toast.success(
-                        "Payment authenticated successfully! Status will be updated shortly.",
-                      );
-                    }
-                  } else if (paymentIntent?.status === "requires_action") {
-                    // Should not happen after confirmCardPayment, but handle just in case
-                    setIsProcessing(false);
-                    toast.error(
-                      "Payment requires additional authentication. Please try again.",
-                    );
-                  } else {
-                    setIsProcessing(false);
-                    onPaymentSuccess();
-                    toast.success("Payment processed successfully!");
-                  }
-                }
-              } catch (authError: any) {
-                setIsProcessing(false);
-                toast.error(
-                  authError.message ||
-                    "Authentication process failed. Please try again.",
-                );
-              }
-            } else {
-              // No 3D Secure required, payment completed
-              setIsProcessing(false);
-              onPaymentSuccess();
-              toast.success("Payment processed successfully!");
-            }
+            })();
           },
           onError: (error) => {
             onPaymentError(error.message || "Payment processing failed");
@@ -791,7 +776,7 @@ const DirectCardPaymentForm: React.FC<{
 };
 
 const InvoiceList = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{
@@ -815,11 +800,11 @@ const InvoiceList = () => {
   }>({});
   const [showDescriptionModal, setShowDescriptionModal] =
     useState<boolean>(false);
-  const [selectedDescription, setSelectedDescription] = useState<string>("");
+  const [selectedDescription] = useState<string>("");
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
-  const [isLoadingCompanyProducts, setIsLoadingCompanyProducts] =
+  const [_isLoadingCompanyProducts, setIsLoadingCompanyProducts] =
     useState<boolean>(false);
 
   // Payment modal states
@@ -850,14 +835,7 @@ const InvoiceList = () => {
     useState<NodeJS.Timeout | null>(null);
 
   // Custom VAT states
-  const [showCustomVatRate, setShowCustomVatRate] = useState<boolean>(false);
-  const [showEditCustomVatRate, setShowEditCustomVatRate] =
-    useState<boolean>(false);
-  const [loadedCurrencies, setLoadedCurrencies] = useState<Set<string>>(
-    new Set(),
-  );
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
-  const [processedInvoiceItems, setProcessedInvoiceItems] = useState<any[]>([]);
 
   const getStatusBadgeVariant = (status: string): string => {
     switch (status) {
@@ -962,7 +940,7 @@ const InvoiceList = () => {
         render: (row) => (
           <span>
             {row.currency_code || "AED"}{" "}
-            {formatNumber(parseFloat(row?.total_amount || "0"))}
+            {formatNumber(Number.parseFloat(row?.total_amount || "0"))}
           </span>
         ),
       },
@@ -973,7 +951,7 @@ const InvoiceList = () => {
         render: (row) => (
           <span>
             {row.currency_code || "AED"}{" "}
-            {formatNumber(parseFloat(row?.amount_due || "0"))}
+            {formatNumber(Number.parseFloat(row?.amount_due || "0"))}
           </span>
         ),
       },
@@ -1245,8 +1223,8 @@ const InvoiceList = () => {
 
         // Use effective_price from the API response, which already handles company-specific pricing
         // If effective_price is different from base_price, it likely includes VAT
-        const basePrice = parseFloat(companyProduct.base_price || "0");
-        const effectivePrice = parseFloat(
+        const basePrice = Number.parseFloat(companyProduct.base_price || "0");
+        const effectivePrice = Number.parseFloat(
           companyProduct.effective_price || "0",
         );
         const includesVat = effectivePrice > basePrice && basePrice > 0;
@@ -1316,21 +1294,20 @@ const InvoiceList = () => {
         if (data.rates) {
           for (const currency of currencies) {
             if (currency !== invoiceCurrency && data.rates[currency]) {
-              // Selected currency to other currencies
-              rates.push({
-                from: invoiceCurrency,
-                to: currency,
-                rate: data.rates[currency],
-                timestamp: Date.now(),
-              });
-
-              // Other currencies to selected currency (inverse)
-              rates.push({
-                from: currency,
-                to: invoiceCurrency,
-                rate: 1 / data.rates[currency],
-                timestamp: Date.now(),
-              });
+              rates.push(
+                {
+                  from: invoiceCurrency,
+                  to: currency,
+                  rate: data.rates[currency],
+                  timestamp: Date.now(),
+                },
+                {
+                  from: currency,
+                  to: invoiceCurrency,
+                  rate: 1 / data.rates[currency],
+                  timestamp: Date.now(),
+                },
+              );
             }
           }
 
@@ -1354,20 +1331,20 @@ const InvoiceList = () => {
                 if (usdData.rates) {
                   // Add USD to selected currency rate
                   if (usdData.rates[invoiceCurrency]) {
-                    rates.push({
-                      from: "USD",
-                      to: invoiceCurrency,
-                      rate: usdData.rates[invoiceCurrency],
-                      timestamp: Date.now(),
-                    });
-
-                    // Add selected currency to USD rate (inverse)
-                    rates.push({
-                      from: invoiceCurrency,
-                      to: "USD",
-                      rate: 1 / usdData.rates[invoiceCurrency],
-                      timestamp: Date.now(),
-                    });
+                    rates.push(
+                      {
+                        from: "USD",
+                        to: invoiceCurrency,
+                        rate: usdData.rates[invoiceCurrency],
+                        timestamp: Date.now(),
+                      },
+                      {
+                        from: invoiceCurrency,
+                        to: "USD",
+                        rate: 1 / usdData.rates[invoiceCurrency],
+                        timestamp: Date.now(),
+                      },
+                    );
                   }
 
                   // Add other currencies to USD rates for cross-conversion
@@ -1381,26 +1358,27 @@ const InvoiceList = () => {
                       const existingRate = rates.find(
                         (r) => r.from === currency && r.to === "USD",
                       );
+                      const toPush: ExchangeRate[] = [];
                       if (!existingRate) {
-                        rates.push({
+                        toPush.push({
                           from: currency,
                           to: "USD",
                           rate: 1 / usdData.rates[currency],
                           timestamp: Date.now(),
                         });
                       }
-
                       const existingRateReverse = rates.find(
                         (r) => r.from === "USD" && r.to === currency,
                       );
                       if (!existingRateReverse) {
-                        rates.push({
+                        toPush.push({
                           from: "USD",
                           to: currency,
                           rate: usdData.rates[currency],
                           timestamp: Date.now(),
                         });
                       }
+                      if (toPush.length) rates.push(...toPush);
                     }
                   }
                 }
@@ -1413,7 +1391,6 @@ const InvoiceList = () => {
 
         // Update state with all rates
         setExchangeRates(rates);
-        setLoadedCurrencies(new Set(currencies));
         setBaseCurrency(invoiceCurrency);
         setIsInitialLoad(false);
       } catch (error) {
@@ -1436,21 +1413,21 @@ const InvoiceList = () => {
                 currency !== invoiceCurrency &&
                 fallbackData.rates[currency]
               ) {
-                // Selected currency to other currencies
-                fallbackRates.push({
-                  from: invoiceCurrency,
-                  to: currency,
-                  rate: fallbackData.rates[currency],
-                  timestamp: Date.now(),
-                });
-
-                // Other currencies to selected currency (inverse)
-                fallbackRates.push({
-                  from: currency,
-                  to: invoiceCurrency,
-                  rate: 1 / fallbackData.rates[currency],
-                  timestamp: Date.now(),
-                });
+                // Selected currency to other currencies and inverse
+                fallbackRates.push(
+                  {
+                    from: invoiceCurrency,
+                    to: currency,
+                    rate: fallbackData.rates[currency],
+                    timestamp: Date.now(),
+                  },
+                  {
+                    from: currency,
+                    to: invoiceCurrency,
+                    rate: 1 / fallbackData.rates[currency],
+                    timestamp: Date.now(),
+                  },
+                );
               }
             }
 
@@ -1471,7 +1448,6 @@ const InvoiceList = () => {
 
           // Update state with fallback rates
           setExchangeRates(fallbackRates);
-          setLoadedCurrencies(new Set(currencies));
           setBaseCurrency(invoiceCurrency);
           setIsInitialLoad(false);
         } catch (fallbackError) {
@@ -1491,7 +1467,6 @@ const InvoiceList = () => {
             { from: "PKR", to: "USD", rate: 0.0036, timestamp: Date.now() },
           ];
           setExchangeRates(defaultRates);
-          setLoadedCurrencies(new Set(["USD", "EUR", "GBP", "AED", "PKR"]));
           setBaseCurrency(invoiceCurrency);
           setIsInitialLoad(false);
         }
@@ -1500,24 +1475,6 @@ const InvoiceList = () => {
       }
     },
     [exchangeRates.length, isInitialLoad, baseCurrency],
-  );
-
-  // Debounced version to prevent too many API calls
-  const debouncedLoadExchangeRates = useCallback(
-    (invoiceCurrency: string) => {
-      // Clear existing timeout
-      if (exchangeRateTimeout) {
-        clearTimeout(exchangeRateTimeout);
-      }
-
-      // Set new timeout
-      const timeout = setTimeout(() => {
-        loadExchangeRates(invoiceCurrency);
-      }, 300); // Reduced timeout for better UX
-
-      setExchangeRateTimeout(timeout);
-    },
-    [loadExchangeRates, exchangeRateTimeout],
   );
 
   useEffect(() => {
@@ -1596,7 +1553,7 @@ const InvoiceList = () => {
   }, [exchangeRateTimeout]);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-  const [summary, setSummary] = useState<any | null>(null);
+  const [_summary, setSummary] = useState<Record<string, unknown> | null>(null);
 
   const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -1651,7 +1608,7 @@ const InvoiceList = () => {
     loadInvoices();
   }, [loadInvoices]);
 
-  const fetchInvoices = useCallback(
+  const _fetchInvoices = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
         const response = await getInvoices({
@@ -1683,9 +1640,12 @@ const InvoiceList = () => {
     [memoizedFilters],
   );
 
-  const handleFiltersChange = useCallback((filters: any) => {
-    setCurrentFilters(filters);
-  }, []);
+  const _handleFiltersChange = useCallback(
+    (filters: Record<string, unknown>) => {
+      setCurrentFilters(filters as typeof currentFilters);
+    },
+    [],
+  );
 
   // Edit Invoice Modal
   const [selectedInvoice, setSelectedInvoice] =
@@ -1719,7 +1679,7 @@ const InvoiceList = () => {
           (c) => c.id.toString() === newInvoice.company_id,
         );
         const companyVatRate = selectedCompany?.profile?.vat_rate
-          ? parseFloat(selectedCompany.profile.vat_rate)
+          ? Number.parseFloat(selectedCompany.profile.vat_rate)
           : 0;
         const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
         const totals = calculateTotals(
@@ -1746,7 +1706,7 @@ const InvoiceList = () => {
           (c) => c.id.toString() === selectedInvoice.company_id,
         );
         const companyVatRate = selectedCompany?.profile?.vat_rate
-          ? parseFloat(selectedCompany.profile.vat_rate)
+          ? Number.parseFloat(selectedCompany.profile.vat_rate)
           : 0;
         const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
         const totals = calculateTotals(
@@ -1778,7 +1738,7 @@ const InvoiceList = () => {
   ]);
 
   // Helper function to transform invoice data for API (map tax_rate to vat_rate for items)
-  const transformInvoiceForAPI = (
+  const _transformInvoiceForAPI = (
     invoice: InvoiceCreateUpdatePayload,
   ): InvoiceCreateUpdateAPIPayload => {
     return {
@@ -1806,8 +1766,8 @@ const InvoiceList = () => {
 
     // Process each item individually to calculate VAT per product
     const processedItems = items.map((item) => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price) || 0;
+      const quantity = Number.parseFloat(item.quantity) || 0;
+      const unitPrice = Number.parseFloat(item.unit_price) || 0;
 
       // Get the product's original currency with company context
       const productInfo = getEffectiveProductPrice(item.product_id, companyId);
@@ -1828,15 +1788,15 @@ const InvoiceList = () => {
       let effectiveVatRate = companyVatRate;
 
       // Use the tax_rate from the item if it's already set
-      if (item.tax_rate && parseFloat(item.tax_rate) >= 0) {
-        effectiveVatRate = parseFloat(item.tax_rate);
+      if (item.tax_rate && Number.parseFloat(item.tax_rate) >= 0) {
+        effectiveVatRate = Number.parseFloat(item.tax_rate);
       } else if (item.product_id) {
         // Fallback to product-specific VAT rate if item tax_rate is not set
         const product = companyProducts.find(
           (p) => p.id.toString() === item.product_id,
         );
         if (product?.vat_rate) {
-          effectiveVatRate = parseFloat(product.vat_rate);
+          effectiveVatRate = Number.parseFloat(product.vat_rate);
         }
       }
 
@@ -1882,9 +1842,9 @@ const InvoiceList = () => {
     const totalAmount = subtotal + totalTaxAmount;
 
     return {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      tax_amount: parseFloat(totalTaxAmount.toFixed(2)),
-      total_amount: parseFloat(totalAmount.toFixed(2)),
+      subtotal: Number.parseFloat(subtotal.toFixed(2)),
+      tax_amount: Number.parseFloat(totalTaxAmount.toFixed(2)),
+      total_amount: Number.parseFloat(totalAmount.toFixed(2)),
       processedItems, // Return processed items with individual VAT calculations
     };
   };
@@ -1905,8 +1865,6 @@ const InvoiceList = () => {
 
   // Direct payment handlers
   const handleDirectPaymentSuccess = useCallback(() => {
-    //toast.success("Payment processed successfully");
-
     // Close modal and reset state
     setShowPaymentModal(false);
     setSelectedInvoiceForPayment(null);
@@ -1930,68 +1888,235 @@ const InvoiceList = () => {
     setIsProcessingPayment(true);
     createInvoicePayment(
       {
-        amount: parseFloat(selectedInvoiceForPayment.total_amount || "0"),
+        amount: Number.parseFloat(
+          selectedInvoiceForPayment.total_amount || "0",
+        ),
         currency: (
           selectedInvoiceForPayment.currency_code || "USD"
         ).toLowerCase(),
         payment_method_id: selectedCardId,
         invoice_id: selectedInvoiceForPayment.id,
-        customer_id: parseInt(selectedInvoiceForPayment.company_id || "0"),
+        customer_id: Number.parseInt(
+          selectedInvoiceForPayment.company_id || "0",
+        ),
       },
       {
-        onSuccess: async (paymentResult: any) => {
-          // Check if payment was already completed
-          if (paymentResult?.already_completed) {
-            setIsProcessingPayment(false);
-            handleDirectPaymentSuccess();
-            toast.success("Payment was already completed successfully!");
-            return;
-          }
-
-          // Helper function to extract payment ID from payment result (handles both response structures)
-          const getPaymentId = (result: any): string | number | undefined => {
-            return (
-              result?.payment?.id ||
-              result?.data?.payment?.id ||
-              result?.payment_id ||
-              result?.data?.payment_id
-            );
-          };
-
-          // Helper function to mark payment as complete
-          const markPaymentComplete = async (result: any): Promise<void> => {
-            console.log("Marking payment as complete:", result);
-            const paymentId = getPaymentId(result);
-            if (paymentId) {
-              try {
-                await CompletePayment({
-                  payment_id: paymentId,
-                  payment_method: "stripe",
-                });
-              } catch (error: any) {
-                console.error("Error marking payment as complete:", error);
-                // Don't throw - payment succeeded on Stripe, just failed to update our DB
-                // The webhook or polling will eventually update the status
-              }
+        onSuccess: (paymentResult: any) => {
+          void (async () => {
+            // Check if payment was already completed
+            if (paymentResult?.already_completed) {
+              setIsProcessingPayment(false);
+              handleDirectPaymentSuccess();
+              toast.success("Payment was already completed successfully!");
+              return;
             }
-          };
 
-          // Extract payment intent from nested structure
-          // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
-          const gatewayResponse =
-            paymentResult?.payment?.gateway_response ||
-            paymentResult?.data?.payment?.gateway_response;
-          const clientSecret =
-            paymentResult?.client_secret ||
-            paymentResult?.data?.client_secret ||
-            gatewayResponse?.client_secret ||
-            paymentResult?.payment_data?.client_secret;
-          const paymentStatus =
-            gatewayResponse?.status || paymentResult?.status;
+            // Helper function to extract payment ID from payment result (handles both response structures)
+            const getPaymentId = (
+              result: Record<string, unknown>,
+            ): string | number | undefined => {
+              const p = result?.payment as { id?: string | number } | undefined;
+              const d = result?.data as
+                | {
+                    payment?: { id?: string | number };
+                    payment_id?: string | number;
+                  }
+                | undefined;
+              return (
+                p?.id ??
+                d?.payment?.id ??
+                (result?.payment_id as string | number) ??
+                d?.payment_id
+              );
+            };
 
-          // Check if this is a duplicate/reused payment
-          if (paymentResult?.duplicate) {
-            // This is a reused existing payment - extract client_secret and handle 3D Secure
+            // Extract payment intent from nested structure
+            // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
+            const gatewayResponse =
+              paymentResult?.payment?.gateway_response ||
+              paymentResult?.data?.payment?.gateway_response;
+            const clientSecret =
+              paymentResult?.client_secret ||
+              paymentResult?.data?.client_secret ||
+              gatewayResponse?.client_secret ||
+              paymentResult?.payment_data?.client_secret;
+            const paymentStatus =
+              gatewayResponse?.status || paymentResult?.status;
+
+            // Check if this is a duplicate/reused payment
+            if (paymentResult?.duplicate) {
+              // This is a reused existing payment - extract client_secret and handle 3D Secure
+              if (clientSecret) {
+                // Load Stripe to confirm payment
+                if (!stripePublishableKey) {
+                  handleDirectPaymentError("Stripe is not initialized");
+                  setIsProcessingPayment(false);
+                  return;
+                }
+
+                const stripeInstance = await loadStripe(stripePublishableKey);
+                if (!stripeInstance) {
+                  handleDirectPaymentError("Failed to load Stripe");
+                  setIsProcessingPayment(false);
+                  return;
+                }
+
+                // Check if confirmation_method is manual AND status is requires_action
+                // handleCardAction can only be used when payment is in requires_action state
+                const confirmationMethod = gatewayResponse?.confirmation_method;
+                const requiresAction = paymentStatus === "requires_action";
+
+                // Handle 3D Secure for the reused payment
+                try {
+                  let paymentIntent;
+                  let confirmError;
+
+                  if (confirmationMethod === "manual" && requiresAction) {
+                    // For manual confirmation with requires_action status, use handleCardAction
+                    console.log(
+                      "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
+                    );
+                    const result =
+                      await stripeInstance.handleCardAction(clientSecret);
+                    confirmError = result.error;
+                    paymentIntent = result.paymentIntent;
+                  } else if (
+                    confirmationMethod === "manual" &&
+                    !requiresAction
+                  ) {
+                    // Manual confirmation but not in requires_action state
+                    // Backend will handle confirmation, just wait and refresh
+                    console.log(
+                      "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
+                    );
+                    setIsProcessingPayment(false);
+                    handleDirectPaymentSuccess();
+                    toast.info(
+                      "Payment is being processed by the backend. Please wait...",
+                      {
+                        autoClose: 3000,
+                      },
+                    );
+                    return;
+                  } else {
+                    // For automatic confirmation, use confirmCardPayment
+                    const result =
+                      await stripeInstance.confirmCardPayment(clientSecret);
+                    confirmError = result.error;
+                    paymentIntent = result.paymentIntent;
+                  }
+
+                  if (confirmError) {
+                    setIsProcessingPayment(false);
+                    toast.error(
+                      confirmError.message ||
+                        "Authentication failed. Please try again or use a different card.",
+                    );
+                    return;
+                  }
+
+                  // Check payment intent status
+                  if (paymentIntent?.status === "succeeded") {
+                    // Payment succeeded, update status
+                    const paymentId = getPaymentId(paymentResult);
+                    if (paymentId) {
+                      try {
+                        await CompletePayment({
+                          payment_id: paymentId,
+                          payment_method: "stripe",
+                        });
+                        setIsProcessingPayment(false);
+                        handleDirectPaymentSuccess();
+                        toast.success(
+                          "Payment authenticated and processed successfully!",
+                        );
+                      } catch (error: any) {
+                        console.error(
+                          "Failed to update payment status:",
+                          error,
+                        );
+                        setIsProcessingPayment(false);
+                        handleDirectPaymentSuccess();
+                        toast.success(
+                          "Payment authenticated successfully! Status update may be delayed.",
+                        );
+                      }
+                    } else {
+                      setIsProcessingPayment(false);
+                      handleDirectPaymentSuccess();
+                      toast.success(
+                        "Payment authenticated and processed successfully!",
+                      );
+                    }
+                  } else if (
+                    paymentIntent?.status === "requires_confirmation"
+                  ) {
+                    // 3D Secure completed successfully, but payment needs backend confirmation
+                    // Challenge is complete, so we should call CompletePayment
+                    console.log(
+                      "Payment requires backend confirmation after 3D Secure (duplicate payment - saved card)",
+                    );
+
+                    const paymentId = getPaymentId(paymentResult);
+
+                    if (paymentId) {
+                      try {
+                        await CompletePayment({
+                          payment_id: paymentId,
+                          payment_method: "stripe",
+                        });
+                        setIsProcessingPayment(false);
+                        handleDirectPaymentSuccess();
+                        toast.success(
+                          "3D Secure authentication completed! Payment is being processed...",
+                        );
+                      } catch (error: any) {
+                        console.error(
+                          "Failed to update payment status:",
+                          error,
+                        );
+                        setIsProcessingPayment(false);
+                        handleDirectPaymentSuccess();
+                        toast.info(
+                          "3D Secure authentication completed! Payment is being processed...",
+                          {
+                            autoClose: 3000,
+                          },
+                        );
+                      }
+                    } else {
+                      setIsProcessingPayment(false);
+                      handleDirectPaymentSuccess();
+                      toast.info(
+                        "3D Secure authentication completed! Payment is being processed...",
+                        {
+                          autoClose: 3000,
+                        },
+                      );
+                    }
+                  } else {
+                    setIsProcessingPayment(false);
+                    toast.error(
+                      "Payment authentication incomplete. Please try again.",
+                    );
+                  }
+                } catch (authError: any) {
+                  setIsProcessingPayment(false);
+                  toast.error(
+                    authError.message ||
+                      "Authentication process failed. Please try again.",
+                  );
+                }
+              } else {
+                // No client_secret for duplicate payment, just refresh
+                setIsProcessingPayment(false);
+                handleDirectPaymentSuccess();
+                toast.success("Payment processed successfully!");
+              }
+              return; // Exit early for duplicate payments
+            }
+
+            // Check if payment requires 3D Secure authentication
             if (clientSecret) {
               // Load Stripe to confirm payment
               if (!stripePublishableKey) {
@@ -2007,21 +2132,21 @@ const InvoiceList = () => {
                 return;
               }
 
-              // Check if confirmation_method is manual AND status is requires_action
-              // handleCardAction can only be used when payment is in requires_action state
-              const confirmationMethod = gatewayResponse?.confirmation_method;
-              const requiresAction = paymentStatus === "requires_action";
-
-              // Handle 3D Secure for the reused payment
               try {
+                // Check if confirmation_method is manual AND status is requires_action
+                // handleCardAction can only be used when payment is in requires_action state
+                const confirmationMethod = gatewayResponse?.confirmation_method;
+                const requiresAction = paymentStatus === "requires_action";
+
                 let paymentIntent;
                 let confirmError;
 
                 if (confirmationMethod === "manual" && requiresAction) {
-                  // For manual confirmation with requires_action status, use handleCardAction
+                  // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
                   console.log(
-                    "Using handleCardAction for duplicate payment (manual confirmation, requires_action)...",
+                    "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
                   );
+
                   const result =
                     await stripeInstance.handleCardAction(clientSecret);
                   confirmError = result.error;
@@ -2030,7 +2155,7 @@ const InvoiceList = () => {
                   // Manual confirmation but not in requires_action state
                   // Backend will handle confirmation, just wait and refresh
                   console.log(
-                    "Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.",
+                    "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
                   );
                   setIsProcessingPayment(false);
                   handleDirectPaymentSuccess();
@@ -2042,9 +2167,13 @@ const InvoiceList = () => {
                   );
                   return;
                 } else {
-                  // For automatic confirmation, use confirmCardPayment
-                  const result =
-                    await stripeInstance.confirmCardPayment(clientSecret);
+                  // For automatic confirmation or when not manual, use confirmCardPayment
+                  const result = await stripeInstance.confirmCardPayment(
+                    clientSecret,
+                    {
+                      payment_method: selectedCardId,
+                    },
+                  );
                   confirmError = result.error;
                   paymentIntent = result.paymentIntent;
                 }
@@ -2060,8 +2189,10 @@ const InvoiceList = () => {
 
                 // Check payment intent status
                 if (paymentIntent?.status === "succeeded") {
-                  // Payment succeeded, update status
+                  // Payment succeeded on Stripe, now update our database
+                  // Extract payment ID from response (could be nested)
                   const paymentId = getPaymentId(paymentResult);
+
                   if (paymentId) {
                     try {
                       await CompletePayment({
@@ -2074,6 +2205,8 @@ const InvoiceList = () => {
                         "Payment authenticated and processed successfully!",
                       );
                     } catch (error: any) {
+                      // Even if completePayment fails, payment succeeded on Stripe
+                      // Log error but still show success to user
                       console.error("Failed to update payment status:", error);
                       setIsProcessingPayment(false);
                       handleDirectPaymentSuccess();
@@ -2082,17 +2215,21 @@ const InvoiceList = () => {
                       );
                     }
                   } else {
+                    // No payment ID found, just refresh and let webhook handle it
+                    console.warn(
+                      "Payment ID not found in response, webhook will update status",
+                    );
                     setIsProcessingPayment(false);
                     handleDirectPaymentSuccess();
                     toast.success(
-                      "Payment authenticated and processed successfully!",
+                      "Payment authenticated successfully! Status will be updated shortly.",
                     );
                   }
                 } else if (paymentIntent?.status === "requires_confirmation") {
                   // 3D Secure completed successfully, but payment needs backend confirmation
                   // Challenge is complete, so we should call CompletePayment
                   console.log(
-                    "Payment requires backend confirmation after 3D Secure (duplicate payment - saved card)",
+                    "Payment requires backend confirmation after 3D Secure (saved card)",
                   );
 
                   const paymentId = getPaymentId(paymentResult);
@@ -2129,11 +2266,16 @@ const InvoiceList = () => {
                       },
                     );
                   }
-                } else {
+                } else if (paymentIntent?.status === "requires_action") {
+                  // Should not happen after confirmCardPayment/handleCardAction, but handle just in case
                   setIsProcessingPayment(false);
                   toast.error(
-                    "Payment authentication incomplete. Please try again.",
+                    "Payment requires additional authentication. Please try again.",
                   );
+                } else {
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.success("Payment processed successfully!");
                 }
               } catch (authError: any) {
                 setIsProcessingPayment(false);
@@ -2143,188 +2285,12 @@ const InvoiceList = () => {
                 );
               }
             } else {
-              // No client_secret for duplicate payment, just refresh
+              // No 3D Secure required, payment completed
               setIsProcessingPayment(false);
               handleDirectPaymentSuccess();
               toast.success("Payment processed successfully!");
             }
-            return; // Exit early for duplicate payments
-          }
-
-          // Check if payment requires 3D Secure authentication
-          if (clientSecret) {
-            // Load Stripe to confirm payment
-            if (!stripePublishableKey) {
-              handleDirectPaymentError("Stripe is not initialized");
-              setIsProcessingPayment(false);
-              return;
-            }
-
-            const stripeInstance = await loadStripe(stripePublishableKey);
-            if (!stripeInstance) {
-              handleDirectPaymentError("Failed to load Stripe");
-              setIsProcessingPayment(false);
-              return;
-            }
-
-            try {
-              // Check if confirmation_method is manual AND status is requires_action
-              // handleCardAction can only be used when payment is in requires_action state
-              const confirmationMethod = gatewayResponse?.confirmation_method;
-              const requiresAction = paymentStatus === "requires_action";
-
-              let paymentIntent;
-              let confirmError;
-
-              if (confirmationMethod === "manual" && requiresAction) {
-                // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
-                console.log(
-                  "Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...",
-                );
-
-                const result =
-                  await stripeInstance.handleCardAction(clientSecret);
-                confirmError = result.error;
-                paymentIntent = result.paymentIntent;
-              } else if (confirmationMethod === "manual" && !requiresAction) {
-                // Manual confirmation but not in requires_action state
-                // Backend will handle confirmation, just wait and refresh
-                console.log(
-                  "Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.",
-                );
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.info(
-                  "Payment is being processed by the backend. Please wait...",
-                  {
-                    autoClose: 3000,
-                  },
-                );
-                return;
-              } else {
-                // For automatic confirmation or when not manual, use confirmCardPayment
-                const result = await stripeInstance.confirmCardPayment(
-                  clientSecret,
-                  {
-                    payment_method: selectedCardId,
-                  },
-                );
-                confirmError = result.error;
-                paymentIntent = result.paymentIntent;
-              }
-
-              if (confirmError) {
-                setIsProcessingPayment(false);
-                toast.error(
-                  confirmError.message ||
-                    "Authentication failed. Please try again or use a different card.",
-                );
-                return;
-              }
-
-              // Check payment intent status
-              if (paymentIntent?.status === "succeeded") {
-                // Payment succeeded on Stripe, now update our database
-                // Extract payment ID from response (could be nested)
-                const paymentId = getPaymentId(paymentResult);
-
-                if (paymentId) {
-                  try {
-                    await CompletePayment({
-                      payment_id: paymentId,
-                      payment_method: "stripe",
-                    });
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success(
-                      "Payment authenticated and processed successfully!",
-                    );
-                  } catch (error: any) {
-                    // Even if completePayment fails, payment succeeded on Stripe
-                    // Log error but still show success to user
-                    console.error("Failed to update payment status:", error);
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success(
-                      "Payment authenticated successfully! Status update may be delayed.",
-                    );
-                  }
-                } else {
-                  // No payment ID found, just refresh and let webhook handle it
-                  console.warn(
-                    "Payment ID not found in response, webhook will update status",
-                  );
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success(
-                    "Payment authenticated successfully! Status will be updated shortly.",
-                  );
-                }
-              } else if (paymentIntent?.status === "requires_confirmation") {
-                // 3D Secure completed successfully, but payment needs backend confirmation
-                // Challenge is complete, so we should call CompletePayment
-                console.log(
-                  "Payment requires backend confirmation after 3D Secure (saved card)",
-                );
-
-                const paymentId = getPaymentId(paymentResult);
-
-                if (paymentId) {
-                  try {
-                    await CompletePayment({
-                      payment_id: paymentId,
-                      payment_method: "stripe",
-                    });
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success(
-                      "3D Secure authentication completed! Payment is being processed...",
-                    );
-                  } catch (error: any) {
-                    console.error("Failed to update payment status:", error);
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.info(
-                      "3D Secure authentication completed! Payment is being processed...",
-                      {
-                        autoClose: 3000,
-                      },
-                    );
-                  }
-                } else {
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.info(
-                    "3D Secure authentication completed! Payment is being processed...",
-                    {
-                      autoClose: 3000,
-                    },
-                  );
-                }
-              } else if (paymentIntent?.status === "requires_action") {
-                // Should not happen after confirmCardPayment/handleCardAction, but handle just in case
-                setIsProcessingPayment(false);
-                toast.error(
-                  "Payment requires additional authentication. Please try again.",
-                );
-              } else {
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.success("Payment processed successfully!");
-              }
-            } catch (authError: any) {
-              setIsProcessingPayment(false);
-              toast.error(
-                authError.message ||
-                  "Authentication process failed. Please try again.",
-              );
-            }
-          } else {
-            // No 3D Secure required, payment completed
-            setIsProcessingPayment(false);
-            handleDirectPaymentSuccess();
-            toast.success("Payment processed successfully!");
-          }
+          })();
         },
         onError: (error) => {
           handleDirectPaymentError(
@@ -2343,11 +2309,11 @@ const InvoiceList = () => {
     stripePublishableKey,
   ]);
 
-  const generateInvoiceHTML = useCallback(
+  const _generateInvoiceHTML = useCallback(
     (invoice: InvoiceData) => {
       // Get company VAT rate
       const companyVatRate = invoice.company?.profile?.vat_rate
-        ? parseFloat(invoice.company.profile.vat_rate)
+        ? Number.parseFloat(invoice.company.profile.vat_rate)
         : 0;
       const isVatExempt = invoice.company?.profile?.vat_exemption;
 
@@ -2590,7 +2556,8 @@ const InvoiceList = () => {
                     );
                     const productCurrency = productInfo.currency;
                     const lineTotalUSD =
-                      parseFloat(item.quantity) * parseFloat(item.unit_price);
+                      Number.parseFloat(item.quantity) *
+                      Number.parseFloat(item.unit_price);
                     const exchangeRate = getExchangeRate(
                       productCurrency,
                       invoice.currency_code || "USD",
@@ -2600,7 +2567,7 @@ const InvoiceList = () => {
                     <tr>
                       <td>${product?.name || "Unknown Product"}</td>
                       <td>${item.quantity}</td>
-                      <td>${(parseFloat(item.unit_price) * exchangeRate).toFixed(2)}</td>
+                      <td>${(Number.parseFloat(item.unit_price) * exchangeRate).toFixed(2)}</td>
                       <td>${lineTotal.toFixed(2)}</td>
                     </tr>
                   `;
@@ -2614,15 +2581,15 @@ const InvoiceList = () => {
                 <div class="totals-content">
                   <div class="totals-row">
                     <span class="totals-label">Subtotal:</span>
-                    <span class="totals-amount">${invoice.currency_code || "AED"} ${parseFloat(invoice.subtotal || "0").toFixed(2)}</span>
+                    <span class="totals-amount">${invoice.currency_code || "AED"} ${Number.parseFloat(invoice.subtotal || "0").toFixed(2)}</span>
                   </div>
                   <div class="totals-row">
                     <span class="totals-label">VAT (${isVatExempt ? "Exempt" : companyVatRate + "%"}):</span>
-                    <span class="totals-amount">${invoice.currency_code || "AED"} ${parseFloat(invoice.tax_amount || "0").toFixed(2)}</span>
+                    <span class="totals-amount">${invoice.currency_code || "AED"} ${Number.parseFloat(invoice.tax_amount || "0").toFixed(2)}</span>
                   </div>
                   <div class="totals-row total-final">
                     <span class="totals-label">Total Amount:</span>
-                    <span class="totals-amount">${invoice.currency_code || "USD"} ${parseFloat(invoice.total_amount || "0").toFixed(2)}</span>
+                    <span class="totals-amount">${invoice.currency_code || "USD"} ${Number.parseFloat(invoice.total_amount || "0").toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -2659,11 +2626,12 @@ const InvoiceList = () => {
                     }
 
                     // Handle numbered lists
+                    const numberedListRe = /^(\d+\.)\s*(.*)/;
+                    const execResult = numberedListRe.exec(trimmedLine);
+                    if (execResult) {
+                      return `<div class="d-flex align-items-start mb-1"><span class="me-2 text-primary fw-bold">${execResult[1]}</span><span>${execResult[2]}</span></div>`;
+                    }
                     if (/^\d+\./.test(trimmedLine)) {
-                      const match = trimmedLine.match(/^(\d+\.)\s*(.*)/);
-                      if (match) {
-                        return `<div class="d-flex align-items-start mb-1"><span class="me-2 text-primary fw-bold">${match[1]}</span><span>${match[2]}</span></div>`;
-                      }
                       return `<div class="mb-1">${trimmedLine}</div>`;
                     }
 
@@ -2758,7 +2726,7 @@ const InvoiceList = () => {
                 onClick={() => {
                   setActiveStatusTab(null);
                   setCurrentFilters((prev) => {
-                    const { status, ...rest } = prev;
+                    const { status: _status, ...rest } = prev;
                     return rest;
                   });
                   setRefreshKey((prev) => prev + 1);
@@ -2929,13 +2897,13 @@ const InvoiceList = () => {
               {
                 label: "Total Amount",
                 value: selectedInvoiceSidebar
-                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.total_amount || "0"))}`
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(Number.parseFloat(selectedInvoiceSidebar?.total_amount || "0"))}`
                   : "N/A",
               },
               {
                 label: "Amount Due",
                 value: selectedInvoiceSidebar
-                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.amount_due || "0"))}`
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(Number.parseFloat(selectedInvoiceSidebar?.amount_due || "0"))}`
                   : "N/A",
               },
               {
@@ -3079,40 +3047,29 @@ const InvoiceList = () => {
                       <strong>Subtotal:</strong>{" "}
                       {selectedInvoiceForPayment.currency_code || "USD"}{" "}
                       {formatNumber(
-                        parseFloat(selectedInvoiceForPayment.subtotal || "0"),
+                        Number.parseFloat(
+                          selectedInvoiceForPayment.subtotal || "0",
+                        ),
                       )}
                     </p>
                     <p>
                       <strong>TAX Amount:</strong>{" "}
                       {selectedInvoiceForPayment.currency_code || "USD"}{" "}
                       {formatNumber(
-                        parseFloat(selectedInvoiceForPayment.tax_amount || "0"),
+                        Number.parseFloat(
+                          selectedInvoiceForPayment.tax_amount || "0",
+                        ),
                       )}
                     </p>
                     <p>
                       <strong className="text-primary">Total Amount:</strong>{" "}
                       {selectedInvoiceForPayment.currency_code || "USD"}{" "}
                       {formatNumber(
-                        parseFloat(
+                        Number.parseFloat(
                           selectedInvoiceForPayment.total_amount || "0",
                         ),
                       )}
                     </p>
-
-                    {/* Currency Conversion Display */}
-                    {/* {exchangeRates.length > 0 && baseCurrency !== (selectedInvoiceForPayment.currency_code || 'USD') && (
-                      <div className="mt-3 p-2 bg-light rounded">
-                        <small className="text-muted">Converted to {baseCurrency}:</small>
-                        <div className="mt-1">
-                          <div><strong>Subtotal:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                          <div><strong>VAT Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                          <div><strong className="text-primary">Total Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                        </div>
-                        <small className="text-muted">
-                          Exchange Rate: 1 {selectedInvoiceForPayment.currency_code || 'USD'} = {formatNumber(getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))} {baseCurrency}
-                        </small>
-                      </div>
-                    )} */}
                   </div>
                 </div>
               </div>
@@ -3123,28 +3080,30 @@ const InvoiceList = () => {
               <h6 className="mb-3">Payment Method</h6>
 
               {/* Tabs */}
-              <ul className="nav nav-tabs mb-3" role="tablist">
-                <li className="nav-item" role="presentation">
+              <div className="nav nav-tabs mb-3" role="tablist">
+                <div className="nav-item">
                   <button
                     className={`nav-link ${activePaymentTab === "saved-cards" ? "active" : ""}`}
                     onClick={() => setActivePaymentTab("saved-cards")}
                     type="button"
                     role="tab"
+                    aria-selected={activePaymentTab === "saved-cards"}
                   >
                     Saved Cards
                   </button>
-                </li>
-                <li className="nav-item" role="presentation">
+                </div>
+                <div className="nav-item">
                   <button
                     className={`nav-link ${activePaymentTab === "direct-payment" ? "active" : ""}`}
                     onClick={() => setActivePaymentTab("direct-payment")}
                     type="button"
                     role="tab"
+                    aria-selected={activePaymentTab === "direct-payment"}
                   >
                     Direct Payment
                   </button>
-                </li>
-              </ul>
+                </div>
+              </div>
 
               {/* Tab Content */}
               <div className="tab-content">
@@ -3162,6 +3121,7 @@ const InvoiceList = () => {
                                 htmlFor={`card-${method.id}`}
                                 className={`card mb-2 ${selectedCardId === method.id ? "border-primary" : ""}`}
                                 style={{ cursor: "pointer", marginBottom: 0 }}
+                                aria-label={`Select card ${method.card?.brand ?? "Card"} ending ${method.card?.last4 ?? ""}`}
                               >
                                 <div className="card-body">
                                   <div className="d-flex align-items-center">
@@ -3252,14 +3212,14 @@ const InvoiceList = () => {
                     {stripePublishableKey ? (
                       <Elements stripe={loadStripe(stripePublishableKey)}>
                         <DirectCardPaymentForm
-                          amount={parseFloat(
+                          amount={Number.parseFloat(
                             selectedInvoiceForPayment.total_amount || "0",
                           )}
                           currency={
                             selectedInvoiceForPayment.currency_code || "USD"
                           }
                           invoiceId={selectedInvoiceForPayment.id}
-                          customerId={parseInt(
+                          customerId={Number.parseInt(
                             selectedInvoiceForPayment.company_id || "0",
                           )}
                           onPaymentSuccess={handleDirectPaymentSuccess}
@@ -3361,26 +3321,24 @@ const InvoiceList = () => {
                       />
                     </div>
                     {Number(selectedInvoiceForView.amount_due) > 0 && (
-                      <>
-                        <div
-                          className="text-end mt-3"
-                          style={{
-                            float: "right",
-                            clear: "both",
-                            fontSize: "1.2rem",
-                          }}
-                        >
-                          Due Amount:
-                          <span className="fw-bold text-danger">
-                            {selectedInvoiceForView.currency_code || "AED"}{" "}
-                            {formatNumber(
-                              parseFloat(
-                                String(selectedInvoiceForView.amount_due ?? 0),
-                              ),
-                            )}
-                          </span>
-                        </div>
-                      </>
+                      <div
+                        className="text-end mt-3"
+                        style={{
+                          float: "right",
+                          clear: "both",
+                          fontSize: "1.2rem",
+                        }}
+                      >
+                        Due Amount:{" "}
+                        <span className="fw-bold text-danger">
+                          {selectedInvoiceForView.currency_code || "AED"}{" "}
+                          {formatNumber(
+                            Number.parseFloat(
+                              String(selectedInvoiceForView.amount_due ?? 0),
+                            ),
+                          )}
+                        </span>
+                      </div>
                     )}
                   </Col>
                 </Row>
@@ -3414,7 +3372,20 @@ const InvoiceList = () => {
                     </div>
                   </Col>
                   <Col md={6}>
-                    <table className="table table-borderless">
+                    <table
+                      className="table table-borderless"
+                      aria-label="Invoice details"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col" className="visually-hidden">
+                            Field
+                          </th>
+                          <th scope="col" className="visually-hidden">
+                            Value
+                          </th>
+                        </tr>
+                      </thead>
                       <tbody>
                         <tr>
                           <td
@@ -3466,11 +3437,6 @@ const InvoiceList = () => {
                               : "N/A"}
                           </td>
                         </tr>
-
-                        {/* <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
-                          <td className="p-2">{(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
-                        </tr> */}
 
                         <tr>
                           <td
@@ -3644,65 +3610,34 @@ const InvoiceList = () => {
                                     style={{ whiteSpace: "wrap" }}
                                   >
                                     <p className="mb-0">{item.description}</p>
-                                    {/* <div>
-                                  <strong>{item.product?.name || item.description || 'N/A'}</strong>
-                                  {(() => {
-                                    // Use item.description if available, otherwise use item.product.description
-                                    const description = item.description || item.product?.description || '';
-                                    const productName = item.product?.name || '';
-                                    // Only show description if it exists and is different from the product name
-                                    if (description && description !== productName) {
-                                      return (
-                                        <div className="text-muted small">
-                                          {description.length > 50 ? (
-                                            <>
-                                              {description.substring(0, 50)}...
-                                              <button
-                                                className="btn btn-link p-0 ms-1 text-decoration-none"
-                                                style={{ fontSize: '0.875rem' }}
-                                                onClick={() => {
-                                                  setSelectedDescription(description);
-                                                  setShowDescriptionModal(true);
-                                                }}
-                                              >
-                                                Show more
-                                              </button>
-                                            </>
-                                          ) : (
-                                            description
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div> */}
                                   </td>
                                   <td className="text-end">{item.quantity}</td>
                                   <td className="text-end">
                                     {formatNumber(
-                                      parseFloat(item.unit_price || "0"),
+                                      Number.parseFloat(item.unit_price || "0"),
+                                    )}
+                                  </td>
+                                  <td className="text-end">
+                                    {formatNumber(
+                                      Number.parseFloat(item.tax_amount || "0"),
                                     )}
                                   </td>
 
-                                  {/* <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td> */}
                                   <td className="text-end">
                                     {formatNumber(
-                                      parseFloat(item.tax_amount || "0"),
-                                    )}
-                                  </td>
-
-                                  <td className="text-end">
-                                    {formatNumber(
-                                      parseFloat(item.line_total || "0"),
+                                      Number.parseFloat(item.line_total || "0"),
                                     )}
                                   </td>
 
                                   <td className="text-end">
                                     <strong>
                                       {formatNumber(
-                                        parseFloat(item.tax_amount || "0") +
-                                          parseFloat(item.line_total || "0"),
+                                        Number.parseFloat(
+                                          item.tax_amount || "0",
+                                        ) +
+                                          Number.parseFloat(
+                                            item.line_total || "0",
+                                          ),
                                       )}
                                     </strong>
                                   </td>
@@ -3713,14 +3648,6 @@ const InvoiceList = () => {
                         </table>
                         <Row>
                           <Col md={6}>
-                            {/* <Card>
-                            <Card.Body>
-                              <Card.Title>Notes & Terms</Card.Title>
-                              <p>{selectedInvoiceForView.notes}</p>
-                              <p>{selectedInvoiceForView.terms_conditions}</p>
-                              <p>{!selectedInvoiceForView.notes && !selectedInvoiceForView.terms_conditions && 'No notes or terms provided'}</p>
-                            </Card.Body>
-                          </Card> */}
                             <h5
                               className="mb-2 fw-bold"
                               style={{ color: "#14509e" }}
@@ -3765,7 +3692,7 @@ const InvoiceList = () => {
                                   {selectedInvoiceForView.currency_code ||
                                     "AED"}{" "}
                                   {formatNumber(
-                                    parseFloat(
+                                    Number.parseFloat(
                                       selectedInvoiceForView.subtotal || "0",
                                     ),
                                   )}
@@ -3778,7 +3705,7 @@ const InvoiceList = () => {
                                   {selectedInvoiceForView.currency_code ||
                                     "AED"}{" "}
                                   {formatNumber(
-                                    parseFloat(
+                                    Number.parseFloat(
                                       selectedInvoiceForView.tax_amount || "0",
                                     ),
                                   )}
@@ -3791,7 +3718,7 @@ const InvoiceList = () => {
                                   {selectedInvoiceForView.currency_code ||
                                     "AED"}{" "}
                                   {formatNumber(
-                                    parseFloat(
+                                    Number.parseFloat(
                                       selectedInvoiceForView.total_amount ||
                                         "0",
                                     ),
@@ -3809,7 +3736,7 @@ const InvoiceList = () => {
                                     {selectedInvoiceForView.currency_code ||
                                       "AED"}{" "}
                                     {formatNumber(
-                                      parseFloat(
+                                      Number.parseFloat(
                                         String(
                                           selectedInvoiceForView.paid_amount ??
                                             0,
@@ -3829,7 +3756,7 @@ const InvoiceList = () => {
                                     {selectedInvoiceForView.currency_code ||
                                       "AED"}{" "}
                                     {formatNumber(
-                                      parseFloat(
+                                      Number.parseFloat(
                                         String(
                                           selectedInvoiceForView.amount_due ??
                                             0,
@@ -3859,8 +3786,11 @@ const InvoiceList = () => {
                         .length > 0 && (
                         <Row>
                           {selectedInvoiceForView?.company?.reseller?.bank_accounts?.map(
-                            (bankAccount: any) => (
-                              <Col md={4}>
+                            (bankAccount: any, index: number) => (
+                              <Col
+                                key={bankAccount?.id ?? `bank-${index}`}
+                                md={4}
+                              >
                                 <p className="mb-1">
                                   <b>Bank Name:</b> {bankAccount.bank_name}
                                 </p>

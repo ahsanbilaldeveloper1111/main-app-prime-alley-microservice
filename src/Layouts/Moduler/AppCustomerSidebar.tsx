@@ -43,7 +43,6 @@ import { useRouter } from "next/router";
 
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
-import { getCurrentUserCompanyImage } from "@utils/company";
 import { useSession } from "next-auth/react";
 
 // Destructure constants for easier use
@@ -105,39 +104,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   const router = useRouter();
   const prevPathnameRef = useRef<string>("");
 
-  const companyImageUrlRef = useRef<string | null>(null);
-
   const [userCompanyName, setUserCompanyName] = useState("");
   useEffect(() => {
-    if (status !== "loading" && session) {
-      if (typeof window !== "undefined") {
-        setUserCompanyName(session.user.company_name || "");
-      }
+    if (status !== "loading" && session && globalThis.window !== undefined) {
+      setUserCompanyName(session.user.company_name || "");
     }
   }, [status, session]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getCurrentUserCompanyImage()
-      .then((blob) => {
-        if (cancelled) return;
-        if (blob && blob.size > 0) {
-          const url = URL.createObjectURL(blob);
-          companyImageUrlRef.current = url;
-        }
-      })
-      .catch(() => {
-        if (!cancelled) companyImageUrlRef.current = null;
-      });
-    return () => {
-      cancelled = true;
-      const url = companyImageUrlRef.current;
-      if (url) {
-        URL.revokeObjectURL(url);
-        companyImageUrlRef.current = null;
-      }
-    };
-  }, []);
 
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
@@ -954,13 +926,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       bottom: 0;
       background: rgba(0, 0, 0, 0.5);
       z-index: 999;
+      cursor: default;
+      font: inherit;
       border: none;
       padding: 0;
-      margin: 0;
-      font: inherit;
-      cursor: pointer;
-      -webkit-appearance: none;
-      appearance: none;
     }
 
     @media (max-width: 1199px) {
@@ -1511,35 +1480,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
   const activeModuleData = mainMenuItems.find((m) => m.id === activeModule);
 
-  const hasSubItems = (module: MainMenuItem) =>
-    Boolean(module.subItems?.length);
-  const getMenuItemMouseEnter = (module: MainMenuItem) =>
-    hasSubItems(module)
-      ? (ev: React.MouseEvent<HTMLElement>) => {
-          if (isSidebarExpanded && isFlyoutPinned) {
-            handleExpandedItemMouseEnter(module, ev);
-          } else if (!isSidebarExpanded) {
-            handleCollapsedItemMouseEnter(module, ev);
-          }
-        }
-      : undefined;
-  const getMenuItemMouseLeave = (module: MainMenuItem) => {
-    if (!hasSubItems(module)) return undefined;
-    if (isSidebarExpanded && isFlyoutPinned) {
-      return handleExpandedItemMouseLeave;
-    }
-    return handleCollapsedItemMouseLeave;
-  };
-  const closeSidebarIfNarrow = () => {
-    if (
-      globalThis.window !== undefined &&
-      globalThis.window.innerWidth < 1200
-    ) {
-      setSidebarOpen(false);
-    }
-  };
-
-  const handleBackdropClose = () => {
+  const closeBackdrop = () => {
     setSidebarOpen(false);
     setActiveModule(null);
     if (isFlyoutPinned) {
@@ -1547,6 +1488,77 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       setHoveredItemRect(null);
       setIsFlyoutPinned(false);
     }
+  };
+
+  const handleBackdropKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      closeBackdrop();
+    }
+  };
+
+  const getModuleMouseLeaveHandler = (module: MainMenuItem) => {
+    if (!module.subItems?.length) return undefined;
+    if (isSidebarExpanded && isFlyoutPinned) return handleExpandedItemMouseLeave;
+    return handleCollapsedItemMouseLeave;
+  };
+
+  const getModuleMouseEnterHandler = (module: MainMenuItem) => {
+    if (!module.subItems?.length) return undefined;
+    return (ev: React.MouseEvent<HTMLElement>) => {
+      if (isSidebarExpanded && isFlyoutPinned) {
+        handleExpandedItemMouseEnter(module, ev);
+      } else if (!isSidebarExpanded) {
+        handleCollapsedItemMouseEnter(module, ev);
+      }
+    };
+  };
+
+  const isModuleLink = (module: MainMenuItem) => Boolean(module.url && module.url !== "");
+
+  const closeFlyoutOnNavigate = () => {
+    setHoveredModuleId(null);
+    setHoveredItemRect(null);
+    setIsFlyoutPinned(false);
+    if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const renderFlyoutSubItem = (subItem: SubMenuItem): React.ReactNode => {
+    const hasNested = subItem.subItems && subItem.subItems.length > 0;
+    if (hasNested) {
+      return (
+        <div key={subItem.id}>
+          <div className="submenu-flyout-item submenu-flyout-item-label">
+            <span className="flyout-item-icon">{subItem.icon}</span>
+            {subItem.title}
+          </div>
+          {subItem.subItems!.map((nestedItem: SubMenuItem) => (
+            <Link
+              key={nestedItem.id}
+              href={(BASE_URL || "") + (nestedItem.url || "/")}
+              className={`submenu-flyout-item ${router.pathname === nestedItem.url ? "active" : ""}`}
+              onClick={closeFlyoutOnNavigate}
+            >
+              <span className="flyout-item-icon">{nestedItem.icon}</span>
+              {nestedItem.title}
+            </Link>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <Link
+        key={subItem.id}
+        href={(BASE_URL || "") + (subItem.url || "/")}
+        className={`submenu-flyout-item ${router.pathname === subItem.url ? "active" : ""}`}
+        onClick={closeFlyoutOnNavigate}
+      >
+        <span className="flyout-item-icon">{subItem.icon}</span>
+        {subItem.title}
+      </Link>
+    );
   };
 
   return (
@@ -1558,7 +1570,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         type="button"
         aria-label="Close sidebar"
         className={`sidebar-backdrop ${sidebarOpen || activeModule || isFlyoutPinned ? "show" : ""}`}
-        onClick={handleBackdropClose}
+        onClick={closeBackdrop}
+        onKeyDown={handleBackdropKeyDown}
       />
 
       {/* Main Sidebar */}
@@ -1568,7 +1581,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {/* Header */}
         <div className="sidebar-header">
           {isSidebarExpanded && (
-            <div className="sidebar-logo">{userCompanyName}</div>
+            <div className="sidebar-logo">
+              {userCompanyName}
+            </div>
           )}
         </div>
 
@@ -1576,158 +1591,161 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-menu">
           <ul className="menu-nav">
             {/* Dashboard Items */}
-            {dashboardItems.map((module) => {
-              const isLink = module.url !== "";
-              const isActive =
-                activeModule === module.id ||
-                (hoveredModuleId === module.id &&
-                  (isFlyoutPinned || !isSidebarExpanded));
-              const showChevron = isSidebarExpanded && hasSubItems(module);
-              return (
-                <li
-                  key={module.id}
-                  className="menu-item"
-                  onMouseEnter={getMenuItemMouseEnter(module)}
-                  onMouseLeave={getMenuItemMouseLeave(module)}
-                >
-                  {!isSidebarExpanded && (
-                    <span className="menu-item-tooltip">{module.title}</span>
-                  )}
-                  {isLink ? (
-                    <Link href={(BASE_URL || "") + (module.url || "/")}>
-                      <button
-                        className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
-                        onClick={closeSidebarIfNarrow}
-                      >
-                        <div className="menu-item-icon">{module.icon}</div>
-                        {isSidebarExpanded && (
-                          <span className="menu-item-text">{module.title}</span>
-                        )}
-                      </button>
-                    </Link>
-                  ) : (
+            {dashboardItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={getModuleMouseEnterHandler(module)}
+                onMouseLeave={getModuleMouseLeaveHandler(module)}
+              >
+                {isSidebarExpanded ? null : (
+                  <span className="menu-item-tooltip">{module.title}</span>
+                )}
+                {isModuleLink(module) ? (
+                  <Link href={(BASE_URL || "") + (module.url || "/")}>
                     <button
-                      className={`menu-item-button ${isActive ? "active" : ""}`}
-                      onClick={(e) => handleModuleClick(module, e)}
+                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      onClick={() => {
+                        if (
+                          globalThis.window !== undefined &&
+                          globalThis.window.innerWidth < 1200
+                        ) {
+                          setSidebarOpen(false);
+                        }
+                      }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
                       {isSidebarExpanded && (
                         <span className="menu-item-text">{module.title}</span>
                       )}
-                      {showChevron && (
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && (
+                      <span className="menu-item-text">{module.title}</span>
+                    )}
+                    {isSidebarExpanded &&
+                      module.subItems &&
+                      module.subItems.length > 0 && (
                         <div className="menu-item-chevron">
                           <ChevronRight size={18} />
                         </div>
                       )}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+                  </button>
+                )}
+              </li>
+            ))}
 
             <div className="sidebar-divider"></div>
 
             {/* Services Items */}
-            {servicesItems.map((module) => {
-              const isLink = module.url !== "";
-              const isActive =
-                activeModule === module.id ||
-                (hoveredModuleId === module.id &&
-                  (isFlyoutPinned || !isSidebarExpanded));
-              const showChevron = isSidebarExpanded && hasSubItems(module);
-              return (
-                <li
-                  key={module.id}
-                  className="menu-item"
-                  onMouseEnter={getMenuItemMouseEnter(module)}
-                  onMouseLeave={getMenuItemMouseLeave(module)}
-                >
-                  {!isSidebarExpanded && (
-                    <span className="menu-item-tooltip">{module.title}</span>
-                  )}
-                  {isLink ? (
-                    <Link href={(BASE_URL || "") + (module.url || "/")}>
-                      <button
-                        className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
-                        onClick={closeSidebarIfNarrow}
-                      >
-                        <div className="menu-item-icon">{module.icon}</div>
-                        {isSidebarExpanded && (
-                          <span className="menu-item-text">{module.title}</span>
-                        )}
-                      </button>
-                    </Link>
-                  ) : (
+            {servicesItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={getModuleMouseEnterHandler(module)}
+                onMouseLeave={getModuleMouseLeaveHandler(module)}
+              >
+                {isSidebarExpanded ? null : (
+                  <span className="menu-item-tooltip">{module.title}</span>
+                )}
+                {isModuleLink(module) ? (
+                  <Link href={(BASE_URL || "") + (module.url || "/")}>
                     <button
-                      className={`menu-item-button ${isActive ? "active" : ""}`}
-                      onClick={(e) => handleModuleClick(module, e)}
+                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      onClick={() => {
+                        if (
+                          globalThis.window !== undefined &&
+                          globalThis.window.innerWidth < 1200
+                        ) {
+                          setSidebarOpen(false);
+                        }
+                      }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
                       {isSidebarExpanded && (
                         <span className="menu-item-text">{module.title}</span>
                       )}
-                      {showChevron && (
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && (
+                      <span className="menu-item-text">{module.title}</span>
+                    )}
+                    {isSidebarExpanded &&
+                      module.subItems &&
+                      module.subItems.length > 0 && (
                         <div className="menu-item-chevron">
                           <ChevronRight size={18} />
                         </div>
                       )}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+                  </button>
+                )}
+              </li>
+            ))}
 
             <div className="sidebar-divider"></div>
 
             {/* System Items */}
-            {systemItems.map((module) => {
-              const isLink = module.url !== "";
-              const isActive =
-                activeModule === module.id ||
-                (hoveredModuleId === module.id &&
-                  (isFlyoutPinned || !isSidebarExpanded));
-              const showChevron = isSidebarExpanded && hasSubItems(module);
-              return (
-                <li
-                  key={module.id}
-                  className="menu-item"
-                  onMouseEnter={getMenuItemMouseEnter(module)}
-                  onMouseLeave={getMenuItemMouseLeave(module)}
-                >
-                  {!isSidebarExpanded && (
-                    <span className="menu-item-tooltip">{module.title}</span>
-                  )}
-                  {isLink ? (
-                    <Link href={(BASE_URL || "") + (module.url || "/")}>
-                      <button
-                        className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
-                        onClick={closeSidebarIfNarrow}
-                      >
-                        <div className="menu-item-icon">{module.icon}</div>
-                        {isSidebarExpanded && (
-                          <span className="menu-item-text">{module.title}</span>
-                        )}
-                      </button>
-                    </Link>
-                  ) : (
+            {systemItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={getModuleMouseEnterHandler(module)}
+                onMouseLeave={getModuleMouseLeaveHandler(module)}
+              >
+                {isSidebarExpanded ? null : (
+                  <span className="menu-item-tooltip">{module.title}</span>
+                )}
+                {isModuleLink(module) ? (
+                  <Link href={(BASE_URL || "") + (module.url || "/")}>
                     <button
-                      className={`menu-item-button ${isActive ? "active" : ""}`}
-                      onClick={(e) => handleModuleClick(module, e)}
+                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      onClick={() => {
+                        if (
+                          globalThis.window !== undefined &&
+                          globalThis.window.innerWidth < 1200
+                        ) {
+                          setSidebarOpen(false);
+                        }
+                      }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
                       {isSidebarExpanded && (
                         <span className="menu-item-text">{module.title}</span>
                       )}
-                      {showChevron && (
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && (
+                      <span className="menu-item-text">{module.title}</span>
+                    )}
+                    {isSidebarExpanded &&
+                      module.subItems &&
+                      module.subItems.length > 0 && (
                         <div className="menu-item-chevron">
                           <ChevronRight size={18} />
                         </div>
                       )}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+                  </button>
+                )}
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -1748,84 +1766,37 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
       {/* Collapsed sidebar: hover flyout for sub-items (above main content) */}
       {/* Submenu flyout: when collapsed on hover, when expanded on click (same style, above content) */}
-      {hoveredModuleId &&
-        hoveredItemRect &&
-        (() => {
-          const flyoutModule = mainMenuItems.find(
-            (m) => m.id === hoveredModuleId,
-          );
-          if (!flyoutModule?.subItems?.length) return null;
-          return (
-            <section
-              aria-label="Submenu"
-              className="submenu-flyout"
-              style={{
-                top: hoveredItemRect.top,
-                left:
-                  (isSidebarExpanded
-                    ? SIDEBAR_WIDTH_EXPANDED
-                    : SIDEBAR_WIDTH_COLLAPSED) + 3,
-              }}
-              onMouseEnter={handleFlyoutMouseEnter}
-              onMouseLeave={handleFlyoutMouseLeave}
-            >
-              <div className="submenu-flyout-header">{flyoutModule.title}</div>
-              <div className="submenu-flyout-content">
-                {flyoutModule.subItems.map((subItem: SubMenuItem) =>
-                  subItem.subItems && subItem.subItems.length > 0 ? (
-                    <div key={subItem.id}>
-                      <div className="submenu-flyout-item submenu-flyout-item-label">
-                        <span className="flyout-item-icon">{subItem.icon}</span>
-                        {subItem.title}
-                      </div>
-                      {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                        <Link
-                          key={nestedItem.id}
-                          href={(BASE_URL || "") + (nestedItem.url || "/")}
-                          className={`submenu-flyout-item ${router.pathname === nestedItem.url ? "active" : ""}`}
-                          onClick={() => {
-                            setHoveredModuleId(null);
-                            setHoveredItemRect(null);
-                            setIsFlyoutPinned(false);
-                            if (
-                              globalThis.window?.innerWidth &&
-                              globalThis.window.innerWidth < 1200
-                            )
-                              setSidebarOpen(false);
-                          }}
-                        >
-                          <span className="flyout-item-icon">
-                            {nestedItem.icon}
-                          </span>
-                          {nestedItem.title}
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <Link
-                      key={subItem.id}
-                      href={(BASE_URL || "") + (subItem.url || "/")}
-                      className={`submenu-flyout-item ${router.pathname === subItem.url ? "active" : ""}`}
-                      onClick={() => {
-                        setHoveredModuleId(null);
-                        setHoveredItemRect(null);
-                        setIsFlyoutPinned(false);
-                        if (
-                          globalThis.window?.innerWidth &&
-                          globalThis.window.innerWidth < 1200
-                        )
-                          setSidebarOpen(false);
-                      }}
-                    >
-                      <span className="flyout-item-icon">{subItem.icon}</span>
-                      {subItem.title}
-                    </Link>
-                  ),
-                )}
-              </div>
-            </section>
-          );
-        })()}
+      {(() => {
+        if (!hoveredModuleId || !hoveredItemRect) return null;
+        const flyoutModule = mainMenuItems.find(
+          (m) => m.id === hoveredModuleId,
+        );
+        if (!flyoutModule?.subItems?.length) return null;
+        return (
+          <div
+            className="submenu-flyout"
+            role="menu"
+            aria-label={flyoutModule.title}
+            tabIndex={0}
+            style={{
+              top: hoveredItemRect.top,
+              left:
+                (isSidebarExpanded
+                  ? SIDEBAR_WIDTH_EXPANDED
+                  : SIDEBAR_WIDTH_COLLAPSED) + 3,
+            }}
+            onMouseEnter={handleFlyoutMouseEnter}
+            onMouseLeave={handleFlyoutMouseLeave}
+          >
+            <div className="submenu-flyout-header">{flyoutModule.title}</div>
+            <div className="submenu-flyout-content">
+              {flyoutModule.subItems.map((subItem: SubMenuItem) =>
+                renderFlyoutSubItem(subItem),
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Submenu Panel */}
       {activeModuleData?.subItems && (

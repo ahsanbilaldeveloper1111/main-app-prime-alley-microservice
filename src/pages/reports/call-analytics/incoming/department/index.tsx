@@ -57,7 +57,6 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
 import {
   formatMinutesAndSeconds,
   ModuleSlug,
@@ -65,12 +64,41 @@ import {
   formatDateTimeToLocal,
   getAutoTimezone,
 } from "@utils/Helper";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+
+/** Convert start/end datetime from local to UTC and assign back to filters */
+function applyUtcDatetimeFilters(formattedFilters: Record<string, any>): void {
+  if (formattedFilters.start_datetime) {
+    let startMoment = moment(formattedFilters.start_datetime);
+    if (
+      formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    ) {
+      startMoment = moment(formattedFilters.start_datetime + ":00");
+    } else if (!formattedFilters.start_datetime.includes("T")) {
+      startMoment = moment(formattedFilters.start_datetime).startOf("day");
+    }
+    formattedFilters.start_datetime =
+      startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  }
+  if (formattedFilters.end_datetime) {
+    let endMoment = moment(formattedFilters.end_datetime);
+    if (
+      formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    ) {
+      const timePart = formattedFilters.end_datetime.split("T")[1];
+      endMoment =
+        timePart === "23:59"
+          ? moment(formattedFilters.end_datetime + ":59")
+          : moment(formattedFilters.end_datetime + ":00");
+    } else if (!formattedFilters.end_datetime.includes("T")) {
+      endMoment = moment(formattedFilters.end_datetime).endOf("day");
+    }
+    formattedFilters.end_datetime =
+      endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  }
+}
 
 const CallIncomingDepartment = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDateTime, setStartDateTime] = useState<string>("");
@@ -79,33 +107,6 @@ const CallIncomingDepartment = () => {
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("calls_chart");
-
-  // Debug session state
-  useEffect(() => {
-    console.log("Session state:", { session, status });
-    if (status === "authenticated" && session) {
-      console.log("Session authenticated successfully");
-    } else if (status === "loading") {
-      console.log("Session still loading...");
-    } else if (status === "unauthenticated") {
-      console.log("User not authenticated");
-    }
-  }, [session, status]);
-
-  // Debug component mounting
-  useEffect(() => {
-    console.log("CallIncomingDepartment component mounted");
-    console.log("Initial props and state:", {
-      session,
-      status,
-      filtersReady,
-      dataLoaded,
-      loading,
-    });
-    return () => {
-      console.log("CallIncomingDepartment component unmounting");
-    };
-  }, []);
 
   // Animation variants for tab transitions
   const tabVariants = {
@@ -244,8 +245,6 @@ const CallIncomingDepartment = () => {
   // Refs to prevent duplicate API calls
   const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
   const isFetchingRef = useRef(false);
-  const lastFetchTimeRef = useRef(0);
-  const lastFetchParamsRef = useRef<string>("");
 
   const {
     hierarchyDataExtensions,
@@ -265,13 +264,7 @@ const CallIncomingDepartment = () => {
   const [showPageLoader, setShowPageLoader] = useState(false);
   const fetchCallLogs = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      // Only fetch if filters are ready
-      if (!filtersReady) {
-        console.log("Filters not ready yet, skipping fetch");
-        return;
-      }
-
-      console.log("Fetching call logs with filters:", currentFilters);
+      if (!filtersReady) return;
       setLoading(true);
       setShowPageLoader(true);
 
@@ -341,79 +334,30 @@ const CallIncomingDepartment = () => {
   // Trigger initial data fetch when filters become ready
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes("list-call-logs")) {
+    if (session?.user?.permissions?.includes("list-call-logs")) {
       initialFetchDone.current = true;
     }
   }, [session]);
 
   const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
     const formattedFilters: any = { ...filters };
+    applyUtcDatetimeFilters(formattedFilters);
 
-    if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    // Check if filters actually changed
     const filtersChanged =
       JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
-
-    // Check if this is a complete clear (empty object or only has default values)
     const isCompletelyCleared =
       Object.keys(formattedFilters).length === 0 ||
       (Object.keys(formattedFilters).length === 1 &&
-        formattedFilters.hasOwnProperty("is_incoming_only"));
+        Object.prototype.hasOwnProperty.call(
+          formattedFilters,
+          "is_incoming_only",
+        ));
 
-    // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
     currentFiltersRef.current = formattedFilters;
 
-    // Reset data loaded state when filters actually change or when cleared
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-      console.log("Resetting data loaded state due to filter change or clear");
       setDataLoaded(false);
-      console.log("DataLoaded set to false due to filter change");
       setSummary({
         total_calls: 0,
         answered_calls: 0,
@@ -423,15 +367,7 @@ const CallIncomingDepartment = () => {
         avg_duration: 0,
         avg_ring_time: 0,
       });
-
-      // Trigger refresh
       setRefreshKey((prev) => prev + 1);
-      console.log("Refresh key updated, new value:", refreshKey + 1);
-    } else if (!filtersChanged) {
-      console.log(
-        "Filters did not change, keeping dataLoaded state:",
-        dataLoaded,
-      );
     }
   };
 
@@ -458,10 +394,6 @@ const CallIncomingDepartment = () => {
     categories: string[];
   } | null>(null);
   const [chartRingTime, setChartRingTime] = useState<{
-    series: any[];
-    categories: string[];
-  } | null>(null);
-  const [chartCost, setChartCost] = useState<{
     series: any[];
     categories: string[];
   } | null>(null);
@@ -524,8 +456,8 @@ const CallIncomingDepartment = () => {
               max_duration: [],
             };
 
-            chartData.forEach((item: any, index: number) => {
-              if (item && item.label) {
+            chartData.forEach((item: any, _index: number) => {
+              if (item?.label) {
                 newChartData.country.push(item.label);
                 newChartData.answered_calls.push(
                   Number(item.answered_calls) || 0,
@@ -551,8 +483,6 @@ const CallIncomingDepartment = () => {
                 newChartData.max_duration.push(Number(item.max_duration) || 0);
               }
             });
-
-            console.log("Chart data", newChartData);
 
             const dataLength = newChartData.country.length;
 
@@ -582,16 +512,6 @@ const CallIncomingDepartment = () => {
                 categories: newChartData.country,
               });
 
-              // Cost Chart
-              setChartCost({
-                series: [
-                  { name: "Max Cost", data: newChartData.max_cost },
-                  { name: "Avg Cost", data: newChartData.avg_cost },
-                  { name: "Min Cost", data: newChartData.min_cost },
-                ],
-                categories: newChartData.country,
-              });
-
               // Duration Chart
               setChartDuration({
                 series: [
@@ -607,19 +527,16 @@ const CallIncomingDepartment = () => {
               );
               setChartCalls(null);
               setChartRingTime(null);
-              setChartCost(null);
               setChartDuration(null);
             }
           } else {
             setChartCalls(null);
             setChartRingTime(null);
-            setChartCost(null);
             setChartDuration(null);
           }
         } catch {
           setChartCalls(null);
           setChartRingTime(null);
-          setChartCost(null);
           setChartDuration(null);
         } finally {
           setChartLoading(false);
@@ -631,7 +548,6 @@ const CallIncomingDepartment = () => {
       // Reset chart when filters are not ready
       setChartCalls(null);
       setChartRingTime(null);
-      setChartCost(null);
       setChartDuration(null);
       setChartLoading(false);
     }
@@ -660,8 +576,96 @@ const CallIncomingDepartment = () => {
     }
   };
 
+  const renderDonutContent = () => {
+    if (loading || !dataLoaded || !filtersReady) {
+      return (
+        <div
+          className="d-flex align-items-center justify-content-center"
+          style={{ height: "180px" }}
+        >
+          <div className="spinner-border text-primary">
+            <output className="visually-hidden">Loading...</output>
+          </div>
+        </div>
+      );
+    }
+    if (
+      summary.answered_calls === 0 &&
+      summary.unanswered_calls === 0 &&
+      summary.total_duration === 0
+    ) {
+      return (
+        <div
+          className="d-flex align-items-center justify-content-center"
+          style={{ height: "180px" }}
+        >
+          <p className="text-muted mb-0">No data available</p>
+        </div>
+      );
+    }
+    if (simpleDonut) {
+      return (
+        <ChartDonut
+          series={simpleDonut.series}
+          labels={simpleDonut.labels}
+          dataType="calls"
+          height={200}
+          width={500}
+          showDataLabels={true}
+          dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+        />
+      );
+    }
+    return (
+      <div
+        className="d-flex align-items-center justify-content-center"
+        style={{ height: "180px" }}
+      >
+        <p className="text-muted mb-0">Loading chart...</p>
+      </div>
+    );
+  };
+
+  const renderChartTabContent = (
+    isLoading: boolean,
+    chartData: { series: any[]; categories: string[] } | null,
+    title: string,
+    dataType: "calls" | "time" | "cost",
+  ) => {
+    if (isLoading || !filtersReady) {
+      return (
+        <div
+          className="d-flex align-items-center justify-content-center"
+          style={{ height: "300px" }}
+        >
+          <div className="spinner-border text-primary">
+            <output className="visually-hidden">Loading chart...</output>
+          </div>
+        </div>
+      );
+    }
+    if (chartData) {
+      return (
+        <ChartBar
+          series={chartData.series}
+          categories={chartData.categories}
+          dataType={dataType}
+          height={300}
+          maxDisplayedItems={5}
+          showViewAllButton={true}
+          viewAllButtonText="View All"
+          showFullScreenButton={true}
+          onFullScreenClick={() =>
+            handleOpenChartModal(chartData, title, dataType)
+          }
+        />
+      );
+    }
+    return <div className="" />;
+  };
+
   return (
-    <React.Fragment>
+    <>
       <BreadcrumbItem
         mainTitle=""
         mainLink=""
@@ -679,26 +683,23 @@ const CallIncomingDepartment = () => {
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   {showDateRange && (
-                    <>
-                      <p className="mb-0">
-                        Date Range:{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            startDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>{" "}
-                        to{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            endDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>
-                      </p>
-                    </>
+                    <p className="mb-0">
+                      Date Range:{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          startDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>{" "}
+                      to{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          endDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>
+                    </p>
                   )}
-                  {/* {session?.user?.permissions?.includes('') && ( */}
                   <div className="d-flex align-items-center gap-2">
                     <button
                       className="btn btn-outline-secondary"
@@ -709,10 +710,9 @@ const CallIncomingDepartment = () => {
                         <>
                           <span
                             className="spinner-border spinner-border-sm me-2"
-                            role="status"
                             aria-hidden="true"
-                          ></span>
-                          Exporting...
+                          />
+                          <output>Exporting...</output>
                         </>
                       ) : (
                         "Export"
@@ -786,44 +786,7 @@ const CallIncomingDepartment = () => {
           >
             <div className="report-grid ">
               <p className="text-muted mb-0">Total Calls</p>
-              <div className="chart-one ">
-                {loading || !dataLoaded || !filtersReady ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">No data available</p>
-                  </div>
-                ) : simpleDonut ? (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={200}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">Loading chart...</p>
-                  </div>
-                )}
-              </div>
+              <div className="chart-one ">{renderDonutContent()}</div>
             </div>
           </motion.div>
         </Col>
@@ -856,40 +819,11 @@ const CallIncomingDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading || !filtersReady ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartCalls ? (
-                              <ChartBar
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCalls,
-                                    "Calls by Department",
-                                    "calls",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
+                            {renderChartTabContent(
+                              chartLoading,
+                              chartCalls,
+                              "Calls by Department",
+                              "calls",
                             )}
                           </div>
                         </div>
@@ -914,40 +848,11 @@ const CallIncomingDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading || !filtersReady ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartDuration ? (
-                              <ChartBar
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartDuration,
-                                    "Duration by Department",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
+                            {renderChartTabContent(
+                              chartLoading,
+                              chartDuration,
+                              "Duration by Department",
+                              "time",
                             )}
                           </div>
                         </div>
@@ -972,40 +877,11 @@ const CallIncomingDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading || !filtersReady ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartRingTime ? (
-                              <ChartBar
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartRingTime,
-                                    "Ring Time by Department",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
+                            {renderChartTabContent(
+                              chartLoading,
+                              chartRingTime,
+                              "Ring Time by Department",
+                              "time",
                             )}
                           </div>
                         </div>
@@ -1166,7 +1042,7 @@ const CallIncomingDepartment = () => {
                         const values = e.target.value
                           .split(",")
                           .map((v) => v.trim())
-                          .filter((v) => v);
+                          .filter(Boolean);
                         setPendingFilters({
                           ...pendingFilters,
                           called_numbers: values,
@@ -1398,7 +1274,7 @@ const CallIncomingDepartment = () => {
           )}
         </Modal.Body>
       </Modal>
-    </React.Fragment>
+    </>
   );
 };
 
