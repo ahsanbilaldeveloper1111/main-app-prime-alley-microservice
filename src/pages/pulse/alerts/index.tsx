@@ -152,7 +152,7 @@ const HostAlerts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
+      
       <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle="Alerts" />
 
       <Row className="mb-3">
@@ -160,7 +160,7 @@ const HostAlerts = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">Host Alerts</h2>
+                {/* <h2 className="mb-0">Host Alerts</h2> */}
               </Col>
               <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
                 <select

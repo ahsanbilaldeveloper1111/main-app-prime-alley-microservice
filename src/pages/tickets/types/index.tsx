@@ -274,8 +274,8 @@ const TicketTypes = () => {
 
 
       <PageHeader
-        title="Ticket Types"
-        description="Manage ticket types and their properties"
+        title=""
+        description=""
         showSearch={false}
         buttons={
           <>

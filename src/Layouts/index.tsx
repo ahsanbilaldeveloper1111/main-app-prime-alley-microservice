@@ -1406,7 +1406,7 @@ font-weight:600;
 
               {/* Settings Icon */}
                 <button className="crm-prime-topbar-icon" title="Settings"
-                onClick={() => router.push('/settings')}
+                onClick={() => router.push('/main-settings')}
                 >
                 <Settings size={18} />
               </button>

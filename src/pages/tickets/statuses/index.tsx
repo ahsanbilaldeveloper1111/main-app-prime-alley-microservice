@@ -187,8 +187,8 @@ const TicketStatuses = () => {
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Status" />
             <PageHeader
-                title="Ticket Statuses"
-                description="Manage and organize ticket statuses"
+                title=""
+                description=""
                 showSearch={false}
                 searchPlaceholder="Search statuses..."
                 searchValue={currentFilters.search || ""}

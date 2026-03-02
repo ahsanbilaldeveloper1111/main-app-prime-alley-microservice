@@ -143,7 +143,7 @@ const GsmSync = () => {
                 <div className="page-header-title style-2">
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={5}>
-						<h2 className="mb-0">Sync Ports</h2>
+						{/* <h2 className="mb-0">Sync Ports</h2> */}
 					</Col>
                   </Row>
                
