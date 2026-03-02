@@ -654,10 +654,10 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceType = callingDeviceType || deviceInfo.callingDeviceType;
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
-    
+    const calledAddress = params.calledAddress?.replaceAll(" ", "");
     return await makeCallAPI({
       callingAddress: callingAddress!,
-      calledAddress: params.calledAddress,
+      calledAddress: calledAddress,
       callingDeviceType: callingDeviceType!,
       callingDeviceName: callingDeviceName!
     });
