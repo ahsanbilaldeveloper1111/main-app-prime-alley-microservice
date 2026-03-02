@@ -1701,29 +1701,31 @@ const NotificationsSettingsNew: React.FC = () => {
 
         {/* Search bar */}
         <div style={{ background: "#f5f5f5", borderRadius: "6px", padding: "16px 20px", marginBottom: "20px" }}>
-          <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "10px", zIndex: 1 }}>
+        {/* <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "10px", zIndex: 1 }}>
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+            </svg> */}
+          <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+            
             <input
               type="text"
               placeholder="Search for notification topics"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
-                paddingLeft: "34px",
-                paddingRight: "34px",
+                paddingLeft: "20px",
+                paddingRight: "20px",
                 paddingTop: "8px",
                 paddingBottom: "8px",
-                fontSize: "14px",
-                fontFamily: baseFont,
-                fontWeight: 300,
+                width: '640px',
+
+        fontSize: '16px',
+        height: '40px',
+        fontWeight: 300,
                 color: "#141414",
-                border: "1px solid #d0d0d0",
+                border: "1px solid #8a8a8a",
                 borderRadius: "20px",
                 background: "#fff",
                 outline: "none",
-                width: "340px",
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#006162")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#d0d0d0")}
