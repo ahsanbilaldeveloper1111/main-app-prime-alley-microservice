@@ -55,7 +55,18 @@ export interface ZabbixHostGroup {
   groupid: string;
   name: string;
   hosts?: Array<{ hostid: string }>;
+  host_count?: number;
   [key: string]: unknown;
+}
+
+/** Response shape for manage/hostgroups API (list with pagination) */
+export interface ZabbixHostGroupsListResponse {
+  hostgroups: ZabbixHostGroup[];
+  total: number;
+  offset: number;
+  limit: number;
+  returned: number;
+  has_more: boolean;
 }
 
 // Host types
@@ -66,7 +77,7 @@ export interface ZabbixHostGetParams {
   selectInterfaces?: string | string[];
   selectGroups?: string | string[];
   selectParentTemplates?: string[];
-  search?: Record<string, string>;
+  search?: string | Record<string, string>;
   searchByAny?: boolean;
   searchWildcardsEnabled?: boolean;
   startSearch?: boolean;
@@ -113,9 +124,11 @@ export interface ZabbixHostUpdateParams {
 export interface ZabbixHostGroupGetParams {
   output?: string | string[];
   groupids?: string[];
-  search?: Record<string, string>;
+  search?: string | Record<string, string>;
   startSearch?: boolean;
   selectHosts?: string[];
+  offset?: number;
+  limit?: number;
   [key: string]: unknown;
 }
 
@@ -490,11 +503,11 @@ export async function getItemsByGroup(
 // ---------------------------------------------------------------------------
 
 /**
- * POST host-groups – get host groups (hostgroup.get)
+ * GET manage/hostgroups – get host groups list with pagination (hostgroups, total, offset, limit, returned, has_more)
  */
 export async function getHostGroups(
   params: ZabbixHostGroupGetParams = {}
-): Promise<ZabbixJsonRpcResponse<unknown[]>> {
+): Promise<ZabbixHostGroupsListResponse> {
   try {
     const defaultParams: ZabbixHostGroupGetParams = {
       output: ["groupid", "name"],
@@ -502,21 +515,34 @@ export async function getHostGroups(
       ...params,
     };
     const payload = buildPayload(defaultParams);
-    const { data } = await axiosInstance.get<ZabbixJsonRpcResponse<unknown[]>>(
-      `${ZABBIX_PREFIX}/host-groups`,
+    const { data } = await axiosInstance.get<ZabbixHostGroupsListResponse>(
+      `${ZABBIX_PREFIX}/manage/hostgroups`,
       { params: payload }
     );
-    if (data.error) {
-      throw new Error(data.error.message || "Zabbix API error");
+    if (!data || !Array.isArray(data.hostgroups)) {
+      throw new Error("Invalid host groups response");
     }
-    return data;
+    const total = data.total ?? data.hostgroups.length;
+    const offset = data.offset ?? 0;
+    const limit = data.limit ?? 200;
+    const returned = data.returned ?? data.hostgroups.length;
+    const hasMore =
+      data.has_more ?? (total > 0 && offset + data.hostgroups.length < total);
+    return {
+      hostgroups: data.hostgroups,
+      total,
+      offset,
+      limit,
+      returned,
+      has_more: hasMore,
+    };
   } catch (error) {
     throw error;
   }
 }
 
 /**
- * POST host-groups/create – get host groups with search (hostgroup.get with search)
+ * POST manage/hostgroups/create – get host groups with search (hostgroup.get with search)
  */
 export async function getHostGroupsSearch(
   params: ZabbixHostGroupGetParams
@@ -524,7 +550,7 @@ export async function getHostGroupsSearch(
   try {
     const payload = buildPayload(params);
     const { data } = await axiosInstance.get<ZabbixJsonRpcResponse<unknown[]>>(
-      `${ZABBIX_PREFIX}/host-groups/create`,
+      `${ZABBIX_PREFIX}/manage/hostgroups/create`,
       { params: payload }
     );
     if (data.error) {
@@ -537,7 +563,7 @@ export async function getHostGroupsSearch(
 }
 
 /**
- * POST host-groups/update – update host group (hostgroup.update)
+ * POST manage/hostgroups/update – update host group (hostgroup.update)
  */
 export async function updateHostGroup(
   params: ZabbixHostGroupUpdateParams
@@ -545,7 +571,7 @@ export async function updateHostGroup(
   try {
     const payload = buildPayload(params);
     const { data } = await axiosInstance.get<ZabbixJsonRpcResponse<{ groupids: string[] }>>(
-      `${ZABBIX_PREFIX}/host-groups/update`,
+      `${ZABBIX_PREFIX}/manage/hostgroups/update`,
       { params: payload }
     );
     if (data.error) {
@@ -558,7 +584,7 @@ export async function updateHostGroup(
 }
 
 /**
- * POST host-groups/delete – delete host groups (hostgroup.delete)
+ * POST manage/hostgroups/delete – delete host groups (hostgroup.delete)
  */
 export async function deleteHostGroups(
   groupids: string | string[]
@@ -567,7 +593,7 @@ export async function deleteHostGroups(
     const ids = Array.isArray(groupids) ? groupids : [groupids];
     const payload = buildPayload(ids);
     const { data } = await axiosInstance.get<ZabbixJsonRpcResponse<{ groupids: string[] }>>(
-      `${ZABBIX_PREFIX}/host-groups/delete`,
+      `${ZABBIX_PREFIX}/manage/hostgroups/delete`,
       { params: payload }
     );
     if (data.error) {

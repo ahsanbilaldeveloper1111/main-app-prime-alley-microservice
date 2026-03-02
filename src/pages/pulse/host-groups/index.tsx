@@ -6,7 +6,6 @@ import GenericTable, { TableColumn } from '@components/GenericTable';
 import { getHostGroups, ZabbixHostGroup } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
@@ -14,39 +13,33 @@ import '@assets/scss/tabs.scss';
 const HostGroups = () => {
   const [groups, setGroups] = useState<ZabbixHostGroup[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [searchValue, setSearchValue] = useState('');
-  const [tablePagination, setTablePagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    totalRows: 0,
+  const [search, setSearch] = useState('');
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: 15,
+    total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZabbixHostGroup>[] = [
-    // { key: 'groupid', label: 'Group ID', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
-  ];
-
-  const fetchHostGroups = useCallback(async () => {
+  const fetchHostGroups = useCallback(async (offset: number, limit: number, searchTerm?: string) => {
     setLoading(true);
     try {
-      const response = await getHostGroups({
-        output: ["groupid", "name"],
-        selectHosts: ["hostid"]
-      });
-      if (response.error) {
-        toast.error(response.error.message || 'Failed to fetch host groups');
-        setGroups([]);
-        return;
-      }
-      const list = response.result ?? [];
-      const data = Array.isArray(list) ? (list as ZabbixHostGroup[]) : [];
+      const params: Parameters<typeof getHostGroups>[0] = {
+        output: ['groupid', 'name'],
+        selectHosts: ['hostid'],
+        offset,
+        limit,
+      };
+      const key = searchTerm?.trim();
+      if (key) params.search = key;
+      const response = await getHostGroups(params);
+      const data = response.hostgroups ?? [];
       setGroups(data);
-      setTablePagination((prev) => ({
+      setPagination((prev) => ({
         ...prev,
-        totalRows: data.length,
-        currentPage: 1,
+        offset: response.offset,
+        limit: response.limit,
+        total: response.total,
       }));
     } catch (error) {
       console.error('Error fetching host groups:', error);
@@ -58,36 +51,36 @@ const HostGroups = () => {
   }, []);
 
   useEffect(() => {
-    fetchHostGroups();
-  }, [refreshKey, fetchHostGroups]);
+    fetchHostGroups(0, 15);
+  }, [fetchHostGroups]);
 
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
+  const handlePrevPage = () => {
+    const { offset, limit } = pagination;
+    fetchHostGroups(Math.max(0, offset - limit), limit, search);
   };
 
-  const filteredGroups = searchValue.trim()
-    ? groups.filter(
-        (g) =>
-          g.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          g.groupid?.toLowerCase().includes(searchValue.toLowerCase())
-      )
-    : groups;
+  const handleNextPage = () => {
+    const { offset, limit, total } = pagination;
+    if (offset + limit < total) {
+      fetchHostGroups(offset + limit, limit, search);
+    }
+  };
 
-  const paginatedData = filteredGroups.slice(
-    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
-    tablePagination.currentPage * tablePagination.rowsPerPage
-  );
+  const handleSearch = () => fetchHostGroups(0, pagination.limit, search);
 
-  const summaryCards: SummaryCard[] = [
+  const handleRefresh = () => fetchHostGroups(0, pagination.limit, search);
+
+  const hasNextPage = pagination.offset + pagination.limit < pagination.total;
+
+  const tableColumns: TableColumn<ZabbixHostGroup>[] = [
+    { key: 'name', label: 'Name', sortable: true },
     {
-      id: 'total-groups',
-      title: 'Total Host Groups',
-      value: groups.length,
-      description: 'Host groups from Zabbix',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
+      key: 'host_count',
+      label: 'Host count',
+      sortable: true,
+      render: (row) => (
+        <span>{row.host_count ?? (row.hosts ? row.hosts.length : 0)}</span>
+      ),
     },
   ];
 
@@ -98,55 +91,72 @@ const HostGroups = () => {
 
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">Host Groups</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search host groups..."
-                  value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-                  }}
-                  style={{ maxWidth: '240px' }}
-                />
-                <Button variant="info" onClick={handleRefresh} disabled={loading}>
-                  <FiRefreshCw size={14} /> Refresh
-                </Button>
-              </Col>
-            </Row>
+          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search host groups..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              style={{ maxWidth: '240px' }}
+            />
+            <Button variant="primary" onClick={handleSearch} disabled={loading}>
+              Search
+            </Button>
+            <Button variant="info" onClick={handleRefresh} disabled={loading}>
+              <FiRefreshCw size={14} /> Refresh
+            </Button>
           </div>
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
+      <Row className="mb-2 align-items-center">
+        <Col>
+          <span className="text-muted small">
+            {pagination.total === 0
+              ? 'No host groups'
+              : `Showing ${pagination.offset + 1}–${pagination.offset + groups.length} of ${pagination.total}`}
+          </span>
+        </Col>
+        <Col className="d-flex justify-content-end gap-2">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handlePrevPage}
+            disabled={loading || pagination.offset <= 0}
+          >
+            ← Prev
+          </Button>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={loading || !hasNextPage}
+          >
+            Next →
+          </Button>
+        </Col>
+      </Row>
 
       <GenericTable<ZabbixHostGroup>
-        data={paginatedData}
+        data={groups}
         columns={tableColumns}
         loading={loading}
         emptyMessage="No host groups found."
         loadingMessage="Loading host groups..."
         pagination={{
-          currentPage: tablePagination.currentPage,
-          rowsPerPage: tablePagination.rowsPerPage,
-          totalRows: filteredGroups.length,
-          pageSizeOptions: tablePagination.pageSizeOptions,
+          currentPage:
+            pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+          rowsPerPage: pagination.limit,
+          totalRows: pagination.total,
+          pageSizeOptions: pagination.pageSizeOptions,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setTablePagination((prev) => ({
-            ...prev,
-            currentPage: page,
-            rowsPerPage,
-          }));
+          fetchHostGroups((page - 1) * rowsPerPage, rowsPerPage, search);
         }}
-        sortable={true}
-        hover={true}
+        sortable
+        hover
         striped={false}
         uniqueKey="groupid"
       />
@@ -154,8 +164,6 @@ const HostGroups = () => {
   );
 };
 
-HostGroups.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+HostGroups.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default HostGroups;
