@@ -462,7 +462,7 @@ function StalledIllustration() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-const navTabs = ["Summary", "Companies", "Deals", "Tasks", "Schedule"];
+const navTabs = ["Summary", "Companies", "Deals", "Tasks", "Calendar"];
 
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
@@ -689,7 +689,7 @@ const SalesDashboard: NextPageWithLayout = () => {
         <TasksData />
         )}
 
-        {activeTab === "Schedule" && (
+        {activeTab === "Calendar" && (
           <SchedulePage />
           // <div style={styles.section}>
           //   <SectionHeader title="Schedule" />

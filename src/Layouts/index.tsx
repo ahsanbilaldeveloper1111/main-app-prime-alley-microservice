@@ -1460,7 +1460,7 @@ font-weight:600;
                   </div>
                   <div className="crm-prime-user-info">
                     <div>
-                      <div className="crm-prime-user-name">{loggedInCompanyName || 'CompanyloggedInCompanyName'}</div>
+                      <div className="crm-prime-user-name">{loggedInCompanyName || ''}</div>
                     </div>
                     <ChevronDown size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                   </div>
@@ -1565,11 +1565,32 @@ font-weight:600;
                           {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
                           <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
-                        </button>
-                        <button className="user-dropdown-item">
+                          </button>
+                          
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/billing/dashboard')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
                         </button>
+                        )}
+
+                          
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Tasks</span>
+                        </button>
+                        )}
+
+<button className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Calendar</span>
+                        </button>
+
+
+
+
+                          
                         <button className="user-dropdown-item user-dropdown-credits-head">
                          
                             <span className="user-dropdown-item-text">CRM Prime Credits</span>
@@ -1581,18 +1602,10 @@ font-weight:600;
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Product Updates</span>
                         </button>
-                        <button className="user-dropdown-item">
-                          {/* <GraduationCap className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">CRM Prime Academy</span>
-                        </button>
-                        <button className="user-dropdown-item">
-                          {/* <HelpCircle className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Training & Services</span>
-                          {/* <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} /> */}
-                        </button>
-                        <button className="user-dropdown-item">
+                        
+                        <button className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Projects (Checklists)</span>
+                          <span className="user-dropdown-item-text">Settings</span>
                         </button>
                       </div>
 

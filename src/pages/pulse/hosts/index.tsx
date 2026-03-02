@@ -7,7 +7,6 @@ import GenericTable, { TableColumn, TableAction } from '@components/GenericTable
 import { getHosts, getItemsByHostName, ZabbixHost, ZabbixItem } from '@utils/zabbix';
 import { Button, Row, Col, Modal, Badge } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw, FiEye } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
@@ -17,18 +16,51 @@ const Hosts = () => {
   const router = useRouter();
   const [hosts, setHosts] = useState<ZabbixHost[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [searchValue, setSearchValue] = useState('');
-  const [tablePagination, setTablePagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    totalRows: 0,
-    pageSizeOptions: [10, 15, 25, 50, 100] as number[],
+  const [search, setSearch] = useState('');
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: 10,
+    total: 0,
+    pageSizeOptions: [5, 10, 15, 20, 25, 50, 100] as number[],
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedHost, setSelectedHost] = useState<ZabbixHost | null>(null);
   const [viewItems, setViewItems] = useState<ZabbixItem[]>([]);
   const [viewLoading, setViewLoading] = useState(false);
+
+  const fetchHosts = useCallback(async (offset: number, limit: number, search?: string) => {
+    setLoading(true);
+    try {
+      const params: Parameters<typeof getHosts>[0] = {
+        output: ['hostid', 'host', 'name'],
+        selectInterfaces: ['interfaceid', 'ip'],
+        selectGroups: ['groupid', 'name'],
+        offset,
+        limit,
+      };
+      const key = search?.trim();
+      if (key) params.search = key;
+      const response = await getHosts(params);
+      const data = response.hosts ?? [];
+      setHosts(data);
+      setPagination((prev) => ({
+        ...prev,
+        offset: response.offset,
+        limit: response.limit,
+        total: response.total,
+      }));
+    } catch (error) {
+      console.error('Error fetching hosts:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch hosts');
+      setHosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHosts(0, 10);
+  }, [fetchHosts]);
 
   const handleViewClick = useCallback(async (row: ZabbixHost) => {
     setSelectedHost(row);
@@ -69,10 +101,26 @@ const Hosts = () => {
     [router]
   );
 
+  const handlePrevPage = () => {
+    const { offset, limit } = pagination;
+    fetchHosts(Math.max(0, offset - limit), limit, search);
+  };
+
+  const handleNextPage = () => {
+    const { offset, limit, total } = pagination;
+    if (offset + limit < total) {
+      fetchHosts(offset + limit, limit, search);
+    }
+  };
+
+  const handleSearch = () => fetchHosts(0, pagination.limit, search);
+
+  const handleRefresh = () => fetchHosts(0, pagination.limit, search);
+
+  const hasNextPage = pagination.offset + pagination.limit < pagination.total;
+
   const tableColumns: TableColumn<ZabbixHost>[] = [
-    // { key: 'hostid', label: 'Host ID', sortable: true },
     { key: 'host', label: 'Name / Hostname', sortable: true },
-   
     {
       key: 'ip',
       label: 'Address',
@@ -83,7 +131,7 @@ const Hosts = () => {
       key: 'groups',
       label: 'Groups',
       sortable: true,
-      render: (row) => <span>{row.groups?.map((group) => group.name).join(', ') ?? '-'}</span>,
+      render: (row) => <span>{row.groups?.map((g) => g.name).join(', ') ?? '-'}</span>,
     },
     {
       key: 'status',
@@ -99,81 +147,8 @@ const Hosts = () => {
   ];
 
   const tableActions: TableAction<ZabbixHost>[] = [
-    {
-          label: 'View',
-      icon: <FiEye size={16} />,
-      onClick: (row) => handleViewClick(row),
-      },
-      {
-        label: 'View Items',
-    icon: <List size={16} />,
-    onClick: (row) => handleViewItemsClick(row),
-  },
-  ];
-
-  const fetchHosts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await getHosts({
-       output: ["hostid", "host", "name"],
-        selectInterfaces: ["interfaceid", "ip"]
-      });
-      if (response.error) {
-        toast.error(response.error.message || 'Failed to fetch hosts');
-        setHosts([]);
-        return;
-      }
-      const list = response.result ?? [];
-      const data = Array.isArray(list) ? (list as ZabbixHost[]) : [];
-      setHosts(data);
-      setTablePagination((prev) => ({
-        ...prev,
-        totalRows: data.length,
-        currentPage: 1,
-      }));
-    } catch (error) {
-      console.error('Error fetching hosts:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch hosts');
-      setHosts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchHosts();
-  }, [refreshKey, fetchHosts]);
-
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
-
-  const filteredHosts = searchValue.trim()
-    ? hosts.filter(
-        (h) =>
-          h.host?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          h.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          h.hostid?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          h.interfaces?.some((i) => i.ip?.toLowerCase().includes(searchValue.toLowerCase()))
-      )
-    : hosts;
-
-  const paginatedData = filteredHosts.slice(
-    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
-    tablePagination.currentPage * tablePagination.rowsPerPage
-  );
-
-  const summaryCards: SummaryCard[] = [
-    {
-      id: 'total-hosts',
-      title: 'Total Hosts',
-      value: hosts.length,
-      description: 'Hosts from Zabbix',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
-    },
+    { label: 'View', icon: <FiEye size={16} />, onClick: (row) => handleViewClick(row) },
+    { label: 'View Items', icon: <List size={16} />, onClick: (row) => handleViewItemsClick(row) },
   ];
 
   return (
@@ -182,58 +157,48 @@ const Hosts = () => {
 
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">Hosts</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search hosts..."
-                  value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-                  }}
-                  style={{ maxWidth: '240px' }}
-                />
-                <Button variant="info" onClick={handleRefresh} disabled={loading}>
-                  <FiRefreshCw size={14} /> Refresh
-                </Button>
-              </Col>
-            </Row>
+          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search hosts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              style={{ maxWidth: '240px' }}
+            />
+            <Button variant="primary" onClick={handleSearch} disabled={loading}>
+              Search
+            </Button>
+            <Button variant="info" onClick={handleRefresh} disabled={loading}>
+              <FiRefreshCw size={14} /> Refresh
+            </Button>
           </div>
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
+   
 
       <GenericTable<ZabbixHost>
-        data={paginatedData}
+        data={hosts}
         columns={tableColumns}
         actions={tableActions}
-        showActions={true}
+        showActions
         actionsLabel="Actions"
         loading={loading}
         emptyMessage="No hosts found."
         loadingMessage="Loading hosts..."
         pagination={{
-          currentPage: tablePagination.currentPage,
-          rowsPerPage: tablePagination.rowsPerPage,
-          totalRows: filteredHosts.length,
-          pageSizeOptions: tablePagination.pageSizeOptions,
+          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+          rowsPerPage: pagination.limit,
+          totalRows: pagination.total,
+          pageSizeOptions: pagination.pageSizeOptions,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setTablePagination((prev) => ({
-            ...prev,
-            currentPage: page,
-            rowsPerPage,
-          }));
+          fetchHosts((page - 1) * rowsPerPage, rowsPerPage, search);
         }}
-        sortable={true}
-        hover={true}
+        sortable
+        hover
         striped={false}
         uniqueKey="hostid"
       />
@@ -284,8 +249,6 @@ const Hosts = () => {
   );
 };
 
-Hosts.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+Hosts.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default Hosts;
