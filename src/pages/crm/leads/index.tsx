@@ -4214,8 +4214,12 @@ const CrmLeads = () => {
                 {
                   label: "Convert to Deal",
                   onClick: () => {
-                    setShowLeadSidebar(false);
-                    handleConvertLead(selectedLead?.rawData || selectedLead);
+                    const leadId = selectedLead?.id ?? selectedLead?.rawData?.id;
+                    if (leadId) {
+                      setShowLeadSidebar(false);
+                      setConvertingLeadId(Number(leadId));
+                      setShowConvertToDealModal(true);
+                    }
                   },
                 },
                 {

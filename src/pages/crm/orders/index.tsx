@@ -907,6 +907,45 @@ const CrmOrders = () => {
     }
   };
 
+  /** Download all attachments for an order (from sidebar Actions). Fetches order + deal attachments and triggers download for each. */
+  const handleDownloadAllAttachments = useCallback(
+    async (orderData: { id: number; deal_id?: number | string } | null) => {
+      if (!orderData?.id) return;
+      try {
+        const orderAttachments = await getOrderAttachments(orderData.id);
+        const orderList = orderAttachments || [];
+        let dealList: any[] = [];
+        if (orderData.deal_id) {
+          try {
+            const dealAttachments = await getDealAttachments(
+              Number(orderData.deal_id),
+            );
+            dealList = dealAttachments || [];
+          } catch {
+            dealList = [];
+          }
+        }
+        const total = orderList.length + dealList.length;
+        if (total === 0) {
+          toast.info("No attachments to download.");
+          return;
+        }
+        for (const att of orderList) {
+          await downloadOrderAttachment(orderData.id, att.id);
+          await new Promise((r) => setTimeout(r, 400));
+        }
+        for (const att of dealList) {
+          await downloadDealAttachment(Number(orderData.deal_id), att.id);
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      } catch (error) {
+        console.error("Failed to download attachments:", error);
+        toast.error("Failed to download some attachments.");
+      }
+    },
+    [],
+  );
+
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
@@ -2924,6 +2963,15 @@ const CrmOrders = () => {
                       selectedOrder?.id || selectedOrder?.rawData?.id;
                     if (orderId) {
                       handleViewOrder(orderId);
+                    }
+                  },
+                },
+                {
+                  label: "Download Attachment",
+                  onClick: () => {
+                    const orderData = selectedOrder?.rawData || selectedOrder;
+                    if (orderData?.id) {
+                      handleDownloadAllAttachments(orderData);
                     }
                   },
                 },

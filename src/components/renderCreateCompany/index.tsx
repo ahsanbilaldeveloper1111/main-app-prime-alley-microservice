@@ -479,6 +479,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
               placeholder="e.g. abc.com"
               style={{ ...inputStyle, textTransform: 'lowercase' }}
               onFocus={focusStyle}
+              data-no-capitalize
               onBlur={blurStyle}
             />
           </div>

@@ -4239,6 +4239,7 @@ const CrmProspectsManagement = () => {
                           })
                         }
                         placeholder="e.g. example.com"
+                        data-no-capitalize
                         style={{
                           width: "100%",
                           padding: "10px 12px",
