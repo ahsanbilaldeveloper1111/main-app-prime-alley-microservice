@@ -14,6 +14,8 @@ import GenericTable, {
   TableColumn,
   TableAction,
   TabConfig,
+  ToolbarConfig,
+  FilterPill,
 } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -128,6 +130,9 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import ColumnEditorModal from "@components/ColumnEditorModal";
+import CrmExportModal from "@components/CrmExportModal";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -500,6 +505,9 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFileName, setExportFileName] = useState("");
+  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
+  const [exporting, setExporting] = useState(false);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -610,6 +618,7 @@ const CrmDeals = () => {
           ];
     },
   );
+  const [approvalsViewMode, setApprovalsViewMode] = useState<"table" | "board">("table");
   const [dealsPagination, setDealsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -740,6 +749,138 @@ const CrmDeals = () => {
     },
     [currentFilters],
   );
+
+  // Sync export modal filters from current table filters when modal opens
+  useEffect(() => {
+    if (showExportModal) {
+      setExportFilters({ ...currentFilters });
+      if (!exportFileName) {
+        setExportFileName(`approvals_deals_${moment().format("YYYY-MM-DD")}`);
+      }
+    }
+  }, [showExportModal, currentFilters]);
+
+  // Build API params from filters for export (same shape as fetchDeals)
+  const buildApprovalsExportParams = useCallback(
+    (
+      filters: Record<string, any>,
+      pagination?: { page: number; per_page: number },
+    ) => {
+      const params: Record<string, any> = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.stage_id) params.stage_id = filters.stage_id;
+      if (filters.assigned_to) params.assigned_to = filters.assigned_to;
+      if (filters.is_lost !== undefined) params.is_lost = filters.is_lost;
+      if (filters.include_lost !== undefined)
+        params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined)
+        params.include_archived = filters.include_archived;
+      if (filters.follow_up_date_from)
+        params.follow_up_date_from = filters.follow_up_date_from;
+      if (filters.follow_up_date_to)
+        params.follow_up_date_to = filters.follow_up_date_to;
+      if (
+        filters.probability_min != null &&
+        filters.probability_min !== ""
+      )
+        params.probability_min = Number(filters.probability_min);
+      if (
+        filters.probability_max != null &&
+        filters.probability_max !== ""
+      )
+        params.probability_max = Number(filters.probability_max);
+      if (filters.deal_type) params.deal_type = filters.deal_type;
+      if (filters.industry) params.industry = filters.industry;
+      if (filters.expected_close_date_from)
+        params.expected_close_date_from = filters.expected_close_date_from;
+      if (filters.expected_close_date_to)
+        params.expected_close_date_to = filters.expected_close_date_to;
+      if (filters.approval_status)
+        params.approval_status = filters.approval_status;
+      if (pagination) {
+        params.page = pagination.page;
+        params.per_page = pagination.per_page;
+      }
+      return params;
+    },
+    [],
+  );
+
+  const fetchDealsForExport = useCallback(
+    async (filters: Record<string, any>) => {
+      const PER_PAGE = 100;
+      let page = 1;
+      const allData: any[] = [];
+      for (;;) {
+        const response: any = await getDeals(
+          buildApprovalsExportParams(filters, { page, per_page: PER_PAGE }),
+        );
+        const dealsArray: any[] = response?.dataList || [];
+        const pagination: any = response?.meta || {};
+        const lastPage = pagination?.last_page ?? 1;
+        allData.push(...dealsArray);
+        if (page >= lastPage || dealsArray.length < PER_PAGE) break;
+        page += 1;
+      }
+      return allData;
+    },
+    [buildApprovalsExportParams],
+  );
+
+  const handleApprovalsExport = useCallback(async () => {
+    const name =
+      exportFileName.trim() ||
+      `approvals_deals_${moment().format("YYYY-MM-DD")}`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const allData = await fetchDealsForExport(exportFilters);
+      if (allData.length === 0) {
+        toast.info("No deals match the selected filters.");
+        return;
+      }
+      const headers = Array.from(
+        new Set(
+          allData.flatMap((row) =>
+            typeof row === "object" && row !== null
+              ? Object.keys(row).filter(
+                  (k) => typeof (row as any)[k] !== "object",
+                )
+              : [],
+          ),
+        ),
+      ).sort();
+      const csvRows = [
+        headers.join(","),
+        ...allData.map((row) =>
+          headers
+            .map((h) => {
+              const val = (row as any)[h];
+              if (val == null) return "";
+              if (typeof val === "object") return "";
+              const s = String(val).replace(/"/g, '""');
+              return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+            })
+            .join(","),
+        ),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setShowExportModal(false);
+      toast.success(`Exported ${allData.length} deals successfully!`);
+    } catch (err) {
+      toast.error("Failed to export deals");
+    } finally {
+      setExporting(false);
+    }
+  }, [exportFileName, exportFilters, fetchDealsForExport]);
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
@@ -2227,6 +2368,13 @@ const CrmDeals = () => {
         ),
       },
       {
+        key: "approvalStatus",
+        label: "Approval Status",
+        sortable: true,
+        type: "text",
+        emptyValue: "-",
+      },
+      {
         key: "dealType",
         label: "Deal Type",
         sortable: true,
@@ -2427,6 +2575,38 @@ const CrmDeals = () => {
     handleApproveDeal,
     handleRejectDeal,
   ]);
+
+  const approvalsToolbarConfig = useCrmToolbarConfig({
+    entity: "deals",
+    searchValue: dealsSearch,
+    searchPlaceholder: "Search deals by name, company, value...",
+    onSearchChange: setDealsSearch,
+    onSearch: () => {},
+    currentFilters,
+    handleFiltersChange,
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    activeTab: activeFilter,
+    onTabChange: handleFilterChange,
+    tabs: [
+      { id: "all", label: "All deals", count: filterCounts.all, removable: false },
+      ...customTabs,
+    ],
+    onTabAdd: () => setShowTabModal(true),
+    onTabRemove: (tabId) => {
+      setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+      if (activeFilter === tabId) handleFilterChange("all");
+    },
+    tabsDropdownLabel: "Deals",
+    onFiltersClick: handleOpenFiltersSidebar,
+    onExportClick: () => setShowExportModal(true),
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    showImport: false,
+    currentTableView: approvalsViewMode,
+    onTableViewChange: setApprovalsViewMode,
+    extensions,
+    onPaginationReset: () =>
+      setDealsPagination((prev) => ({ ...prev, currentPage: 1 })),
+  });
 
   if (!session?.user?.permissions?.includes("list-crm-deals")) {
     return null;
@@ -3054,7 +3234,8 @@ const CrmDeals = () => {
               columns={dealsColumns}
               actions={dealsActions}
               showActions={false}
-              // customizableColumns={true}
+              customizableColumns={true}
+              selectedColumns={selectedDealsColumns}
               defaultSelectedColumns={[
                 "name",
                 "company",
@@ -3108,110 +3289,25 @@ const CrmDeals = () => {
               maxHeight="calc(100vh - 380px)"
               // Toolbar
               showToolbar={true}
-              toolbar={{
-                // Tabs
-                showTabs: true,
-                showImport: false,
-                onImportClick: () => {
-                  console.log("Import prospects");
-                },
-                tabsDropdownLabel: "Deals",
-                tabs: [
-                  {
-                    id: "all",
-                    label: "All deals",
-                    count: filterCounts.all,
-                    removable: false,
-                  },
-                  ...customTabs,
-                ],
-                activeTab: activeFilter,
-                onTabChange: handleFilterChange,
-                onTabAdd: () => setShowTabModal(true),
-                onTabRemove: (tabId) => {
-                  setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
-                  if (activeFilter === tabId) {
-                    handleFilterChange("all");
-                  }
-                },
-
-                // Search
-                showSearch: true,
-                searchValue: dealsSearch,
-                searchPlaceholder: "Search deals by name, company, value...",
-                onSearchChange: (value) => {
-                  setDealsSearch(value);
-                  // Clear search on empty value
-                  if (!value) {
-                    const newFilters = { ...currentFilters };
-                    delete newFilters.search;
-                    handleFiltersChange(newFilters);
-                    setRefreshKey((prev) => prev + 1);
-                  }
-                },
-                onSearch: () => {
-                  if (dealsSearch) {
-                    handleFiltersChange({
-                      ...currentFilters,
-                      search: dealsSearch,
-                    });
-                    setDealsPagination({ ...dealsPagination, currentPage: 1 });
-                    setRefreshKey((prev) => prev + 1);
-                  }
-                },
-
-                // Actions
-                showTableViewDropdown: true,
-                tableViewLabel: "Table view",
-                showViewSwitcher: true,
-                showEditColumns: true,
-                onEditColumnsClick: () => setShowColumnEditor(true),
-                showPipelineDropdown: false,
-                pipelineLabel: "All Pipelines",
-                showFiltersButton: true,
-                onFiltersClick: handleOpenFiltersSidebar,
-                showSortButton: true,
-                showExportButton: true,
-                onExportClick: () => setShowExportModal(true),
-                showSaveButton: true,
-                onSaveClick: () => console.log("Save view"),
-
-                // Filter Pills
-                filterPills: [
-                  {
-                    id: "contact_owner",
-                    label: "Associate with",
-                    showDropdown: true,
-                    dropdownOptions: [
-                      {
-                        label: "All Owners",
-                        value: "all",
-                        onClick: () => {
-                          const newFilters = { ...currentFilters };
-                          delete newFilters.assigned_to;
-                          handleFiltersChange(newFilters);
-                          setRefreshKey((prev) => prev + 1);
-                        },
-                      },
-                      ...extensions.map((ext) => ({
-                        label: ext.display_name || ext.name || ext.extension,
-                        value: ext.id || ext.extension,
-                        onClick: () => {
-                          handleFiltersChange({
-                            ...currentFilters,
-                            assigned_to: ext.id || ext.extension,
-                          });
-                          setRefreshKey((prev) => prev + 1);
-                        },
-                      })),
-                    ],
-                  },
-                ],
-                showAdvancedFilters: true,
-                onAdvancedFiltersClick: handleOpenFiltersSidebar,
-              }}
-              // Stats cards for metrics
+              toolbar={approvalsToolbarConfig}
               statsCards={dealsStatsCards}
+              customBody={
+                approvalsViewMode === "board" ? (
+                  <div
+                    className="d-flex align-items-center justify-content-center p-5"
+                    style={{ minHeight: "400px", background: "#f8f9fa" }}
+                  >
+                    <div className="text-center text-muted">
+                      <Layers size={48} className="mb-3 opacity-50" />
+                      <h5 className="mb-2">Board View</h5>
+                      <p className="mb-0 small">
+                        Switch to Table view from the dropdown to see the
+                        table.
+                      </p>
+                    </div>
+                  </div>
+                ) : undefined
+              }
             />
           </div>
         </div>
@@ -7411,6 +7507,87 @@ const CrmDeals = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Column Editor Modal */}
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedDealsColumns}
+        onApply={(keys) => {
+          setSelectedDealsColumns(keys);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(
+              "dealsSelectedColumns",
+              JSON.stringify(keys),
+            );
+          }
+        }}
+      />
+
+      {/* Export Modal */}
+      <CrmExportModal
+        show={showExportModal}
+        onHide={() => setShowExportModal(false)}
+        title="Export Deals"
+        subtitle="Choose filters to define which deals are exported. Defaults match your current table view."
+        fileNameValue={exportFileName}
+        onFileNameChange={setExportFileName}
+        fileNamePlaceholder={`approvals_deals_${moment().format("YYYY-MM-DD")}`}
+        onExportClick={handleApprovalsExport}
+        exporting={exporting}
+        exportButtonLabel="Export"
+      >
+        <hr />
+        <h6 className="mb-3">Export filters</h6>
+        <Row>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Owner</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All owners" },
+                  ...extensions.map((ext: any) => ({
+                    value: String(ext.id ?? ext.extension),
+                    label:
+                      ext.display_name || ext.name || ext.id || ext.extension || "",
+                  })),
+                ]}
+                value={
+                  exportFilters.assigned_to
+                    ? (() => {
+                        const id = exportFilters.assigned_to;
+                        const ext = extensions.find(
+                          (e: any) => (e.id || e.extension) === id,
+                        );
+                        return {
+                          value: id,
+                          label: ext
+                            ? ext.display_name || ext.name || id
+                            : id,
+                        };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.assigned_to = v;
+                    else delete next.assigned_to;
+                    return next;
+                  });
+                }}
+                placeholder="Select owner..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+        </Row>
+      </CrmExportModal>
 
       {/* Convert to Order Modal */}
       {dealToConvert && (

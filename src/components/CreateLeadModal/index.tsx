@@ -1823,6 +1823,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                     value={formData.company_domain}
                     onChange={(e) => handleInputChange("company_domain", e.target.value)}
                     placeholder="e.g. example.com"
+                    data-no-capitalize
                     style={inputStyle}
                     onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
                     onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
@@ -2221,9 +2222,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             }}
           >
             <CheckCircle size={16} style={{ verticalAlign: "middle", marginRight: "6px" }} />
-            {loading ? (editLeadId ? "Updating..." : "Creating...") : (editLeadId ? "Update" : "Create")}
+            {loading ? (editLeadId ? "Updating..." : "Creating...") : (editLeadId ? "Update" : crmDataId ? "Convert" : "Create")}
           </button>
-          {!editLeadId && (
+          {!editLeadId && !crmDataId && (
           <button
             type="button"
             disabled={loading || editFetching || loadingProspectData}
