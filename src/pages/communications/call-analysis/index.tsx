@@ -124,9 +124,9 @@ const AnalyzeRecordings = () => {
         },
         {
             id: 'transribing-transcriptions',
-            title: 'Transribing',
+            title: 'Transcribing',
             value: transcriptionSummary?.transribing_transcriptions || 0,
-            description: 'Transribing calls in the system',
+            description: 'Transcribing calls in the system',
             delay: 0.7,
             ...baseCardConfig
         },

@@ -317,11 +317,11 @@ export const routePermissions: RoutePermission[] = [
             { path: '/sub-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
 
             
-            {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/attendance',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
             {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]
     },
-    //workforce services end
+    //workforce services ends
 
 
     //reports services start

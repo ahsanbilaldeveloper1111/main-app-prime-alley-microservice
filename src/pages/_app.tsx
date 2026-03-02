@@ -10,7 +10,10 @@ import { appWithTranslation } from "next-i18next";
 import { ToastContainer } from 'react-toastify';
 import * as Sentry from "@sentry/nextjs";
 import Providers from "@components/providers";
-import favicon from "@assets/images/favicon.png";
+
+import favicon from "@assets/images/favicon-analisys.ico";
+// import faviconBlack from "@assets/images/favicon-black.png";
+
 import Router, { useRouter } from "next/router";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
@@ -120,7 +123,7 @@ const MyApp: any = ({ Component, pageProps, ...rest }: AppPropsWithLayout) => {
   return (
     <>
       <Head>
-        {/* <link rel='icon' href={favicon.src} /> */}
+        <link rel='icon' href={favicon.src} type="image/x-icon" />
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"

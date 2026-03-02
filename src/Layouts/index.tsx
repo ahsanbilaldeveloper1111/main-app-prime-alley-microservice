@@ -118,9 +118,9 @@ const Layout = ({ children }: LayoutProps) => {
 			.then((blob) => {
 				if (cancelled) return;
 				if (blob && blob.size > 0) {
-					const url = URL.createObjectURL(blob);
-					headerLogoUrlRef.current = url;
-					setHeaderLogoUrl(url);
+					// const url = URL.createObjectURL(blob);
+					// headerLogoUrlRef.current = url; //
+					setHeaderLogoUrl('');
 				} else {
 					setHeaderLogoUrl(null);
 				}
@@ -233,7 +233,9 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const totalUnreadCount = unreadCount;
 
-	const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInCompanyName, setLoggedInCompanyName] = useState('');
+  
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
 	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
 	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
@@ -242,6 +244,7 @@ const Layout = ({ children }: LayoutProps) => {
 		if (status !=="loading" && session) {
 		  if (typeof window !== "undefined") {
 		    setLoggedInName(session.user.name || '');
+		    setLoggedInCompanyName(session.user.company_name || '');
 		    setLoggedInUserUsername(session.user.username || '');
 		    setLoggedInUserRole(session.user.role || '');
 		    setLoggedInUserProfilePicture(session.user?.profile_picture || '');
@@ -1449,15 +1452,15 @@ font-weight:600;
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
                 >
                   <div className="crm-prime-user-avatar">
-                    {profileImageUrl ? (
-                      <img src={profileImageUrl} alt={loggedInName || ''} />
+                    {headerLogoUrl ? (
+                      <img src={headerLogoUrl} alt={loggedInCompanyName || ''} />
                     ) : (
-                      loggedInName?.charAt(0)?.toUpperCase() || <User size={14} />
+                      loggedInCompanyName?.charAt(0)?.toUpperCase() || <User size={14} />
                     )}
                   </div>
                   <div className="crm-prime-user-info">
                     <div>
-                      <div className="crm-prime-user-name">{loggedInName || 'User'}</div>
+                      <div className="crm-prime-user-name">{loggedInCompanyName || 'CompanyloggedInCompanyName'}</div>
                     </div>
                     <ChevronDown size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                   </div>

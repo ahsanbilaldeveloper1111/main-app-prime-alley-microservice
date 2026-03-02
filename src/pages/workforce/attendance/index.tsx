@@ -204,9 +204,9 @@ const Attendences = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendences" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendance" />
 
-      <PageHeader title="Attendences" showSearch={false} />
+      <PageHeader title="Attendance" showSearch={false} />
 
       {/* Current status & Check In / Out */}
       <div
