@@ -75,14 +75,16 @@ const sidebarGroups: SidebarGroup[] = [
       { id: 'planner', label: 'Planner' },
       { id: 'virtual-agents', label: 'Virtual Agents' },
       { id: 'pulse', label: 'Pulse' },
+      
+      
       { id: 'compliance', label: 'Compliance', badge: 'Beta' },
       { id: 'workforce', label: 'Workforce' },
       { id: 'billing', label: 'Billing' },
-
+      
       { id: 'tickets', label: 'Tickets' },
       { id: 'help-center', label: 'Help Center' },
       { id: 'ai-chat', label: 'AI Chat' },
-      { id: 'gsm', label: 'Telco Gateway' },
+     
 
       
       // { id: 'account-cleanup', label: 'Account Cleanup', badge: 'Beta' },
@@ -1075,6 +1077,9 @@ const pulseTabs: Tab[] = [
   { id: 'hosts', label: 'Hosts' },
   { id: 'host-groups', label: 'Host Groups' },
   { id: 'events', label: 'Events' },
+  { id: 'assign-devices', label: 'Assign Devices' },
+  { id: 'sync-gsm', label: 'Sync GSM' },
+  { id: 'company-profiling', label: 'Company Profiling' },
 ]
 
 const PulsePage: React.FC = () => {
@@ -1084,6 +1089,9 @@ const PulsePage: React.FC = () => {
     'hosts': <Hosts />,
     'host-groups': <HostGroups />,
     events: <Events />,
+    'assign-devices': <GsmAssign />,
+    'sync-gsm': <GsmSync />,
+    'company-profiling': <CompanyPO />,
   }
 
   return (
@@ -1143,58 +1151,6 @@ const PulsePage: React.FC = () => {
   )
 }
 
-// ─── GSM / Telco Gateway (from settings: Assign Devices, Sync GSM, Company Profiling) ───
-const gsmTabs: Tab[] = [
-  { id: 'assign-devices', label: 'Assign Devices' },
-  { id: 'sync-gsm', label: 'Sync GSM' },
-  { id: 'company-profiling', label: 'Company Profiling' },
-]
-
-const GsmPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('assign-devices')
-  const tabContentMap: Record<string, React.ReactNode> = {
-    'assign-devices': <GsmAssign />,
-    'sync-gsm': <GsmSync />,
-    'company-profiling': <CompanyPO />,
-  }
-  return (
-    <div style={{ padding: '32px 40px', flex: 1 }}>
-      <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Telco Gateway</h1>
-      <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
-        {gsmTabs.map((tab, index) => {
-          const isActive = activeTab === tab.id
-          const isLast = index === gsmTabs.length - 1
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '12px 28px',
-                background: isActive ? '#ffffff' : 'whitesmoke',
-                border: '1px solid #e0e0e0',
-                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
-                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
-                cursor: 'pointer',
-                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                fontSize: '14px',
-                fontWeight: 300,
-                color: '#141414',
-                whiteSpace: 'nowrap',
-                transition: 'background 0.15s',
-                position: 'relative',
-                top: '1px',
-              }}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
-      <div>{tabContentMap[activeTab]}</div>
-    </div>
-  )
-}
-
 // Other section pages (dummy)
 const GenericPage: React.FC<{ title: string }> = ({ title }) => (
   <div style={{ padding: '32px 40px', flex: 1 }}>
@@ -1244,7 +1200,6 @@ const sectionPageMap: Record<string, React.ReactNode> = {
   'tickets': <TicketsPage />,
   'help-center': <HelpCenterPage />,
   'ai-chat': <AIChatPage />,
-  'gsm': <GsmPage />,
   'virtual-agents': <VirtualAgentsPage />,
   'pulse': <PulsePage />,
   'compliance': <GenericPage title="Compliance" />,
