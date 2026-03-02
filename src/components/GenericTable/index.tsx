@@ -253,6 +253,8 @@ export interface GenericTableProps<T = any> {
 
   // Column customization
   customizableColumns?: boolean;
+  /** When provided, column selection is controlled by the parent (e.g. from ColumnEditorModal) */
+  selectedColumns?: string[];
   defaultSelectedColumns?: string[];
   onColumnChange?: (selectedColumns: string[]) => void;
   columnStorageKey?: string;
@@ -315,6 +317,7 @@ const GenericTable = <T extends Record<string, any>>({
   selectedRows = [],
   onSelectionChange,
   customizableColumns = false,
+  selectedColumns: selectedColumnsProp,
   defaultSelectedColumns,
   onColumnChange,
   columnStorageKey,
@@ -351,15 +354,15 @@ const GenericTable = <T extends Record<string, any>>({
     setSortDirection(defaultSortDirection);
   }, [defaultSortColumn, defaultSortDirection]);
 
-  // Column selection state
+  // Column selection state (uncontrolled when selectedColumns prop is not provided)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    if (selectedColumnsProp && selectedColumnsProp.length > 0) return selectedColumnsProp;
     const defaults = defaultSelectedColumns || columns.map((c) => c.key);
     if (columnStorageKey && typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(columnStorageKey);
         if (saved) {
           const savedCols: string[] = JSON.parse(saved);
-          // Merge in any default columns missing from saved (e.g. newly added columns)
           const missing = defaults.filter(
             (c: string) => !savedCols.includes(c),
           );
@@ -369,6 +372,14 @@ const GenericTable = <T extends Record<string, any>>({
     }
     return defaults;
   });
+
+  // Sync internal column selection when parent controls it (e.g. ColumnEditorModal apply)
+  const effectiveSelectedColumns = selectedColumnsProp ?? selectedColumns;
+  useEffect(() => {
+    if (selectedColumnsProp !== undefined && selectedColumnsProp.length > 0) {
+      setSelectedColumns(selectedColumnsProp);
+    }
+  }, [selectedColumnsProp]);
 
   // Context menu (right‑click) state
   const [contextMenu, setContextMenu] = useState<{
@@ -500,11 +511,11 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  // Filter visible columns
+  // Filter visible columns (use effective so controlled parent updates apply)
   const visibleColumns = useMemo(() => {
     if (!customizableColumns) return columns;
-    return columns.filter((col) => selectedColumns.includes(col.key));
-  }, [columns, selectedColumns, customizableColumns]);
+    return columns.filter((col) => effectiveSelectedColumns.includes(col.key));
+  }, [columns, effectiveSelectedColumns, customizableColumns]);
 
   // Sortable columns for toolbar Sort dropdown
   const sortableColumns = useMemo(
@@ -688,18 +699,19 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
-  // Handle column selection
+  // Handle column selection (when controlled, parent updates via onColumnChange)
   const handleColumnToggle = (columnKey: string) => {
-    const newSelected = selectedColumns.includes(columnKey)
-      ? selectedColumns.filter((k) => k !== columnKey)
-      : [...selectedColumns, columnKey];
+    const current = effectiveSelectedColumns;
+    const newSelected = current.includes(columnKey)
+      ? current.filter((k) => k !== columnKey)
+      : [...current, columnKey];
 
-    setSelectedColumns(newSelected);
-
+    if (selectedColumnsProp === undefined) {
+      setSelectedColumns(newSelected);
+    }
     if (columnStorageKey) {
       localStorage.setItem(columnStorageKey, JSON.stringify(newSelected));
     }
-
     if (onColumnChange) {
       onColumnChange(newSelected);
     }
@@ -1466,7 +1478,7 @@ const GenericTable = <T extends Record<string, any>>({
                                     <Form.Check
                                       type="checkbox"
                                       label={c.label || c.key}
-                                      checked={selectedColumns.includes(c.key)}
+                                      checked={effectiveSelectedColumns.includes(c.key)}
                                       onChange={() => handleColumnToggle(c.key)}
                                     />
                                   </Dropdown.Item>
@@ -1475,7 +1487,8 @@ const GenericTable = <T extends Record<string, any>>({
                                 <Dropdown.Item
                                   onClick={() => {
                                     const allKeys = columns.map((c) => c.key);
-                                    setSelectedColumns(allKeys);
+                                    if (selectedColumnsProp === undefined)
+                                      setSelectedColumns(allKeys);
                                     if (columnStorageKey)
                                       localStorage.setItem(
                                         columnStorageKey,
@@ -1491,7 +1504,8 @@ const GenericTable = <T extends Record<string, any>>({
                                     const defaultKeys =
                                       defaultSelectedColumns ||
                                       columns.map((c) => c.key);
-                                    setSelectedColumns(defaultKeys);
+                                    if (selectedColumnsProp === undefined)
+                                      setSelectedColumns(defaultKeys);
                                     if (columnStorageKey)
                                       localStorage.setItem(
                                         columnStorageKey,
@@ -1540,7 +1554,7 @@ const GenericTable = <T extends Record<string, any>>({
                                   <Form.Check
                                     type="checkbox"
                                     label={c.label || c.key}
-                                    checked={selectedColumns.includes(c.key)}
+                                    checked={effectiveSelectedColumns.includes(c.key)}
                                     onChange={() => handleColumnToggle(c.key)}
                                   />
                                 </Dropdown.Item>
@@ -1549,7 +1563,8 @@ const GenericTable = <T extends Record<string, any>>({
                               <Dropdown.Item
                                 onClick={() => {
                                   const allKeys = columns.map((c) => c.key);
-                                  setSelectedColumns(allKeys);
+                                  if (selectedColumnsProp === undefined)
+                                    setSelectedColumns(allKeys);
                                   if (columnStorageKey)
                                     localStorage.setItem(
                                       columnStorageKey,
@@ -1565,7 +1580,8 @@ const GenericTable = <T extends Record<string, any>>({
                                   const defaultKeys =
                                     defaultSelectedColumns ||
                                     columns.map((c) => c.key);
-                                  setSelectedColumns(defaultKeys);
+                                  if (selectedColumnsProp === undefined)
+                                    setSelectedColumns(defaultKeys);
                                   if (columnStorageKey)
                                     localStorage.setItem(
                                       columnStorageKey,
