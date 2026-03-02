@@ -3039,7 +3039,8 @@ const CrmOrders = () => {
               onClick: () => {
                 const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
                 if (orderId) {
-                  router.push(`/crm/orders/${orderId}/edit`);
+                  setShowOrderSidebar(false);
+                  router.push(`/crm/orders/${orderId}/order-detailpage`);
                 }
               },
             }}
@@ -3052,7 +3053,10 @@ const CrmOrders = () => {
                     const orderId =
                       selectedOrder?.id || selectedOrder?.rawData?.id;
                     if (orderId) {
-                      router.push(`/crm/orders/${orderId}/edit`);
+                      setShowOrderSidebar(false);
+                      setEditingOrderIdInSidebar(orderId);
+                      setEditOrderModeInSidebar("account");
+                      setShowEditOrderSidebar(true);
                     }
                   },
                 },
@@ -3088,55 +3092,6 @@ const CrmOrders = () => {
                 },
               ],
             }}
-            quickActions={[
-              {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {
-                  const phone = selectedOrder?.customer_phone;
-                  if (phone) {
-                    // Handle call action
-                  }
-                },
-                disabled: !selectedOrder?.customer_phone,
-              },
-              {
-                id: "email",
-                label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                disabled: !selectedOrder?.customer_email,
-              },
-              {
-                id: "task",
-                label: "Task",
-                icon: FileText,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
-              },
-            ]}
             sections={[
               {
                 id: "about-order",
@@ -3300,6 +3255,22 @@ const CrmOrders = () => {
                     show: !!selectedOrder?.payment_status,
                   },
                 ],
+              },
+              {
+                id: "recent-activities",
+                title: "Recent activities",
+                icon: History,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this order.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => console.log("Log activity"),
+                  },
+                },
               },
             ]}
           />

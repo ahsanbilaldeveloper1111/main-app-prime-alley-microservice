@@ -3996,7 +3996,8 @@ const CrmLeads = () => {
               onClick: () => {
                 const leadId = selectedLead?.id || selectedLead?.rawData?.id;
                 if (leadId) {
-                  router.push(`/crm/leads/${leadId}/edit`);
+                  setShowLeadSidebar(false);
+                  router.push(`/crm/leads/leads-detailpage?id=${leadId}`);
                 }
               },
             }}
@@ -4009,7 +4010,8 @@ const CrmLeads = () => {
                     const leadId =
                       selectedLead?.id || selectedLead?.rawData?.id;
                     if (leadId) {
-                      router.push(`/crm/leads/${leadId}/edit`);
+                      setShowLeadSidebar(false);
+                      handleEditLead(leadId);
                     }
                   },
                 },
@@ -4048,66 +4050,6 @@ const CrmLeads = () => {
                 },
               ],
             }}
-            quickActions={[
-              {
-                id: "note",
-                label: "Note",
-                icon: FileText,
-                onClick: () => {}, // This is handled internally now
-                disabled: false,
-              },
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {},
-                disabled: !contactPhone,
-              },
-              {
-                id: "email",
-                label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                disabled: !contactEmail,
-              },
-              {
-                id: "task",
-                label: "Task",
-                icon: CheckSquare,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {
-                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                  if (leadId) {
-                    setMeetingData({
-                      leadId: Number(leadId),
-                      leadName: selectedLead?.name || "",
-                      meetingName: "",
-                      meetingType: "Online",
-                      meetingDate: "",
-                      meetingTime: "",
-                      meetingOutcome: "",
-                      extensions: [],
-                    });
-                    setMeetingAttendees([]);
-                    setShowAddMeetingModal(true);
-                  }
-                },
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => console.log("More actions"),
-                disabled: false,
-              },
-            ]}
             sections={[
               {
                 id: "about-lead",
@@ -4122,7 +4064,8 @@ const CrmLeads = () => {
                       const leadId =
                         selectedLead?.id || selectedLead?.rawData?.id;
                       if (leadId) {
-                        router.push(`/crm/leads/${leadId}/edit`);
+                        setShowLeadSidebar(false);
+                        handleEditLead(leadId);
                       }
                     },
                   },

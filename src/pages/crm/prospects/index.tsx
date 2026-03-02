@@ -8313,7 +8313,13 @@ const CrmProspectsManagement = () => {
             crmSummary={selectedProspect?.data?.crm_summary ?? selectedProspect?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
-              onClick: () => console.log("View full prospect record"),
+              onClick: () => {
+                const prospectId = selectedProspect?.id;
+                if (prospectId != null) {
+                  setShowProspectSidebar(false);
+                  router.push(`/crm/prospects/prospects-detailpage?id=${prospectId}`);
+                }
+              },
             }}
             actionsDropdown={{
               label: "Actions",
@@ -8343,50 +8349,6 @@ const CrmProspectsManagement = () => {
                 },
               ],
             }}
-            quickActions={[
-              {
-                id: "call",
-                label: "Call",
-                icon: Phone,
-                onClick: () => {},
-                disabled: !selectedProspect?.phone,
-              },
-              {
-                id: "whatsapp",
-                label: "WhatsApp",
-                icon: MessageCircle,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "sms",
-                label: "SMS",
-                icon: MessageSquare,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "meeting",
-                label: "Meeting",
-                icon: Calendar,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "email",
-                label: "Email",
-                icon: Mail,
-                onClick: () => {},
-                disabled: false,
-              },
-              {
-                id: "more",
-                label: "More",
-                icon: MoreVertical,
-                onClick: () => {},
-                disabled: false,
-              },
-            ]}
             sections={[
               {
                 id: "about-prospect",
