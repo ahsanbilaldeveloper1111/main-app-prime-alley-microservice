@@ -21,9 +21,15 @@ const Hosts = () => {
   const [searchValue, setSearchValue] = useState('');
   const [tablePagination, setTablePagination] = useState({
     currentPage: 1,
-    rowsPerPage: 15,
+    rowsPerPage: 2,
     totalRows: 0,
-    pageSizeOptions: [10, 15, 25, 50, 100] as number[],
+    pageSizeOptions: [5, 10, 15, 20, 25, 50, 100] as number[],
+  });
+  const [apiPagination, setApiPagination] = useState({
+    offset: 0,
+    limit: 2,
+    total: 0,
+    has_more: false,
   });
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedHost, setSelectedHost] = useState<ZabbixHost | null>(null);
@@ -111,25 +117,29 @@ const Hosts = () => {
   },
   ];
 
-  const fetchHosts = useCallback(async () => {
+  const fetchHosts = useCallback(async (offset: number = 0, limit: number = tablePagination.rowsPerPage) => {
     setLoading(true);
     try {
       const response = await getHosts({
-       output: ["hostid", "host", "name"],
-        selectInterfaces: ["interfaceid", "ip"]
+        output: ['hostid', 'host', 'name'],
+        selectInterfaces: ['interfaceid', 'ip'],
+        selectGroups: ['groupid', 'name'],
+        offset,
+        limit,
       });
-      if (response.error) {
-        toast.error(response.error.message || 'Failed to fetch hosts');
-        setHosts([]);
-        return;
-      }
-      const list = response.result ?? [];
-      const data = Array.isArray(list) ? (list as ZabbixHost[]) : [];
+      const data = response.hosts ?? [];
       setHosts(data);
+      setApiPagination({
+        offset: response.offset,
+        limit: response.limit,
+        total: response.total,
+        has_more: response.has_more,
+      });
       setTablePagination((prev) => ({
         ...prev,
-        totalRows: data.length,
-        currentPage: 1,
+        totalRows: response.total,
+        currentPage: Math.floor(offset / limit) + 1,
+        rowsPerPage: limit,
       }));
     } catch (error) {
       console.error('Error fetching hosts:', error);
@@ -141,12 +151,8 @@ const Hosts = () => {
   }, []);
 
   useEffect(() => {
-    fetchHosts();
+    fetchHosts(0, tablePagination.rowsPerPage);
   }, [refreshKey, fetchHosts]);
-
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
 
   const filteredHosts = searchValue.trim()
     ? hosts.filter(
@@ -158,10 +164,25 @@ const Hosts = () => {
       )
     : hosts;
 
-  const paginatedData = filteredHosts.slice(
-    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
-    tablePagination.currentPage * tablePagination.rowsPerPage
-  );
+  const paginatedData = filteredHosts;
+
+  const handlePrevPage = () => {
+    const { offset, limit } = apiPagination;
+    const newOffset = Math.max(0, offset - limit);
+    fetchHosts(newOffset, limit);
+  };
+
+  const handleNextPage = () => {
+    const { offset, limit, has_more, total } = apiPagination;
+    const canNext = has_more || offset + hosts.length < total;
+    if (canNext) {
+      fetchHosts(offset + limit, limit);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshKey((k) => k + 1);
+  };
 
   const summaryCards: SummaryCard[] = [
     {
@@ -208,7 +229,34 @@ const Hosts = () => {
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
+      {/* API pagination: Prev / Next */}
+      <Row className="mb-2 align-items-center">
+        <Col>
+          <span className="text-muted small">
+            {apiPagination.total === 0
+              ? 'No hosts'
+              : `Showing ${apiPagination.offset + 1}–${apiPagination.offset + hosts.length} of ${apiPagination.total}`}
+          </span>
+        </Col>
+        <Col className="d-flex justify-content-end gap-2">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handlePrevPage}
+            disabled={loading || apiPagination.offset <= 0}
+          >
+            ← Prev
+          </Button>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={loading || !apiPagination.has_more}
+          >
+            Next →
+          </Button>
+        </Col>
+      </Row>
 
       <GenericTable<ZabbixHost>
         data={paginatedData}
@@ -222,15 +270,13 @@ const Hosts = () => {
         pagination={{
           currentPage: tablePagination.currentPage,
           rowsPerPage: tablePagination.rowsPerPage,
-          totalRows: filteredHosts.length,
+          totalRows: apiPagination.total,
           pageSizeOptions: tablePagination.pageSizeOptions,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setTablePagination((prev) => ({
-            ...prev,
-            currentPage: page,
-            rowsPerPage,
-          }));
+          const newOffset = (page - 1) * rowsPerPage;
+          fetchHosts(newOffset, rowsPerPage);
+          setTablePagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
         }}
         sortable={true}
         hover={true}

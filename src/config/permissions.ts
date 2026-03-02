@@ -208,6 +208,7 @@ export const routePermissions: RoutePermission[] = [
 
             { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
             { path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            { path: '/calendar', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
             
             {
                 path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
