@@ -889,7 +889,7 @@ const CELL_STYLE: React.CSSProperties = {
             </div>
   
             {/* RIGHT */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {/* <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               <Button
                 variant="outline-secondary"
                 style={{
@@ -916,7 +916,7 @@ const CELL_STYLE: React.CSSProperties = {
               >
                 Start {total} tasks
               </Button>
-            </div>
+            </div> */}
           </div>
   
           {/* ══════════════════════════════════════════════════════

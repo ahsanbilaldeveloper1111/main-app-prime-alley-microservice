@@ -24,12 +24,13 @@ import {
 import { toast } from "react-toastify";
 import CompanyData from "@pages/crm/companies";
 import DealsData from "@pages/crm/deals";
-import TasksData from "@pages/crm/crm-tasks";
+import TasksData from "@pages/planner/tasks";
 import AssociateTaskModal from "@components/AssociateTaskModal";
 import CreateTaskSidebar from "@components/CreateTaskSidebar";
 import UserActivityByCategory from "@components/UserActivityByCategory";
 import TwoCharts from "@components/TwoCharts";
 import SchedulePage from "@components/SchedulePage";
+import {useSession} from "next-auth/react";
 
 // ─── Styles (inline via style tag approach using className strings) ───────────
 
@@ -468,6 +469,11 @@ type NextPageWithLayout = React.FC & {
 };
 
 const SalesDashboard: NextPageWithLayout = () => {
+  const { data: session, status } = useSession();
+  
+
+
+
   const [activeTab, setActiveTab] = useState("Summary");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -497,11 +503,11 @@ const SalesDashboard: NextPageWithLayout = () => {
           <div style={styles.headerTitle}>
             <span>Welcome</span>
             <span style={styles.headerDivider}>|</span>
-            <span style={styles.headerUser}>Rizwan Haider</span>
+            <span style={styles.headerUser}>{session?.user?.name}</span>
           </div>
-          <div style={styles.helpBtn}>
+          {/* <div style={styles.helpBtn}>
             <HelpCircle size={15} color="#666" />
-          </div>
+          </div> */}
         </div>
         <nav style={styles.nav}>
           {navTabs.map((tab) => (
@@ -561,14 +567,14 @@ const SalesDashboard: NextPageWithLayout = () => {
                   <Plus size={12} /> Create task
                 </span>
               </button>
-              <button
+              {/* <button
   style={{ ...styles.btn, ...styles.btnPrimary }}
   onClick={() => setIsModalOpen(true)}
 >
   <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
     <Play size={12} /> Start tasks
   </span>
-</button>
+</button> */}
             </div>
           </div>
 

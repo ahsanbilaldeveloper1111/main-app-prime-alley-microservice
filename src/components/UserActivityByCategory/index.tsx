@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -18,31 +18,32 @@ const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const categories = [
-  { name: "Property Value",            value: 57.5, color: "#F4A57A" },
-  { name: "CRM Object",                value: 20.8, color: "#4ECDC4" },
-  { name: "CRM Object Association",    value: 6.2,  color: "#B5A7E0" },
-  { name: "Security Activity",         value: 3.8,  color: "#F4D47A" },
-  { name: "Property Definition",       value: 2.6,  color: "#F48FB1" },
-  { name: "Workflows",                 value: 1.4,  color: "#90CAF9" },
-  { name: "Content",                   value: 1.2,  color: "#A5D6A7" },
-  { name: "Meeting",                   value: 1.0,  color: "#EF6C00" },
-  { name: "Communication preferences", value: 0.9,  color: "#006D77" },
-  { name: "Record Creation Form",      value: 0,    color: "#CE93D8" },
-  { name: "Segments",                  value: 0,    color: "#B0BEC5" },
+  { name: "Leads", value: 70.5, color: "#F4A57A" },
+  { name: "Deals", value: 60.5, color: "#90CAF9" },
+  { name: "Orders",            value: 50.5, color: "#A5D6A7" },
+  { name: "Companies",                value: 20.8, color: "#4ECDC4" },
+  { name: "Tasks",    value: 6.2,  color: "#B5A7E0" },
+  { name: "Meetings",         value: 3.8,  color: "#F4D47A" },
+  { name: "Calls",       value: 2.6,  color: "#F48FB1" },
+  { name: "Emails",                   value: 1.0,  color: "#EF6C00" },
+  { name: "Tickets", value: 0.8,  color: "#006D77" },
+  { name: "Attendance",      value: 0.5,    color: "#CE93D8" },
+  { name: "Projects",                  value: 0.2,    color: "#B0BEC5" },
 ];
 
 // Legend items (top 10 shown in legend)
 const legendItems = [
-  { label: "Property Value",            color: "#F4A57A" },
-  { label: "CRM Object",                color: "#4ECDC4" },
-  { label: "CRM Object Association",    color: "#B5A7E0" },
-  { label: "Security Activity",         color: "#F4D47A" },
-  { label: "Property Definition",       color: "#F48FB1" },
-  { label: "Workflows",                 color: "#90CAF9" },
-  { label: "Content",                   color: "#A5D6A7" },
-  { label: "Meeting",                   color: "#EF6C00" },
-  { label: "Communication preferences", color: "#006D77" },
-  { label: "Record Creation Form",      color: "#CE93D8" },
+  { label: "Leads",            color: "#F4A57A" },
+  { label: "Deals",            color: "#90CAF9" },
+  { label: "Orders",            color: "#A5D6A7" },
+  { label: "Companies",                color: "#4ECDC4" },
+  { label: "Tasks",    color: "#B5A7E0" },
+  { label: "Meetings",         color: "#F4D47A" },
+  { label: "Calls",       color: "#F48FB1" },
+  { label: "Emails",                   color: "#EF6C00" },
+  { label: "Tickets", color: "#006D77" },
+  { label: "Attendance", color: "#CE93D8" },
+  { label: "Projects", color: "#B0BEC5" },
 ];
 
 // ─── Custom Tooltip ────────────────────────────────────────────────────────────
@@ -82,6 +83,8 @@ const formatXTick = (value: number) => `${value}%`;
 export default function UserActivityByCategory() {
   const [fromDate, setFromDate] = useState("27/01/2026");
   const [toDate, setToDate] = useState("27/02/2026");
+  const fromInputRef = useRef<HTMLInputElement>(null);
+  const toInputRef = useRef<HTMLInputElement>(null);
 
   const handleFromDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const date = new Date(e.target.value);
@@ -127,7 +130,7 @@ export default function UserActivityByCategory() {
             fontFamily: FONT,
           }}
         >
-          Chart view
+          Chart view 
         </h2>
 
         {/* Filters */}
@@ -176,6 +179,7 @@ export default function UserActivityByCategory() {
 
           {/* From date */}
           <label
+            onClick={() => fromInputRef.current?.showPicker?.()}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -194,18 +198,19 @@ export default function UserActivityByCategory() {
             <Calendar size={14} color="#555" style={{ pointerEvents: "none" }} />
             <span style={{ pointerEvents: "none" }}>{fromDate}</span>
             <input
+              ref={fromInputRef}
               type="date"
               value={formatDateForInput(fromDate)}
               onChange={handleFromDateChange}
               style={{
                 position: "absolute",
-                opacity: 0,
+                inset: 0,
                 width: "100%",
                 height: "100%",
-                left: 0,
-                top: 0,
+                opacity: 0.01,
                 cursor: "pointer",
-                zIndex: 1,
+                zIndex: 2,
+                pointerEvents: "auto",
               }}
             />
           </label>
@@ -214,6 +219,7 @@ export default function UserActivityByCategory() {
 
           {/* To date */}
           <label
+            onClick={() => toInputRef.current?.showPicker?.()}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -232,18 +238,19 @@ export default function UserActivityByCategory() {
             <Calendar size={14} color="#555" style={{ pointerEvents: "none" }} />
             <span style={{ pointerEvents: "none" }}>{toDate}</span>
             <input
+              ref={toInputRef}
               type="date"
               value={formatDateForInput(toDate)}
               onChange={handleToDateChange}
               style={{
                 position: "absolute",
-                opacity: 0,
+                inset: 0,
                 width: "100%",
                 height: "100%",
-                left: 0,
-                top: 0,
+                opacity: 0.01,
                 cursor: "pointer",
-                zIndex: 1,
+                zIndex: 2,
+                pointerEvents: "auto",
               }}
             />
           </label>
@@ -288,7 +295,7 @@ export default function UserActivityByCategory() {
       </div>
 
       {/* Pagination hint */}
-      <div
+      {/* <div
         style={{
           fontSize: "12px",
           color: "#141414",
@@ -302,7 +309,7 @@ export default function UserActivityByCategory() {
         <span style={{ fontSize: "14px" }}>▲</span>
         <span>1/2</span>
         <span style={{ fontSize: "14px" }}>▼</span>
-      </div>
+      </div> */}
 
       {/* ── Chart ── */}
       <ResponsiveContainer width="100%" height={360}>
@@ -368,7 +375,7 @@ export default function UserActivityByCategory() {
       </ResponsiveContainer>
 
       {/* ── View filtered records ── */}
-      <div
+      {/* <div
         style={{
           display: "flex",
           justifyContent: "center",
@@ -393,7 +400,7 @@ export default function UserActivityByCategory() {
           View filtered records
           <ExternalLink size={13} />
         </a>
-      </div>
+      </div> */}
     </div>
   );
 }

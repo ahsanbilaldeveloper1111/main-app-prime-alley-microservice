@@ -60,7 +60,8 @@ import {
   Layers2,
   Map,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  House
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -180,7 +181,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'compliance',
     'workforce',
     'unified-reports',
-    'audit-logs'
+    'audit-logs',
+    'settings',
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -188,7 +190,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'dashboard',
       key: 'dashboard',
       permission: '',
-      icon: <LayoutDashboard size={16} />,
+      icon: <House size={16} />,
       color: MENU_COLORS.DASHBOARD,
       title: "Overview",
       label: "Overview",
@@ -661,9 +663,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'workforce-attendence',
-          title: 'Attendence',
+          title: 'Attendance',
           icon: <Clock size={16} />,
-          url: '/workforce/attendences',
+          url: '/workforce/attendance',
           permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
         },
         { 
@@ -779,16 +781,29 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     //reports and audit services end
 
     //audit logs services start
+      {
+        id: 'audit-logs',
+        key: 'audit-logs',
+        permission: PERMISSIONS.TMS_SERVICES,
+        icon: <History size={16} />,
+        color: MENU_COLORS.REPORTS,
+        title: 'Audit Logs',
+        label: 'Audit Logs',
+        url: '/audit-logs',
+    },
+    //audit logs services end
+    //settings services start
     {
-      id: 'audit-logs',
-      key: 'audit-logs',
+      id: 'settings',
+      key: 'settings',
       permission: PERMISSIONS.TMS_SERVICES,
-      icon: <History size={16} />,
+      icon: <Settings size={16} />,
       color: MENU_COLORS.REPORTS,
-      title: 'Audit Logs',
-      label: 'Audit Logs',
-      url: '/audit-logs',
-    }
+      title: 'Settings',
+      label: 'Settings',
+      url: '/main-settings',
+    },
+    //settings services end
 
   ].filter(item => ENABLED_MODULE_IDS.includes(item.id) && (!item.permission || hasPermission(item.permission)));
 
@@ -1576,9 +1591,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       {/* Main Sidebar */}
       <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''} ${!isSidebarExpanded ? 'collapsed' : ''}`}>
         {/* Header */}
-        <div className="sidebar-header">
-          {isSidebarExpanded && <div className="sidebar-logo">
+        <div className="sidebar-header" style={{ display: 'none' }}>
+          {isSidebarExpanded && <div className="sidebar-logo menu-item-text">
             {userCompanyName}
+
             {/* {currentUserCompanyImageUrl ? (
               <img
                 src={currentUserCompanyImageUrl}
@@ -1592,6 +1608,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             ) : (
               <img src={logodark.src} alt="logo" className="img-fluid" />
             )} */}
+
+
           </div>}
         </div>
 
@@ -1616,6 +1634,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
+                      type="button"
+                      title={module.title}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1629,6 +1649,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
+                    type="button"
+                    title={module.title}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
@@ -1664,6 +1686,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
+                      type="button"
+                      title={module.title}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1677,6 +1701,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
+                    type="button"
+                    title={module.title}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
@@ -1712,6 +1738,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
+                      type="button"
+                      title={module.title}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1725,6 +1753,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
+                    type="button"
+                    title={module.title}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
