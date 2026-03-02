@@ -412,6 +412,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/planner/tasks',
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
         },
+        {
+          id: 'planner-calendar',
+          title: 'Calendar',
+          icon: <Calendar size={16} />,
+          url: '/planner/calendar',
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+        },
 
       
         { 
