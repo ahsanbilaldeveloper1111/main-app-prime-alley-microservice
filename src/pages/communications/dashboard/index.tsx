@@ -61,6 +61,144 @@ interface TrendByCountry {
 
 const DATETIME_LOCAL_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
+const xaxisLabelsStyle = { show: true as const, style: { fontSize: "11px", colors: "#666" } };
+
+const DEFAULT_COUNTRY_CHART_OPTIONS: ApexOptions = {
+  chart: { type: "bar", toolbar: { show: false } },
+  plotOptions: { bar: { borderRadius: 4, borderRadiusApplication: "end", horizontal: true } },
+  legend: { show: true, position: "bottom" },
+  dataLabels: { enabled: false },
+  tooltip: {},
+  xaxis: { categories: [], labels: xaxisLabelsStyle },
+  yaxis: { title: { text: "", style: { fontSize: "12px", fontWeight: "bold", color: "#263238" } } },
+};
+
+const DEFAULT_DEPARTMENT_CHART_OPTIONS: ApexOptions = {
+  ...DEFAULT_COUNTRY_CHART_OPTIONS,
+  yaxis: { title: { text: "Call Count", style: { fontSize: "12px", fontWeight: "bold", color: "#263238" } }, labels: xaxisLabelsStyle },
+  fill: { opacity: 1 },
+};
+
+const DEFAULT_EXTENSION_CHART_OPTIONS: ApexOptions = {
+  chart: { type: "bar", toolbar: { show: false } },
+  plotOptions: { bar: { horizontal: true, dataLabels: { position: "top" } } },
+  dataLabels: { enabled: false },
+  stroke: { width: 1, colors: ["#fff"] },
+  tooltip: { shared: false, intersect: false },
+  xaxis: { categories: [], labels: xaxisLabelsStyle },
+  yaxis: { title: { text: "" } },
+  legend: { position: "bottom", horizontalAlign: "center", offsetX: 40 },
+};
+
+function mapChartDataFromApi(items: { label?: string; value?: unknown }[]) {
+  return {
+    labels: items.map((item) => item.label || "Unknown"),
+    values: items.map((item) => (item.value ? Number.parseInt(String(item.value), 10) : 0)),
+  };
+}
+
+type ChartSeries = { name: string; data: number[] }[];
+
+interface ChartCardProps {
+  readonly title: string;
+  readonly emptyTitle: string;
+  readonly dataLength: number;
+  readonly options: ApexOptions;
+  readonly series: ChartSeries;
+  readonly onExpand: () => void;
+  readonly show: boolean;
+}
+
+function ChartCard({ title, emptyTitle, dataLength, options, series, onExpand, show }: ChartCardProps) {
+  if (!show) return null;
+  return (
+    <Col md={4}>
+      <div className="card">
+        <div className="card-body">
+          {dataLength === 0 ? (
+            <EmptyState title={emptyTitle} description="Chart data will appear here when available." className="table-empty-state" />
+          ) : (
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="mb-0 app-title-heading">{title}</h5>
+                <button type="button" className="btn btn-sm btn-light" onClick={onExpand} aria-label={`Expand ${title}`}>
+                  <i className="material-icons-two-tone">open_in_full</i>
+                </button>
+              </div>
+              <ReactApexChart options={options} series={series} type="bar" height={200} />
+            </>
+          )}
+        </div>
+      </div>
+    </Col>
+  );
+}
+
+interface ChartModalProps {
+  readonly show: boolean;
+  readonly onHide: () => void;
+  readonly title: string;
+  readonly options: ApexOptions;
+  readonly series: ChartSeries;
+}
+
+function ChartModal({ show, onHide, title, options, series }: ChartModalProps) {
+  return (
+    <Modal show={show} onHide={onHide} size="xl" centered className="chart-modal">
+      <Modal.Header closeButton>
+        <Modal.Title>{title}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="chart-container" style={{ minHeight: "500px" }}>
+          <ReactApexChart
+            options={{ ...options, chart: { ...options.chart, height: 500, toolbar: { show: true } } }}
+            series={series}
+            type="bar"
+            height={500}
+          />
+        </div>
+      </Modal.Body>
+    </Modal>
+  );
+}
+
+interface StatsTableCardProps {
+  readonly show: boolean;
+  readonly title: string;
+  readonly emptyTitle: string;
+  readonly emptyDescription: string;
+  readonly isEmpty: boolean;
+  readonly viewAllHref: string;
+  readonly children: React.ReactNode;
+}
+
+function StatsTableCard({ show, title, emptyTitle, emptyDescription, isEmpty, viewAllHref, children }: StatsTableCardProps) {
+  if (!show) return null;
+  return (
+    <Col md={6}>
+      <div className="card">
+        <div className="card-body">
+          {isEmpty ? (
+            <EmptyState title={emptyTitle} description={emptyDescription} isTableRow colSpan={6} />
+          ) : (
+            <>
+              <h5 className="mb-0 app-title-heading">{title}</h5>
+              <div className="table-responsive">
+                {children}
+                <div className="d-flex justify-content-center">
+                  <Link href={viewAllHref} className="link-primary">
+                    View All
+                  </Link>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Col>
+  );
+}
+
 const CallDashboard = () => {
   useSession();
   const [showPageLoader, setShowPageLoader] = useState(false);
@@ -198,45 +336,15 @@ const CallDashboard = () => {
         totalAvgCost: responseData.avg_cost,
       });
 
-      // Extract and map chart data
+      // Extract and map chart data using shared helper and default options
       const chartExtension = responseData?.chart_data?.extension;
       if (chartExtension) {
         setShowExtensionChart(true);
         setExtensionChartData(chartExtension);
-
-        // Map extension data to chart format
-        const extensionLabels = chartExtension.map(
-          (item: any) => item.label || "Unknown",
-        );
-        const values = chartExtension.map((item: any) =>
-          item.value ? Number.parseInt(String(item.value), 10) : 0,
-        );
-
+        const { labels, values } = mapChartDataFromApi(chartExtension);
         setExtensionChart({
-          series: [
-            {
-              name: "Call Count",
-              data: values,
-            },
-          ],
-          options: {
-            ...ExtensionChart.options,
-            xaxis: {
-              ...ExtensionChart.options.xaxis,
-              categories: extensionLabels,
-              labels: {
-                show: true,
-
-                style: {
-                  fontSize: "11px",
-                  colors: "#666",
-                },
-              },
-            },
-            tooltip: {
-              ...ExtensionChart.options.tooltip,
-            },
-          },
+          series: [{ name: "Call Count", data: values }],
+          options: { ...DEFAULT_EXTENSION_CHART_OPTIONS, xaxis: { ...DEFAULT_EXTENSION_CHART_OPTIONS.xaxis, categories: labels } },
         });
       }
 
@@ -244,63 +352,10 @@ const CallDashboard = () => {
       if (chartDepartment) {
         setShowDepartmentChart(true);
         setDepartmentChartData(chartDepartment);
-
-        // Map department data to chart format
-        const departmentLabels = chartDepartment.map(
-          (item: any) => item.label || "Unknown",
-        );
-        const values = chartDepartment.map((item: any) =>
-          item.value ? Number.parseInt(String(item.value), 10) : 0,
-        );
-
+        const { labels, values } = mapChartDataFromApi(chartDepartment);
         setDepartmentChart({
-          series: [
-            {
-              name: "Call Count",
-              data: values,
-            },
-          ],
-          options: {
-            ...DepartmentChart.options,
-            xaxis: {
-              ...DepartmentChart.options.xaxis,
-              categories: departmentLabels as string[],
-              labels: {
-                show: true,
-
-                style: {
-                  fontSize: "11px",
-                  colors: "#666",
-                },
-              },
-            },
-            yaxis: {
-              ...DepartmentChart.options.yaxis,
-              show: true,
-              labels: {
-                show: true,
-                style: {
-                  fontSize: "11px",
-                  colors: "#666",
-                },
-              },
-            },
-            chart: {
-              ...DepartmentChart.options.chart,
-            },
-            plotOptions: {
-              bar: {
-                borderRadius: 4,
-                borderRadiusApplication: "end",
-                horizontal: true,
-                columnHeight: "2px",
-              },
-            },
-            dataLabels: {
-              enabled: false,
-            },
-            tooltip: {},
-          },
+          series: [{ name: "Call Count", data: values }],
+          options: { ...DEFAULT_DEPARTMENT_CHART_OPTIONS, xaxis: { ...DEFAULT_DEPARTMENT_CHART_OPTIONS.xaxis, categories: labels } },
         });
       }
 
@@ -308,208 +363,26 @@ const CallDashboard = () => {
       if (chartCountry) {
         setShowCountryChart(true);
         setCountryChartData(chartCountry);
-
-        // Map country data to chart format
-        const countryLabels = chartCountry.map(
-          (item: any) => item.label || "Unknown",
-        );
-        const values = chartCountry.map((item: any) =>
-          item.value ? Number.parseInt(String(item.value), 10) : 0,
-        );
-
+        const { labels, values } = mapChartDataFromApi(chartCountry);
         setCountryChart({
-          series: [
-            {
-              name: "Call Count",
-              data: values,
-            },
-          ],
-          options: {
-            ...CountryChart.options,
-            xaxis: {
-              ...CountryChart.options.xaxis,
-              categories: countryLabels,
-              labels: {
-                show: true,
-
-                style: {
-                  fontSize: "11px",
-                  colors: "#666",
-                },
-              },
-            },
-            tooltip: {},
-          },
+          series: [{ name: "Call Count", data: values }],
+          options: { ...DEFAULT_COUNTRY_CHART_OPTIONS, xaxis: { ...DEFAULT_COUNTRY_CHART_OPTIONS.xaxis, categories: labels } },
         });
       }
     }
   };
 
-  const [CountryChart, setCountryChart] = React.useState({
-    series: [
-      {
-        name: "",
-        data: [] as number[],
-      },
-    ],
-    options: {
-      chart: {
-        type: "bar" as const,
-        toolbar: {
-          show: false,
-        },
-      },
-      plotOptions: {
-        bar: {
-          borderRadius: 4,
-          borderRadiusApplication: "end",
-          horizontal: true,
-          columnHeight: "2px",
-        },
-      },
-      legend: {
-        show: true,
-        position: "bottom",
-      },
-      dataLabels: {
-        enabled: false,
-      },
-      tooltip: {},
-      xaxis: {
-        categories: [] as string[],
-        labels: {
-          show: true,
-          style: {
-            fontSize: "11px",
-            colors: "#666",
-          },
-        },
-      },
-      yaxis: {
-        title: {
-          text: "", // <-- Your custom label here
-          style: {
-            fontSize: "12px",
-            fontWeight: "bold",
-            color: "#263238",
-            marginRight: "10px",
-          },
-        },
-      },
-    },
+  const [countryChart, setCountryChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+    series: [{ name: "", data: [] }],
+    options: DEFAULT_COUNTRY_CHART_OPTIONS,
   });
-
-  const [DepartmentChart, setDepartmentChart] = React.useState({
-    series: [] as any[],
-    options: {
-      chart: {
-        type: "bar",
-        toolbar: {
-          show: false,
-        },
-      },
-      plotOptions: {
-        bar: {
-          borderRadius: 4,
-          borderRadiusApplication: "end",
-          horizontal: true,
-          columnHeight: "2px",
-        },
-      },
-      legend: {
-        show: true,
-        position: "bottom",
-      },
-      dataLabels: {
-        enabled: false,
-      },
-      tooltip: {},
-      xaxis: {
-        categories: [] as string[],
-        labels: {
-          show: true,
-          style: {
-            fontSize: "11px",
-            colors: "#666",
-          },
-        },
-      },
-      yaxis: {
-        show: true,
-        title: {
-          text: "Call Count", // <-- Your custom label here
-          style: {
-            fontSize: "12px",
-            fontWeight: "bold",
-            color: "#263238",
-            marginRight: "10px",
-          },
-        },
-        labels: {
-          show: true,
-          style: {
-            fontSize: "11px",
-            colors: "#666",
-          },
-        },
-      },
-      fill: {
-        opacity: 1,
-      },
-    },
+  const [departmentChart, setDepartmentChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+    series: [],
+    options: DEFAULT_DEPARTMENT_CHART_OPTIONS,
   });
-
-  const [ExtensionChart, setExtensionChart] = React.useState({
-    series: [] as any[],
-    options: {
-      chart: {
-        type: "bar" as const,
-        toolbar: {
-          show: false,
-        },
-      },
-      plotOptions: {
-        bar: {
-          horizontal: true,
-          dataLabels: {
-            show: true,
-            position: "top",
-          },
-        },
-      },
-      dataLabels: {
-        enabled: false,
-      },
-      stroke: {
-        show: true,
-        width: 1,
-        colors: ["#fff"],
-      },
-      tooltip: {
-        shared: false,
-        intersect: false,
-      },
-      xaxis: {
-        categories: [] as string[],
-        labels: {
-          show: true,
-          style: {
-            fontSize: "11px",
-            colors: "#666",
-          },
-        },
-      },
-      yaxis: {
-        title: {
-          text: "",
-        },
-      },
-      legend: {
-        position: "bottom" as const,
-        horizontalAlign: "center" as const,
-        offsetX: 40,
-      },
-    },
+  const [extensionChart, setExtensionChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+    series: [],
+    options: DEFAULT_EXTENSION_CHART_OPTIONS,
   });
 
   const [showStatsByExtensionTable] = useState(true);
@@ -729,334 +602,122 @@ const CallDashboard = () => {
         <StatsCards data={statsCardsData} gridMinWidth="180px" />
       </div>
       <Row>
-        {showCountryChart && (
-          <Col md={4}>
-            <div className="card">
-              <div className="card-body">
-                {countryChartData.length === 0 ? (
-                  <EmptyState
-                    title="No Calls by Country Data"
-                    description="Chart data will appear here when available."
-                    className="table-empty-state"
-                  />
-                ) : (
-                  <>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h5 className="mb-0 app-title-heading">
-                        Calls by Country
-                      </h5>
-                      <button
-                        className="btn btn-sm btn-light"
-                        onClick={() => setShowCountryChartModal(true)}
-                      >
-                        <i className="material-icons-two-tone">open_in_full</i>
-                      </button>
-                    </div>
-                    <ReactApexChart
-                      options={CountryChart.options as ApexOptions}
-                      series={CountryChart.series}
-                      type="bar"
-                      height={200}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          </Col>
-        )}
-
-        {showDepartmentChart && (
-          <Col md={4}>
-            <div className="card">
-              <div className="card-body">
-                {departmentChartData.length === 0 ? (
-                  <EmptyState
-                    title="No Calls by Department Data"
-                    description="Chart data will appear here when available."
-                    className="table-empty-state"
-                  />
-                ) : (
-                  <>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h5 className="mb-0 app-title-heading">
-                        Call by Department
-                      </h5>
-                      <button
-                        className="btn btn-sm btn-light"
-                        onClick={() => setShowDepartmentChartModal(true)}
-                      >
-                        <i className="material-icons-two-tone">open_in_full</i>
-                      </button>
-                    </div>
-                    <ReactApexChart
-                      options={DepartmentChart.options as ApexOptions}
-                      series={DepartmentChart.series}
-                      type="bar"
-                      height={200}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          </Col>
-        )}
-
-        {showExtensionChart && (
-          <Col md={4}>
-            <div className="card">
-              <div className="card-body">
-                {extensionChartData.length === 0 ? (
-                  <EmptyState
-                    title="No Calls by Extension Data"
-                    description="Chart data will appear here when available."
-                    className="table-empty-state"
-                  />
-                ) : (
-                  <>
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <h5 className="mb-0 app-title-heading">
-                        Call by Extension
-                      </h5>
-                      <button
-                        className="btn btn-sm btn-light"
-                        onClick={() => setShowExtensionChartModal(true)}
-                      >
-                        <i className="material-icons-two-tone">open_in_full</i>
-                      </button>
-                    </div>
-                    <ReactApexChart
-                      options={ExtensionChart.options}
-                      series={ExtensionChart.series}
-                      type="bar"
-                      height={200}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          </Col>
-        )}
+        <ChartCard
+          show={showCountryChart}
+          title="Calls by Country"
+          emptyTitle="No Calls by Country Data"
+          dataLength={countryChartData.length}
+          options={countryChart.options}
+          series={countryChart.series}
+          onExpand={() => setShowCountryChartModal(true)}
+        />
+        <ChartCard
+          show={showDepartmentChart}
+          title="Call by Department"
+          emptyTitle="No Calls by Department Data"
+          dataLength={departmentChartData.length}
+          options={departmentChart.options}
+          series={departmentChart.series}
+          onExpand={() => setShowDepartmentChartModal(true)}
+        />
+        <ChartCard
+          show={showExtensionChart}
+          title="Call by Extension"
+          emptyTitle="No Calls by Extension Data"
+          dataLength={extensionChartData.length}
+          options={extensionChart.options}
+          series={extensionChart.series}
+          onExpand={() => setShowExtensionChartModal(true)}
+        />
       </Row>
 
       <Row>
-        {showStatsByExtensionTable && (
-          <Col md={6}>
-            <div className="card">
-              <div className="card-body">
-                {extensionData.length === 0 ? (
-                  <EmptyState
-                    title="No Call by Extension Data"
-                    description="List of call by extension data will appear here."
-                    isTableRow={true}
-                    colSpan={6}
-                  />
-                ) : (
-                  <>
-                    <h5 className="mb-0 app-title-heading">
-                      Call by Extension
-                    </h5>
-                    <div className="table-responsive">
-                      <table className="table table-bordered table-striped table-sm ">
-                        <thead>
-                          <tr>
-                            <th>Extension</th>
-                            <th>Calls</th>
-                            <th>Answered</th>
-                            <th>Un Answered</th>
-                            <th>Duration</th>
-                            {/* <th>Cost</th> */}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {extensionData.map((item) => (
-                            <tr
-                              key={`extension-${item.Extension}-${item.Calls}-${item.TotalDuration}`}
-                            >
-                              <td>{item.Extension}</td>
-                              <td>{item.Calls}</td>
-                              <td>{item.Answered}</td>
-                              <td>{item.Unanswered}</td>
-                              <td>
-                                {formatDuration(Number(item.TotalDuration))}
-                              </td>
-                              {/* <td>{parseFloat(item.Cost).toFixed(2)}</td> */}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="d-flex justify-content-center">
-                        <Link
-                          href="/call-reports/stats/extension"
-                          className="link-primary"
-                        >
-                          View All
-                        </Link>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </Col>
-        )}
+        <StatsTableCard
+          show={showStatsByExtensionTable}
+          title="Call by Extension"
+          emptyTitle="No Call by Extension Data"
+          emptyDescription="List of call by extension data will appear here."
+          isEmpty={extensionData.length === 0}
+          viewAllHref="/call-reports/stats/extension"
+        >
+          <table className="table table-bordered table-striped table-sm">
+            <thead>
+              <tr>
+                <th>Extension</th>
+                <th>Calls</th>
+                <th>Answered</th>
+                <th>Un Answered</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {extensionData.map((item) => (
+                <tr key={`extension-${item.Extension}-${item.Calls}-${item.TotalDuration}`}>
+                  <td>{item.Extension}</td>
+                  <td>{item.Calls}</td>
+                  <td>{item.Answered}</td>
+                  <td>{item.Unanswered}</td>
+                  <td>{formatDuration(Number(item.TotalDuration))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </StatsTableCard>
 
-        {showTrendByCountryTable && (
-          <Col md={6}>
-            <div className="card">
-              <div className="card-body">
-                {trendByCountryData.length === 0 ? (
-                  <EmptyState
-                    title="No Call Stats by Country Data"
-                    description="List of call stats by country data will appear here."
-                    isTableRow={true}
-                    colSpan={6}
-                  />
-                ) : (
-                  <>
-                    <h5 className="mb-0 app-title-heading">
-                      Call Stats by Country
-                    </h5>
-                    <div className="table-responsive">
-                      <table className="table table-bordered table-striped table-sm ">
-                        <thead>
-                          <tr>
-                            <th>Country</th>
-                            <th>Calls</th>
-                            <th>Answered</th>
-                            <th>Un Answered</th>
-                            <th>Duration</th>
-                            {/* <th>Cost</th> */}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {trendByCountryData.map((item) => (
-                            <tr
-                              key={`country-${item.Country}-${item.Calls}-${item.TotalDuration}`}
-                            >
-                              <td>{item.Country}</td>
-                              <td>{item.Calls}</td>
-                              <td>{item.Answered}</td>
-                              <td>{item.Unanswered}</td>
-                              <td>
-                                {formatDuration(Number(item.TotalDuration))}
-                              </td>
-                              {/* <td>{parseFloat(item.Cost).toFixed(2)}</td> */}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <div className="d-flex justify-content-center">
-                        <Link
-                          href="/call-reports/stats/country"
-                          className="link-primary"
-                        >
-                          View All
-                        </Link>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </Col>
-        )}
+        <StatsTableCard
+          show={showTrendByCountryTable}
+          title="Call Stats by Country"
+          emptyTitle="No Call Stats by Country Data"
+          emptyDescription="List of call stats by country data will appear here."
+          isEmpty={trendByCountryData.length === 0}
+          viewAllHref="/call-reports/stats/country"
+        >
+          <table className="table table-bordered table-striped table-sm">
+            <thead>
+              <tr>
+                <th>Country</th>
+                <th>Calls</th>
+                <th>Answered</th>
+                <th>Un Answered</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trendByCountryData.map((item) => (
+                <tr key={`country-${item.Country}-${item.Calls}-${item.TotalDuration}`}>
+                  <td>{item.Country}</td>
+                  <td>{item.Calls}</td>
+                  <td>{item.Answered}</td>
+                  <td>{item.Unanswered}</td>
+                  <td>{formatDuration(Number(item.TotalDuration))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </StatsTableCard>
       </Row>
 
-      {/* Country Chart Modal */}
-      <Modal
+      <ChartModal
         show={showCountryChartModal}
         onHide={() => setShowCountryChartModal(false)}
-        size="xl"
-        centered
-        className="chart-modal"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Calls by Country</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="chart-container" style={{ minHeight: "500px" }}>
-            <ReactApexChart
-              options={{
-                ...(CountryChart.options as ApexOptions),
-                chart: {
-                  ...CountryChart.options.chart,
-                  height: 500,
-                  toolbar: {
-                    show: true,
-                  },
-                },
-              }}
-              series={CountryChart.series}
-              type="bar"
-              height={500}
-            />
-          </div>
-        </Modal.Body>
-      </Modal>
-
-      {/* Department Chart Modal */}
-      <Modal
+        title="Calls by Country"
+        options={countryChart.options}
+        series={countryChart.series}
+      />
+      <ChartModal
         show={showDepartmentChartModal}
         onHide={() => setShowDepartmentChartModal(false)}
-        size="xl"
-        centered
-        className="chart-modal"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Calls by Department</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="chart-container" style={{ minHeight: "500px" }}>
-            <ReactApexChart
-              options={{
-                ...(DepartmentChart.options as ApexOptions),
-                chart: {
-                  ...(DepartmentChart.options.chart as ApexChart),
-                  height: 500,
-                  toolbar: {
-                    show: true,
-                  },
-                },
-              }}
-              series={DepartmentChart.series}
-              type="bar"
-              height={500}
-            />
-          </div>
-        </Modal.Body>
-      </Modal>
-
-      {/* Extension Chart Modal */}
-      <Modal
+        title="Calls by Department"
+        options={departmentChart.options}
+        series={departmentChart.series}
+      />
+      <ChartModal
         show={showExtensionChartModal}
         onHide={() => setShowExtensionChartModal(false)}
-        size="xl"
-        centered
-        className="chart-modal"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Calls by Extension</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="chart-container" style={{ minHeight: "500px" }}>
-            <ReactApexChart
-              options={{
-                ...ExtensionChart.options,
-                chart: {
-                  ...(ExtensionChart.options.chart as ApexChart),
-                  height: 500,
-                  toolbar: {
-                    show: true,
-                  },
-                },
-              }}
-              series={ExtensionChart.series}
-              type="bar"
-              height={500}
-            />
-          </div>
-        </Modal.Body>
-      </Modal>
+        title="Calls by Extension"
+        options={extensionChart.options}
+        series={extensionChart.series}
+      />
     </React.Fragment>
   );
 };

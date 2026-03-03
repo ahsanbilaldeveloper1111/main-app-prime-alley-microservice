@@ -65,6 +65,54 @@ import {
   getAutoTimezone,
 } from "@utils/Helper";
 
+// Reusable loading and empty-state components to avoid duplication
+const ChartLoadingSpinner = () => (
+  <div
+    className="d-flex align-items-center justify-content-center"
+    style={{ height: "300px" }}
+  >
+    <output className="spinner-border text-primary" aria-live="polite">
+      <span className="visually-hidden">Loading chart...</span>
+    </output>
+  </div>
+);
+
+const EmptyChartState = ({
+  icon,
+  title,
+  message,
+}: {
+  icon: string;
+  title: string;
+  message: string;
+}) => (
+  <div
+    className="d-flex flex-column align-items-center justify-content-center text-center"
+    style={{ height: "300px" }}
+  >
+    <i className={`fa ${icon} fa-3x text-muted mb-3`}></i>
+    <h5 className="text-muted mb-2">{title}</h5>
+    <p className="text-muted mb-0">{message}</p>
+  </div>
+);
+
+const StatCardLoadingCard = () => (
+  <div className="card report-shadow h-100">
+    <div
+      className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+      style={{ minHeight: "120px" }}
+    >
+      <output className="spinner-border text-primary mb-2" aria-live="polite">
+        <span className="visually-hidden">Loading...</span>
+      </output>
+      <p className="text-muted mb-0">Loading...</p>
+    </div>
+  </div>
+);
+
+const EMPTY_CHART_MESSAGE =
+  "No call statistics found for the selected filters and date range.";
+
 function formatFiltersDatetimeToUTC(filters: Record<string, any>): void {
   if (filters.start_datetime) {
     let startMoment = moment(filters.start_datetime);
@@ -598,6 +646,82 @@ const CallStatsExtension = () => {
     }
   };
 
+  type ChartDataType = "calls" | "time" | "cost" | "custom";
+  const renderChartTabContent = (
+    chartData: { series: any[]; categories: string[] } | null,
+    loading: boolean,
+    dataType: ChartDataType,
+    modalTitle: string,
+    emptyIcon: string,
+    emptyTitle: string,
+    emptyMessage: string,
+  ) => {
+    if (loading) return <ChartLoadingSpinner />;
+    if (chartData)
+      return (
+        <ChartBar
+          series={chartData.series}
+          categories={chartData.categories}
+          dataType={dataType}
+          height={300}
+          maxDisplayedItems={5}
+          showViewAllButton={true}
+          viewAllButtonText="View All"
+          showFullScreenButton={true}
+          onFullScreenClick={() =>
+            handleOpenChartModal(chartData, modalTitle, dataType)
+          }
+        />
+      );
+    return (
+      <EmptyChartState
+        icon={emptyIcon}
+        title={emptyTitle}
+        message={emptyMessage}
+      />
+    );
+  };
+
+  const renderChartTab = (
+    tabKey: string,
+    chartData: { series: any[]; categories: string[] } | null,
+    dataType: ChartDataType,
+    modalTitle: string,
+    emptyIcon: string,
+    emptyTitle: string,
+    emptyMessage: string,
+  ) => (
+    <AnimatePresence mode="wait">
+      {activeTab === tabKey && (
+        <motion.div
+          key={tabKey}
+          variants={tabVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          <Row>
+            <Col md={12}>
+              <div className="card report-shadow">
+                <div className="card-body">
+                  {renderChartTabContent(
+                    chartData,
+                    chartLoading,
+                    dataType,
+                    modalTitle,
+                    emptyIcon,
+                    emptyTitle,
+                    emptyMessage,
+                  )}
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   const emptyDonutMessage = (
     <div
       className="d-flex flex-column align-items-center justify-content-center text-center"
@@ -615,70 +739,13 @@ const CallStatsExtension = () => {
     if (dataLoaded === false) {
       return (
         <>
-          <Col md={6} className="mb-3">
-            <div className="card report-shadow h-100">
-              <div
-                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                style={{ minHeight: "120px" }}
-              >
-                <output
-                  className="spinner-border text-primary mb-2"
-                  aria-live="polite"
-                >
-                  <span className="visually-hidden">Loading...</span>
-                </output>
-                <p className="text-muted mb-0">Loading...</p>
-              </div>
-            </div>
-          </Col>
-          <Col md={6} className="mb-3">
-            <div className="card report-shadow h-100">
-              <div
-                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                style={{ minHeight: "120px" }}
-              >
-                <output
-                  className="spinner-border text-primary mb-2"
-                  aria-live="polite"
-                >
-                  <span className="visually-hidden">Loading...</span>
-                </output>
-                <p className="text-muted mb-0">Loading...</p>
-              </div>
-            </div>
-          </Col>
-          <Col md={6} className="mb-3">
-            <div className="card report-shadow h-100">
-              <div
-                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                style={{ minHeight: "120px" }}
-              >
-                <output
-                  className="spinner-border text-primary mb-2"
-                  aria-live="polite"
-                >
-                  <span className="visually-hidden">Loading...</span>
-                </output>
-                <p className="text-muted mb-0">Loading...</p>
-              </div>
-            </div>
-          </Col>
-          <Col md={6} className="mb-3">
-            <div className="card report-shadow h-100">
-              <div
-                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                style={{ minHeight: "120px" }}
-              >
-                <output
-                  className="spinner-border text-primary mb-2"
-                  aria-live="polite"
-                >
-                  <span className="visually-hidden">Loading...</span>
-                </output>
-                <p className="text-muted mb-0">Loading...</p>
-              </div>
-            </div>
-          </Col>
+          {["stat-loading-0", "stat-loading-1", "stat-loading-2", "stat-loading-3"].map(
+            (key) => (
+              <Col md={6} className="mb-3" key={key}>
+                <StatCardLoadingCard />
+              </Col>
+            ),
+          )}
         </>
       );
     }
@@ -882,219 +949,39 @@ const CallStatsExtension = () => {
             onSelect={handleTabChange}
           >
             <Tab eventKey="calls_chart" title="Calls by Extension">
-              <AnimatePresence mode="wait">
-                {activeTab === "calls_chart" && (
-                  <motion.div
-                    key="calls_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading && (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <output
-                                  className="spinner-border text-primary"
-                                  aria-live="polite"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </output>
-                              </div>
-                            )}
-                            {!chartLoading && chartCalls && (
-                              <ChartBar
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCalls,
-                                    "Calls by Extension",
-                                    "calls",
-                                  )
-                                }
-                              />
-                            )}
-                            {!chartLoading && !chartCalls && (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-chart-bar fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Call Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No call statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "calls_chart",
+                chartCalls,
+                "calls",
+                "Calls by Extension",
+                "fa-chart-bar",
+                "No Call Data Available",
+                EMPTY_CHART_MESSAGE,
+              )}
             </Tab>
 
             <Tab eventKey="duration_chart" title="Duration by Extension">
-              <AnimatePresence mode="wait">
-                {activeTab === "duration_chart" && (
-                  <motion.div
-                    key="duration_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading && (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <output
-                                  className="spinner-border text-primary"
-                                  aria-live="polite"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </output>
-                              </div>
-                            )}
-                            {!chartLoading && chartDuration && (
-                              <ChartBar
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartDuration,
-                                    "Duration by Extension",
-                                    "time",
-                                  )
-                                }
-                              />
-                            )}
-                            {!chartLoading && !chartDuration && (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-clock fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Duration Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No duration statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "duration_chart",
+                chartDuration,
+                "time",
+                "Duration by Extension",
+                "fa-clock",
+                "No Duration Data Available",
+                EMPTY_CHART_MESSAGE,
+              )}
             </Tab>
 
             <Tab eventKey="ring_chart" title="Ring Time by Extension">
-              <AnimatePresence mode="wait">
-                {activeTab === "ring_chart" && (
-                  <motion.div
-                    key="ring_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading && (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <output
-                                  className="spinner-border text-primary"
-                                  aria-live="polite"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </output>
-                              </div>
-                            )}
-                            {!chartLoading && chartRingTime && (
-                              <ChartBar
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartRingTime,
-                                    "Ring Time by Extension",
-                                    "time",
-                                  )
-                                }
-                              />
-                            )}
-                            {!chartLoading && !chartRingTime && (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-phone fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Ring Time Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No ring time statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "ring_chart",
+                chartRingTime,
+                "time",
+                "Ring Time by Extension",
+                "fa-phone",
+                "No Ring Time Data Available",
+                EMPTY_CHART_MESSAGE,
+              )}
             </Tab>
 
             {/* <Tab eventKey="cost_chart" title="Cost by Extension">

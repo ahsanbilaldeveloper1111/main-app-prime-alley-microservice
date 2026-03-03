@@ -9,21 +9,7 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import {
-  ListCallLogs,
-  ExportCallLogs,
-  DownloadStreamingExport,
-  DownloadCallsExport,
-} from "@utils/calls";
-
-// Debug: check if API functions are available
-if (globalThis.window !== undefined) {
-  console.log("API functions available:", {
-    ListCallLogs: typeof ListCallLogs,
-    ExportCallLogs: typeof ExportCallLogs,
-    DownloadStreamingExport: typeof DownloadStreamingExport,
-  });
-}
+import { ListCallLogs, DownloadCallsExport } from "@utils/calls";
 import { Column } from "@components/CustomDataTable";
 import { Modal, Row, Tab, Tabs, Form, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -49,6 +35,8 @@ interface Summary {
   avg_duration: number;
   avg_ring_time: number;
 }
+
+type ChartDataType = "calls" | "time" | "cost" | "custom";
 
 interface ChartData {
   country: string[];
@@ -97,9 +85,7 @@ function formatEndDatetimeToUTC(value: string): string {
   if (DATETIME_LOCAL_REGEX.exec(value)) {
     const timePart = value.split("T")[1];
     endMoment =
-      timePart === "23:59"
-        ? moment(value + ":59")
-        : moment(value + ":00");
+      timePart === "23:59" ? moment(value + ":59") : moment(value + ":00");
   } else if (!value.includes("T")) {
     endMoment = moment(value).endOf("day");
   }
@@ -107,7 +93,7 @@ function formatEndDatetimeToUTC(value: string): string {
 }
 
 const CallIncomingCountry = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDateTime, setStartDateTime] = useState<string>("");
@@ -117,33 +103,6 @@ const CallIncomingCountry = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("calls_chart");
   const [showPageLoader, setShowPageLoader] = useState(false);
-
-  // Debug session state
-  useEffect(() => {
-    console.log("Session state:", { session, status });
-    if (status === "authenticated" && session) {
-      console.log("Session authenticated successfully");
-    } else if (status === "loading") {
-      console.log("Session still loading...");
-    } else if (status === "unauthenticated") {
-      console.log("User not authenticated");
-    }
-  }, [session, status]);
-
-  // Debug component mounting
-  useEffect(() => {
-    console.log("CallIncomingCountry component mounted");
-    console.log("Initial props and state:", {
-      session,
-      status,
-      filtersReady,
-      dataLoaded,
-      loading,
-    });
-    return () => {
-      console.log("CallIncomingCountry component unmounting");
-    };
-  }, []);
 
   // Animation variants for tab transitions
   const tabVariants = {
@@ -274,9 +233,6 @@ const CallIncomingCountry = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const filtersReady = true; // Always ready since filters are initialized immediately
 
-  // Use ref to track if initial fetch has been done
-  const initialFetchDone = React.useRef(false);
-  // Use ref to track last filters used for charts to prevent unnecessary refetches
   const lastChartFilters = React.useRef<string>("");
 
   // Refs to prevent duplicate API calls
@@ -300,11 +256,7 @@ const CallIncomingCountry = () => {
 
   const fetchCallLogs = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      // Only fetch if filters are ready
-      if (!filtersReady) {
-        console.log("Filters not ready yet, skipping fetch");
-        return;
-      }
+      if (!filtersReady) return;
 
       setLoading(true);
       setShowPageLoader(true);
@@ -370,14 +322,6 @@ const CallIncomingCountry = () => {
       }
     }
   }, [summary, dataLoaded]);
-
-  // Trigger initial data fetch when filters become ready
-  // Ensure initial fetch happens when session is ready
-  useEffect(() => {
-    if (session?.user?.permissions?.includes("list-call-logs")) {
-      initialFetchDone.current = true;
-    }
-  }, [session]);
 
   const handleFiltersChange = (filters: any) => {
     const formattedFilters: any = { ...filters };
@@ -539,8 +483,6 @@ const CallIncomingCountry = () => {
               }
             });
 
-            console.log("Chart data", newChartData);
-
             const dataLength = newChartData.country.length;
 
             if (
@@ -579,15 +521,11 @@ const CallIncomingCountry = () => {
                 categories: newChartData.country,
               });
             } else {
-              console.error(
-                "Chart data arrays have different lengths or no data",
-              );
               setChartCalls(null);
               setChartRingTime(null);
               setChartDuration(null);
             }
           } else {
-            console.log("No chart data available");
             setChartCalls(null);
             setChartRingTime(null);
             setChartDuration(null);
@@ -612,14 +550,13 @@ const CallIncomingCountry = () => {
     }
   }, [currentFilters, session]);
 
-  const [currentChartDataType, setCurrentChartDataType] = useState<
-    "calls" | "time" | "cost" | "custom"
-  >("custom");
+  const [currentChartDataType, setCurrentChartDataType] =
+    useState<ChartDataType>("custom");
 
   const handleOpenChartModal = (
     chartData: { series: any[]; categories: string[] } | null,
     title: string,
-    dataType: "calls" | "time" | "cost" | "custom",
+    dataType: ChartDataType,
   ) => {
     if (chartData) {
       setCurrentChartData(chartData);
@@ -630,9 +567,59 @@ const CallIncomingCountry = () => {
   };
 
   const handleTabChange = (key: string | null) => {
-    if (key) {
-      setActiveTab(key);
+    if (key) setActiveTab(key);
+  };
+
+  const dateRangeBadge = showDateRange && (
+    <p className="mb-0">
+      Date Range:{" "}
+      <span className="status-badge primary">
+        {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+      </span>
+      {" to "}
+      <span className="status-badge primary">
+        {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+      </span>
+    </p>
+  );
+
+  const renderChartTab = (
+    chartData: { series: any[]; categories: string[] } | null,
+    title: string,
+    dataType: ChartDataType,
+    useLogScale = false,
+  ) => {
+    if (chartLoading || !filtersReady) {
+      return (
+        <div
+          className="d-flex align-items-center justify-content-center"
+          style={{ height: "300px" }}
+        >
+          <div className="spinner-border text-primary">
+            <output className="visually-hidden">Loading chart...</output>
+          </div>
+        </div>
+      );
     }
+    if (chartData) {
+      return (
+        <ChartBar
+          series={chartData.series}
+          categories={chartData.categories}
+          dataType={dataType}
+          height={300}
+          maxDisplayedItems={5}
+          showViewAllButton={true}
+          viewAllButtonText="View All"
+          showFullScreenButton={true}
+          useLogScale={useLogScale}
+          onFullScreenClick={() =>
+            handleOpenChartModal(chartData, title, dataType)
+          }
+        />
+      );
+    }
+    return <div className="" />;
   };
 
   return (
@@ -653,24 +640,7 @@ const CallIncomingCountry = () => {
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  {showDateRange && (
-                    <p className="mb-0">
-                      Date Range:{" "}
-                      <span className="status-badge primary">
-                        {formatDateTimeToLocal(
-                          startDateTime,
-                          GlobalDateTimeFormat,
-                        )}
-                      </span>
-                      {" to "}
-                      <span className="status-badge primary">
-                        {formatDateTimeToLocal(
-                          endDateTime,
-                          GlobalDateTimeFormat,
-                        )}
-                      </span>
-                    </p>
-                  )}
+                  {dateRangeBadge}
                   {/* {session?.user?.permissions?.includes('') && ( */}
                   <div className="d-flex align-items-center gap-2">
                     <button
@@ -760,8 +730,7 @@ const CallIncomingCountry = () => {
               <p className="text-muted mb-0">Total Calls</p>
               <div className="chart-one ">
                 {(() => {
-                  const isLoading =
-                    loading || !dataLoaded || !filtersReady;
+                  const isLoading = loading || !dataLoaded || !filtersReady;
                   const isEmpty =
                     summary.answered_calls === 0 &&
                     summary.unanswered_calls === 0 &&
@@ -799,9 +768,7 @@ const CallIncomingCountry = () => {
                         height={200}
                         width={500}
                         showDataLabels={true}
-                        dataLabelsFormatter={(value) =>
-                          `${value.toFixed(0)}%`
-                        }
+                        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
                       />
                     );
                   }
@@ -847,45 +814,12 @@ const CallIncomingCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {(() => {
-                              if (chartLoading || !filtersReady) {
-                                return (
-                                  <div
-                                    className="d-flex align-items-center justify-content-center"
-                                    style={{ height: "300px" }}
-                                  >
-                                    <div className="spinner-border text-primary">
-                                      <output className="visually-hidden">
-                                        Loading chart...
-                                      </output>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              if (chartCalls) {
-                                return (
-                                  <ChartBar
-                                    series={chartCalls.series}
-                                    categories={chartCalls.categories}
-                                    dataType="calls"
-                                    height={300}
-                                    maxDisplayedItems={5}
-                                    showViewAllButton={true}
-                                    viewAllButtonText="View All"
-                                    showFullScreenButton={true}
-                                    useLogScale={true}
-                                    onFullScreenClick={() =>
-                                      handleOpenChartModal(
-                                        chartCalls,
-                                        "Calls by Country",
-                                        "calls",
-                                      )
-                                    }
-                                  />
-                                );
-                              }
-                              return <div className="" />;
-                            })()}
+                            {renderChartTab(
+                              chartCalls,
+                              "Calls by Country",
+                              "calls",
+                              true,
+                            )}
                           </div>
                         </div>
                       </Col>
@@ -909,44 +843,11 @@ const CallIncomingCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {(() => {
-                              if (chartLoading || !filtersReady) {
-                                return (
-                                  <div
-                                    className="d-flex align-items-center justify-content-center"
-                                    style={{ height: "300px" }}
-                                  >
-                                    <div className="spinner-border text-primary">
-                                      <output className="visually-hidden">
-                                        Loading chart...
-                                      </output>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              if (chartDuration) {
-                                return (
-                                  <ChartBar
-                                    series={chartDuration.series}
-                                    categories={chartDuration.categories}
-                                    dataType="time"
-                                    height={300}
-                                    maxDisplayedItems={5}
-                                    showViewAllButton={true}
-                                    viewAllButtonText="View All"
-                                    showFullScreenButton={true}
-                                    onFullScreenClick={() =>
-                                      handleOpenChartModal(
-                                        chartDuration,
-                                        "Duration by Country",
-                                        "time",
-                                      )
-                                    }
-                                  />
-                                );
-                              }
-                              return <div className="" />;
-                            })()}
+                            {renderChartTab(
+                              chartDuration,
+                              "Duration by Country",
+                              "time",
+                            )}
                           </div>
                         </div>
                       </Col>
@@ -970,44 +871,11 @@ const CallIncomingCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {(() => {
-                              if (chartLoading || !filtersReady) {
-                                return (
-                                  <div
-                                    className="d-flex align-items-center justify-content-center"
-                                    style={{ height: "300px" }}
-                                  >
-                                    <div className="spinner-border text-primary">
-                                      <output className="visually-hidden">
-                                        Loading chart...
-                                      </output>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              if (chartRingTime) {
-                                return (
-                                  <ChartBar
-                                    series={chartRingTime.series}
-                                    categories={chartRingTime.categories}
-                                    dataType="time"
-                                    height={300}
-                                    maxDisplayedItems={5}
-                                    showViewAllButton={true}
-                                    viewAllButtonText="View All"
-                                    showFullScreenButton={true}
-                                    onFullScreenClick={() =>
-                                      handleOpenChartModal(
-                                        chartRingTime,
-                                        "Ring Time by Country",
-                                        "time",
-                                      )
-                                    }
-                                  />
-                                );
-                              }
-                              return <div className="" />;
-                            })()}
+                            {renderChartTab(
+                              chartRingTime,
+                              "Ring Time by Country",
+                              "time",
+                            )}
                           </div>
                         </div>
                       </Col>
@@ -1016,51 +884,6 @@ const CallIncomingCountry = () => {
                 )}
               </AnimatePresence>
             </Tab>
-
-            {/* <Tab eventKey="cost_chart" title="Cost by Country">
-                           <AnimatePresence mode="wait">
-                             {activeTab === 'cost_chart' && (
-                               <motion.div
-                                 key="cost_chart"
-                                 variants={tabVariants}
-                                 initial="hidden"
-                                 animate="visible"
-                                 exit="exit"
-                               >
-                                 <Row>
-                                  <Col md={12}>
-                                      <div className="card report-shadow">
-                                          <div className="card-body">
-                                          
-                                          {chartLoading || !filtersReady ? (
-                                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
-                                                      <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
-                                              </div>
-                                          ) : chartCost ? (
-                                              <ChartBar 
-                                                  series={chartCost.series}
-                                                  categories={chartCost.categories}
-                                                  dataType="cost"
-                                                  height={300}
-                                                  maxDisplayedItems={5}
-                                                  showViewAllButton={true}
-                                                  viewAllButtonText="View All"
-                                                  showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Country', 'cost')}
-                                              />
-                                          ) : (
-                                            <div className=""></div>
-                                          )}
-                                          </div>
-                                      </div>
-                                  </Col>
-                                 </Row>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                        </Tab> */}
           </Tabs>
         </Col>
       </Row>
@@ -1068,25 +891,7 @@ const CallIncomingCountry = () => {
       {session?.user?.permissions?.includes("list-call-logs") && (
         <>
           <BarFilters
-            leftContent={
-              <>
-                {showDateRange && (
-                  <p className="mb-0">
-                    Date Range:{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(
-                        startDateTime,
-                        GlobalDateTimeFormat,
-                      )}
-                    </span>{" "}
-                    to{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
-                    </span>
-                  </p>
-                )}
-              </>
-            }
+            leftContent={<>{dateRangeBadge}</>}
             searchValue=""
             onSearchChange={() => {}}
             onSearch={() => {}}
@@ -1104,7 +909,6 @@ const CallIncomingCountry = () => {
               // Chart data will be triggered by useEffect watching currentFilters
             }}
             onReset={() => {
-              // Preserve current date filters, clear all other filters
               const resetPendingFilters: Record<string, any> = {
                 start_datetime:
                   (pendingFilters as any)?.start_datetime ||
@@ -1114,18 +918,7 @@ const CallIncomingCountry = () => {
                   defaultFilters.pending.end_datetime,
                 is_incoming_only: "true",
               };
-              const resetCurrentFilters: Record<string, any> = {
-                start_datetime:
-                  (currentFilters as any)?.start_datetime ||
-                  defaultFilters.current.start_datetime,
-                end_datetime:
-                  (currentFilters as any)?.end_datetime ||
-                  defaultFilters.current.end_datetime,
-                is_incoming_only: "true",
-              };
               setPendingFilters(resetPendingFilters);
-              setCurrentFilters(resetCurrentFilters);
-              currentFiltersRef.current = resetCurrentFilters;
               handleFiltersChange(resetPendingFilters);
             }}
             filterContent={

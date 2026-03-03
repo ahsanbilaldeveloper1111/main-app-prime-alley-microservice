@@ -386,6 +386,27 @@ const CallIncomingDepartment = () => {
     }
   };
 
+  const getResetFilters = () => ({
+    pending: {
+      start_datetime:
+        (pendingFilters as any)?.start_datetime ||
+        defaultFilters.pending.start_datetime,
+      end_datetime:
+        (pendingFilters as any)?.end_datetime ||
+        defaultFilters.pending.end_datetime,
+      is_incoming_only: "true",
+    },
+    current: {
+      start_datetime:
+        (currentFilters as any)?.start_datetime ||
+        defaultFilters.current.start_datetime,
+      end_datetime:
+        (currentFilters as any)?.end_datetime ||
+        defaultFilters.current.end_datetime,
+      is_incoming_only: "true",
+    },
+  });
+
   const [chartCalls, setChartCalls] = useState<{
     series: any[];
     categories: string[];
@@ -406,6 +427,13 @@ const CallIncomingDepartment = () => {
     categories: string[];
   } | null>(null);
   const [currentChartTitle, setCurrentChartTitle] = useState("");
+
+  const resetCharts = useCallback(() => {
+    setChartCalls(null);
+    setChartRingTime(null);
+    setChartDuration(null);
+    setChartLoading(false);
+  }, []);
 
   useEffect(() => {
     // Check if filters have actually changed
@@ -522,19 +550,13 @@ const CallIncomingDepartment = () => {
               console.error(
                 "Chart data arrays have different lengths or no data",
               );
-              setChartCalls(null);
-              setChartRingTime(null);
-              setChartDuration(null);
+              resetCharts();
             }
           } else {
-            setChartCalls(null);
-            setChartRingTime(null);
-            setChartDuration(null);
+            resetCharts();
           }
         } catch {
-          setChartCalls(null);
-          setChartRingTime(null);
-          setChartDuration(null);
+          resetCharts();
         } finally {
           setChartLoading(false);
         }
@@ -542,13 +564,9 @@ const CallIncomingDepartment = () => {
 
       fetchCharts();
     } else {
-      // Reset chart when filters are not ready
-      setChartCalls(null);
-      setChartRingTime(null);
-      setChartDuration(null);
-      setChartLoading(false);
+      resetCharts();
     }
-  }, [currentFilters, session]);
+  }, [currentFilters, session, resetCharts]);
 
   const [currentChartDataType, setCurrentChartDataType] = useState<
     "calls" | "time" | "cost" | "custom"
@@ -572,6 +590,53 @@ const CallIncomingDepartment = () => {
       setActiveTab(key);
     }
   };
+
+  const dateRangeDisplay =
+    showDateRange && startDateTime && endDateTime ? (
+      <p className="mb-0">
+        Date Range:{" "}
+        <span className="status-badge primary">
+          {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+        </span>{" "}
+        to{" "}
+        <span className="status-badge primary">
+          {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+        </span>
+      </p>
+    ) : null;
+
+  const renderChartTab = (
+    tabKey: string,
+    chartData: { series: any[]; categories: string[] } | null,
+    title: string,
+    dataType: "calls" | "time" | "cost",
+  ) =>
+    activeTab === tabKey ? (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tabKey}
+          variants={tabVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          <Row>
+            <Col md={12}>
+              <div className="card report-shadow">
+                <div className="card-body">
+                  {renderChartTabContent(
+                    chartLoading,
+                    chartData,
+                    title,
+                    dataType,
+                  )}
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </motion.div>
+      </AnimatePresence>
+    ) : null;
 
   const renderDonutContent = () => {
     if (loading || !dataLoaded || !filtersReady) {
@@ -679,24 +744,7 @@ const CallIncomingDepartment = () => {
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
-                  {showDateRange && (
-                    <p className="mb-0">
-                      Date Range:{" "}
-                      <span className="status-badge primary">
-                        {formatDateTimeToLocal(
-                          startDateTime,
-                          GlobalDateTimeFormat,
-                        )}
-                      </span>{" "}
-                      to{" "}
-                      <span className="status-badge primary">
-                        {formatDateTimeToLocal(
-                          endDateTime,
-                          GlobalDateTimeFormat,
-                        )}
-                      </span>
-                    </p>
-                  )}
+                  {dateRangeDisplay}
                   <div className="d-flex align-items-center gap-2">
                     <button
                       className="btn btn-outline-secondary"
@@ -803,90 +851,30 @@ const CallIncomingDepartment = () => {
             onSelect={handleTabChange}
           >
             <Tab eventKey="calls_chart" title="Calls by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "calls_chart" && (
-                  <motion.div
-                    key="calls_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabContent(
-                              chartLoading,
-                              chartCalls,
-                              "Calls by Department",
-                              "calls",
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "calls_chart",
+                chartCalls,
+                "Calls by Department",
+                "calls",
+              )}
             </Tab>
 
             <Tab eventKey="duration_chart" title="Duration by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "duration_chart" && (
-                  <motion.div
-                    key="duration_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabContent(
-                              chartLoading,
-                              chartDuration,
-                              "Duration by Department",
-                              "time",
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "duration_chart",
+                chartDuration,
+                "Duration by Department",
+                "time",
+              )}
             </Tab>
 
             <Tab eventKey="ring_chart" title="Ring Time by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "ring_chart" && (
-                  <motion.div
-                    key="ring_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabContent(
-                              chartLoading,
-                              chartRingTime,
-                              "Ring Time by Department",
-                              "time",
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {renderChartTab(
+                "ring_chart",
+                chartRingTime,
+                "Ring Time by Department",
+                "time",
+              )}
             </Tab>
 
             {/* <Tab eventKey="cost_chart" title="Cost by Department">
@@ -940,25 +928,7 @@ const CallIncomingDepartment = () => {
       {session?.user?.permissions?.includes("list-call-logs") && (
         <>
           <BarFilters
-            leftContent={
-              <>
-                {showDateRange && (
-                  <p className="mb-0">
-                    Date Range:{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(
-                        startDateTime,
-                        GlobalDateTimeFormat,
-                      )}
-                    </span>{" "}
-                    to{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
-                    </span>
-                  </p>
-                )}
-              </>
-            }
+            leftContent={<>{dateRangeDisplay}</>}
             searchValue=""
             onSearchChange={() => {}}
             onSearch={() => {}}
@@ -976,29 +946,12 @@ const CallIncomingDepartment = () => {
               // Chart data will be triggered by useEffect watching currentFilters
             }}
             onReset={() => {
-              // Preserve current date filters, clear all other filters
-              const resetPendingFilters: Record<string, any> = {
-                start_datetime:
-                  (pendingFilters as any)?.start_datetime ||
-                  defaultFilters.pending.start_datetime,
-                end_datetime:
-                  (pendingFilters as any)?.end_datetime ||
-                  defaultFilters.pending.end_datetime,
-                is_incoming_only: "true",
-              };
-              const resetCurrentFilters: Record<string, any> = {
-                start_datetime:
-                  (currentFilters as any)?.start_datetime ||
-                  defaultFilters.current.start_datetime,
-                end_datetime:
-                  (currentFilters as any)?.end_datetime ||
-                  defaultFilters.current.end_datetime,
-                is_incoming_only: "true",
-              };
-              setPendingFilters(resetPendingFilters);
-              setCurrentFilters(resetCurrentFilters);
-              currentFiltersRef.current = resetCurrentFilters;
-              handleFiltersChange(resetPendingFilters);
+              const { pending: resetPending, current: resetCurrent } =
+                getResetFilters();
+              setPendingFilters(resetPending);
+              setCurrentFilters(resetCurrent);
+              currentFiltersRef.current = resetCurrent;
+              handleFiltersChange(resetPending);
             }}
             filterContent={
               <>

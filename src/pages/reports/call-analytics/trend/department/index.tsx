@@ -48,6 +48,55 @@ interface ChartData {
   max_duration: number[];
 }
 
+const EMPTY_SUMMARY: Summary = {
+  total_calls: 0,
+  answered_calls: 0,
+  unanswered_calls: 0,
+  total_cost: 0,
+  total_duration: 0,
+  avg_duration: 0,
+  avg_ring_time: 0,
+};
+
+type ChartDataType = "calls" | "time" | "cost";
+
+const CHART_TABS: Array<{
+  eventKey: string;
+  title: string;
+  modalTitle: string;
+  dataType: ChartDataType;
+  chartKey: "calls" | "duration" | "ringTime" | "cost";
+}> = [
+  {
+    eventKey: "calls_chart",
+    title: "Calls by Department",
+    modalTitle: "Calls by Department",
+    dataType: "calls",
+    chartKey: "calls",
+  },
+  {
+    eventKey: "duration_chart",
+    title: "Duration by Department",
+    modalTitle: "Duration by Department",
+    dataType: "time",
+    chartKey: "duration",
+  },
+  {
+    eventKey: "ring_chart",
+    title: "Ring Time by Department",
+    modalTitle: "Ring Time by Department",
+    dataType: "time",
+    chartKey: "ringTime",
+  },
+  {
+    eventKey: "cost_chart",
+    title: "Cost by Department",
+    modalTitle: "Cost by Department",
+    dataType: "cost",
+    chartKey: "cost",
+  },
+];
+
 const CallTrendDepartment = () => {
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(false);
@@ -175,15 +224,7 @@ const CallTrendDepartment = () => {
 
   const [dataLoaded, setDataLoaded] = useState(false);
   const [filtersReady, setFiltersReady] = useState(false);
-  const [summary, setSummary] = useState<Summary>({
-    total_calls: 0,
-    answered_calls: 0,
-    unanswered_calls: 0,
-    total_cost: 0,
-    total_duration: 0,
-    avg_duration: 0,
-    avg_ring_time: 0,
-  });
+  const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
 
   const [showPageLoader, setShowPageLoader] = useState(false);
 
@@ -297,15 +338,7 @@ const CallTrendDepartment = () => {
 
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
       setDataLoaded(false);
-      setSummary({
-        total_calls: 0,
-        answered_calls: 0,
-        unanswered_calls: 0,
-        total_cost: 0,
-        total_duration: 0,
-        avg_duration: 0,
-        avg_ring_time: 0,
-      });
+      setSummary(EMPTY_SUMMARY);
       setRefreshKey((prev) => prev + 1);
     }
   };
@@ -369,6 +402,13 @@ const CallTrendDepartment = () => {
     categories: string[];
   } | null>(null);
   const [currentChartTitle, setCurrentChartTitle] = useState("");
+
+  const resetAllCharts = useCallback(() => {
+    setChartCalls(null);
+    setChartRingTime(null);
+    setChartCost(null);
+    setChartDuration(null);
+  }, []);
 
   useEffect(() => {
     // Only fetch charts when filters are ready and not empty
@@ -486,23 +526,14 @@ const CallTrendDepartment = () => {
                 categories: newChartData.country,
               });
             } else {
-              setChartCalls(null);
-              setChartRingTime(null);
-              setChartCost(null);
-              setChartDuration(null);
+              resetAllCharts();
             }
           } else {
-            setChartCalls(null);
-            setChartRingTime(null);
-            setChartCost(null);
-            setChartDuration(null);
+            resetAllCharts();
           }
         } catch (error) {
           console.error("Error fetching chart data:", error);
-          setChartCalls(null);
-          setChartRingTime(null);
-          setChartCost(null);
-          setChartDuration(null);
+          resetAllCharts();
         } finally {
           setChartLoading(false);
         }
@@ -511,13 +542,10 @@ const CallTrendDepartment = () => {
       fetchCharts();
     } else {
       // Reset chart when filters are not ready
-      setChartCalls(null);
-      setChartRingTime(null);
-      setChartCost(null);
-      setChartDuration(null);
+      resetAllCharts();
       setChartLoading(false);
     }
-  }, [currentFilters, filtersReady]);
+  }, [currentFilters, filtersReady, resetAllCharts]);
 
   const [currentChartDataType, setCurrentChartDataType] = useState<
     "calls" | "time" | "cost" | "custom"
@@ -561,6 +589,62 @@ const CallTrendDepartment = () => {
     if (isLoading) return renderChartSpinner("Loading chart...", 300);
     if (chartData) return chartBarNode;
     return <div className="" />;
+  };
+
+  const renderChartTabContent = (
+    tabKey: string,
+    chartData: { series: any[]; categories: string[] } | null,
+    dataType: ChartDataType,
+    modalTitle: string,
+  ) => (
+    <AnimatePresence mode="wait">
+      {activeTab === tabKey && (
+        <motion.div
+          key={tabKey}
+          variants={tabVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          <Row>
+            <Col md={12}>
+              <div className="card report-shadow">
+                <div className="card-body">
+                  {renderChartTabBody(
+                    chartLoading,
+                    chartData,
+                    chartData ? (
+                      <ChartBar
+                        series={chartData.series}
+                        categories={chartData.categories}
+                        dataType={dataType}
+                        height={300}
+                        maxDisplayedItems={5}
+                        showViewAllButton={true}
+                        viewAllButtonText="View All"
+                        showFullScreenButton={true}
+                        onFullScreenClick={() =>
+                          handleOpenChartModal(chartData, modalTitle, dataType)
+                        }
+                      />
+                    ) : (
+                      <div className="" />
+                    ),
+                  )}
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const chartsByKey = {
+    calls: chartCalls,
+    duration: chartDuration,
+    ringTime: chartRingTime,
+    cost: chartCost,
   };
 
   let donutChartContent: React.ReactNode;
@@ -701,181 +785,16 @@ const CallTrendDepartment = () => {
             activeKey={activeTab}
             onSelect={handleTabChange}
           >
-            <Tab eventKey="calls_chart" title="Calls by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "calls_chart" && (
-                  <motion.div
-                    key="calls_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabBody(
-                              chartLoading,
-                              chartCalls,
-                              <ChartBar
-                                series={chartCalls!.series}
-                                categories={chartCalls!.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCalls,
-                                    "Calls by Country",
-                                    "calls",
-                                  )
-                                }
-                              />,
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
+            {CHART_TABS.map((tab) => (
+              <Tab key={tab.eventKey} eventKey={tab.eventKey} title={tab.title}>
+                {renderChartTabContent(
+                  tab.eventKey,
+                  chartsByKey[tab.chartKey],
+                  tab.dataType,
+                  tab.modalTitle,
                 )}
-              </AnimatePresence>
-            </Tab>
-
-            <Tab eventKey="duration_chart" title="Duration by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "duration_chart" && (
-                  <motion.div
-                    key="duration_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabBody(
-                              chartLoading,
-                              chartDuration,
-                              <ChartBar
-                                series={chartDuration!.series}
-                                categories={chartDuration!.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartDuration,
-                                    "Duration by Country",
-                                    "time",
-                                  )
-                                }
-                              />,
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
-
-            <Tab eventKey="ring_chart" title="Ring Time by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "ring_chart" && (
-                  <motion.div
-                    key="ring_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabBody(
-                              chartLoading,
-                              chartRingTime,
-                              <ChartBar
-                                series={chartRingTime!.series}
-                                categories={chartRingTime!.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartRingTime,
-                                    "Ring Time by Country",
-                                    "time",
-                                  )
-                                }
-                              />,
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
-
-            <Tab eventKey="cost_chart" title="Cost by Department">
-              <AnimatePresence mode="wait">
-                {activeTab === "cost_chart" && (
-                  <motion.div
-                    key="cost_chart"
-                    variants={tabVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {renderChartTabBody(
-                              chartLoading,
-                              chartCost,
-                              <ChartBar
-                                series={chartCost!.series}
-                                categories={chartCost!.categories}
-                                dataType="cost"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCost,
-                                    "Cost by Country",
-                                    "cost",
-                                  )
-                                }
-                              />,
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
+              </Tab>
+            ))}
           </Tabs>
         </Col>
       </Row>
