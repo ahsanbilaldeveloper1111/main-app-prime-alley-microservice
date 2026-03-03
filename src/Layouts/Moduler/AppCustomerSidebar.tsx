@@ -1642,7 +1642,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
                       type="button"
-                      title={module.title}
+                      title={!isSidebarExpanded ? module.title : undefined}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1657,7 +1657,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <button
                     type="button"
-                    title={module.title}
+                    title={!isSidebarExpanded ? module.title : undefined}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
@@ -1694,7 +1694,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
                       type="button"
-                      title={module.title}
+                      title={!isSidebarExpanded ? module.title : undefined}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1709,7 +1709,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <button
                     type="button"
-                    title={module.title}
+                    title={!isSidebarExpanded ? module.title : undefined}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
@@ -1746,7 +1746,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
                       type="button"
-                      title={module.title}
+                      title={!isSidebarExpanded ? module.title : undefined}
                       className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
                         if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
@@ -1761,7 +1761,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <button
                     type="button"
-                    title={module.title}
+                    title={!isSidebarExpanded ? module.title : undefined}
                     className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
