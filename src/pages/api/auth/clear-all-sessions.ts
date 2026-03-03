@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './[...nextauth]';
-import { sessionStore } from '../../../utils/sessionStore';
+import { jwtPayloadStore, sessionStore } from '../../../utils/sessionStore';
 import { setCookieClearHeaders } from '../../../utils/cookieUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -46,16 +46,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Also clear NextAuth JWT payload store (this is what actually backs NextAuth auth with small cookies)
+    let clearedJwtPayloadCount = 0;
+    if (global.nextAuthJwtPayloadStore) {
+      const payloadsToDelete: string[] = [];
+      global.nextAuthJwtPayloadStore.forEach((_payload: any, sessionId: string) => {
+        payloadsToDelete.push(sessionId);
+      });
+      payloadsToDelete.forEach((sessionId) => {
+        jwtPayloadStore.delete(sessionId);
+        clearedJwtPayloadCount++;
+      });
+    }
+
 
     // Clear all cookies related to sessions (including NextAuth cookies)
     setCookieClearHeaders(res, true);
 
-    console.log(`Cleared ${clearedCount} sessions on browser close`);
+    console.log(`Cleared ${clearedCount} sessions + ${clearedJwtPayloadCount} jwt payloads on browser close`);
 
     return res.status(200).json({
       success: true,
       message: 'All sessions cleared successfully',
-      clearedCount
+      clearedCount,
+      clearedJwtPayloadCount,
     });
 
   } catch (error) {

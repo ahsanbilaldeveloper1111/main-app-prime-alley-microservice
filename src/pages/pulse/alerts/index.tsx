@@ -3,231 +3,238 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getAlerts, getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
+import { getAlerts, ZabbixAlertRow } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import { FORMAT_CLOCK } from '@utils/Helper';
+import { Badge } from 'react-bootstrap';
+import AppSelect from '@components/AppSelect';
 
-const SEVERITY_LABELS: Record<string, string> = {
-  '0': 'Not classified',
-  '1': 'Information',
-  '2': 'Warning',
-  '3': 'Average',
-  '4': 'High',
-  '5': 'Disaster',
-};
+type SeverityOption = { value: string; label: string };
+type AcknowledgedOption = { value: boolean; label: string };
 
+const SEVERITY_OPTIONS: SeverityOption[] = [
+  { value: 'not_classified', label: 'Not classified' },
+  { value: 'information', label: 'Information' },
+  { value: 'warning', label: 'Warning' },
+  { value: 'average', label: 'Average' },
+  { value: 'high', label: 'High' },
+  { value: 'disaster', label: 'Disaster' },
+];
 
-const HostAlerts = () => {
-  const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
-  const [hosts, setHosts] = useState<ZebbixHost[]>([]);
-  const [selectedHostId, setSelectedHostId] = useState<string>('');
+const ACKNOWLEDGED_OPTIONS: AcknowledgedOption[] = [
+  { value: true, label: 'Acknowledged' },
+  { value: false, label: 'Unacknowledged' },
+];
+
+const Alerts = () => {
+  const [alerts, setAlerts] = useState<ZabbixAlertRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [searchValue, setSearchValue] = useState('');
-  const [tablePagination, setTablePagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    totalRows: 0,
+  const [search, setSearch] = useState('');
+  const [selectedSeverity, setSelectedSeverity] = useState<SeverityOption | null>(null);
+  const [selectedAcknowledged, setSelectedAcknowledged] = useState<AcknowledgedOption | null>(null);
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: 15,
+    total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZebbixAlert>[] = [
-    // { key: 'eventid', label: 'Event ID', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
+  const fetchAlerts = useCallback(
+    async (
+      offset: number,
+      limit: number,
+      searchTerm?: string,
+      severity?: string,
+      acknowledged?: boolean
+    ) => {
+    setLoading(true);
+    try {
+      const response = await getAlerts({
+        offset,
+        limit,
+        ...(severity ? { severity } : {}),
+        ...(acknowledged !== undefined ? { acknowledged } : {}),
+        ...(searchTerm?.trim() ? { search: searchTerm.trim() } : {}),
+      });
+      setAlerts(response.alerts ?? []);
+      setPagination((prev) => ({
+        ...prev,
+        offset: response.offset,
+        limit: response.limit,
+        total: response.total,
+      }));
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch alerts');
+      setAlerts([]);
+      setPagination((prev) => ({ ...prev, offset: 0, total: 0 }));
+    } finally {
+      setLoading(false);
+    }
+    },
+    []
+  );
+
+  useEffect(() => {
+    fetchAlerts(
+      0,
+      pagination.limit,
+      undefined,
+      selectedSeverity?.value,
+      selectedAcknowledged?.value
+    );
+  }, [fetchAlerts, pagination.limit, selectedSeverity?.value, selectedAcknowledged?.value]);
+
+  const badgeVariantForSeverityClass = (severityClass?: string) => {
+    const s = (severityClass ?? '').toLowerCase();
+    if (s === 'danger' || s === 'error') return 'danger';
+    if (s === 'warning') return 'warning';
+    if (s === 'success') return 'success';
+    if (s === 'info') return 'info';
+    if (s === 'primary') return 'primary';
+    if (s === 'secondary') return 'secondary';
+    return 'secondary';
+  };
+
+  const tableColumns: TableColumn<ZabbixAlertRow>[] = [
+    { key: 'description', label: 'Description', sortable: true },
     {
       key: 'severity',
       label: 'Severity',
       sortable: true,
       render: (row) => (
-        <span className="badge bg-warning text-dark">
-          {SEVERITY_LABELS[row.severity] ?? row.severity}
-        </span>
+        <Badge bg={badgeVariantForSeverityClass(row.severity_class)} className="text-capitalize">
+          {row.severity ?? '-'}
+        </Badge>
       ),
     },
     {
-      key: 'clock',
+      key: 'time',
       label: 'Time',
       sortable: true,
-      render: (row) => FORMAT_CLOCK(row.clock ?? ''),
+      render: (row) => <span>{row.time ?? '-'}</span>,
     },
     {
-      key: 'host',
+      key: 'hostname',
       label: 'Host',
       sortable: true,
-      render: (row) => row.hosts?.[0]?.host ?? '-',
+      render: (row) => <span>{row.hostname ?? '-'}</span>,
     },
-  ];
-
-  const fetchHosts = useCallback(async () => {
-    try {
-      const response = await getHosts();
-      if (response.error || !response.result) return;
-      const list = response.result ?? [];
-      setHosts(Array.isArray(list) ? list : []);
-      if (list.length > 0 && !selectedHostId) {
-        setSelectedHostId((list[0] as ZebbixHost).hostid);
-      }
-    } catch (error) {
-      console.error('Error fetching hosts:', error);
-    }
-  }, []);
-
-  const fetchAlerts = useCallback(async () => {
-    if (!selectedHostId) {
-      setAlerts([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await getAlerts(selectedHostId);
-      if (response?.error) {
-        toast.error(response.error.message || 'Failed to fetch alerts');
-        setAlerts([]);
-        return;
-      }
-      const list =
-        Array.isArray((response as any)?.result)
-          ? (response as any).result
-          : Array.isArray((response as any)?.data?.result)
-            ? (response as any).data.result
-            : Array.isArray((response as any)?.data)
-              ? (response as any).data
-              : [];
-      setAlerts(list);
-      setTablePagination((prev) => ({
-        ...prev,
-        totalRows: list.length,
-        currentPage: 1,
-      }));
-    } catch (error) {
-      console.error('Error fetching alerts:', error);
-      toast.error('Failed to fetch alerts');
-      setAlerts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedHostId]);
-
-  useEffect(() => {
-    fetchHosts();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    fetchAlerts();
-  }, [selectedHostId, refreshKey, fetchAlerts]);
-
-  const handleRefresh = () => setRefreshKey((k) => k + 1);
-
-  const filteredAlerts = searchValue.trim()
-    ? alerts.filter(
-        (a) =>
-          a.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          a.eventid?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          a.hosts?.[0]?.host?.toLowerCase().includes(searchValue.toLowerCase())
-      )
-    : alerts;
-
-  const paginatedData = filteredAlerts.slice(
-    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
-    tablePagination.currentPage * tablePagination.rowsPerPage
-  );
-
-  const summaryCards: SummaryCard[] = [
     {
-      id: 'total-alerts',
-      title: 'Total Alerts',
-      value: alerts.length,
-      description: 'Alerts for selected host',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
+      key: 'customer',
+      label: 'Customer',
+      sortable: true,
+      render: (row) => <span>{row.customer ?? '-'}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (row) => <span className="text-capitalize">{row.status ?? '-'}</span>,
+    },
+    {
+      key: 'acknowledged',
+      label: 'Acknowledged',
+      sortable: true,
+      render: (row) =>
+        row.acknowledged ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>,
     },
   ];
+
+  const handleSearch = () =>
+    fetchAlerts(0, pagination.limit, search, selectedSeverity?.value, selectedAcknowledged?.value);
+  const handleRefresh = () =>
+    fetchAlerts(0, pagination.limit, search, selectedSeverity?.value, selectedAcknowledged?.value);
 
   return (
     <React.Fragment>
-      
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle="Alerts" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Alerts" />
 
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">Host Alerts</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                <select
-                  className="form-select"
-                  value={selectedHostId}
-                  onChange={(e) => setSelectedHostId(e.target.value)}
-                  style={{ maxWidth: '280px' }}
-                >
-                  <option value="">Select host</option>
-                  {hosts.map((h) => (
-                    <option key={h.hostid} value={h.hostid}>
-                      {h.name ?? h.host ?? h.hostid}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search alerts..."
-                  value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-                  }}
-                  style={{ maxWidth: '240px' }}
-                />
-                <Button variant="info" onClick={handleRefresh} disabled={loading}>
-                  <FiRefreshCw size={14} /> Refresh
-                </Button>
-              </Col>
-            </Row>
+          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
+            <div style={{ minWidth: '220px', maxWidth: '260px' }}>
+              <AppSelect<SeverityOption>
+                instanceId="pulse-alerts-severity"
+                placeholder="All severities"
+                isClearable
+                options={SEVERITY_OPTIONS}
+                value={selectedSeverity}
+                onChange={(opt) => {
+                  const next = (opt ?? null) as SeverityOption | null;
+                  setSelectedSeverity(next);
+                  fetchAlerts(0, pagination.limit, search, next?.value, selectedAcknowledged?.value);
+                }}
+              />
+            </div>
+            <div style={{ minWidth: '220px', maxWidth: '260px' }}>
+              <AppSelect<AcknowledgedOption>
+                instanceId="pulse-alerts-acknowledged"
+                placeholder="All acknowledgements"
+                isClearable
+                options={ACKNOWLEDGED_OPTIONS}
+                value={selectedAcknowledged}
+                onChange={(opt) => {
+                  const next = (opt ?? null) as AcknowledgedOption | null;
+                  setSelectedAcknowledged(next);
+                  fetchAlerts(0, pagination.limit, search, selectedSeverity?.value, next?.value);
+                }}
+              />
+            </div>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search alerts..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              style={{ maxWidth: '240px' }}
+            />
+            <Button variant="primary" onClick={handleSearch} disabled={loading}>
+              Search
+            </Button>
+            <Button variant="info" onClick={handleRefresh} disabled={loading}>
+              <FiRefreshCw size={14} /> Refresh
+            </Button>
           </div>
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
-
-      <GenericTable<ZebbixAlert>
-        data={paginatedData}
+      <GenericTable<ZabbixAlertRow>
+        data={alerts}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No alerts found for this host.' : 'Select a host to view alerts.'}
+        emptyMessage="No alerts found."
         loadingMessage="Loading alerts..."
         pagination={{
-          currentPage: tablePagination.currentPage,
-          rowsPerPage: tablePagination.rowsPerPage,
-          totalRows: filteredAlerts.length,
-          pageSizeOptions: tablePagination.pageSizeOptions,
+          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+          rowsPerPage: pagination.limit,
+          totalRows: pagination.total,
+          pageSizeOptions: pagination.pageSizeOptions,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setTablePagination((prev) => ({
-            ...prev,
-            currentPage: page,
+          fetchAlerts(
+            (page - 1) * rowsPerPage,
             rowsPerPage,
-          }));
+            search,
+            selectedSeverity?.value,
+            selectedAcknowledged?.value
+          );
         }}
         sortable={true}
         hover={true}
         striped={false}
-        uniqueKey="eventid"
+        uniqueKey="alertid"
       />
     </React.Fragment>
   );
 };
 
-HostAlerts.getLayout = (page: ReactElement) => {
+Alerts.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default HostAlerts;
+export default Alerts;

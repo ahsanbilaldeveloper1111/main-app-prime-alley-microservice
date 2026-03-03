@@ -327,7 +327,7 @@ const Alerts = () => {
         ]);
 
         // Calculate alert summary from alerts data
-        const alerts = alertsResponse || [];
+        const alerts = (alertsResponse as any)?.alerts ?? [];
         const alertSummary = {
           total_alerts: alerts.length,
           critical_alerts: alerts.filter(

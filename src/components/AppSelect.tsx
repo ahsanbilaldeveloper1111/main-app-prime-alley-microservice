@@ -36,6 +36,7 @@ function AppSelectInner<Option, IsMulti extends boolean = false, Group extends G
     openMenuOnFocus,
     resetSearchOnValueChange,
     value,
+    styles: userStyles,
     ...rest
   } = props;
 
@@ -95,6 +96,29 @@ function AppSelectInner<Option, IsMulti extends boolean = false, Group extends G
 
   const selectProps: Props<Option, IsMulti, Group> = {
     ...rest,
+    styles: {
+      ...(userStyles ?? {}),
+      control: (base: any, state: any) => {
+        const next = userStyles?.control ? (userStyles.control as any)(base, state) : base;
+        return {
+          ...next,
+          minHeight: 48,
+          borderColor: state.isFocused ? '#04A9F5' : '#DBE0E5',
+          borderRadius: 10,
+          ':hover': {
+            ...(next?.[':hover'] ?? {}),
+            borderColor: state.isFocused ? '#04A9F5' : '#DBE0E5',
+          },
+        };
+      },
+      menu: (base: any, state: any) => {
+        const next = userStyles?.menu ? (userStyles.menu as any)(base, state) : base;
+        return {
+          ...next,
+          borderRadius: 10,
+        };
+      },
+    } as any,
     value,
     onChange: handleChange,
     isSearchable,

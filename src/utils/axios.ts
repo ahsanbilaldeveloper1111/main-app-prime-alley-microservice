@@ -129,6 +129,8 @@ axiosInstance.interceptors.response.use(
           } else {
             // Token refresh failed - clear cookies and session, then sign out
             if (typeof window !== 'undefined') {
+              // Best-effort: clear server-side NextAuth session payload before wiping cookies
+              fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
               clearSessionCookiesClient(true);
               sessionStorage.clear();
               const callbackUrl = getLogoutCallbackUrl();

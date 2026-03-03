@@ -457,6 +457,10 @@ class TokenService {
     // if (error?.response?.status === 401 || error?.response?.status === 403) {
       // console.log('Token refresh failed with auth error, clearing session...');
       if (typeof window !== 'undefined' && window.sessionStorage) {
+        // Best-effort: clear server-side NextAuth session payload before wiping cookies,
+        // otherwise the server can still consider the old cookie session valid.
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+
         sessionStorage.clear();
         clearAllLocalStorage();
         clearSessionCookiesClient(true);
