@@ -57,7 +57,6 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
 import {
   formatMinutesAndSeconds,
   ModuleSlug,
@@ -65,19 +64,43 @@ import {
   formatDateTimeToLocal,
   getAutoTimezone,
 } from "@utils/Helper";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+
+function formatFiltersDatetimeToUTC(filters: Record<string, any>): void {
+  if (filters.start_datetime) {
+    let startMoment = moment(filters.start_datetime);
+    if (filters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+      startMoment = moment(filters.start_datetime + ":00");
+    } else if (!filters.start_datetime.includes("T")) {
+      startMoment = moment(filters.start_datetime).startOf("day");
+    }
+    filters.start_datetime =
+      startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  }
+  if (filters.end_datetime) {
+    let endMoment = moment(filters.end_datetime);
+    if (filters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+      const timePart = filters.end_datetime.split("T")[1];
+      endMoment =
+        timePart === "23:59"
+          ? moment(filters.end_datetime + ":59")
+          : moment(filters.end_datetime + ":00");
+    } else if (!filters.end_datetime.includes("T")) {
+      endMoment = moment(filters.end_datetime).endOf("day");
+    }
+    filters.end_datetime = endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  }
+}
 
 const CallStatsExtension = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDateTime, setStartDateTime] = useState<string>("");
   const [endDateTime, setEndDateTime] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  // Intentional: setter only used for fetch state; value unused to avoid extra re-renders
+  const [_loading, setLoading] = useState(false); // NOSONAR
   const [activeTab, setActiveTab] = useState("calls_chart");
 
   // Animation variants for tab transitions
@@ -211,8 +234,6 @@ const CallStatsExtension = () => {
     loading: hierarchyLoading,
   } = useHierarchyData(ModuleSlug.CALL_REPORTS);
 
-  // Use ref to track if initial fetch has been done
-  const initialFetchDone = React.useRef(false);
   // Use ref to track last filters used for charts to prevent unnecessary refetches
   const lastChartFilters = React.useRef<string>("");
 
@@ -329,62 +350,9 @@ const CallStatsExtension = () => {
     }
   }, [summary, dataLoaded]);
 
-  // Trigger initial data fetch when filters become ready (only once)
-  // Ensure initial fetch happens when session is ready
-  useEffect(() => {
-    if (session && session.user?.permissions?.includes("list-call-logs")) {
-      initialFetchDone.current = true;
-    }
-  }, [session]);
-
   const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
     const formattedFilters: any = { ...filters };
-
-    if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
-
-    if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    }
+    formatFiltersDatetimeToUTC(formattedFilters);
 
     // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
     if (
@@ -402,7 +370,10 @@ const CallStatsExtension = () => {
     const isCompletelyCleared =
       Object.keys(formattedFilters).length === 0 ||
       (Object.keys(formattedFilters).length === 1 &&
-        formattedFilters.hasOwnProperty("is_incoming_only"));
+        Object.prototype.hasOwnProperty.call(
+          formattedFilters,
+          "is_incoming_only",
+        ));
 
     // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
@@ -451,10 +422,6 @@ const CallStatsExtension = () => {
     categories: string[];
   } | null>(null);
   const [chartRingTime, setChartRingTime] = useState<{
-    series: any[];
-    categories: string[];
-  } | null>(null);
-  const [chartCost, setChartCost] = useState<{
     series: any[];
     categories: string[];
   } | null>(null);
@@ -518,8 +485,8 @@ const CallStatsExtension = () => {
               max_duration: [],
             };
 
-            chartData.forEach((item: any, index: number) => {
-              if (item && item.label) {
+            chartData.forEach((item: any) => {
+              if (item?.label) {
                 newChartData.country.push(item.label);
                 newChartData.answered_calls.push(
                   Number(item.answered_calls) || 0,
@@ -573,17 +540,6 @@ const CallStatsExtension = () => {
                 ],
                 categories: newChartData.country,
               });
-
-              // Cost Chart
-              setChartCost({
-                series: [
-                  { name: "Max Cost", data: newChartData.max_cost },
-                  { name: "Avg Cost", data: newChartData.avg_cost },
-                  { name: "Min Cost", data: newChartData.min_cost },
-                ],
-                categories: newChartData.country,
-              });
-
               // Duration Chart
               setChartDuration({
                 series: [
@@ -596,21 +552,16 @@ const CallStatsExtension = () => {
             } else {
               setChartCalls(null);
               setChartRingTime(null);
-              setChartCost(null);
               setChartDuration(null);
             }
           } else {
             setChartCalls(null);
             setChartRingTime(null);
-            setChartCost(null);
             setChartDuration(null);
           }
-        } catch (error: unknown) {
-          if (error instanceof Error) {
-          }
+        } catch {
           setChartCalls(null);
           setChartRingTime(null);
-          setChartCost(null);
           setChartDuration(null);
         } finally {
           setChartLoading(false);
@@ -622,7 +573,6 @@ const CallStatsExtension = () => {
       // Reset chart when filters are not ready
       setChartCalls(null);
       setChartRingTime(null);
-      setChartCost(null);
       setChartDuration(null);
       setChartLoading(false);
     }
@@ -645,35 +595,197 @@ const CallStatsExtension = () => {
     }
   };
 
-  // Debug: log when chart data changes
-  useEffect(() => {
-    console.log("Chart data state updated:", {
-      hasChartCalls: !!chartCalls,
-      hasChartRingTime: !!chartRingTime,
-      hasChartCost: !!chartCost,
-      hasChartDuration: !!chartDuration,
-      chartLoading,
-    });
-  }, [chartCalls, chartRingTime, chartCost, chartDuration, chartLoading]);
-
-  // Debug: log when summary data changes
-  useEffect(() => {
-    console.log("Summary data updated:", summary);
-  }, [summary]);
-
-  // Debug: log when dataLoaded state changes
-  useEffect(() => {
-    console.log("DataLoaded state changed:", dataLoaded);
-    console.log("Loading state:", loading);
-    console.log("FiltersReady state:", filtersReady);
-  }, [dataLoaded, loading, filtersReady]);
-
   const handleTabChange = (key: string | null) => {
     if (key) {
-      console.log("Tab changed to:", key);
       setActiveTab(key);
     }
   };
+
+  const emptyDonutMessage = (
+    <div
+      className="d-flex flex-column align-items-center justify-content-center text-center"
+      style={{ height: "180px" }}
+    >
+      <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
+      <h6 className="text-muted mb-1">No Call Data Available</h6>
+      <p className="text-muted mb-0">
+        No call statistics found for the selected filters
+      </p>
+    </div>
+  );
+
+  function renderStatCardsContent() {
+    if (dataLoaded === false) {
+      return (
+        <>
+          <Col md={6} className="mb-3">
+            <div className="card report-shadow h-100">
+              <div
+                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: "120px" }}
+              >
+                <output
+                  className="spinner-border text-primary mb-2"
+                  aria-live="polite"
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+                <p className="text-muted mb-0">Loading...</p>
+              </div>
+            </div>
+          </Col>
+          <Col md={6} className="mb-3">
+            <div className="card report-shadow h-100">
+              <div
+                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: "120px" }}
+              >
+                <output
+                  className="spinner-border text-primary mb-2"
+                  aria-live="polite"
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+                <p className="text-muted mb-0">Loading...</p>
+              </div>
+            </div>
+          </Col>
+          <Col md={6} className="mb-3">
+            <div className="card report-shadow h-100">
+              <div
+                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: "120px" }}
+              >
+                <output
+                  className="spinner-border text-primary mb-2"
+                  aria-live="polite"
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+                <p className="text-muted mb-0">Loading...</p>
+              </div>
+            </div>
+          </Col>
+          <Col md={6} className="mb-3">
+            <div className="card report-shadow h-100">
+              <div
+                className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+                style={{ minHeight: "120px" }}
+              >
+                <output
+                  className="spinner-border text-primary mb-2"
+                  aria-live="polite"
+                >
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+                <p className="text-muted mb-0">Loading...</p>
+              </div>
+            </div>
+          </Col>
+        </>
+      );
+    }
+    const isSummaryEmpty =
+      summary.total_calls === 0 &&
+      summary.total_duration === 0 &&
+      summary.answered_calls === 0 &&
+      summary.unanswered_calls === 0;
+    if (isSummaryEmpty) {
+      return (
+        <Col md={12}>
+          <div className="card report-shadow">
+            <div
+              className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+              style={{ minHeight: "120px" }}
+            >
+              <i className="fa fa-database fa-3x text-muted mb-3"></i>
+              <h5 className="text-muted mb-2">No Data Available</h5>
+              <p className="text-muted mb-0">
+                No call statistics found for the selected filters and date
+                range.
+              </p>
+            </div>
+          </div>
+        </Col>
+      );
+    }
+    return (
+      <PageSummaryGrid
+        gridColumns={2}
+        cards={[
+          {
+            id: "total-calls",
+            title: "Total Calls",
+            value: summary.total_calls,
+            valueType: "number",
+            description: "Total number of calls",
+            delay: 0,
+          },
+          {
+            id: "avg-ring-time",
+            title: "Avg Ring Time",
+            value: summary.avg_ring_time,
+            valueType: "seconds",
+            description: "Average ring time for calls",
+            delay: 0.3,
+          },
+          {
+            id: "avg-duration",
+            title: "Avg Duration",
+            value: summary.avg_duration,
+            valueType: "seconds",
+            description: "Average call duration",
+            delay: 0.6,
+          },
+          {
+            id: "total-cost",
+            title: "Total Duration",
+            value: summary.total_duration,
+            valueType: "seconds",
+            description: "Total duration of calls",
+            delay: 0.9,
+          },
+        ]}
+      />
+    );
+  }
+
+  function renderDonutChartContent() {
+    if (dataLoaded === false) {
+      return (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-center"
+          style={{ height: "180px" }}
+        >
+          <output
+            className="spinner-border text-primary mb-2"
+            aria-live="polite"
+          >
+            <span className="visually-hidden">Loading...</span>
+          </output>
+          <p className="text-muted mb-0">Loading chart data...</p>
+        </div>
+      );
+    }
+    const noCallData =
+      summary.answered_calls === 0 &&
+      summary.unanswered_calls === 0 &&
+      summary.total_duration === 0;
+    if (noCallData || !simpleDonut) {
+      return emptyDonutMessage;
+    }
+    return (
+      <ChartDonut
+        series={simpleDonut.series}
+        labels={simpleDonut.labels}
+        dataType="calls"
+        height={200}
+        width={500}
+        showDataLabels={true}
+        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+      />
+    );
+  }
 
   return (
     <React.Fragment>
@@ -694,26 +806,23 @@ const CallStatsExtension = () => {
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   {showDateRange && (
-                    <>
-                      <p className="mb-0">
-                        Date Range:{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            startDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>{" "}
-                        to{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            endDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>
-                      </p>
-                    </>
+                    <p className="mb-0">
+                      Date Range:{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          startDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>{" "}
+                      to{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          endDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>
+                    </p>
                   )}
-                  {/* {session?.user?.permissions?.includes('') && ( */}
                   <div className="d-flex align-items-center gap-2">
                     <button
                       className="btn btn-outline-secondary"
@@ -722,11 +831,13 @@ const CallStatsExtension = () => {
                     >
                       {isExporting ? (
                         <>
-                          <span
+                          <output
                             className="spinner-border spinner-border-sm me-2"
-                            role="status"
                             aria-hidden="true"
-                          ></span>
+                            aria-live="polite"
+                          >
+                            <span className="visually-hidden">Exporting</span>
+                          </output>
                           Exporting...
                         </>
                       ) : (
@@ -734,7 +845,6 @@ const CallStatsExtension = () => {
                       )}
                     </button>
                   </div>
-                  {/* )} */}
                 </div>
               </Col>
             </Row>
@@ -744,139 +854,7 @@ const CallStatsExtension = () => {
 
       <Row>
         <Col md={6}>
-          <Row>
-            {!dataLoaded ? (
-              // Loading state for stat cards
-              <>
-                <Col md={6} className="mb-3">
-                  <div className="card report-shadow h-100">
-                    <div
-                      className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                      style={{ minHeight: "120px" }}
-                    >
-                      <div
-                        className="spinner-border text-primary mb-2"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <p className="text-muted mb-0">Loading...</p>
-                    </div>
-                  </div>
-                </Col>
-                <Col md={6} className="mb-3">
-                  <div className="card report-shadow h-100">
-                    <div
-                      className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                      style={{ minHeight: "120px" }}
-                    >
-                      <div
-                        className="spinner-border text-primary mb-2"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <p className="text-muted mb-0">Loading...</p>
-                    </div>
-                  </div>
-                </Col>
-                <Col md={6} className="mb-3">
-                  <div className="card report-shadow h-100">
-                    <div
-                      className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                      style={{ minHeight: "120px" }}
-                    >
-                      <div
-                        className="spinner-border text-primary mb-2"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <p className="text-muted mb-0">Loading...</p>
-                    </div>
-                  </div>
-                </Col>
-                <Col md={6} className="mb-3">
-                  <div className="card report-shadow h-100">
-                    <div
-                      className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                      style={{ minHeight: "120px" }}
-                    >
-                      <div
-                        className="spinner-border text-primary mb-2"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <p className="text-muted mb-0">Loading...</p>
-                    </div>
-                  </div>
-                </Col>
-              </>
-            ) : dataLoaded &&
-              summary.total_calls === 0 &&
-              summary.total_duration === 0 &&
-              summary.answered_calls === 0 &&
-              summary.unanswered_calls === 0 ? (
-              // Empty state when no data is available
-              <Col md={12}>
-                <div className="card report-shadow">
-                  <div
-                    className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ minHeight: "120px" }}
-                  >
-                    <i className="fa fa-database fa-3x text-muted mb-3"></i>
-                    <h5 className="text-muted mb-2">No Data Available</h5>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters and date
-                      range.
-                    </p>
-                  </div>
-                </div>
-              </Col>
-            ) : (
-              // Normal stat cards when data is available
-              <>
-                <PageSummaryGrid
-                  gridColumns={2}
-                  cards={[
-                    {
-                      id: "total-calls",
-                      title: "Total Calls",
-                      value: summary.total_calls,
-                      valueType: "number",
-                      description: "Total number of calls",
-                      delay: 0,
-                    },
-                    {
-                      id: "avg-ring-time",
-                      title: "Avg Ring Time",
-                      value: summary.avg_ring_time,
-                      valueType: "seconds",
-                      description: "Average ring time for calls",
-                      delay: 0.3,
-                    },
-                    {
-                      id: "avg-duration",
-                      title: "Avg Duration",
-                      value: summary.avg_duration,
-                      valueType: "seconds",
-                      description: "Average call duration",
-                      delay: 0.6,
-                    },
-                    {
-                      id: "total-cost",
-                      title: "Total Duration",
-                      value: summary.total_duration,
-                      valueType: "seconds",
-                      description: "Total duration of calls",
-                      delay: 0.9,
-                    },
-                  ]}
-                />
-              </>
-            )}
-          </Row>
+          <Row>{renderStatCardsContent()}</Row>
         </Col>
 
         <Col md={6}>
@@ -887,71 +865,7 @@ const CallStatsExtension = () => {
           >
             <div className="report-grid ">
               <p className="text-muted mb-0">Total Calls</p>
-              <div className="chart-one ">
-                {!dataLoaded ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div
-                      className="spinner-border text-primary mb-2"
-                      role="status"
-                    >
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="text-muted mb-0">Loading chart data...</p>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters
-                    </p>
-                  </div>
-                ) : !simpleDonut ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters
-                    </p>
-                  </div>
-                ) : simpleDonut ? (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={200}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                ) : (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div
-                      className="spinner-border text-primary mb-2"
-                      role="status"
-                    >
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="text-muted mb-0">
-                      Preparing chart visualization...
-                    </p>
-                  </div>
-                )}
-              </div>
+              <div className="chart-one ">{renderDonutChartContent()}</div>
             </div>
           </motion.div>
         </Col>
@@ -984,21 +898,22 @@ const CallStatsExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
+                                <output
                                   className="spinner-border text-primary"
-                                  role="status"
+                                  aria-live="polite"
                                 >
                                   <span className="visually-hidden">
                                     Loading chart...
                                   </span>
-                                </div>
+                                </output>
                               </div>
-                            ) : chartCalls ? (
+                            )}
+                            {!chartLoading && chartCalls && (
                               <ChartBar
                                 series={chartCalls.series}
                                 categories={chartCalls.categories}
@@ -1016,7 +931,8 @@ const CallStatsExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
+                            )}
+                            {!chartLoading && !chartCalls && (
                               <div
                                 className="d-flex flex-column align-items-center justify-content-center text-center"
                                 style={{ height: "300px" }}
@@ -1054,21 +970,22 @@ const CallStatsExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
+                                <output
                                   className="spinner-border text-primary"
-                                  role="status"
+                                  aria-live="polite"
                                 >
                                   <span className="visually-hidden">
                                     Loading chart...
                                   </span>
-                                </div>
+                                </output>
                               </div>
-                            ) : chartDuration ? (
+                            )}
+                            {!chartLoading && chartDuration && (
                               <ChartBar
                                 series={chartDuration.series}
                                 categories={chartDuration.categories}
@@ -1086,7 +1003,8 @@ const CallStatsExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
+                            )}
+                            {!chartLoading && !chartDuration && (
                               <div
                                 className="d-flex flex-column align-items-center justify-content-center text-center"
                                 style={{ height: "300px" }}
@@ -1124,21 +1042,22 @@ const CallStatsExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
+                                <output
                                   className="spinner-border text-primary"
-                                  role="status"
+                                  aria-live="polite"
                                 >
                                   <span className="visually-hidden">
                                     Loading chart...
                                   </span>
-                                </div>
+                                </output>
                               </div>
-                            ) : chartRingTime ? (
+                            )}
+                            {!chartLoading && chartRingTime && (
                               <ChartBar
                                 series={chartRingTime.series}
                                 categories={chartRingTime.categories}
@@ -1156,7 +1075,8 @@ const CallStatsExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
+                            )}
+                            {!chartLoading && !chartRingTime && (
                               <div
                                 className="d-flex flex-column align-items-center justify-content-center text-center"
                                 style={{ height: "300px" }}
@@ -1197,9 +1117,9 @@ const CallStatsExtension = () => {
                                           
                                           {chartLoading ? (
                                               <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
+                                                  <output className="spinner-border text-primary" aria-live="polite">
                                                       <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
+                                                  </output>
                                               </div>
                                           ) : chartCost ? (
                                               <ChartBar 
@@ -1236,23 +1156,18 @@ const CallStatsExtension = () => {
         <>
           <BarFilters
             leftContent={
-              <>
-                {showDateRange && (
-                  <p className="mb-0">
-                    Date Range:{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(
-                        startDateTime,
-                        GlobalDateTimeFormat,
-                      )}
-                    </span>{" "}
-                    to{" "}
-                    <span className="status-badge primary">
-                      {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
-                    </span>
-                  </p>
-                )}
-              </>
+              showDateRange ? (
+                <p className="mb-0">
+                  Date Range:{" "}
+                  <span className="status-badge primary">
+                    {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+                  </span>{" "}
+                  to{" "}
+                  <span className="status-badge primary">
+                    {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+                  </span>
+                </p>
+              ) : null
             }
             searchValue=""
             onSearchChange={() => {}}
@@ -1351,7 +1266,7 @@ const CallStatsExtension = () => {
                         const values = e.target.value
                           .split(",")
                           .map((v) => v.trim())
-                          .filter((v) => v);
+                          .filter(Boolean);
                         setPendingFilters({
                           ...pendingFilters,
                           called_numbers: values,

@@ -52,10 +52,119 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+const CHART_BOX_HEIGHT = 300;
+const DONUT_BOX_HEIGHT = 180;
+
+function ChartLoadingSpinner({
+  message = "Loading chart...",
+}: Readonly<{ message?: string }>) {
+  return (
+    <div
+      className="d-flex align-items-center justify-content-center"
+      style={{ height: `${CHART_BOX_HEIGHT}px` }}
+    >
+      <div className="spinner-border text-primary">
+        <output className="visually-hidden" aria-live="polite">
+          {message}
+        </output>
+      </div>
+    </div>
+  );
+}
+
+function DonutChartContent({
+  loading,
+  dataLoaded,
+  summary,
+  simpleDonut,
+}: Readonly<{
+  loading: boolean;
+  dataLoaded: boolean;
+  summary: Summary;
+  simpleDonut: { series: number[]; labels: string[] } | null;
+}>) {
+  if (loading || !dataLoaded) {
+    return (
+      <div
+        className="d-flex align-items-center justify-content-center"
+        style={{ height: `${DONUT_BOX_HEIGHT}px` }}
+      >
+        <div className="spinner-border text-primary">
+          <output className="visually-hidden" aria-live="polite">
+            Loading...
+          </output>
+        </div>
+      </div>
+    );
+  }
+  const noData =
+    summary.answered_calls === 0 &&
+    summary.unanswered_calls === 0 &&
+    summary.total_duration === 0;
+  if (noData) {
+    return (
+      <div
+        className="d-flex align-items-center justify-content-center"
+        style={{ height: `${DONUT_BOX_HEIGHT}px` }}
+      >
+        <p className="text-muted mb-0">No data available</p>
+      </div>
+    );
+  }
+  if (simpleDonut) {
+    return (
+      <ChartDonut
+        series={simpleDonut.series}
+        labels={simpleDonut.labels}
+        dataType="calls"
+        height={DONUT_BOX_HEIGHT}
+        width={500}
+        showDataLabels={true}
+        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+      />
+    );
+  }
+  return (
+    <div
+      className="d-flex align-items-center justify-content-center"
+      style={{ height: `${DONUT_BOX_HEIGHT}px` }}
+    >
+      <p className="text-muted mb-0">Loading chart...</p>
+    </div>
+  );
+}
+
+function TabChartContent({
+  chartLoading,
+  chartData,
+  dataType,
+  onFullScreenClick,
+}: Readonly<{
+  chartLoading: boolean;
+  chartData: { series: any[]; categories: string[] } | null;
+  dataType: "calls" | "time" | "cost";
+  onFullScreenClick: () => void;
+}>) {
+  if (chartLoading) {
+    return <ChartLoadingSpinner />;
+  }
+  if (chartData) {
+    return (
+      <ChartBar
+        series={chartData.series}
+        categories={chartData.categories}
+        dataType={dataType}
+        height={CHART_BOX_HEIGHT}
+        maxDisplayedItems={5}
+        showViewAllButton={true}
+        viewAllButtonText="View All"
+        showFullScreenButton={true}
+        onFullScreenClick={onFullScreenClick}
+      />
+    );
+  }
+  return <div className="" />;
+}
 
 const CallTrendCountry = () => {
   const { data: session, status } = useSession();
@@ -450,7 +559,7 @@ const CallTrendCountry = () => {
 
   const handleExport = async (
     exportType: string,
-    filters: Record<string, any>,
+    _filters: Record<string, any>,
   ) => {
     try {
       if (exportType === "excel") {
@@ -547,8 +656,8 @@ const CallTrendCountry = () => {
               max_duration: [],
             };
 
-            chartData.forEach((item: any, index: number) => {
-              if (item && item.label) {
+            chartData?.forEach((item: any, _index: number) => {
+              if (item?.label) {
                 newChartData.country.push(item.label);
                 newChartData.answered_calls.push(
                   Number(item.answered_calls) || 0,
@@ -766,42 +875,12 @@ const CallTrendCountry = () => {
             <div className="report-grid ">
               <p className="text-muted mb-0">Total Calls</p>
               <div className="chart-one ">
-                {loading || !dataLoaded ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">No data available</p>
-                  </div>
-                ) : simpleDonut ? (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={180}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">Loading chart...</p>
-                  </div>
-                )}
+                <DonutChartContent
+                  loading={loading}
+                  dataLoaded={dataLoaded}
+                  summary={summary}
+                  simpleDonut={simpleDonut}
+                />
               </div>
             </div>
           </motion.div>
@@ -835,41 +914,18 @@ const CallTrendCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartCalls ? (
-                              <ChartBar
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCalls,
-                                    "Calls by Country",
-                                    "calls",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
-                            )}
+                            <TabChartContent
+                              chartLoading={chartLoading}
+                              chartData={chartCalls}
+                              dataType="calls"
+                              onFullScreenClick={() =>
+                                handleOpenChartModal(
+                                  chartCalls,
+                                  "Calls by Country",
+                                  "calls",
+                                )
+                              }
+                            />
                           </div>
                         </div>
                       </Col>
@@ -893,41 +949,18 @@ const CallTrendCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartDuration ? (
-                              <ChartBar
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartDuration,
-                                    "Duration by Country",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
-                            )}
+                            <TabChartContent
+                              chartLoading={chartLoading}
+                              chartData={chartDuration}
+                              dataType="time"
+                              onFullScreenClick={() =>
+                                handleOpenChartModal(
+                                  chartDuration,
+                                  "Duration by Country",
+                                  "time",
+                                )
+                              }
+                            />
                           </div>
                         </div>
                       </Col>
@@ -951,41 +984,18 @@ const CallTrendCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartRingTime ? (
-                              <ChartBar
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartRingTime,
-                                    "Ring Time by Country",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
-                            )}
+                            <TabChartContent
+                              chartLoading={chartLoading}
+                              chartData={chartRingTime}
+                              dataType="time"
+                              onFullScreenClick={() =>
+                                handleOpenChartModal(
+                                  chartRingTime,
+                                  "Ring Time by Country",
+                                  "time",
+                                )
+                              }
+                            />
                           </div>
                         </div>
                       </Col>
@@ -1009,41 +1019,18 @@ const CallTrendCountry = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartCost ? (
-                              <ChartBar
-                                series={chartCost.series}
-                                categories={chartCost.categories}
-                                dataType="cost"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCost,
-                                    "Cost by Country",
-                                    "cost",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div className=""></div>
-                            )}
+                            <TabChartContent
+                              chartLoading={chartLoading}
+                              chartData={chartCost}
+                              dataType="cost"
+                              onFullScreenClick={() =>
+                                handleOpenChartModal(
+                                  chartCost,
+                                  "Cost by Country",
+                                  "cost",
+                                )
+                              }
+                            />
                           </div>
                         </div>
                       </Col>

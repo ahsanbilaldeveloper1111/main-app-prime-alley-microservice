@@ -5,7 +5,6 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import {
   ListCallLogs,
-  ExportCallLogs,
   DownloadStreamingExport,
 } from "@utils/calls";
 import { Column } from "@components/CustomDataTable";
@@ -52,42 +51,10 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
-
 const CallTrendDepartment = () => {
   const { data: session, status } = useSession();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("calls_chart");
-
-  // Debug session state
-  useEffect(() => {
-    console.log("Session state:", { session, status });
-    if (status === "authenticated" && session) {
-      console.log("Session authenticated successfully");
-    } else if (status === "loading") {
-      console.log("Session still loading...");
-    } else if (status === "unauthenticated") {
-      console.log("User not authenticated");
-    }
-  }, [session, status]);
-
-  // Debug component mounting
-  useEffect(() => {
-    console.log("CallTrendDepartment component mounted");
-    console.log("Initial props and state:", {
-      session,
-      status,
-      filtersReady,
-      dataLoaded,
-      loading,
-    });
-    return () => {
-      console.log("CallTrendDepartment component unmounting");
-    };
-  }, []);
 
   // Animation variants for tab transitions
   const tabVariants = {
@@ -209,10 +176,6 @@ const CallTrendDepartment = () => {
     is_incoming_only: "false",
   });
 
-  // Debug current filters state
-  useEffect(() => {
-    console.log("Current filters state changed:", currentFilters);
-  }, [currentFilters]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [filtersReady, setFiltersReady] = useState(false);
   const [summary, setSummary] = useState<Summary>({
@@ -230,12 +193,8 @@ const CallTrendDepartment = () => {
   const fetchCallLogs = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       // Only fetch if filters are ready
-      if (!filtersReady) {
-        console.log("Filters not ready yet, skipping fetch");
-        return;
-      }
+      if (!filtersReady) return;
 
-      console.log("Fetching call logs with filters:", currentFilters);
       setLoading(true);
       setShowPageLoader(true);
 
@@ -256,27 +215,10 @@ const CallTrendDepartment = () => {
 
         if (response?.summary) {
           setSummary(response.summary);
-          setDataLoaded(true);
-          console.log("Summary data set:", response.summary);
-          console.log("DataLoaded set to true");
-        } else if (response?.data) {
-          // Fallback: check if data exists but no summary
-          console.log("Response has data but no summary:", response.data);
-          setDataLoaded(true);
-          console.log("DataLoaded set to true (fallback 1)");
-        } else if (response && typeof response === "object") {
-          // Check if response is an object but doesn't have expected properties
-          console.log(
-            "Response is object but missing expected properties:",
-            response,
-          );
-          setDataLoaded(true);
-          console.log("DataLoaded set to true (fallback 2)");
-        } else {
-          console.warn("No summary or data in response:", response);
-          setDataLoaded(true); // Mark as loaded even if no data
-          console.log("DataLoaded set to true (fallback 3)");
+        } else if (response?.data || (response && typeof response === "object")) {
+          // Fallback: data exists or response is object
         }
+        setDataLoaded(true);
 
         setLoading(false);
         return response;
@@ -290,8 +232,7 @@ const CallTrendDepartment = () => {
           });
         }
         setLoading(false);
-        setDataLoaded(true); // Mark as loaded even on error
-        console.log("DataLoaded set to true (error case)");
+        setDataLoaded(true);
         toast.error("Failed to fetch call data");
         return null;
       }
@@ -305,62 +246,31 @@ const CallTrendDepartment = () => {
   } | null>(null);
 
   useEffect(() => {
-    if (summary && dataLoaded) {
-      console.log("Summary data:", summary);
-      const answeredCalls = Number(summary.answered_calls) || 0;
-      const unansweredCalls = Number(summary.unanswered_calls) || 0;
-
-      // Check if both values are 0, if so don't set chart data (will show empty state)
-      if (answeredCalls === 0 && unansweredCalls === 0) {
-        console.log(
-          "Both answered and unanswered calls are 0, not setting chart data",
-        );
-        setSimpleDonut(null);
-      } else {
-        // Set chart data only when there's actual data
-        setSimpleDonut({
-          series: [answeredCalls, unansweredCalls],
-          labels: ["Answered Calls", "Unanswered Calls"],
-        });
-      }
+    if (!summary || !dataLoaded) return;
+    const answeredCalls = Number(summary.answered_calls) || 0;
+    const unansweredCalls = Number(summary.unanswered_calls) || 0;
+    if (answeredCalls === 0 && unansweredCalls === 0) {
+      setSimpleDonut(null);
+    } else {
+      setSimpleDonut({
+        series: [answeredCalls, unansweredCalls],
+        labels: ["Answered Calls", "Unanswered Calls"],
+      });
     }
   }, [summary, dataLoaded]);
 
   // Trigger initial data fetch when filters become ready
   useEffect(() => {
-    console.log("Initial data fetch useEffect triggered:", {
-      filtersReady,
-      status,
-      session,
-    });
     if (filtersReady && status === "authenticated" && session) {
-      console.log(
-        "Filters ready and session authenticated, triggering initial fetch",
-      );
-      console.log("DataLoaded before fetch:", dataLoaded);
       fetchCallLogs(1, 15, "");
-    } else if (status === "loading") {
-      console.log("Session still loading, waiting...");
-    } else if (status === "unauthenticated") {
-      console.log("User not authenticated");
-    } else {
-      console.log("Not ready for data fetch:", {
-        filtersReady,
-        status,
-        hasSession: !!session,
-      });
     }
   }, [filtersReady, fetchCallLogs, status, session]);
 
   // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!filtersReady) {
-        console.log("Fallback: marking filters as ready");
-        setFiltersReady(true);
-      }
+      if (!filtersReady) setFiltersReady(true);
     }, 1000);
-
     return () => clearTimeout(timer);
   }, [filtersReady]);
 
@@ -368,66 +278,25 @@ const CallTrendDepartment = () => {
   useEffect(() => {
     if (status === "authenticated" && session) {
       const timer = setTimeout(() => {
-        if (!filtersReady) {
-          console.log("Session-based fallback: marking filters as ready");
-          setFiltersReady(true);
-        }
+        if (!filtersReady) setFiltersReady(true);
       }, 2000);
-
       return () => clearTimeout(timer);
     }
   }, [status, session, filtersReady]);
 
-  // Debug initial state
-  useEffect(() => {
-    console.log("Initial state:", {
-      filtersReady,
-      dataLoaded,
-      loading,
-      currentFilters,
-      session: !!session,
-      status,
-    });
-
-    // Log the actual API functions to make sure they're available
-    console.log("API functions check:", {
-      ListCallLogs: typeof ListCallLogs,
-      ExportCallLogs: typeof ExportCallLogs,
-      DownloadStreamingExport: typeof DownloadStreamingExport,
-    });
-  }, [filtersReady, dataLoaded, loading, currentFilters, session, status]);
-
   const handleFiltersChange = (filters: any) => {
-    console.log("Filters changed:", filters);
-    console.log("Previous filters:", currentFilters);
-    console.log("New filters:", filters);
-
-    // Check if filters actually changed
     const filtersChanged =
       JSON.stringify(currentFilters) !== JSON.stringify(filters);
-    console.log("Filters actually changed:", filtersChanged);
-
-    // Check if this is a complete clear (empty object or only has default values)
     const isCompletelyCleared =
       Object.keys(filters).length === 0 ||
       (Object.keys(filters).length === 1 &&
-        filters.hasOwnProperty("is_incoming_only"));
-
-    console.log("Is completely cleared:", isCompletelyCleared);
+        Object.prototype.hasOwnProperty.call(filters, "is_incoming_only"));
 
     setCurrentFilters(filters);
+    if (!filtersReady) setFiltersReady(true);
 
-    // Mark filters as ready when they are first set
-    if (!filtersReady) {
-      console.log("Marking filters as ready for the first time");
-      setFiltersReady(true);
-    }
-
-    // Reset data loaded state when filters actually change or when cleared
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-      console.log("Resetting data loaded state due to filter change or clear");
       setDataLoaded(false);
-      console.log("DataLoaded set to false due to filter change");
       setSummary({
         total_calls: 0,
         answered_calls: 0,
@@ -437,21 +306,13 @@ const CallTrendDepartment = () => {
         avg_duration: 0,
         avg_ring_time: 0,
       });
-
-      // Trigger refresh
       setRefreshKey((prev) => prev + 1);
-      console.log("Refresh key updated, new value:", refreshKey + 1);
-    } else if (!filtersChanged) {
-      console.log(
-        "Filters did not change, keeping dataLoaded state:",
-        dataLoaded,
-      );
     }
   };
 
   const handleExport = async (
     exportType: string,
-    filters: Record<string, any>,
+    _filters: Record<string, any>,
   ) => {
     try {
       if (exportType === "excel") {
@@ -549,8 +410,8 @@ const CallTrendDepartment = () => {
               max_duration: [],
             };
 
-            chartData.forEach((item: any, index: number) => {
-              if (item && item.label) {
+            chartData.forEach((item: any, _index: number) => {
+              if (item?.label) {
                 newChartData.country.push(item.label);
                 newChartData.answered_calls.push(
                   Number(item.answered_calls) || 0,
@@ -576,8 +437,6 @@ const CallTrendDepartment = () => {
                 newChartData.max_duration.push(Number(item.max_duration) || 0);
               }
             });
-
-            console.log("Chart data", newChartData);
 
             const dataLength = newChartData.country.length;
 
@@ -627,16 +486,12 @@ const CallTrendDepartment = () => {
                 categories: newChartData.country,
               });
             } else {
-              console.error(
-                "Chart data arrays have different lengths or no data",
-              );
               setChartCalls(null);
               setChartRingTime(null);
               setChartCost(null);
               setChartDuration(null);
             }
           } else {
-            console.log("No chart data available");
             setChartCalls(null);
             setChartRingTime(null);
             setChartCost(null);
@@ -682,10 +537,70 @@ const CallTrendDepartment = () => {
   };
 
   const handleTabChange = (key: string | null) => {
-    if (key) {
-      setActiveTab(key);
-    }
+    if (key) setActiveTab(key);
   };
+
+  const renderChartSpinner = (message: string, heightPx: number) => (
+    <div
+      className="d-flex align-items-center justify-content-center"
+      style={{ height: `${heightPx}px` }}
+    >
+      <div className="spinner-border text-primary" aria-busy="true">
+        <output className="visually-hidden" aria-live="polite">
+          {message}
+        </output>
+      </div>
+    </div>
+  );
+
+  const renderChartTabBody = (
+    isLoading: boolean,
+    chartData: { series: any[]; categories: string[] } | null,
+    chartBarNode: React.ReactNode,
+  ) => {
+    if (isLoading) return renderChartSpinner("Loading chart...", 300);
+    if (chartData) return chartBarNode;
+    return <div className="" />;
+  };
+
+  let donutChartContent: React.ReactNode;
+  if (loading || !dataLoaded) {
+    donutChartContent = renderChartSpinner("Loading...", 180);
+  } else if (
+    summary.answered_calls === 0 &&
+    summary.unanswered_calls === 0 &&
+    summary.total_duration === 0
+  ) {
+    donutChartContent = (
+      <div
+        className="d-flex align-items-center justify-content-center"
+        style={{ height: "180px" }}
+      >
+        <p className="text-muted mb-0">No data available</p>
+      </div>
+    );
+  } else if (simpleDonut) {
+    donutChartContent = (
+      <ChartDonut
+        series={simpleDonut.series}
+        labels={simpleDonut.labels}
+        dataType="calls"
+        height={180}
+        width={500}
+        showDataLabels={true}
+        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+      />
+    );
+  } else {
+    donutChartContent = (
+      <div
+        className="d-flex align-items-center justify-content-center"
+        style={{ height: "180px" }}
+      >
+        <p className="text-muted mb-0">Loading chart...</p>
+      </div>
+    );
+  }
 
   return (
     <React.Fragment>
@@ -767,44 +682,7 @@ const CallTrendDepartment = () => {
           >
             <div className="report-grid ">
               <p className="text-muted mb-0">Total Calls</p>
-              <div className="chart-one ">
-                {loading || !dataLoaded ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">No data available</p>
-                  </div>
-                ) : simpleDonut ? (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={180}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">Loading chart...</p>
-                  </div>
-                )}
-              </div>
+              <div className="chart-one ">{donutChartContent}</div>
             </div>
           </motion.div>
         </Col>
@@ -837,24 +715,12 @@ const CallTrendDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartCalls ? (
+                            {renderChartTabBody(
+                              chartLoading,
+                              chartCalls,
                               <ChartBar
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
+                                series={chartCalls!.series}
+                                categories={chartCalls!.categories}
                                 dataType="calls"
                                 height={300}
                                 maxDisplayedItems={5}
@@ -868,9 +734,7 @@ const CallTrendDepartment = () => {
                                     "calls",
                                   )
                                 }
-                              />
-                            ) : (
-                              <div className=""></div>
+                              />,
                             )}
                           </div>
                         </div>
@@ -895,24 +759,12 @@ const CallTrendDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartDuration ? (
+                            {renderChartTabBody(
+                              chartLoading,
+                              chartDuration,
                               <ChartBar
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
+                                series={chartDuration!.series}
+                                categories={chartDuration!.categories}
                                 dataType="time"
                                 height={300}
                                 maxDisplayedItems={5}
@@ -926,9 +778,7 @@ const CallTrendDepartment = () => {
                                     "time",
                                   )
                                 }
-                              />
-                            ) : (
-                              <div className=""></div>
+                              />,
                             )}
                           </div>
                         </div>
@@ -953,24 +803,12 @@ const CallTrendDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartRingTime ? (
+                            {renderChartTabBody(
+                              chartLoading,
+                              chartRingTime,
                               <ChartBar
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
+                                series={chartRingTime!.series}
+                                categories={chartRingTime!.categories}
                                 dataType="time"
                                 height={300}
                                 maxDisplayedItems={5}
@@ -984,9 +822,7 @@ const CallTrendDepartment = () => {
                                     "time",
                                   )
                                 }
-                              />
-                            ) : (
-                              <div className=""></div>
+                              />,
                             )}
                           </div>
                         </div>
@@ -1011,24 +847,12 @@ const CallTrendDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
-                                </div>
-                              </div>
-                            ) : chartCost ? (
+                            {renderChartTabBody(
+                              chartLoading,
+                              chartCost,
                               <ChartBar
-                                series={chartCost.series}
-                                categories={chartCost.categories}
+                                series={chartCost!.series}
+                                categories={chartCost!.categories}
                                 dataType="cost"
                                 height={300}
                                 maxDisplayedItems={5}
@@ -1042,9 +866,7 @@ const CallTrendDepartment = () => {
                                     "cost",
                                   )
                                 }
-                              />
-                            ) : (
-                              <div className=""></div>
+                              />,
                             )}
                           </div>
                         </div>
