@@ -46,6 +46,8 @@ import CreateLeadModal from "@components/CreateLeadModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { toast } from "react-toastify";
+import { GetHierarchyData } from "@utils/users";
+import { ModuleSlug } from "@utils/Helper";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -133,6 +135,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
   // Export single lead (CSV)
   const [exporting, setExporting] = useState(false);
+  const [extensions, setExtensions] = useState<any[]>([]);
 
   // Fetch lead detail by ID from URL (same pattern as prospect detail page)
   useEffect(() => {
@@ -167,6 +170,23 @@ const ContactRecordPage: NextPageWithLayout = () => {
         setLeadLoading(false);
       });
   }, [router.isReady, leadId]);
+
+  // Load extensions (owners/associates) for friendly "Associate with" name
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+        if (hierarchyData?.extensions) {
+          setExtensions(hierarchyData.extensions);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to fetch extensions:", error);
+      }
+    };
+
+    void fetchExtensions();
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -338,13 +358,32 @@ const ContactRecordPage: NextPageWithLayout = () => {
         lead?.company_contact ||
         "--";
 
-  const associateName =
-    (lead as any)?.created_by_name ||
-    (lead as any)?.owner_name ||
-    (lead as any)?.created_by ||
-    (lead as any)?.user_extension_name ||
-    lead?.user_extension ||
-    "--";
+  const associateName = (() => {
+    const rawAssociate =
+      (lead as any)?.user_extension ??
+      (lead as any)?.created_by ??
+      (lead as any)?.owner_id ??
+      null;
+
+    if (rawAssociate != null) {
+      const match = extensions.find(
+        (ext: any) =>
+          String(ext.id) === String(rawAssociate) ||
+          String(ext.extension) === String(rawAssociate),
+      );
+      if (match) {
+        return match.display_name || match.name || String(rawAssociate);
+      }
+      return String(rawAssociate);
+    }
+
+    return (
+      (lead as any)?.created_by_name ||
+      (lead as any)?.owner_name ||
+      (lead as any)?.user_extension_name ||
+      "--"
+    );
+  })();
 
   const keyInfoFields: KeyInfoField[] = [
     {

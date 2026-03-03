@@ -8310,6 +8310,8 @@ const CrmProspectsManagement = () => {
             subtitle={selectedProspect?.phone || ""}
             email={selectedProspect?.data?.email}
             phone={selectedProspect?.phone}
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
             record={{
               id: selectedProspect?.id,
               type: RECORD_TYPES.PROSPECT,

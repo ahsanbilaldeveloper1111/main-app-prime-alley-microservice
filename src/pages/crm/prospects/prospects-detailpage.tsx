@@ -40,9 +40,17 @@ import {
   Pencil,
   Trash2,
   MessageCircle,
+  Download as DownloadIcon,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getAllCrmDataById, getCampaigns, getCrmDataTags, updateCrmData, type CrmDataItem } from "@utils/crm";
+import {
+  getAllCrmDataById,
+  getCampaigns,
+  getCrmDataTags,
+  updateCrmData,
+  deleteCrmData,
+  type CrmDataItem,
+} from "@utils/crm";
 import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
@@ -61,6 +69,8 @@ import { Dropdown, Form } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -164,6 +174,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
   // Edit Prospect Sidebar States
   const [showEditContactSidebar, setShowEditContactSidebar] = useState(false);
   const [editContactLoading, setEditContactLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [prospectToDelete, setProspectToDelete] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
@@ -290,6 +309,69 @@ const ContactRecordPage: NextPageWithLayout = () => {
       toast.error("No phone number available");
     }
   }, [hasPhone, numberToCall, handleCall]);
+
+  const handleProspectExport = useCallback(async () => {
+    if (!prospect?.data) return;
+    const id = prospect.data.id ?? prospectRecordId;
+    const name = `prospect_${id}.csv`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const row = prospect.data as any;
+      const headers = Object.keys(row).filter(
+        (k) => typeof row[k] !== "object",
+      );
+      const csvRows = [
+        headers.join(","),
+        headers
+          .map((h) => {
+            const val = row[h];
+            if (val == null) return "";
+            if (typeof val === "object") return "";
+            const s = String(val).replace(/"/g, '""');
+            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+          })
+          .join(","),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported prospect successfully!");
+    } catch (err) {
+      toast.error("Failed to export prospect");
+    } finally {
+      setExporting(false);
+    }
+  }, [prospect, prospectRecordId]);
+
+  const handleOpenDeleteProspect = useCallback(() => {
+    if (!prospectRecordId || !prospect) return;
+    setProspectToDelete({ id: prospectRecordId, name: prospect.data?.name });
+    setShowDeleteModal(true);
+  }, [prospectRecordId, prospect]);
+
+  const confirmDeleteProspect = useCallback(async () => {
+    if (!prospectToDelete) return;
+    try {
+      await deleteCrmData(prospectToDelete.id);
+      setShowDeleteModal(false);
+      setProspectToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Prospect Deleted");
+      setSuccessModalDescription("Prospect has been deleted successfully");
+      router.push("/crm/prospects");
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error("Delete prospect error:", error);
+      toast.error("Failed to delete prospect");
+    }
+  }, [prospectToDelete, router]);
 
   // Load prospect by ID from URL
   useEffect(() => {
@@ -494,11 +576,26 @@ const ContactRecordPage: NextPageWithLayout = () => {
         prospect?.data?.name ??
         "--",
     },
+    // {
+    //   label: "Lifecycle Stage",
+    //   value:
+    //     prospect?.data?.lifecycle_stage ??
+    //     prospect?.data?.data?.lifecycle_stage ??
+    //     "--",
+    // },
     {
-      label: "Lifecycle Stage",
-      value: prospect?.data?.data?.lifecycle_stage ?? "--",
+      label: "Contact owner",
+      value: (() => {
+        const ownerId = prospect?.data?.user_extension;
+        if (ownerId == null) return "--";
+        const match = extensions.find(
+          (ext: any) =>
+            String(ext.id) === String(ownerId) ||
+            String(ext.extension) === String(ownerId),
+        );
+        return match?.display_name ?? match?.name ?? String(ownerId);
+      })(),
     },
-    { label: "Contact owner", value: extensions.find((ext: any) => ext.id === prospect?.data?.data?.contact_owner)?.display_name || "--" },
   ];
 
   const renderRevenueSection = (section: RevenueSection) => {
@@ -1795,6 +1892,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     onClick={() => {
                       if (action === "Edit") {
                         setShowEditContactSidebar(true);
+                      } else if (action === "Delete") {
+                        handleOpenDeleteProspect();
+                      } else if (action === "Export") {
+                        void handleProspectExport();
                       }
                       setShowActionsDropdown(false);
                     }}
@@ -2476,118 +2577,127 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       </div>
                     </>
                   )}
-                  {((prospect as any)?.crm_summary?.summary ?? (prospect as any)?.data?.crm_summary?.summary) == null && (
+                  {((prospect as any)?.crm_summary?.summary ??
+                    (prospect as any)?.data?.crm_summary?.summary) == null && (
                     <div style={{ fontSize: "14px", color: "#718096" }}>
                       No summary available.
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #fee",
-                    }}
-                  >
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Good summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Bad summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
+                  {((prospect as any)?.crm_summary?.summary ??
+                    (prospect as any)?.data?.crm_summary?.summary) != null && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #fee",
+                        }}
+                      >
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Good summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <ThumbsUp size={16} />
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Bad summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <ThumbsDown size={16} />
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Copy"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
 
-                  <button
-                    style={{
-                      marginTop: "16px",
-                      padding: "6px 16px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fff5f7";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
+                      <button
+                        style={{
+                          marginTop: "16px",
+                          padding: "6px 16px",
+                          backgroundColor: "transparent",
+                          border: "1px solid #d20688",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: "500",
+                          color: "#d20688",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#fff5f7";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Sparkles size={16} />
+                        Ask a question
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -3325,6 +3435,22 @@ const ContactRecordPage: NextPageWithLayout = () => {
         onSelectDevice={handleDeviceSelect}
         extensionNumber={ctiUserAddress ?? ""}
         userAddress={ctiUserAddress}
+      />
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setProspectToDelete(null);
+        }}
+        onConfirm={confirmDeleteProspect}
+        itemName={prospectToDelete?.name}
+        itemType="prospect"
+      />
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
       />
       {activityModals.modals}
       {renderEditContactSidebar()}
