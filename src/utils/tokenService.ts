@@ -22,6 +22,7 @@ class TokenService {
     sessionTimer: null,
     refreshTimer: null
   };
+  private logoutInProgress = false;
   
   // Buffer time to refresh before expiry (30 seconds)
   private readonly REFRESH_BUFFER = 30 * 1000; // Buffer for 5-minute session token
@@ -457,6 +458,25 @@ class TokenService {
     // if (error?.response?.status === 401 || error?.response?.status === 403) {
       // console.log('Token refresh failed with auth error, clearing session...');
       if (typeof window !== 'undefined' && window.sessionStorage) {
+        // Prevent repeated redirects/toasts when multiple requests fail at once
+        if (this.logoutInProgress || (window as any).__authLogoutInProgress) {
+          return;
+        }
+
+        // Never spam "session expired" flow on auth pages
+        if (window.location.pathname.startsWith('/auth/')) {
+          this.stop();
+          return;
+        }
+
+        this.logoutInProgress = true;
+        (window as any).__authLogoutInProgress = true;
+        this.stop();
+
+        // Best-effort: clear server-side NextAuth session payload before wiping cookies,
+        // otherwise the server can still consider the old cookie session valid.
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+
         sessionStorage.clear();
         clearAllLocalStorage();
         clearSessionCookiesClient(true);
@@ -464,8 +484,8 @@ class TokenService {
         // Await signOut so NextAuth session cookie is cleared before redirect.
         // Otherwise signin page may still see "authenticated" and redirect to dashboard, causing a loop.
         signOut({ callbackUrl, redirect: false }).then(() => {
-          toast.error('Session expired - Please login again');
-          window.location.href = callbackUrl;
+          toast.error('Session expired - Please login again', { toastId: 'session-expired' });
+          window.location.replace(callbackUrl);
         });
       }
     // } else {

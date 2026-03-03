@@ -16,7 +16,7 @@ const HostGroups = () => {
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 15,
+    limit: 10,
     total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
@@ -51,7 +51,7 @@ const HostGroups = () => {
   }, []);
 
   useEffect(() => {
-    fetchHostGroups(0, 15);
+    fetchHostGroups(0, 10);
   }, [fetchHostGroups]);
 
   const handlePrevPage = () => {
@@ -79,7 +79,7 @@ const HostGroups = () => {
       label: 'Host count',
       sortable: true,
       render: (row) => (
-        <span>{row.host_count ?? (row.hosts ? row.hosts.length : 0)}</span>
+        <span>{row.host_count ?? (row.hosts ? row.hosts.length : 0)} Hosts</span>
       ),
     },
   ];
@@ -111,33 +111,7 @@ const HostGroups = () => {
         </Col>
       </Row>
 
-      <Row className="mb-2 align-items-center">
-        <Col>
-          <span className="text-muted small">
-            {pagination.total === 0
-              ? 'No host groups'
-              : `Showing ${pagination.offset + 1}–${pagination.offset + groups.length} of ${pagination.total}`}
-          </span>
-        </Col>
-        <Col className="d-flex justify-content-end gap-2">
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            onClick={handlePrevPage}
-            disabled={loading || pagination.offset <= 0}
-          >
-            ← Prev
-          </Button>
-          <Button
-            variant="outline-secondary"
-            size="sm"
-            onClick={handleNextPage}
-            disabled={loading || !hasNextPage}
-          >
-            Next →
-          </Button>
-        </Col>
-      </Row>
+      
 
       <GenericTable<ZabbixHostGroup>
         data={groups}
@@ -146,8 +120,7 @@ const HostGroups = () => {
         emptyMessage="No host groups found."
         loadingMessage="Loading host groups..."
         pagination={{
-          currentPage:
-            pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
           rowsPerPage: pagination.limit,
           totalRows: pagination.total,
           pageSizeOptions: pagination.pageSizeOptions,

@@ -127,7 +127,7 @@ const SelectServer = () => {
             is_resolved: false,  // Only get unresolved alerts
             limit: 5  // Limit to 5 most recent alerts
           });
-          setAlerts(alertsData);
+          setAlerts((alertsData as any)?.alerts ?? []);
         } catch (error: any) {
           console.error("=== Failed to fetch alerts ===", error);
         } finally {

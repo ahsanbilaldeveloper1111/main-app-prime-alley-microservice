@@ -215,7 +215,7 @@ export const getAlerts = async (
       },
       id: 1,
     };
-    const response = await axiosInstance.post<
+    const response = await axiosInstance.get<
       ZebbixJsonRpcResponse<ZebbixAlert[]>
     >(`${ZEBBIX_PREFIX}/alerts`, payload);
     return response.data;
