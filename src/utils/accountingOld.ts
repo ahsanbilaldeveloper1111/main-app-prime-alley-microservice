@@ -1,16 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
-// API Response Structure from Controlhub
-interface ControlhubResponse<T> {
-  code: number;
-  message: string;
-  data: {
-    success: boolean;
-    data: T;
-  };
-}
-
 // Pagination wrapper
 interface PaginationWrapper<T> {
   data: T[];
@@ -237,9 +227,9 @@ export interface ExpenseData {
     type: string;
     uploaded_at: string;
   }[];
-  vendor: any | null;
+  vendor: any;
   category: ExpenseCategoryData;
-  service: any | null;
+  service: any;
   currency: string;
 }
 
@@ -252,7 +242,7 @@ export interface ExpenseCategoryData {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  company?: any | null;
+  company?: any;
   expenses?: ExpenseData[];
 }
 
@@ -293,7 +283,7 @@ export interface ProductData {
   deleted_at?: string | null;
   invoice_items?: any[];
   category?: ProductCategoryData;
-  company_pricing?: any | null;
+  company_pricing?: any;
 }
 
 export interface ProductCategoryData {
@@ -537,7 +527,7 @@ export interface ProductPricingData {
       updated_at: string;
     };
   };
-  discount_applicability: any | null;
+  discount_applicability: any;
 }
 
 export interface ProductPricingCreateUpdatePayload {
@@ -763,7 +753,7 @@ export const deleteDiscountApplicability = async (
 // Invoice Management
 export const getInvoices = async (
   params: PaginationParams = {},
-): Promise<PaginationWrapper<any>> => {
+): Promise<PaginationWrapper<InvoiceData>> => {
   try {
     const response = await axiosInstance.get("/accounting/invoices", {
       params,
@@ -890,8 +880,9 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
       const filenameMatch = contentDisposition.match(
         /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
       );
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, "");
+      const matched = filenameMatch?.[1];
+      if (matched) {
+        filename = matched.replaceAll(/['"]/g, "");
       }
     }
 
@@ -907,20 +898,22 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
       );
     }
 
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
 
     toast.success("PDF downloaded successfully");
   } catch (error: any) {
     console.error("PDF download error:", error);
-    toast.error(error?.message || "Failed to download invoice PDF");
+    toast.error(
+      error instanceof Error ? error.message : "Failed to download invoice PDF",
+    );
     throw error;
   }
 };
@@ -949,8 +942,9 @@ export const downloadExpensePdf = async (id: number): Promise<void> => {
       const filenameMatch = contentDisposition.match(
         /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
       );
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, "");
+      const matched = filenameMatch?.[1];
+      if (matched) {
+        filename = matched.replaceAll(/['"]/g, "");
       }
     }
 
@@ -966,20 +960,22 @@ export const downloadExpensePdf = async (id: number): Promise<void> => {
       );
     }
 
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
 
     toast.success("PDF downloaded successfully");
   } catch (error: any) {
     console.error("PDF download error:", error);
-    toast.error(error?.message || "Failed to download expense PDF");
+    toast.error(
+      error instanceof Error ? error.message : "Failed to download expense PDF",
+    );
     throw error;
   }
 };
@@ -1008,30 +1004,29 @@ export const downloadTemplate = async (): Promise<void> => {
       const filenameMatch = contentDisposition.match(
         /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
       );
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, "");
+      const matched = filenameMatch?.[1];
+      if (matched) {
+        filename = matched.replaceAll(/['"]/g, "");
       }
     }
 
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
 
-    // Verify blob type
-
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-
-    // toast.success('PDF downloaded successfully');
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
   } catch (error: any) {
     console.error("PDF download error:", error);
-    toast.error(error?.message || "Failed to download File");
+    toast.error(
+      error instanceof Error ? error.message : "Failed to download File",
+    );
     throw error;
   }
 };
@@ -1750,23 +1745,19 @@ export const createDirectPayment = async (
     // Handle the actual API response structure
 
     if (response.data?.code === 200 && response.data?.data?.success) {
-      // The actual payment intent data should be in response.data.data.data
-      // If it's an empty array, we might need to handle this case
       const paymentData = response.data.data;
-
-      // if (Array.isArray(paymentData) && paymentData.length === 0) {
-      //   // Handle case where data is empty array
-      //   throw new Error("No payment intent data returned from server");
-      // }
-
       return paymentData as PaymentIntentResponse;
     }
 
     // Fallback to extractData if structure is different
     return extractData<PaymentIntentResponse>(response.data);
   } catch (error: any) {
-    console.log(error, "error.createDirectPayment");
-    toast.error(error?.message || "Failed to create direct payment");
+    console.error("createDirectPayment error:", error);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Failed to create direct payment",
+    );
     throw error;
   }
 };
