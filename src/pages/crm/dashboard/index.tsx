@@ -684,8 +684,8 @@ const CrmDashboard = () => {
                   >
                     Upcoming Meetings
                   </h5>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     style={{
                       fontSize: "14px",
                       color: "#3B82F6",
@@ -693,10 +693,15 @@ const CrmDashboard = () => {
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      font: "inherit",
                     }}
                   >
                     View Calendar <ChevronRight size={16} />
-                  </a>
+                  </button>
                 </div>
 
                 <ListGroup variant="flush">

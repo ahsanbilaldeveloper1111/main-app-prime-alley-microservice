@@ -106,6 +106,8 @@ interface UseCreateInvoicePaymentReturn {
   createInvoicePaymentError: any;
 }
 
+type PaymentIdValue = string | number | undefined;
+
 // Utility function to format currency
 const formatCurrency = (amount: number, currency: string): string => {
   return new Intl.NumberFormat("en-US", {
@@ -117,7 +119,7 @@ const formatCurrency = (amount: number, currency: string): string => {
 // Extract payment ID from payment result (handles both response structures)
 const getPaymentIdFromResult = (
   result: Record<string, unknown>,
-): string | number | undefined => {
+): PaymentIdValue => {
   const p = result?.payment as { id?: string | number } | undefined;
   const d = result?.data as
     | {
@@ -197,8 +199,7 @@ function parsePaymentResult(paymentResult: any) {
     paymentResult?.data?.client_secret ||
     gatewayResponse?.client_secret ||
     paymentResult?.payment_data?.client_secret;
-  const paymentStatus =
-    gatewayResponse?.status || paymentResult?.status;
+  const paymentStatus = gatewayResponse?.status || paymentResult?.status;
   const confirmationMethod = gatewayResponse?.confirmation_method;
   const requiresAction = paymentStatus === "requires_action";
   return {
@@ -211,7 +212,7 @@ function parsePaymentResult(paymentResult: any) {
 }
 
 async function completePaymentAndNotify(
-  paymentId: string | number | undefined,
+  paymentId: PaymentIdValue,
   ctx: PaymentSuccessContext,
   successMsg: string,
   fallbackMsg: string,
@@ -245,7 +246,7 @@ async function completePaymentAndNotify(
 
 async function applyDuplicatePaymentIntentStatus(
   paymentIntent: { status?: string } | null,
-  paymentId: string | number | undefined,
+  paymentId: PaymentIdValue,
   ctx: PaymentSuccessContext,
   onIncomplete: () => void,
 ): Promise<void> {
@@ -289,11 +290,7 @@ async function runDuplicatePaymentFlow(
   parsed: ReturnType<typeof parsePaymentResult>,
   ctx: PaymentSuccessContext,
 ): Promise<void> {
-  const {
-    clientSecret,
-    confirmationMethod,
-    requiresAction,
-  } = parsed;
+  const { clientSecret, confirmationMethod, requiresAction } = parsed;
 
   const stripeResult = await getDuplicateStripeResult(
     stripe,
@@ -313,16 +310,13 @@ async function runDuplicatePaymentFlow(
     return;
   }
 
-  const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
-  await applyDuplicatePaymentIntentStatus(
-    paymentIntent,
-    paymentId,
-    ctx,
-    () => {
-      ctx.setIsProcessing(false);
-      toast.error("Payment authentication incomplete. Please try again.");
-    },
+  const paymentId = getPaymentIdFromResult(
+    paymentResult as Record<string, unknown>,
   );
+  await applyDuplicatePaymentIntentStatus(paymentIntent, paymentId, ctx, () => {
+    ctx.setIsProcessing(false);
+    toast.error("Payment authentication incomplete. Please try again.");
+  });
 }
 
 function getDuplicateEarlyExit(
@@ -333,8 +327,7 @@ function getDuplicateEarlyExit(
   if (!clientSecret || !stripe) {
     return { exit: true, useInfoToast: false };
   }
-  const manualNoAction =
-    confirmationMethod === "manual" && !requiresAction;
+  const manualNoAction = confirmationMethod === "manual" && !requiresAction;
   if (manualNoAction) {
     return { exit: true, useInfoToast: true };
   }
@@ -348,10 +341,9 @@ function finishDuplicateEarly(
   ctx.setIsProcessing(false);
   ctx.onPaymentSuccess();
   if (useInfoToast) {
-    toast.info(
-      "Payment is being processed by the backend. Please wait...",
-      { autoClose: 3000 },
-    );
+    toast.info("Payment is being processed by the backend. Please wait...", {
+      autoClose: 3000,
+    });
   } else {
     toast.success("Payment processed successfully!");
   }
@@ -374,15 +366,14 @@ async function handleDuplicatePayment(
   } catch (authError: any) {
     ctx.setIsProcessing(false);
     toast.error(
-      authError.message ||
-        "Authentication process failed. Please try again.",
+      authError.message || "Authentication process failed. Please try again.",
     );
   }
 }
 
 async function applyHandleCardActionResult(
   paymentIntent: { status?: string } | undefined,
-  paymentId: string | number | undefined,
+  paymentId: PaymentIdValue,
   ctx: PaymentSuccessContext,
 ): Promise<void> {
   if (paymentIntent?.status === "succeeded") {
@@ -406,20 +397,16 @@ async function applyHandleCardActionResult(
   }
   if (paymentIntent?.status === "requires_action") {
     ctx.setIsProcessing(false);
-    toast.error(
-      "Payment requires additional verification. Please try again.",
-    );
+    toast.error("Payment requires additional verification. Please try again.");
     return;
   }
   ctx.setIsProcessing(false);
-  toast.error(
-    `Payment status after 3D Secure: ${paymentIntent?.status}`,
-  );
+  toast.error(`Payment status after 3D Secure: ${paymentIntent?.status}`);
 }
 
 async function applyConfirmCardPaymentResult(
   paymentIntent: { status?: string } | undefined,
-  paymentId: string | number | undefined,
+  paymentId: PaymentIdValue,
   ctx: PaymentSuccessContext,
 ): Promise<void> {
   if (paymentIntent?.status === "succeeded") {
@@ -450,11 +437,7 @@ async function handle3DSOrConfirm(
   ctx: PaymentSuccessContext,
   confirmOptions?: any,
 ): Promise<void> {
-  const {
-    clientSecret,
-    confirmationMethod,
-    requiresAction,
-  } = parsed;
+  const { clientSecret, confirmationMethod, requiresAction } = parsed;
 
   try {
     if (confirmationMethod === "manual" && requiresAction) {
@@ -468,7 +451,9 @@ async function handle3DSOrConfirm(
         );
         return;
       }
-      const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
+      const paymentId = getPaymentIdFromResult(
+        paymentResult as Record<string, unknown>,
+      );
       await applyHandleCardActionResult(paymentIntent, paymentId, ctx);
       return;
     }
@@ -476,10 +461,9 @@ async function handle3DSOrConfirm(
     if (confirmationMethod === "manual" && !requiresAction) {
       ctx.setIsProcessing(false);
       ctx.onPaymentSuccess();
-      toast.info(
-        "Payment is being processed by the backend. Please wait...",
-        { autoClose: 3000 },
-      );
+      toast.info("Payment is being processed by the backend. Please wait...", {
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -493,13 +477,14 @@ async function handle3DSOrConfirm(
       );
       return;
     }
-    const paymentId = getPaymentIdFromResult(paymentResult as Record<string, unknown>);
+    const paymentId = getPaymentIdFromResult(
+      paymentResult as Record<string, unknown>,
+    );
     await applyConfirmCardPaymentResult(paymentIntent, paymentId, ctx);
   } catch (authError: any) {
     ctx.setIsProcessing(false);
     toast.error(
-      authError.message ||
-        "Authentication process failed. Please try again.",
+      authError.message || "Authentication process failed. Please try again.",
     );
   }
 }
@@ -525,7 +510,13 @@ async function handlePaymentSuccess(
   }
 
   if (parsed.clientSecret && stripe) {
-    await handle3DSOrConfirm(stripe, paymentResult, parsed, ctx, confirmOptions);
+    await handle3DSOrConfirm(
+      stripe,
+      paymentResult,
+      parsed,
+      ctx,
+      confirmOptions,
+    );
     return;
   }
 
@@ -806,9 +797,7 @@ const augmentWithUsdBasedRates = async (
     const updatedRates = [...existingRates];
 
     const pushIfMissing = (from: string, to: string, rate: number) => {
-      const exists = updatedRates.some(
-        (r) => r.from === from && r.to === to,
-      );
+      const exists = updatedRates.some((r) => r.from === from && r.to === to);
       if (!exists) {
         updatedRates.push({ from, to, rate, timestamp: now });
       }
@@ -924,10 +913,7 @@ const handleFallbackExchangeRates = async (
       setExchangeRates(getDefaultExchangeRates());
     }
   } catch (fallbackError) {
-    console.error(
-      "Fallback exchange rate API also failed:",
-      fallbackError,
-    );
+    console.error("Fallback exchange rate API also failed:", fallbackError);
     setExchangeRates(getDefaultExchangeRates());
   }
 
@@ -1047,8 +1033,7 @@ const computeEffectiveProductPrice = (
     if (
       companyProduct.pricing_type === "company_specific" &&
       companyProduct.company_pricing &&
-      (!companyId ||
-        companyProduct.company_pricing.company_id === companyId)
+      (!companyId || companyProduct.company_pricing.company_id === companyId)
     ) {
       return {
         price: companyProduct.company_pricing.selling_price || "0",
@@ -1064,8 +1049,7 @@ const computeEffectiveProductPrice = (
     const includesVat = effectivePrice > basePrice && basePrice > 0;
 
     return {
-      price:
-        companyProduct.effective_price || companyProduct.base_price || "0",
+      price: companyProduct.effective_price || companyProduct.base_price || "0",
       currency: companyProduct.currency || "USD",
       includesVat,
     };
@@ -1078,17 +1062,32 @@ const computeEffectiveProductPrice = (
   };
 };
 
+type CalculateTotalsForItemsOptions = {
+  companyVatRate: number;
+  isVatExempt: boolean;
+  toCurrency: string;
+  companyId: string | undefined;
+  companyProducts: ProductData[];
+  exchangeRates: ExchangeRate[];
+  baseCurrency: string;
+  isLoadingExchangeRates: boolean;
+};
+
 const calculateTotalsForItems = (
   items: InvoiceItemCreateUpdatePayload[],
-  companyVatRate: number,
-  isVatExempt: boolean,
-  toCurrency: string,
-  companyId: string | undefined,
-  companyProducts: ProductData[],
-  exchangeRates: ExchangeRate[],
-  baseCurrency: string,
-  isLoadingExchangeRates: boolean,
+  options: CalculateTotalsForItemsOptions,
 ) => {
+  const {
+    companyVatRate,
+    isVatExempt,
+    toCurrency,
+    companyId,
+    companyProducts,
+    exchangeRates,
+    baseCurrency,
+    isLoadingExchangeRates,
+  } = options;
+
   let subtotal = 0;
   let totalTaxAmount = 0;
 
@@ -1266,13 +1265,10 @@ const InvoiceList = () => {
         label: "Status",
         sortable: true,
         type: "badge",
-        accessor: (row) =>
-          getInvoiceStatusLabel(row.status || STATUS_DRAFT),
+        accessor: (row) => getInvoiceStatusLabel(row.status || STATUS_DRAFT),
         badge: {
           getVariant: (row) =>
-            getInvoiceStatusBadgeVariant(
-              row.status || STATUS_DRAFT,
-            ) as any,
+            getInvoiceStatusBadgeVariant(row.status || STATUS_DRAFT) as any,
         },
       },
       {
@@ -1795,8 +1791,7 @@ const InvoiceList = () => {
     toCurrency: string = "USD",
     companyId?: string,
   ) =>
-    calculateTotalsForItems(
-      items,
+    calculateTotalsForItems(items, {
       companyVatRate,
       isVatExempt,
       toCurrency,
@@ -1805,7 +1800,7 @@ const InvoiceList = () => {
       exchangeRates,
       baseCurrency,
       isLoadingExchangeRates,
-    );
+    });
 
   // Payment handlers
   const handlePayInvoice = useCallback(async (invoice: InvoiceData) => {

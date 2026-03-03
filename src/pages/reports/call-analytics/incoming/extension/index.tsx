@@ -57,7 +57,6 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
 import {
   formatMinutesAndSeconds,
   ModuleSlug,
@@ -65,12 +64,38 @@ import {
   formatDateTimeToLocal,
   getAutoTimezone,
 } from "@utils/Helper";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+
+function formatStartDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let m: moment.Moment;
+  if (hasTime) {
+    m = moment(value + ":00");
+  } else if (value.includes("T")) {
+    m = moment(value);
+  } else {
+    m = moment(value).startOf("day");
+  }
+  return m.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
+
+function formatEndDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let m: moment.Moment;
+  if (hasTime) {
+    const timePart = value.split("T")[1];
+    m = timePart === "23:59" ? moment(value + ":59") : moment(value + ":00");
+  } else if (value.includes("T")) {
+    m = moment(value);
+  } else {
+    m = moment(value).endOf("day");
+  }
+  return m.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
 
 const CallIncomingExtension = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDateTime, setStartDateTime] = useState<string>("");
@@ -334,7 +359,7 @@ const CallIncomingExtension = () => {
   // Trigger initial data fetch when filters become ready
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes("list-call-logs")) {
+    if (session?.user?.permissions?.includes("list-call-logs")) {
       initialFetchDone.current = true;
     }
   }, [session]);
@@ -342,50 +367,15 @@ const CallIncomingExtension = () => {
   const handleFiltersChange = (filters: any) => {
     // Convert datetime values from local timezone to UTC before sending to API
     const formattedFilters: any = { ...filters };
-
     if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.start_datetime = formatStartDatetimeToUTC(
+        formattedFilters.start_datetime,
+      );
     }
-
     if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.end_datetime = formatEndDatetimeToUTC(
+        formattedFilters.end_datetime,
+      );
     }
 
     // Check if filters actually changed
@@ -396,7 +386,7 @@ const CallIncomingExtension = () => {
     const isCompletelyCleared =
       Object.keys(formattedFilters).length === 0 ||
       (Object.keys(formattedFilters).length === 1 &&
-        formattedFilters.hasOwnProperty("is_incoming_only"));
+        Object.hasOwn(formattedFilters, "is_incoming_only"));
 
     // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
@@ -512,8 +502,8 @@ const CallIncomingExtension = () => {
               max_duration: [],
             };
 
-            chartData.forEach((item: any, index: number) => {
-              if (item && item.label) {
+            chartData.forEach((item: any) => {
+              if (item?.label) {
                 newChartData.country.push(item.label);
                 newChartData.answered_calls.push(
                   Number(item.answered_calls) || 0,
@@ -625,7 +615,7 @@ const CallIncomingExtension = () => {
       setChartDuration(null);
       setChartLoading(false);
     }
-  }, [currentFilters, session]);
+  }, [currentFilters, session, chartCost]);
 
   const [currentChartDataType, setCurrentChartDataType] = useState<
     "calls" | "time" | "cost" | "custom"
@@ -669,24 +659,22 @@ const CallIncomingExtension = () => {
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   {showDateRange && (
-                    <>
-                      <p className="mb-0">
-                        Date Range:{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            startDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>{" "}
-                        to{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            endDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>
-                      </p>
-                    </>
+                    <p className="mb-0">
+                      Date Range:{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          startDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>{" "}
+                      to{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          endDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>
+                    </p>
                   )}
                   {/* {session?.user?.permissions?.includes('') && ( */}
                   <div className="d-flex align-items-center gap-2">
@@ -699,10 +687,9 @@ const CallIncomingExtension = () => {
                         <>
                           <span
                             className="spinner-border spinner-border-sm me-2"
-                            role="status"
                             aria-hidden="true"
-                          ></span>
-                          Exporting...
+                          />
+                          <output>Exporting...</output>
                         </>
                       ) : (
                         "Export"
@@ -775,42 +762,57 @@ const CallIncomingExtension = () => {
             <div className="report-grid ">
               <p className="text-muted mb-0">Total Calls</p>
               <div className="chart-one ">
-                {loading || !dataLoaded ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
+                {(() => {
+                  if (loading || !dataLoaded) {
+                    return (
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ height: "180px" }}
+                      >
+                        <div className="spinner-border text-primary">
+                          <output className="visually-hidden">Loading...</output>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const hasNoData =
+                    summary.answered_calls === 0 &&
+                    summary.unanswered_calls === 0 &&
+                    summary.total_duration === 0;
+                  if (hasNoData) {
+                    return (
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ height: "180px" }}
+                      >
+                        <p className="text-muted mb-0">No data available</p>
+                      </div>
+                    );
+                  }
+                  if (simpleDonut) {
+                    return (
+                      <ChartDonut
+                        series={simpleDonut.series}
+                        labels={simpleDonut.labels}
+                        dataType="calls"
+                        height={200}
+                        width={500}
+                        showDataLabels={true}
+                        dataLabelsFormatter={(value) =>
+                          `${value.toFixed(0)}%`
+                        }
+                      />
+                    );
+                  }
+                  return (
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ height: "180px" }}
+                    >
+                      <p className="text-muted mb-0">Loading chart...</p>
                     </div>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">No data available</p>
-                  </div>
-                ) : simpleDonut ? (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={200}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                ) : (
-                  <div
-                    className="d-flex align-items-center justify-content-center"
-                    style={{ height: "180px" }}
-                  >
-                    <p className="text-muted mb-0">Loading chart...</p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           </motion.div>
@@ -844,21 +846,19 @@ const CallIncomingExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
+                                <div className="spinner-border text-primary">
+                                  <output className="visually-hidden">
                                     Loading chart...
-                                  </span>
+                                  </output>
                                 </div>
                               </div>
-                            ) : chartCalls ? (
+                            )}
+                            {!chartLoading && chartCalls && (
                               <ChartBar
                                 series={chartCalls.series}
                                 categories={chartCalls.categories}
@@ -876,8 +876,6 @@ const CallIncomingExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
-                              <div className=""></div>
                             )}
                           </div>
                         </div>
@@ -902,21 +900,19 @@ const CallIncomingExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
+                                <div className="spinner-border text-primary">
+                                  <output className="visually-hidden">
                                     Loading chart...
-                                  </span>
+                                  </output>
                                 </div>
                               </div>
-                            ) : chartDuration ? (
+                            )}
+                            {!chartLoading && chartDuration && (
                               <ChartBar
                                 series={chartDuration.series}
                                 categories={chartDuration.categories}
@@ -934,8 +930,6 @@ const CallIncomingExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
-                              <div className=""></div>
                             )}
                           </div>
                         </div>
@@ -960,21 +954,19 @@ const CallIncomingExtension = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
+                            {chartLoading && (
                               <div
                                 className="d-flex align-items-center justify-content-center"
                                 style={{ height: "300px" }}
                               >
-                                <div
-                                  className="spinner-border text-primary"
-                                  role="status"
-                                >
-                                  <span className="visually-hidden">
+                                <div className="spinner-border text-primary">
+                                  <output className="visually-hidden">
                                     Loading chart...
-                                  </span>
+                                  </output>
                                 </div>
                               </div>
-                            ) : chartRingTime ? (
+                            )}
+                            {!chartLoading && chartRingTime && (
                               <ChartBar
                                 series={chartRingTime.series}
                                 categories={chartRingTime.categories}
@@ -992,8 +984,6 @@ const CallIncomingExtension = () => {
                                   )
                                 }
                               />
-                            ) : (
-                              <div className=""></div>
                             )}
                           </div>
                         </div>
@@ -1154,7 +1144,7 @@ const CallIncomingExtension = () => {
                         const values = e.target.value
                           .split(",")
                           .map((v) => v.trim())
-                          .filter((v) => v);
+                          .filter(Boolean);
                         setPendingFilters({
                           ...pendingFilters,
                           called_numbers: values,

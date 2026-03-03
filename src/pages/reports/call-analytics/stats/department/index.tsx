@@ -59,10 +59,62 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from "next/dynamic";
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+function getDefaultFilters() {
+  const now = moment();
+  const startDateInput = now.clone().startOf("day").format("YYYY-MM-DDTHH:mm");
+  const endDateInput = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
+  const startDateUTC =
+    now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  const endDateUTC =
+    now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+  return {
+    pending: {
+      start_datetime: startDateInput,
+      end_datetime: endDateInput,
+    },
+    current: {
+      start_datetime: startDateUTC,
+      end_datetime: endDateUTC,
+    },
+  };
+}
+
+function formatStartDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let startMoment: moment.Moment;
+  if (hasTime) {
+    startMoment = moment(value + ":00");
+  } else if (value.includes("T")) {
+    startMoment = moment(value);
+  } else {
+    startMoment = moment(value).startOf("day");
+  }
+  return startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
+
+function formatEndDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let endMoment: moment.Moment;
+  if (hasTime) {
+    const timePart = value.split("T")[1];
+    endMoment =
+      timePart === "23:59" ? moment(value + ":59") : moment(value + ":00");
+  } else if (value.includes("T")) {
+    endMoment = moment(value);
+  } else {
+    endMoment = moment(value).endOf("day");
+  }
+  return endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
+
+const SKELETON_CARD_IDS = [
+  "skeleton-1",
+  "skeleton-2",
+  "skeleton-3",
+  "skeleton-4",
+];
 
 const CallStatsDepartment = () => {
   const { data: session } = useSession();
@@ -72,33 +124,8 @@ const CallStatsDepartment = () => {
   const [endDateTime, setEndDateTime] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
 
-  // Initialize filters with default values immediately to prevent first API call without dates
-  const getDefaultFilters = () => {
-    const now = moment();
-    const startDateInput = now
-      .clone()
-      .startOf("day")
-      .format("YYYY-MM-DDTHH:mm");
-    const endDateInput = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
-    const startDateUTC =
-      now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    const endDateUTC =
-      now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    return {
-      pending: {
-        start_datetime: startDateInput,
-        end_datetime: endDateInput,
-      },
-      current: {
-        start_datetime: startDateUTC,
-        end_datetime: endDateUTC,
-      },
-    };
-  };
-
   const defaultFilters = getDefaultFilters();
 
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("calls_chart");
   const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
@@ -230,7 +257,6 @@ const CallStatsDepartment = () => {
       lastFetchTimeRef.current = now;
       lastFetchParamsRef.current = paramsKey;
 
-      setLoading(true);
       setShowPageLoader(true);
 
       try {
@@ -258,10 +284,8 @@ const CallStatsDepartment = () => {
           setDataLoaded(true);
         }
 
-        setLoading(false);
         return response;
       } catch {
-        setLoading(false);
         setDataLoaded(true);
         toast.error("Failed to fetch call data");
         return null;
@@ -293,55 +317,19 @@ const CallStatsDepartment = () => {
   };
 
   const handleFiltersChange = (filters: any) => {
-    // Convert datetime values from local timezone to UTC before sending to API
     const formattedFilters: any = { ...filters };
 
     if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.start_datetime = formatStartDatetimeToUTC(
+        formattedFilters.start_datetime,
+      );
     }
-
     if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-      // Convert to UTC ISO format
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.end_datetime = formatEndDatetimeToUTC(
+        formattedFilters.end_datetime,
+      );
     }
 
-    // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
     if (
       !formattedFilters.is_incoming_only ||
       formattedFilters.is_incoming_only === ""
@@ -351,17 +339,15 @@ const CallStatsDepartment = () => {
 
     const filtersChanged =
       JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
+    const keyCount = Object.keys(formattedFilters).length;
     const isCompletelyCleared =
-      Object.keys(formattedFilters).length === 0 ||
-      (Object.keys(formattedFilters).length === 1 &&
-        formattedFilters.hasOwnProperty("is_incoming_only"));
+      keyCount === 0 ||
+      (keyCount === 1 && Object.hasOwn(formattedFilters, "is_incoming_only"));
 
-    // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
     currentFiltersRef.current = formattedFilters;
 
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-      // Reset chart filters ref to allow chart refetch
       lastChartFilters.current = "";
       setRefreshKey((prev) => prev + 1);
     }
@@ -369,7 +355,7 @@ const CallStatsDepartment = () => {
 
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes("list-call-logs")) {
+    if (session?.user?.permissions?.includes("list-call-logs")) {
       initialFetchDone.current = true;
     }
   }, [session]);
@@ -420,7 +406,7 @@ const CallStatsDepartment = () => {
               };
 
               chartData.forEach((item: any) => {
-                if (item && item.label) {
+                if (item?.label) {
                   newChartData.department.push(item.label);
                   newChartData.answered_calls.push(
                     Number(item.answered_calls) || 0,
@@ -481,16 +467,6 @@ const CallStatsDepartment = () => {
                   categories: newChartData.department,
                 });
 
-                // Cost Chart
-                setChartCost({
-                  series: [
-                    { name: "Max Cost", data: newChartData.max_cost },
-                    { name: "Avg Cost", data: newChartData.avg_cost },
-                    { name: "Min Cost", data: newChartData.min_cost },
-                  ],
-                  categories: newChartData.department,
-                });
-
                 // Duration Chart
                 setChartDuration({
                   series: [
@@ -503,20 +479,17 @@ const CallStatsDepartment = () => {
               } else {
                 setChartCalls(null);
                 setChartRingTime(null);
-                setChartCost(null);
                 setChartDuration(null);
               }
             } else {
               setChartCalls(null);
               setChartRingTime(null);
-              setChartCost(null);
               setChartDuration(null);
             }
           } catch (error: unknown) {
             console.error("Error fetching chart data:", error);
             setChartCalls(null);
             setChartRingTime(null);
-            setChartCost(null);
             setChartDuration(null);
           } finally {
             setChartLoading(false);
@@ -537,10 +510,6 @@ const CallStatsDepartment = () => {
     categories: string[];
   } | null>(null);
   const [chartRingTime, setChartRingTime] = useState<{
-    series: any[];
-    categories: string[];
-  } | null>(null);
-  const [chartCost, setChartCost] = useState<{
     series: any[];
     categories: string[];
   } | null>(null);
@@ -588,6 +557,149 @@ const CallStatsDepartment = () => {
     }
   }, [summary, dataLoaded]);
 
+  const renderSummaryContent = () => {
+    const isEmpty =
+      summary.total_calls === 0 &&
+      summary.total_cost === 0 &&
+      summary.answered_calls === 0 &&
+      summary.unanswered_calls === 0;
+    if (!dataLoaded) {
+      return (
+        <>
+          {SKELETON_CARD_IDS.map((id) => (
+            <Col md={6} className="mb-3" key={id}>
+              <div className="card report-shadow h-100">
+                <div
+                  className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+                  style={{ minHeight: "120px" }}
+                >
+                  <output
+                    className="spinner-border text-primary mb-2"
+                    aria-live="polite"
+                  >
+                    <span className="visually-hidden">Loading...</span>
+                  </output>
+                  <p className="text-muted mb-0">Loading...</p>
+                </div>
+              </div>
+            </Col>
+          ))}
+        </>
+      );
+    }
+    if (isEmpty) {
+      return (
+        <Col md={12}>
+          <div className="card report-shadow">
+            <div
+              className="card-body d-flex flex-column align-items-center justify-content-center text-center"
+              style={{ minHeight: "120px" }}
+            >
+              <i className="fa fa-database fa-3x text-muted mb-3"></i>
+              <h5 className="text-muted mb-2">No Data Available</h5>
+              <p className="text-muted mb-0">
+                No call statistics found for the selected filters and date
+                range.
+              </p>
+            </div>
+          </div>
+        </Col>
+      );
+    }
+    return (
+      <PageSummaryGrid
+        gridColumns={2}
+        cards={[
+          {
+            id: "total-calls",
+            title: "Total Calls",
+            value: summary.total_calls,
+            description: "Total number of calls",
+            delay: 0,
+            valueType: "number",
+            showAnimatedNumber: true,
+          },
+          {
+            id: "avg-ring-time",
+            title: "Avg Ring Time",
+            value: summary.avg_ring_time,
+            description: "Average ring time in seconds",
+            delay: 0.3,
+            valueType: "seconds",
+            showAnimatedNumber: true,
+          },
+          {
+            id: "avg-duration",
+            title: "Avg Duration",
+            value: summary.avg_duration,
+            description: "Average call duration",
+            delay: 0.6,
+            valueType: "seconds",
+            showAnimatedNumber: true,
+          },
+          {
+            id: "total-cost",
+            title: "Total Duration",
+            value: summary.total_duration,
+            description: "Total duration of calls",
+            delay: 0.9,
+            valueType: "seconds",
+            showAnimatedNumber: true,
+          },
+        ]}
+      />
+    );
+  };
+
+  const renderDonutChartContent = () => {
+    const noDataMessage = (
+      <div
+        className="d-flex flex-column align-items-center justify-content-center text-center"
+        style={{ height: "180px" }}
+      >
+        <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
+        <h6 className="text-muted mb-1">No Call Data Available</h6>
+        <p className="text-muted mb-0">
+          No call statistics found for the selected filters
+        </p>
+      </div>
+    );
+    if (!dataLoaded) {
+      return (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-center"
+          style={{ height: "180px" }}
+        >
+          <output
+            className="spinner-border text-primary mb-2"
+            aria-live="polite"
+          >
+            <span className="visually-hidden">Loading...</span>
+          </output>
+          <p className="text-muted mb-0">Loading chart data...</p>
+        </div>
+      );
+    }
+    const hasNoCallData =
+      summary.answered_calls === 0 &&
+      summary.unanswered_calls === 0 &&
+      summary.total_duration === 0;
+    if (hasNoCallData || !simpleDonut) {
+      return noDataMessage;
+    }
+    return (
+      <ChartDonut
+        series={simpleDonut.series}
+        labels={simpleDonut.labels}
+        dataType="calls"
+        height={200}
+        width={500}
+        showDataLabels={true}
+        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+      />
+    );
+  };
+
   return (
     <React.Fragment>
       <BreadcrumbItem
@@ -607,24 +719,22 @@ const CallStatsDepartment = () => {
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
                   {showDateRange && (
-                    <>
-                      <p className="mb-0">
-                        Date Range:{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            startDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>{" "}
-                        to{" "}
-                        <span className="status-badge primary">
-                          {formatDateTimeToLocal(
-                            endDateTime,
-                            GlobalDateTimeFormat,
-                          )}
-                        </span>
-                      </p>
-                    </>
+                    <p className="mb-0">
+                      Date Range:{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          startDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>{" "}
+                      to{" "}
+                      <span className="status-badge primary">
+                        {formatDateTimeToLocal(
+                          endDateTime,
+                          GlobalDateTimeFormat,
+                        )}
+                      </span>
+                    </p>
                   )}
                   {/* {session?.user?.permissions?.includes('') && ( */}
                   <div className="d-flex align-items-center gap-2">
@@ -635,11 +745,11 @@ const CallStatsDepartment = () => {
                     >
                       {isExporting ? (
                         <>
-                          <span
+                          <output
                             className="spinner-border spinner-border-sm me-2"
-                            role="status"
                             aria-hidden="true"
-                          ></span>
+                            aria-live="polite"
+                          />
                           Exporting...
                         </>
                       ) : (
@@ -657,92 +767,7 @@ const CallStatsDepartment = () => {
 
       <Row>
         <Col md={6}>
-          <Row>
-            {!dataLoaded ? (
-              <>
-                {[...Array(4)].map((_, index) => (
-                  <Col md={6} className="mb-3" key={index}>
-                    <div className="card report-shadow h-100">
-                      <div
-                        className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                        style={{ minHeight: "120px" }}
-                      >
-                        <div
-                          className="spinner-border text-primary mb-2"
-                          role="status"
-                        >
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="text-muted mb-0">Loading...</p>
-                      </div>
-                    </div>
-                  </Col>
-                ))}
-              </>
-            ) : dataLoaded &&
-              summary.total_calls === 0 &&
-              summary.total_cost === 0 &&
-              summary.answered_calls === 0 &&
-              summary.unanswered_calls === 0 ? (
-              <Col md={12}>
-                <div className="card report-shadow">
-                  <div
-                    className="card-body d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ minHeight: "120px" }}
-                  >
-                    <i className="fa fa-database fa-3x text-muted mb-3"></i>
-                    <h5 className="text-muted mb-2">No Data Available</h5>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters and date
-                      range.
-                    </p>
-                  </div>
-                </div>
-              </Col>
-            ) : (
-              <PageSummaryGrid
-                gridColumns={2}
-                cards={[
-                  {
-                    id: "total-calls",
-                    title: "Total Calls",
-                    value: summary.total_calls,
-                    description: "Total number of calls",
-                    delay: 0,
-                    valueType: "number",
-                    showAnimatedNumber: true,
-                  },
-                  {
-                    id: "avg-ring-time",
-                    title: "Avg Ring Time",
-                    value: summary.avg_ring_time,
-                    description: "Average ring time in seconds",
-                    delay: 0.3,
-                    valueType: "seconds",
-                    showAnimatedNumber: true,
-                  },
-                  {
-                    id: "avg-duration",
-                    title: "Avg Duration",
-                    value: summary.avg_duration,
-                    description: "Average call duration",
-                    delay: 0.6,
-                    valueType: "seconds",
-                    showAnimatedNumber: true,
-                  },
-                  {
-                    id: "total-cost",
-                    title: "Total Duration",
-                    value: summary.total_duration,
-                    description: "Total duration of calls",
-                    delay: 0.9,
-                    valueType: "seconds",
-                    showAnimatedNumber: true,
-                  },
-                ]}
-              />
-            )}
-          </Row>
+          <Row>{renderSummaryContent()}</Row>
         </Col>
 
         <Col md={6}>
@@ -753,56 +778,7 @@ const CallStatsDepartment = () => {
           >
             <div className="report-grid">
               <p className="text-muted mb-0">Total Calls</p>
-              <div className="chart-one">
-                {!dataLoaded ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <div
-                      className="spinner-border text-primary mb-2"
-                      role="status"
-                    >
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="text-muted mb-0">Loading chart data...</p>
-                  </div>
-                ) : summary.answered_calls === 0 &&
-                  summary.unanswered_calls === 0 &&
-                  summary.total_duration === 0 ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters
-                    </p>
-                  </div>
-                ) : !simpleDonut ? (
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center text-center"
-                    style={{ height: "180px" }}
-                  >
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">
-                      No call statistics found for the selected filters
-                    </p>
-                  </div>
-                ) : (
-                  <ChartDonut
-                    series={simpleDonut.series}
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={200}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                )}
-              </div>
+              <div className="chart-one">{renderDonutChartContent()}</div>
             </div>
           </motion.div>
         </Col>
@@ -834,53 +810,61 @@ const CallStatsDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
+                            {(() => {
+                              if (chartLoading) {
+                                return (
+                                  <div
+                                    className="d-flex align-items-center justify-content-center"
+                                    style={{ height: "300px" }}
+                                  >
+                                    <output
+                                      className="spinner-border text-primary"
+                                      aria-live="polite"
+                                    >
+                                      <span className="visually-hidden">
+                                        Loading chart...
+                                      </span>
+                                    </output>
+                                  </div>
+                                );
+                              }
+                              if (chartCalls) {
+                                return (
+                                  <ChartBar
+                                    series={chartCalls.series}
+                                    categories={chartCalls.categories}
+                                    dataType="calls"
+                                    height={300}
+                                    maxDisplayedItems={5}
+                                    showViewAllButton={true}
+                                    viewAllButtonText="View All"
+                                    showFullScreenButton={true}
+                                    onFullScreenClick={() =>
+                                      handleOpenChartModal(
+                                        chartCalls,
+                                        "Calls by Department",
+                                        "calls",
+                                      )
+                                    }
+                                  />
+                                );
+                              }
+                              return (
                                 <div
-                                  className="spinner-border text-primary"
-                                  role="status"
+                                  className="d-flex flex-column align-items-center justify-content-center text-center"
+                                  style={{ height: "300px" }}
                                 >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
+                                  <i className="fa fa-chart-bar fa-3x text-muted mb-3"></i>
+                                  <h5 className="text-muted mb-2">
+                                    No Call Data Available
+                                  </h5>
+                                  <p className="text-muted mb-0">
+                                    No call statistics found for the selected
+                                    filters and date range.
+                                  </p>
                                 </div>
-                              </div>
-                            ) : chartCalls ? (
-                              <ChartBar
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartCalls,
-                                    "Calls by Department",
-                                    "calls",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-chart-bar fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Call Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No call statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         </div>
                       </Col>
@@ -903,53 +887,61 @@ const CallStatsDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
+                            {(() => {
+                              if (chartLoading) {
+                                return (
+                                  <div
+                                    className="d-flex align-items-center justify-content-center"
+                                    style={{ height: "300px" }}
+                                  >
+                                    <output
+                                      className="spinner-border text-primary"
+                                      aria-live="polite"
+                                    >
+                                      <span className="visually-hidden">
+                                        Loading chart...
+                                      </span>
+                                    </output>
+                                  </div>
+                                );
+                              }
+                              if (chartDuration) {
+                                return (
+                                  <ChartBar
+                                    series={chartDuration.series}
+                                    categories={chartDuration.categories}
+                                    dataType="time"
+                                    height={300}
+                                    maxDisplayedItems={5}
+                                    showViewAllButton={true}
+                                    viewAllButtonText="View All"
+                                    showFullScreenButton={true}
+                                    onFullScreenClick={() =>
+                                      handleOpenChartModal(
+                                        chartDuration,
+                                        "Duration by Department",
+                                        "time",
+                                      )
+                                    }
+                                  />
+                                );
+                              }
+                              return (
                                 <div
-                                  className="spinner-border text-primary"
-                                  role="status"
+                                  className="d-flex flex-column align-items-center justify-content-center text-center"
+                                  style={{ height: "300px" }}
                                 >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
+                                  <i className="fa fa-clock fa-3x text-muted mb-3"></i>
+                                  <h5 className="text-muted mb-2">
+                                    No Duration Data Available
+                                  </h5>
+                                  <p className="text-muted mb-0">
+                                    No duration statistics found for the
+                                    selected filters and date range.
+                                  </p>
                                 </div>
-                              </div>
-                            ) : chartDuration ? (
-                              <ChartBar
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartDuration,
-                                    "Duration by Department",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-clock fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Duration Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No duration statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         </div>
                       </Col>
@@ -972,53 +964,61 @@ const CallStatsDepartment = () => {
                       <Col md={12}>
                         <div className="card report-shadow">
                           <div className="card-body">
-                            {chartLoading ? (
-                              <div
-                                className="d-flex align-items-center justify-content-center"
-                                style={{ height: "300px" }}
-                              >
+                            {(() => {
+                              if (chartLoading) {
+                                return (
+                                  <div
+                                    className="d-flex align-items-center justify-content-center"
+                                    style={{ height: "300px" }}
+                                  >
+                                    <output
+                                      className="spinner-border text-primary"
+                                      aria-live="polite"
+                                    >
+                                      <span className="visually-hidden">
+                                        Loading chart...
+                                      </span>
+                                    </output>
+                                  </div>
+                                );
+                              }
+                              if (chartRingTime) {
+                                return (
+                                  <ChartBar
+                                    series={chartRingTime.series}
+                                    categories={chartRingTime.categories}
+                                    dataType="time"
+                                    height={300}
+                                    maxDisplayedItems={5}
+                                    showViewAllButton={true}
+                                    viewAllButtonText="View All"
+                                    showFullScreenButton={true}
+                                    onFullScreenClick={() =>
+                                      handleOpenChartModal(
+                                        chartRingTime,
+                                        "Ring Time by Department",
+                                        "time",
+                                      )
+                                    }
+                                  />
+                                );
+                              }
+                              return (
                                 <div
-                                  className="spinner-border text-primary"
-                                  role="status"
+                                  className="d-flex flex-column align-items-center justify-content-center text-center"
+                                  style={{ height: "300px" }}
                                 >
-                                  <span className="visually-hidden">
-                                    Loading chart...
-                                  </span>
+                                  <i className="fa fa-phone fa-3x text-muted mb-3"></i>
+                                  <h5 className="text-muted mb-2">
+                                    No Ring Time Data Available
+                                  </h5>
+                                  <p className="text-muted mb-0">
+                                    No ring time statistics found for the
+                                    selected filters and date range.
+                                  </p>
                                 </div>
-                              </div>
-                            ) : chartRingTime ? (
-                              <ChartBar
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() =>
-                                  handleOpenChartModal(
-                                    chartRingTime,
-                                    "Ring Time by Department",
-                                    "time",
-                                  )
-                                }
-                              />
-                            ) : (
-                              <div
-                                className="d-flex flex-column align-items-center justify-content-center text-center"
-                                style={{ height: "300px" }}
-                              >
-                                <i className="fa fa-phone fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">
-                                  No Ring Time Data Available
-                                </h5>
-                                <p className="text-muted mb-0">
-                                  No ring time statistics found for the selected
-                                  filters and date range.
-                                </p>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
                         </div>
                       </Col>
