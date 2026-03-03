@@ -559,11 +559,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/pulse/events'
         },
         {
-          id: 'pulse-triggers',
-          title: 'Triggers',
+          id: 'pulse-customers',
+          title: 'Customers',
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/pulse/triggers'
+          url: '/pulse/customers'
         },
 
 

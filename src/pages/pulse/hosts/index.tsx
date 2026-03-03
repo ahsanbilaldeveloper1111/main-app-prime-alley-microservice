@@ -14,9 +14,10 @@ import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
 import AppSelect from '@components/AppSelect';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import router from 'next/router';
 
 type HostGroupOption = { value: string; label: string };
 
@@ -190,6 +191,7 @@ const Hosts = () => {
   ];
 
   const tableActions: TableAction<ZabbixHost>[] = [
+    { label: 'View', icon: <Eye size={16} />, onClick: (row) => router.push(`/pulse/hosts/${row.hostid}`) },
     // { label: 'Edit', icon: <Pencil size={16} />, onClick: (row) => openEditModal(row) },
     // { label: 'Delete', icon: <Trash2 size={16} />, onClick: (row) => openDeleteConfirm(row) },
   ];

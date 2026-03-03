@@ -114,6 +114,10 @@ axiosInstance.interceptors.response.use(
 
     if (error.response) {
       if (error.response.status === 401 && !originalRequest._retry) {
+        if (typeof window !== 'undefined' && (window as any).__authLogoutInProgress) {
+          return Promise.reject(error);
+        }
+
         originalRequest._retry = true;
         
         try {
@@ -129,6 +133,7 @@ axiosInstance.interceptors.response.use(
           } else {
             // Token refresh failed - clear cookies and session, then sign out
             if (typeof window !== 'undefined') {
+              (window as any).__authLogoutInProgress = true;
               // Best-effort: clear server-side NextAuth session payload before wiping cookies
               fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
               clearSessionCookiesClient(true);
@@ -136,7 +141,7 @@ axiosInstance.interceptors.response.use(
               const callbackUrl = getLogoutCallbackUrl();
               // Await signOut so NextAuth cookie is cleared before redirect (prevents signin/dashboard loop)
               signOut({ callbackUrl, redirect: false }).then(() => {
-                window.location.href = callbackUrl;
+                window.location.replace(callbackUrl);
               });
             }
             return Promise.reject(error);

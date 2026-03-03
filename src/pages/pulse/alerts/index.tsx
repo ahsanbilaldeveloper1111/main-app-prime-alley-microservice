@@ -37,7 +37,7 @@ const Alerts = () => {
   const [selectedAcknowledged, setSelectedAcknowledged] = useState<AcknowledgedOption | null>(null);
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 15,
+    limit: 10,
     total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
@@ -184,7 +184,7 @@ const Alerts = () => {
                 }}
               />
             </div>
-            <input
+            {/* <input
               type="text"
               className="form-control"
               placeholder="Search alerts..."
@@ -192,10 +192,10 @@ const Alerts = () => {
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               style={{ maxWidth: '240px' }}
-            />
-            <Button variant="primary" onClick={handleSearch} disabled={loading}>
+            /> */}
+            {/* <Button variant="primary" onClick={handleSearch} disabled={loading}>
               Search
-            </Button>
+            </Button> */}
             <Button variant="info" onClick={handleRefresh} disabled={loading}>
               <FiRefreshCw size={14} /> Refresh
             </Button>

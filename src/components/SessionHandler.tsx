@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import tokenService from '../utils/tokenService';
-import { useBrowserCloseDetection } from '../hooks/useBrowserCloseDetection';
 
 interface SessionHandlerProps {
   children: React.ReactNode;
@@ -12,9 +11,6 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
   const { data: session, status } = useSession();
   const router = useRouter();
   
-  // Detect browser close and clear all sessions
-  //useBrowserCloseDetection();
-
   useEffect(() => {
     // Handle session state changes
     if (status === 'loading') {
@@ -22,6 +18,11 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
       return;
     }
 
+    // Don't run auth enforcement on auth pages; those pages manage their own flow.
+    if (router.pathname.startsWith('/auth/')) {
+      tokenService.stop();
+      return;
+    }
 
     if (status === 'authenticated' && session) {
       // User is authenticated, initialize token service
@@ -39,7 +40,7 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
         router.push('/auth/signin');
       }
     }
-  }, [status, session, router]);
+  }, [status, session, router.pathname, router]);
 
   // Show loading state while session is being determined
   if (status === 'loading') {

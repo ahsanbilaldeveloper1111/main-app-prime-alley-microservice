@@ -304,6 +304,8 @@ const Signin = () => {
         typeof window !== "undefined" &&
         window.sessionStorage?.getItem("accessToken");
       if (!hasAppTokens) {
+        // Best-effort: clear server-side NextAuth session payload store, then sign out
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         // Stale NextAuth session without app tokens – clear it and show sign-in form
         signOut({ redirect: false });
         return;
