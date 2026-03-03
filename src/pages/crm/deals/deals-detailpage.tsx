@@ -1,20 +1,32 @@
-import React, { useState, useRef, useEffect, ReactElement } from 'react';
+import React, { useState, useRef, useEffect, ReactElement, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import {
   ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
   ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
-  AlertCircle, ShoppingCart, Handshake
+  AlertCircle, ShoppingCart, Handshake, Download as DownloadIcon
 } from 'lucide-react';
 import Layout from "@layout/index";
-import { getDeal, type DealData } from '@utils/crm';
-import { usePermissions } from '@utils/permissionUtils';
-import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
-import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
+import {
+  getDeal,
+  deleteDeal,
+  PDFDownloadDeal,
+  downloadDealAttachment,
+  type DealData,
+} from "@utils/crm";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
+import { CreateDealSidebar } from "@components/renderCreateDealForm";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { GetHierarchyData } from "@utils/users";
+import { ModuleSlug } from "@utils/Helper";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -77,6 +89,24 @@ const DealRecordPage: NextPageWithLayout = () => {
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
+  // Edit Deal sidebar (same CreateDealSidebar as list page)
+  const [showCreateDealSidebar, setShowCreateDealSidebar] = useState(false);
+  const [editDealIdForSidebar, setEditDealIdForSidebar] = useState<number | null>(null);
+
+  // Delete Deal modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState<{ id: number; name?: string } | null>(null);
+
+  // Success modal (reuse common SuccessfulModal)
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
+
+  // Exporting state (single deal export)
+  const [exporting, setExporting] = useState(false);
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
+
   // Load deal by ID from URL
   useEffect(() => {
     if (!router.isReady || dealId == null || dealId === '') {
@@ -104,6 +134,23 @@ const DealRecordPage: NextPageWithLayout = () => {
         setDealLoading(false);
       });
   }, [router.isReady, dealId]);
+
+  // Load extensions (owners/assignees) for friendly Deal Owner names
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DEALS);
+        if (hierarchyData?.extensions) {
+          setExtensions(hierarchyData.extensions);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to fetch extensions:", error);
+      }
+    };
+
+    void fetchExtensions();
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -219,13 +266,27 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   // Key Information Fields - from deal API
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Deal Value', value: formatDealAmount(deal), copyable: true },
-    { label: 'Stage', value: deal?.stage?.name ?? deal?.status ?? '--' },
-    { label: 'Probability', value: deal != null ? `${deal.probability ?? 0}%` : '--' },
-    { label: 'Expected Close Date', value: formatDate(deal?.expected_close_date) },
-    { label: 'Deal Type', value: deal?.deal_type ?? '--' },
-    { label: 'Company Name', value: deal?.company_name ?? '--' },
-    { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
+    { label: "Deal Value", value: formatDealAmount(deal), copyable: true },
+    { label: "Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
+    { label: "Probability", value: deal != null ? `${deal.probability ?? 0}%` : "--" },
+    { label: "Expected Close Date", value: formatDate(deal?.expected_close_date) },
+    {
+      label: "Company Name",
+      value: deal?.company_name ?? "--",
+    },
+    {
+      label: "Deal Owner",
+      value: (() => {
+        const rawOwner = deal?.assigned_to ?? null;
+        if (!rawOwner) return "--";
+        const match = extensions.find(
+          (ext: any) =>
+            String(ext.id) === String(rawOwner) ||
+            String(ext.extension) === String(rawOwner),
+        );
+        return match?.display_name ?? match?.name ?? String(rawOwner);
+      })(),
+    },
   ];
 
   // Normalize deal for CrmActivitiesPanel (include audit_trail so Activity tab shows deal history)
@@ -246,7 +307,68 @@ const DealRecordPage: NextPageWithLayout = () => {
   const dealRecordName = deal?.name ?? 'Deal';
   const dealRecordEmail = (deal as any)?.decision_maker_email ?? (deal as any)?.contact_email ?? '';
 
-  const dealRecordPhone = deal?.decision_maker_phone ?? (deal as any)?.phone ?? '';
+  const dealRecordPhone = deal?.decision_maker_phone ?? (deal as any)?.phone ?? "";
+
+  const handleOpenEditDeal = useCallback(() => {
+    if (!dealRecordId) return;
+    setEditDealIdForSidebar(dealRecordId);
+    setShowCreateDealSidebar(true);
+  }, [dealRecordId]);
+
+  const handleOpenDeleteDeal = useCallback(() => {
+    if (!dealRecordId) return;
+    setDealToDelete({ id: dealRecordId, name: dealRecordName });
+    setShowDeleteModal(true);
+  }, [dealRecordId, dealRecordName]);
+
+  const confirmDeleteDeal = useCallback(async () => {
+    if (!dealToDelete) return;
+    try {
+      await deleteDeal(dealToDelete.id);
+      setShowDeleteModal(false);
+      setDealToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Deal Deleted");
+      setSuccessModalDescription("Deal has been deleted successfully");
+      router.push("/crm/deals");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to delete deal:", error);
+      toast.error("Failed to delete deal");
+    }
+  }, [dealToDelete, router]);
+
+  const handleDealExport = useCallback(async () => {
+    if (!dealRecordId) return;
+    setExporting(true);
+    try {
+      await PDFDownloadDeal(dealRecordId);
+      toast.success("Exported deal successfully!");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to export deal:", error);
+      toast.error("Failed to export deal");
+    } finally {
+      setExporting(false);
+    }
+  }, [dealRecordId]);
+
+  const handleDownloadAttachment = useCallback(
+    async (attachmentId: number) => {
+      if (!dealRecordId) return;
+      setDownloadingAttachmentId(attachmentId);
+      try {
+        await downloadDealAttachment(dealRecordId, attachmentId);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to download attachment:", error);
+        toast.error("Failed to download attachment");
+      } finally {
+        setDownloadingAttachmentId(null);
+      }
+    },
+    [dealRecordId],
+  );
 
   const activityModals = useCrmActivityModals({
     recordType: 'deal',
@@ -259,244 +381,6 @@ const DealRecordPage: NextPageWithLayout = () => {
     onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
-
-  const renderIntelligenceTab = () => {
-    return (
-      <div>
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '20px',
-          marginBottom: '20px',
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '20px',
-            marginBottom: '16px',
-          }}>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Deal Stage
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal?.stage?.name ?? deal?.status ?? '--'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Related Company
-              </div>
-              <span style={{
-                fontSize: '14px',
-                color: '#006162',
-                fontWeight: '500',
-              }}>
-                {deal?.company_name ?? '--'}
-              </span>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Deal Value
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {formatDealAmount(deal)}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Probability
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal != null ? `${deal.probability ?? 0}%` : '--'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Expected Close Date
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {formatDate(deal?.expected_close_date)}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Deal Type
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal?.deal_type ?? '--'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '20px',
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '5px',
-            padding: '20px',
-          }}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Industry
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal?.industry ?? '--'}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Company description
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal?.company_name ? `${deal.company_name} deal` : '--'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '5px',
-            padding: '20px',
-          }}>
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: '0 0 16px 0',
-            }}>
-              Deal Information
-            </h3>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Deal Owner
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {deal?.assigned_to ?? '--'}
-              </div>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '20px',
-              marginBottom: '20px',
-            }}>
-              <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
-                  Approval Status
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
-                  {deal?.is_lost ? 'Lost' : (deal?.status ?? '--')}
-                </div>
-              </div>
-              <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
-                  Currency
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
-                  {deal?.currency ?? '--'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -808,7 +692,16 @@ const DealRecordPage: NextPageWithLayout = () => {
                 {['Edit', 'Delete', 'Clone', 'Export'].map((action) => (
                   <button
                     key={action}
-                    onClick={() => setShowActionsDropdown(false)}
+                    onClick={() => {
+                      setShowActionsDropdown(false);
+                      if (action === 'Edit') {
+                        handleOpenEditDeal();
+                      } else if (action === 'Delete') {
+                        handleOpenDeleteDeal();
+                      } else if (action === 'Export') {
+                        void handleDealExport();
+                      }
+                    }}
                     style={{
                       width: '100%',
                       padding: '10px 16px',
@@ -1674,12 +1567,21 @@ const DealRecordPage: NextPageWithLayout = () => {
               sectionId="companies"
               collapsedSections={collapsedSections}
               toggleSection={toggleSection}
-              companyName={(deal as any)?.company?.enrichment_data?.structured_data?.official_company_name ?? null}
-              phones={((deal as any)?.company?.enrichment_data?.structured_data?.phones ?? [])
-                .map((p: any) => ({
-                  number: p?.number ?? "",
-                  type: p?.type ?? null,
-                }))}
+              companyName={
+                (deal as any)?.company?.enrichment_data?.structured_data
+                  ?.official_company_name ?? deal?.company_name ?? null
+              }
+              primaryPhone={
+                (deal as any)?.company?.enrichment_data?.structured_data
+                  ?.phones?.[0]?.number ?? (deal as any)?.company?.phone ?? null
+              }
+              phones={(
+                (deal as any)?.company?.enrichment_data?.structured_data
+                  ?.phones ?? []
+              ).map((p: any) => ({
+                number: p?.number ?? "",
+                type: p?.type ?? null,
+              }))}
             />
 
             <div style={{
@@ -1873,29 +1775,51 @@ const DealRecordPage: NextPageWithLayout = () => {
                         <div
                           key={att.id}
                           style={{
-                            marginBottom: '12px',
-                            border: '1px solid #cccccc',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
+                            marginBottom: "12px",
+                            border: "1px solid #cccccc",
+                            borderRadius: "8px",
+                            padding: "12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
                           }}
                         >
-                          <Paperclip size={18} style={{ color: '#718096' }} />
-                          <a
-                            href={att.file_path}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <Paperclip size={18} style={{ color: "#718096" }} />
+                          <button
+                            type="button"
+                            onClick={() => void handleDownloadAttachment(att.id)}
                             style={{
-                              fontSize: '14px',
-                              color: '#006162',
-                              textDecoration: 'none',
-                              fontWeight: '500',
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              background: "transparent",
+                              border: "none",
+                              padding: 0,
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              color: "#006162",
+                              fontWeight: "500",
+                              textDecoration: "none",
                             }}
                           >
-                            {att.file_path?.split('/').pop() ?? `Attachment ${att.id}`}
-                          </a>
+                            <span>
+                              {att.file_path?.split("/").pop() ??
+                                att.original_name ??
+                                `Attachment ${att.id}`}
+                            </span>
+                            <DownloadIcon size={16} />
+                            {downloadingAttachmentId === att.id && (
+                              <span
+                                style={{
+                                  fontSize: "12px",
+                                  color: "#718096",
+                                  marginLeft: "4px",
+                                }}
+                              >
+                                Downloading...
+                              </span>
+                            )}
+                          </button>
                         </div>
                       ))}
                     </>
@@ -2049,6 +1973,49 @@ const DealRecordPage: NextPageWithLayout = () => {
       </div>
 
       {activityModals.modals}
+
+      {/* Delete Deal Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setDealToDelete(null);
+        }}
+        onConfirm={confirmDeleteDeal}
+        itemName={dealToDelete?.name}
+        itemType="deal"
+      />
+
+      {/* Success Modal for delete and other deal actions */}
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
+      />
+
+      {/* Edit Deal sidebar (CreateDealSidebar in edit mode) */}
+      {showCreateDealSidebar && (
+        <CreateDealSidebar
+          onClose={() => {
+            setShowCreateDealSidebar(false);
+            setEditDealIdForSidebar(null);
+          }}
+          dealId={editDealIdForSidebar}
+          onSuccess={async () => {
+            setShowCreateDealSidebar(false);
+            setEditDealIdForSidebar(null);
+            if (dealRecordId) {
+              try {
+                const data = await getDeal(dealRecordId);
+                setDeal(data);
+              } catch {
+                // ignore refresh errors
+              }
+            }
+          }}
+        />
+      )}
     </>
   );
 };
