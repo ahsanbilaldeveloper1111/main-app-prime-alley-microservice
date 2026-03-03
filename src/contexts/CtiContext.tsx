@@ -914,34 +914,33 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         error: 'No device information for current user. Cannot put call on hold for transfer.',
       };
     }
+
+    console.log('activeCalls 1234', activeCalls);
+    
+
     const callEntry = Array.from(activeCalls.values()).find((c) => c.callId === params.callId);
-    // Other party = the leg in the call that is not the current user (so hold works for both 531 and 532).
-    let otherPartyAddress: string = params.transferAddress;
-    if (callEntry) {
-      if (callEntry.callingAddress && callEntry.callingAddress !== controllerAddress) {
-        otherPartyAddress = callEntry.callingAddress;
-      } else if (callEntry.calledAddress && callEntry.calledAddress !== controllerAddress) {
-        otherPartyAddress = callEntry.calledAddress;
-      } else if (callEntry.number && callEntry.number !== controllerAddress) {
-        otherPartyAddress = callEntry.number;
-      }
+    
+
+    if (!callEntry?.callingAddress || !callEntry?.calledAddress) {
+      return { success: false, error: "Missing calling/called addresses for this call." };
     }
-    if (otherPartyAddress === controllerAddress) {
-      return {
-        success: false,
-        error: 'Cannot determine the other party in the call for hold.',
-      };
-    }
+    
     const holdResult = await holdCallAPI({
       callId: params.callId,
-      callingAddress: controllerAddress,
-      calledAddress: otherPartyAddress,
-      callingDeviceType: controllerDevice.callingDeviceType,
-      callingDeviceName: controllerDevice.callingDeviceName,
-      controllerAddress,
+      
+      // ✅ preserve original direction from the call itself (never derive from controller)
+      callingAddress: callEntry.callingAddress ,
+      calledAddress: callEntry.calledAddress ,
+      
+      // ✅ keep device info aligned with the calling side of the call direction
+      callingDeviceType: callEntry?.callingDeviceType || '',
+      callingDeviceName: callEntry?.callingDeviceName || '',
+      
+      // ✅ controller = logged-in user performing the action
+      controllerAddress: controllerAddress,
       controllerDeviceName: controllerDevice.callingDeviceName,
       controllerDeviceType: controllerDevice.callingDeviceType,
-    });
+      });
     if (!holdResult.success) {
       return holdResult;
     }
@@ -951,7 +950,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorAddress: transferInitiatorAddress!,
       transferInitiatorDeviceType: transferInitiatorDeviceType!,
       transferInitiatorDeviceName: transferInitiatorDeviceName!,
-      transferAddress: otherPartyAddress,
+      transferAddress: params.transferAddress,
       targetAddress: params.targetAddress,
       mode: "CONSULT",
     });
