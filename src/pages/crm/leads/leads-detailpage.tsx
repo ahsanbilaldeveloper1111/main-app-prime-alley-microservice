@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useCallback, useRef, useEffect, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
   X,
@@ -32,13 +32,20 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getLead, type LeadData } from "@utils/crm";
+import { getLead, deleteLead, type LeadData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel, {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
+import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
+import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
+import CrmProfileSection from "@components/CrmProfileSection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import CreateLeadModal from "@components/CreateLeadModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -76,6 +83,7 @@ interface RevenueSection {
   addButtonText?: string;
   onAddClick?: () => void;
 }
+
 // Add this function to toggle activity expansion
 
 // ============================================================================
@@ -104,6 +112,27 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
+
+  // Edit Lead sidebar (same CreateLeadModal as list page)
+  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<
+    number | null
+  >(null);
+
+  // Delete Lead modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
+
+  // Success modal (reuse common SuccessfulModal)
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
+
+  // Export single lead (CSV)
+  const [exporting, setExporting] = useState(false);
 
   // Fetch lead detail by ID from URL (same pattern as prospect detail page)
   useEffect(() => {
@@ -197,6 +226,83 @@ const ContactRecordPage: NextPageWithLayout = () => {
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
+  const handleOpenEditLead = useCallback(() => {
+    if (!leadRecordId) return;
+    setEditLeadIdForSidebar(leadRecordId);
+    setShowCreateLeadModal(true);
+  }, [leadRecordId]);
+
+  const handleOpenDeleteLead = useCallback(() => {
+    if (!leadRecordId) return;
+    setLeadToDelete({ id: leadRecordId, name: leadRecordName });
+    setShowDeleteModal(true);
+  }, [leadRecordId, leadRecordName]);
+
+  const confirmDeleteLead = useCallback(async () => {
+    if (!leadToDelete) return;
+
+    try {
+      await deleteLead(leadToDelete.id);
+      setShowDeleteModal(false);
+      setLeadToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Lead Deleted");
+      setSuccessModalDescription("Lead has been deleted successfully");
+      router.push("/crm/leads");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to delete lead:", error);
+      toast.error("Failed to delete lead");
+    }
+  }, [leadToDelete, router]);
+
+  const handleLeadsExport = useCallback(async () => {
+    if (!lead) return;
+    const name = `lead_${lead.id}.csv`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const row = lead as any;
+      const headers = Object.keys(row).filter(
+        (k) =>
+          !["campaign", "stage", "contact_persons", "audit_trail"].includes(k) &&
+          typeof row[k] !== "object",
+      );
+      const csvRows = [
+        headers.join(","),
+        headers
+          .map((h) => {
+            const val = row[h];
+            if (val == null) return "";
+            if (typeof val === "object") return "";
+            const s = String(val).replace(/"/g, '""');
+            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+          })
+          .join(","),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported lead successfully!");
+    } catch (err) {
+      toast.error("Failed to export lead");
+    } finally {
+      setExporting(false);
+    }
+  }, [lead]);
+
+  const handleOpenExport = useCallback(() => {
+    if (!lead) return;
+    // Directly export the currently opened lead
+    void handleLeadsExport();
+  }, [lead, handleLeadsExport]);
+
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
@@ -221,22 +327,37 @@ const ContactRecordPage: NextPageWithLayout = () => {
   ];
 
   // Key Information Fields – values from lead API response (same pattern as prospects)
+  const primaryContact = (lead as any)?.contact_persons?.[0] ?? null;
+  const primaryPhoneCountryCode = primaryContact?.phone_country_code || "";
+  const primaryPhoneNumber = primaryContact?.phone || "";
+  const formattedPhoneNumber =
+    primaryPhoneCountryCode && primaryPhoneNumber
+      ? `${primaryPhoneCountryCode} ${primaryPhoneNumber}`
+      : primaryPhoneNumber ||
+        (lead as any)?.crm_data?.phone ||
+        lead?.company_contact ||
+        "--";
+
+  const associateName =
+    (lead as any)?.created_by_name ||
+    (lead as any)?.owner_name ||
+    (lead as any)?.created_by ||
+    (lead as any)?.user_extension_name ||
+    lead?.user_extension ||
+    "--";
+
   const keyInfoFields: KeyInfoField[] = [
     {
       label: "Email",
       value:
-        (lead as any)?.contact_persons?.[0]?.email ??
+        primaryContact?.email ??
         (lead as any)?.crm_data?.data?.email ??
         "--",
       copyable: true,
     },
     {
       label: "Phone Number",
-      value:
-        (lead as any)?.contact_persons?.[0]?.phone ??
-        (lead as any)?.crm_data?.phone ??
-        lead?.company_contact ??
-        "--",
+      value: formattedPhoneNumber,
       copyable: true,
     },
     { label: "Company Name", value: lead?.company_name ?? "--" },
@@ -250,450 +371,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
     },
     {
       label: "Associate with",
-      value: (lead as any)?.created_by ?? lead?.user_extension ?? "--",
+      value: associateName,
     },
     { label: "Source", value: (lead as any)?.source ?? "--" },
   ];
 
-  const renderIntelligenceTab = () => {
-    return (
-      <div>
-        {/* Info Banner */}
-        {/* <div style={{
-          padding: '16px 20px',
-          backgroundColor: '#fffbeb',
-          border: '1px solid #fde68a',
-          borderRadius: '5px',
-          marginBottom: '20px',
-        }}>
-          <p style={{
-            fontSize: '14px',
-            color: '#92400e',
-            margin: 0,
-          }}>
-            HubSpot does not have enrichment data for this record, yet.
-          </p>
-        </div> */}
-
-        {/* Contact Information Card */}
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #eaf0f6",
-            borderRadius: "5px",
-            padding: "20px",
-            marginBottom: "20px",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: "20px",
-              marginBottom: "16px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Lifecycle stage
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {(lead as any)?.crm_data?.data?.lifecycle_stage ??
-                  lead?.stage?.name ??
-                  "—"}
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Related company
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {lead?.company_name ?? "—"}
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Employment role
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                City
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                State
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Region
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-          </div>
-
-          {/* Social Icons */}
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              paddingTop: "16px",
-              borderTop: "1px solid #eaf0f6",
-            }}
-          >
-            <button
-              style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: "8px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "4px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Two Column Layout */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "20px",
-          }}
-        >
-          {/* Left Column - Company Info */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #eaf0f6",
-              borderRadius: "5px",
-              padding: "20px",
-            }}
-          >
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Industry
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Company description
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Company keywords
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Contact Outreach */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #eaf0f6",
-              borderRadius: "5px",
-              padding: "20px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "600",
-                color: "#141414",
-                margin: "0 0 16px 0",
-              }}
-            >
-              Contact Outreach
-            </h3>
-
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                Email
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {(lead as any)?.contact_persons?.[0]?.email ??
-                  (lead as any)?.crm_data?.data?.email ??
-                  "—"}
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
-                marginBottom: "20px",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#7c98b6",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Job sub role
-                </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "#141414",
-                    fontWeight: "400",
-                  }}
-                >
-                  --
-                </div>
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#7c98b6",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Job seniority
-                </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "#141414",
-                    fontWeight: "400",
-                  }}
-                >
-                  --
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  color: "#7c98b6",
-                  marginBottom: "6px",
-                }}
-              >
-                LinkedIn
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Intelligence tab is now a shared component (CrmIntelligenceTab)
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -1039,7 +722,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Clone", "Export"].map((action) => (
                   <button
                     key={action}
-                    onClick={() => setShowActionsDropdown(false)}
+            onClick={() => {
+              setShowActionsDropdown(false);
+              if (action === "Edit") {
+                handleOpenEditLead();
+              } else if (action === "Delete") {
+                handleOpenDeleteLead();
+              } else if (action === "Export") {
+                handleOpenExport();
+              }
+            }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -1900,96 +1592,59 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 marginBottom: "20px",
               }}
             >
-              <div
-                style={{
-                  padding: "16px 20px",
-                  borderBottom: "1px solid #eaf0f6",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    color: "#141414",
-                    margin: 0,
-                  }}
-                >
-                  Contact profile
-                </h3>
-              </div>
-
-              <div style={{ padding: "20px" }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: "20px",
-                  }}
-                >
-                  {[
-                    {
-                      label: "Company name",
-                      value: lead?.company_name ?? "--",
-                    },
-                    {
-                      label: "Street address",
-                      value:
-                        (lead as any)?.crm_data?.data?.street_address ??
-                        lead?.campaign_field_values?.street_address ??
-                        "--",
-                    },
-                    {
-                      label: "City",
-                      value:
-                        (lead as any)?.crm_data?.data?.city ??
-                        lead?.campaign_field_values?.city ??
-                        "--",
-                    },
-                    {
-                      label: "Postal code",
-                      value:
-                        (lead as any)?.crm_data?.data?.postal_code ??
-                        lead?.campaign_field_values?.postal_code ??
-                        "--",
-                    },
-                    {
-                      label: "State/Region",
-                      value:
-                        (lead as any)?.crm_data?.data?.state ??
-                        lead?.campaign_field_values?.state ??
-                        "--",
-                    },
-                    {
-                      label: "Email",
-                      value:
-                        (lead as any)?.contact_persons?.[0]?.email ??
-                        (lead as any)?.crm_data?.data?.email ??
-                        "--",
-                      link: true,
-                    },
-                  ].map((field, index) => (
-                    <div key={index}>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "#666666",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {field.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: field.link ? "#006162" : "#141414",
-                        }}
-                      >
-                        {field.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <CrmProfileSection
+                title="Contact profile"
+                fields={[
+                  {
+                    label: "Company name",
+                    value:
+                      (lead as any)?.company?.enrichment_data?.structured_data
+                        ?.official_company_name ?? lead?.company_name ?? "--",
+                  },
+                  {
+                    label: "Street address",
+                    value:
+                      (lead as any)?.company?.enrichment_data?.structured_data
+                        ?.headquarters?.address ??
+                      (lead as any)?.crm_data?.data?.street_address ??
+                      lead?.campaign_field_values?.street_address ??
+                      "--",
+                  },
+                  {
+                    label: "City",
+                    value:
+                      (lead as any)?.company?.enrichment_data?.structured_data
+                        ?.headquarters?.city ??
+                      (lead as any)?.crm_data?.data?.city ??
+                      lead?.campaign_field_values?.city ??
+                      "--",
+                  },
+                  {
+                    label: "Postal code",
+                    value:
+                      (lead as any)?.crm_data?.data?.postal_code ??
+                      lead?.campaign_field_values?.postal_code ??
+                      "--",
+                  },
+                  {
+                    label: "State/Region",
+                    value:
+                      (lead as any)?.crm_data?.data?.state ??
+                      lead?.campaign_field_values?.state ??
+                      "--",
+                  },
+                  {
+                    label: "Email",
+                    value:
+                      (lead as any)?.company?.enrichment_data?.structured_data
+                        ?.emails?.[0]?.email ??
+                      (lead as any)?.contact_persons?.[0]?.email ??
+                      (lead as any)?.crm_data?.data?.email ??
+                      "--",
+                    link: true,
+                  },
+                ]}
+              />
             </div>
           </>
         )}
@@ -2008,7 +1663,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
           />
         )}
 
-        {activeTab === "intelligence" && renderIntelligenceTab()}
+        {activeTab === "intelligence" && (
+          <CrmIntelligenceTab
+            company={(lead as any)?.company ?? null}
+            relatedCompany={lead?.company_name ?? "—"}
+          />
+        )}
       </div>
     </div>
   );
@@ -2082,178 +1742,33 @@ const ContactRecordPage: NextPageWithLayout = () => {
               paddingBottom: "0",
             }}
           >
-            {/* Companies - from lead.company_name */}
             {(() => {
-              const companyName = lead?.company_name ?? null;
-              const companiesCount = companyName ? 1 : 0;
+              const company = (lead as any)?.company ?? null;
+              const struct = company?.enrichment_data?.structured_data ?? null;
+              const companyName =
+                struct?.official_company_name ??
+                company?.name ??
+                lead?.company_name ??
+                null;
+              const primaryPhone =
+                struct?.phones?.[0]?.number ??
+                company?.phone ??
+                lead?.company_contact ??
+                null;
+              const phones =
+                struct?.phones?.map((p: any) => ({
+                  number: p?.number ?? "",
+                  type: p?.type ?? null,
+                })) ?? undefined;
               return (
-                <div
-                  style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: "10px",
-                    marginBottom: "12px",
-                    overflow: "hidden",
-                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                    border: "1px solid #cccccc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 20px 0",
-                      cursor: "pointer",
-                      backgroundColor: "#ffffff",
-                    }}
-                    onClick={() => toggleSection("companies")}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        flex: 1,
-                      }}
-                    >
-                      <ChevronDown
-                        size={18}
-                        style={{
-                          color: "#141414",
-                          transform: collapsedSections.has("companies")
-                            ? "rotate(-90deg)"
-                            : "rotate(0deg)",
-                          transition: "transform 0.2s ease",
-                        }}
-                      />
-                      <h3
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: "600",
-                          color: "#141414",
-                          margin: 0,
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        Companies ({companiesCount})
-                      </h3>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#141414",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                        padding: "6px",
-                        borderRadius: "3px",
-                        transition: "background-color 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f5f8fa";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <span style={{ fontSize: "14px", fontWeight: "300" }}>
-                        +
-                      </span>{" "}
-                      <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                        Add
-                      </span>
-                    </button>
-                  </div>
-
-                  {!collapsedSections.has("companies") && (
-                    <div style={{ padding: "20px" }}>
-                      {companiesCount === 0 ? (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: 0,
-                          }}
-                        >
-                          No companies associated.
-                        </p>
-                      ) : (
-                        <>
-                          <div
-                            style={{
-                              marginBottom: "16px",
-                              border: "1px solid #cccccc",
-                              borderRadius: "10px",
-                              padding: "15px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "14px",
-                                  color: "#006162",
-                                  fontWeight: "500",
-                                }}
-                              >
-                                {companyName}
-                              </span>
-                              <span
-                                style={{
-                                  padding: "2px 8px",
-                                  backgroundColor: "#e6f3ff",
-                                  color: "#006162",
-                                  borderRadius: "3px",
-                                  fontSize: "11px",
-                                  fontWeight: "600",
-                                }}
-                              >
-                                Primary
-                              </span>
-                            </div>
-                            <p
-                              style={{
-                                fontSize: "13px",
-                                color: "#666666",
-                                margin: "4px 0",
-                              }}
-                            >
-                              Phone: {lead?.company_contact ?? "--"}
-                            </p>
-                          </div>
-                          <a
-                            href="#"
-                            style={{
-                              fontSize: "12px",
-                              color: "#141414",
-                              textDecoration: "none",
-                              fontWeight: "300",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              border: "1px solid #cccccc",
-                              borderRadius: "6px",
-                              padding: "6px 12px",
-                            }}
-                          >
-                            View all associated Companies
-                            <ExternalLink size={12} />
-                          </a>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <CrmAssociatedCompaniesCard
+                  sectionId="companies"
+                  collapsedSections={collapsedSections}
+                  toggleSection={toggleSection}
+                  companyName={companyName}
+                  primaryPhone={primaryPhone}
+                  phones={phones}
+                />
               );
             })()}
 
@@ -2589,6 +2104,49 @@ const ContactRecordPage: NextPageWithLayout = () => {
       </div>
 
       {activityModals.modals}
+
+      {/* Delete Lead Modal (same as list page) */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setLeadToDelete(null);
+        }}
+        onConfirm={confirmDeleteLead}
+        itemName={leadToDelete?.name}
+        itemType="lead"
+      />
+
+      {/* Success Modal for delete and other lead actions */}
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
+      />
+
+      {/* Edit Lead sidebar (CreateLeadModal in edit mode) */}
+      <CreateLeadModal
+        show={showCreateLeadModal}
+        onHide={() => {
+          setShowCreateLeadModal(false);
+          setEditLeadIdForSidebar(null);
+        }}
+        onSuccess={async () => {
+          setShowCreateLeadModal(false);
+          setEditLeadIdForSidebar(null);
+          if (leadRecordId) {
+            try {
+              const data = await getLead(leadRecordId);
+              setLead(data);
+            } catch {
+              // ignore refresh errors
+            }
+          }
+        }}
+        type="lead"
+        editLeadId={editLeadIdForSidebar}
+      />
     </>
   );
 };

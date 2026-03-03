@@ -12,6 +12,9 @@ import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
 import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
+import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
+import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
+import CrmProfileSection from "@components/CrmProfileSection";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -1433,61 +1436,57 @@ const DealRecordPage: NextPageWithLayout = () => {
               )}
             </div>
 
-            <div style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #cccccc',
-              borderRadius: '10px',
-              marginBottom: '20px',
-            }}>
-              <div style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #eaf0f6',
-              }}>
-                <h3 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  Deal profile
-                </h3>
-              </div>
-
-              <div style={{ padding: '20px' }}>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '20px',
-                }}>
-                  {[
-                    { label: 'Deal Name', value: deal?.name ?? '--' },
-                    { label: 'Company Name', value: deal?.company_name ?? '--' },
-                    { label: 'Deal Value', value: formatDealAmount(deal) },
-                    { label: 'Stage', value: deal?.stage?.name ?? deal?.status ?? '--' },
-                    { label: 'Probability', value: deal != null ? `${deal.probability ?? 0}%` : '--' },
-                    { label: 'Expected Close Date', value: formatDate(deal?.expected_close_date) },
-                    { label: 'Deal Type', value: deal?.deal_type ?? '--' },
-                    { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
-                  ].map((field, index) => (
-                    <div key={index}>
-                      <div style={{
-                        fontSize: '13px',
-                        color: '#666666',
-                        marginBottom: '4px',
-                      }}>
-                        {field.label}
-                      </div>
-                      <div style={{
-                        fontSize: '14px',
-                        color: '#141414',
-                      }}>
-                        {field.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <CrmProfileSection
+              title="Deal profile"
+              fields={[
+                {
+                  label: "Company name",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.official_company_name ?? deal?.company_name ?? "--",
+                },
+                {
+                  label: "Street address",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.headquarters?.address ??
+                    (deal as any)?.company?.address ??
+                    "--",
+                },
+                {
+                  label: "City",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.headquarters?.city ??
+                    (deal as any)?.company?.city ??
+                    "--",
+                },
+                {
+                  label: "Postal code",
+                  value:
+                    (deal as any)?.company?.postal_code ??
+                    (deal as any)?.company?.zip ??
+                    "--",
+                },
+                {
+                  label: "State/Region",
+                  value:
+                    (deal as any)?.company?.state ??
+                    (deal as any)?.company?.province ??
+                    "--",
+                },
+                {
+                  label: "Email",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.emails?.[0]?.email ??
+                    (deal as any)?.decision_maker_email ??
+                    (deal as any)?.contact_email ??
+                    "--",
+                  link: true,
+                },
+              ]}
+            />
           </>
         )}
 
@@ -1602,7 +1601,14 @@ const DealRecordPage: NextPageWithLayout = () => {
           </div>
         )}
 
-        {activeTab === 'intelligence' && renderIntelligenceTab()}
+        {activeTab === 'intelligence' && (
+          <CrmIntelligenceTab
+            company={(deal as any)?.company ?? null}
+            relatedCompany={deal?.company_name ?? '--'}
+            industryName={(deal as any)?.industries[0]?.name ?? '--'}
+            industryDescription={(deal as any)?.industries[0]?.description ?? '--'}
+          />
+        )}
       </div>
     </div>
   );
@@ -1664,134 +1670,17 @@ const DealRecordPage: NextPageWithLayout = () => {
           borderRadius: '10px',
         }}>
           <div style={{ paddingTop: '0px', paddingBottom: '0' }}>
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              marginBottom: '12px',
-              overflow: 'hidden',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-              border: '1px solid #cccccc',
-            }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 20px 0',
-                  cursor: 'pointer',
-                  backgroundColor: '#ffffff',
-                }}
-                onClick={() => toggleSection('companies')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: '#141414',
-                      transform: collapsedSections.has('companies') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    margin: 0,
-                    lineHeight: '1.2',
-                  }}>
-                    Companies ({deal?.company_name ? 1 : 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#141414',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    padding: '6px',
-                    borderRadius: '3px',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f8fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                </button>
-              </div>
-
-              {!collapsedSections.has('companies') && (
-                <div style={{ padding: '20px' }}>
-                  {deal?.company_name ? (
-                    <>
-                      <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '8px',
-                        }}>
-                          <span style={{
-                            fontSize: '14px',
-                            color: '#006162',
-                            fontWeight: '500',
-                          }}>
-                            {deal.company_name}
-                          </span>
-                          <span style={{
-                            padding: '2px 8px',
-                            backgroundColor: '#e6f3ff',
-                            color: '#006162',
-                            borderRadius: '3px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                          }}>
-                            Primary
-                          </span>
-                        </div>
-                        {deal.industry && (
-                          <p style={{
-                            fontSize: '13px',
-                            color: '#666666',
-                            margin: '4px 0',
-                          }}>
-                            Industry: {deal.industry}
-                          </p>
-                        )}
-                      </div>
-                      <a
-                        href="#"
-                        style={{
-                          fontSize: '12px',
-                          color: '#141414',
-                          textDecoration: 'none',
-                          fontWeight: '300',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          border: '1px solid #cccccc',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                        }}
-                      >
-                        View all associated Companies
-                        <ExternalLink size={12} />
-                      </a>
-                    </>
-                  ) : (
-                    <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No companies associated.</p>
-                  )}
-                </div>
-              )}
-            </div>
+            <CrmAssociatedCompaniesCard
+              sectionId="companies"
+              collapsedSections={collapsedSections}
+              toggleSection={toggleSection}
+              companyName={(deal as any)?.company?.enrichment_data?.structured_data?.official_company_name ?? null}
+              phones={((deal as any)?.company?.enrichment_data?.structured_data?.phones ?? [])
+                .map((p: any) => ({
+                  number: p?.number ?? "",
+                  type: p?.type ?? null,
+                }))}
+            />
 
             <div style={{
               backgroundColor: '#ffffff',
