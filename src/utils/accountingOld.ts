@@ -85,6 +85,15 @@ export interface CompanyData {
     organization_unit: string | null;
     created_at: string;
     updated_at: string;
+    profile?: {
+      tax_id?: string | null;
+      logo_url?: string | null;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      payment_terms?: string | null;
+    };
+    bank_accounts?: string[] | null;
   } | null;
 }
 
@@ -144,7 +153,8 @@ export interface InvoiceData {
   items: InvoiceItemData[];
   payments: InvoicePaymentData[];
   bank_accounts: string[];
-
+  end_date?: string | null;
+  paid_amount?: number | null;
 }
 
 export interface InvoiceCreateUpdatePayload {
@@ -544,7 +554,6 @@ export interface PaginationParams extends Record<string, any> {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     return response.data.data;
@@ -552,27 +561,26 @@ function extractData<T>(response: any): T {
 
   // Handle direct data response (fallback)
   if (response?.data) {
-   
     return response.data;
   }
 
   console.error("Failed to extract data from response:", response);
 
   throw new Error(
-    response?.data?.message || response?.message || "API request failed"
+    response?.data?.message || response?.message || "API request failed",
   );
 }
 
 // Reseller Management
 export const getResellers = async (
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<PaginationWrapper<ResellerData>> => {
   try {
     const response = await axiosInstance.get("/accounting/resellers", {
       params,
     });
     const extractedData = extractData<PaginationWrapper<ResellerData>>(
-      response.data
+      response.data,
     );
 
     // Transform the response to match our interface
@@ -587,8 +595,6 @@ export const getResellers = async (
   }
 };
 
-
-
 export const getReseller = async (id: number): Promise<ResellerData> => {
   try {
     const response = await axiosInstance.get(`/accounting/resellers/${id}`);
@@ -599,12 +605,9 @@ export const getReseller = async (id: number): Promise<ResellerData> => {
   }
 };
 
-
-
-
 // Company Management
 export const getCompanies = async (
-  params: PaginationParams & { load_profile?: boolean } = {}
+  params: PaginationParams & { load_profile?: boolean } = {},
 ): Promise<PaginationWrapper<CompanyData>> => {
   try {
     const response = await axiosInstance.get("/accounting/company", { params });
@@ -639,7 +642,7 @@ export const getCompanies = async (
         per_page: companiesData.length,
         total: companiesData.length,
         last_page: 1,
-        from: 1,  
+        from: 1,
         to: companiesData.length,
         page: 1,
         limit: companiesData.length,
@@ -651,14 +654,12 @@ export const getCompanies = async (
   }
 };
 
-
-
 export const getAvailableExtensions = async (
-  companyId: number
+  companyId: number,
 ): Promise<any[]> => {
   try {
     const response = await axiosInstance.get(
-      `/accounting/company/available-extensions/${companyId}`
+      `/accounting/company/available-extensions/${companyId}`,
     );
     return extractData<any[]>(response.data);
   } catch (error: any) {
@@ -671,7 +672,7 @@ export const generateFacCode = async (data: any): Promise<any> => {
   try {
     const response = await axiosInstance.post(
       "/accounting/company/generate-fac-code",
-      data
+      data,
     );
     return extractData<any>(response.data);
   } catch (error: any) {
@@ -684,7 +685,7 @@ export const createUpdateCompany = async (data: any): Promise<CompanyData> => {
   try {
     const response = await axiosInstance.post(
       "/accounting/company/create-update",
-      data
+      data,
     );
     return extractData<CompanyData>(response.data);
   } catch (error: any) {
@@ -712,15 +713,14 @@ export const getCompany = async (id: number): Promise<CompanyData> => {
   }
 };
 
-
 export const createDiscountApplicability = async (
   companyId: number,
-  data: DiscountApplicabilityCreateUpdatePayload
+  data: DiscountApplicabilityCreateUpdatePayload,
 ): Promise<DiscountApplicabilityData> => {
   try {
     const response = await axiosInstance.post(
       `/accounting/company/${companyId}/discount-applicability`,
-      { ...data, company_id: companyId }
+      { ...data, company_id: companyId },
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -732,12 +732,12 @@ export const createDiscountApplicability = async (
 export const updateDiscountApplicability = async (
   companyId: number,
   applicabilityId: number,
-  data: DiscountApplicabilityCreateUpdatePayload
+  data: DiscountApplicabilityCreateUpdatePayload,
 ): Promise<DiscountApplicabilityData> => {
   try {
     const response = await axiosInstance.put(
       `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`,
-      { ...data, company_id: companyId }
+      { ...data, company_id: companyId },
     );
     return extractData<DiscountApplicabilityData>(response.data);
   } catch (error: any) {
@@ -748,11 +748,11 @@ export const updateDiscountApplicability = async (
 
 export const deleteDiscountApplicability = async (
   companyId: number,
-  applicabilityId: number
+  applicabilityId: number,
 ): Promise<void> => {
   try {
     await axiosInstance.delete(
-      `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`
+      `/accounting/company/${companyId}/discount-applicability/${applicabilityId}`,
     );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete discount applicability");
@@ -760,13 +760,9 @@ export const deleteDiscountApplicability = async (
   }
 };
 
-
-
-
-
 // Invoice Management
 export const getInvoices = async (
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<PaginationWrapper<any>> => {
   try {
     const response = await axiosInstance.get("/accounting/invoices", {
@@ -781,7 +777,9 @@ export const getInvoices = async (
         pagination: {
           current_page: response.data.data.pagination?.page || 1,
           page: response.data.data.pagination?.page || 1,
-          limit: response.data.data.pagination?.limit || response.data.data.data.length,
+          limit:
+            response.data.data.pagination?.limit ||
+            response.data.data.data.length,
           per_page: response.data.data.pagination.limit,
           total: response.data.data.pagination.total,
           last_page: response.data.data.pagination.last_page,
@@ -800,7 +798,7 @@ export const getInvoices = async (
 };
 
 export const createInvoice = async (
-  data: InvoiceCreateUpdateAPIPayload
+  data: InvoiceCreateUpdateAPIPayload,
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.post("/accounting/invoices", data);
@@ -829,9 +827,14 @@ export interface InvoicePaymentPayload {
   notes?: string;
 }
 
-export const payInvoice = async (payload: InvoicePaymentPayload): Promise<any> => {
+export const payInvoice = async (
+  payload: InvoicePaymentPayload,
+): Promise<any> => {
   try {
-    const response = await axiosInstance.post(`/accounting/invoices/pay`, payload);
+    const response = await axiosInstance.post(
+      `/accounting/invoices/pay`,
+      payload,
+    );
     return response.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to process payment");
@@ -842,7 +845,7 @@ export const payInvoice = async (payload: InvoicePaymentPayload): Promise<any> =
 export const getInvoiceDetails = async (id: number): Promise<any> => {
   try {
     const response = await axiosInstance.get(
-      `/accounting/invoices/${id}/details`
+      `/accounting/invoices/${id}/details`,
     );
     return extractData<any>(response.data);
   } catch (error: any) {
@@ -865,100 +868,117 @@ export const generateInvoicePdf = async (id: number): Promise<Blob> => {
 
 export const downloadInvoicePdf = async (id: number): Promise<void> => {
   try {
-    const response = await axiosInstance.get(`/accounting/invoices/${id}/download-pdf`,  {
-      responseType: "blob",
-      headers: {
-        Accept: "blob",
+    const response = await axiosInstance.get(
+      `/accounting/invoices/${id}/download-pdf`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
       },
-    });
-    
+    );
+
     // Check if response is valid
     if (!response.data || response.data.size === 0) {
-      throw new Error('Empty PDF response received');
+      throw new Error("Empty PDF response received");
     }
-    
+
     // Extract filename from content-disposition header if available
     let filename = `invoice-${id}.pdf`;
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+      );
       if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+        filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
-    
+
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
-    
+
     // Verify blob type
-    if (blob.type !== 'application/pdf') {
-      console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
+    if (blob.type !== "application/pdf") {
+      console.warn(
+        "Unexpected blob type:",
+        blob.type,
+        "Expected: application/pdf",
+      );
     }
-    
+
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
-    link.style.display = 'none';
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
-    toast.success('PDF downloaded successfully');
+
+    toast.success("PDF downloaded successfully");
   } catch (error: any) {
-    console.error('PDF download error:', error);
+    console.error("PDF download error:", error);
     toast.error(error?.message || "Failed to download invoice PDF");
     throw error;
   }
 };
 
-
 export const downloadExpensePdf = async (id: number): Promise<void> => {
   try {
-    const response = await axiosInstance.get(`/accounting/expenses/${id}/download-pdf`,  {
-      responseType: "blob",
-      headers: {
-        Accept: "blob",
+    const response = await axiosInstance.get(
+      `/accounting/expenses/${id}/download-pdf`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
       },
-    });
-    
+    );
+
     // Check if response is valid
     if (!response.data || response.data.size === 0) {
-      throw new Error('Empty PDF response received');
+      throw new Error("Empty PDF response received");
     }
-    
+
     // Extract filename from content-disposition header if available
     let filename = `expense-${id}.pdf`;
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+      );
       if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+        filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
-    
+
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
-    
+
     // Verify blob type
-    if (blob.type !== 'application/pdf') {
-      console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
+    if (blob.type !== "application/pdf") {
+      console.warn(
+        "Unexpected blob type:",
+        blob.type,
+        "Expected: application/pdf",
+      );
     }
-    
+
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
-    link.style.display = 'none';
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
-    toast.success('PDF downloaded successfully');
+
+    toast.success("PDF downloaded successfully");
   } catch (error: any) {
-    console.error('PDF download error:', error);
+    console.error("PDF download error:", error);
     toast.error(error?.message || "Failed to download expense PDF");
     throw error;
   }
@@ -966,46 +986,51 @@ export const downloadExpensePdf = async (id: number): Promise<void> => {
 
 export const downloadTemplate = async (): Promise<void> => {
   try {
-    const response = await axiosInstance.get(`/accounting/company/template/download`,  {
-      responseType: "blob",
-      headers: {
-        Accept: "blob",
+    const response = await axiosInstance.get(
+      `/accounting/company/template/download`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
       },
-    });
-    
+    );
+
     // Check if response is valid
     if (!response.data || response.data.size === 0) {
-      throw new Error('Empty response received');
+      throw new Error("Empty response received");
     }
-    
+
     // Extract filename from content-disposition header if available
     let filename = `company-template.csv`;
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/,
+      );
       if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+        filename = filenameMatch[1].replace(/['"]/g, "");
       }
     }
-    
+
     // response.data is already a blob when responseType is "blob"
     const blob = response.data;
-    
+
     // Verify blob type
-    
+
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
-    link.style.display = 'none';
+    link.style.display = "none";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
+
     // toast.success('PDF downloaded successfully');
   } catch (error: any) {
-    console.error('PDF download error:', error);
+    console.error("PDF download error:", error);
     toast.error(error?.message || "Failed to download File");
     throw error;
   }
@@ -1013,12 +1038,12 @@ export const downloadTemplate = async (): Promise<void> => {
 
 export const updateInvoice = async (
   id: number,
-  data: InvoiceCreateUpdateAPIPayload
+  data: InvoiceCreateUpdateAPIPayload,
 ): Promise<InvoiceData> => {
   try {
     const response = await axiosInstance.put(
       `/accounting/invoices/${id}`,
-      data
+      data,
     );
     return extractData<InvoiceData>(response.data);
   } catch (error: any) {
@@ -1038,7 +1063,7 @@ export const deleteInvoice = async (id: number): Promise<void> => {
 
 // Expense Management
 export const getExpenses = async (
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<PaginationWrapper<ExpenseData>> => {
   try {
     const response = await axiosInstance.get("/accounting/expenses", {
@@ -1053,7 +1078,9 @@ export const getExpenses = async (
         pagination: {
           current_page: response.data.data.data.current_page || 1,
           page: response.data.data.data.page || 1,
-          limit: response.data.data.data.limit || response.data.data.data.data.length,
+          limit:
+            response.data.data.data.limit ||
+            response.data.data.data.data.length,
           per_page: response.data.data.data.per_page,
           total: response.data.data.data.total,
           last_page: response.data.data.data.last_page,
@@ -1072,7 +1099,7 @@ export const getExpenses = async (
 };
 
 export const createExpense = async (
-  data: ExpenseCreateUpdatePayload | FormData
+  data: ExpenseCreateUpdatePayload | FormData,
 ): Promise<ExpenseData> => {
   try {
     const response = await axiosInstance.post("/accounting/expenses", data, {
@@ -1089,23 +1116,27 @@ export const createExpense = async (
 };
 
 export const uploadCompanyFile = async (
-  data:FormData
+  data: FormData,
 ): Promise<ExpenseData> => {
   try {
-    const response = await axiosInstance.post("/accounting/company/file/upload", data, {
-      headers:
-        data instanceof FormData
-          ? { "Content-Type": "multipart/form-data" }
-          : {},
-    });
-    
+    const response = await axiosInstance.post(
+      "/accounting/company/file/upload",
+      data,
+      {
+        headers:
+          data instanceof FormData
+            ? { "Content-Type": "multipart/form-data" }
+            : {},
+      },
+    );
+
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success === false) {
       // Show error toast for failed upload
       // toast.error(response.data.data.message || "File upload failed");
       throw new Error(response.data.data.message || "File upload failed");
     }
-    
+
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to upload company file");
@@ -1125,7 +1156,7 @@ export const getExpense = async (id: number): Promise<ExpenseData> => {
 
 export const updateExpense = async (
   id: number,
-  data: ExpenseCreateUpdatePayload | FormData
+  data: ExpenseCreateUpdatePayload | FormData,
 ): Promise<ExpenseData> => {
   try {
     const response = await axiosInstance.post(
@@ -1136,7 +1167,7 @@ export const updateExpense = async (
           data instanceof FormData
             ? { "Content-Type": "multipart/form-data" }
             : {},
-      }
+      },
     );
     return extractData<ExpenseData>(response.data);
   } catch (error: any) {
@@ -1160,7 +1191,7 @@ export const downloadReceipt = async (id: number): Promise<Blob> => {
       `/accounting/expenses/${id}/receipt`,
       {
         responseType: "blob",
-      }
+      },
     );
     return response.data;
   } catch (error: any) {
@@ -1171,7 +1202,7 @@ export const downloadReceipt = async (id: number): Promise<Blob> => {
 
 export const downloadFile = async (
   id: number,
-  fileIndex: number
+  fileIndex: number,
 ): Promise<{ blob: Blob; filename: string }> => {
   try {
     const response = await axiosInstance.get(
@@ -1181,23 +1212,23 @@ export const downloadFile = async (
         headers: {
           Accept: "blob",
         },
-      }
+      },
     );
-    
+
     // Extract filename from content-disposition header
-    const contentDisposition = response.headers['content-disposition'];
+    const contentDisposition = response.headers["content-disposition"];
     let filename = `receipt_${id}_${fileIndex}`;
-    
+
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="(.+)"/);
       if (filenameMatch) {
         filename = filenameMatch[1];
       }
     }
-    
+
     return {
       blob: response.data,
-      filename: filename
+      filename: filename,
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to download file");
@@ -1205,10 +1236,9 @@ export const downloadFile = async (
   }
 };
 
-
 // Product Management
 export const getProducts = async (
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
     const response = await axiosInstance.get("/accounting/products", {
@@ -1256,27 +1286,26 @@ export const getProducts = async (
   }
 };
 
-
 export const getProductsWithCompanyPricing = async (
   companyId?: number,
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<ProductData[]> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/with-company-pricing",
-      { params: { ...params, company_id: companyId } }
+      { params: { ...params, company_id: companyId } },
     );
     return extractData<PaginationWrapper<ProductData>>(response.data) as any;
   } catch (error: any) {
     toast.error(
-      error?.message || "Failed to fetch products with company pricing"
+      error?.message || "Failed to fetch products with company pricing",
     );
     throw error;
   }
 };
 
 export const createProduct = async (
-  data: ProductCreateUpdatePayload
+  data: ProductCreateUpdatePayload,
 ): Promise<ProductData> => {
   try {
     const response = await axiosInstance.post("/accounting/products", data);
@@ -1292,7 +1321,7 @@ export const getProductCategoriesList = async (): Promise<
 > => {
   try {
     const response = await axiosInstance.get(
-      "/accounting/products/categories-list"
+      "/accounting/products/categories-list",
     );
     return extractData<ProductCategoryData[]>(response.data);
   } catch (error: any) {
@@ -1302,12 +1331,12 @@ export const getProductCategoriesList = async (): Promise<
 };
 
 export const createProductCategory = async (
-  data: ProductCategoryCreateUpdatePayload
+  data: ProductCategoryCreateUpdatePayload,
 ): Promise<ProductCategoryData> => {
   try {
     const response = await axiosInstance.post(
       "/accounting/products/categories",
-      data
+      data,
     );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
@@ -1318,12 +1347,12 @@ export const createProductCategory = async (
 
 export const updateProductCategory = async (
   id: number,
-  data: ProductCategoryCreateUpdatePayload
+  data: ProductCategoryCreateUpdatePayload,
 ): Promise<ProductCategoryData> => {
   try {
     const response = await axiosInstance.put(
       `/accounting/products/categories/${id}`,
-      data
+      data,
     );
     return extractData<ProductCategoryData>(response.data);
   } catch (error: any) {
@@ -1344,7 +1373,7 @@ export const deleteProductCategory = async (id: number): Promise<void> => {
 export const softDeleteProductCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.post(
-      `/accounting/products/categories/${id}/soft-delete`
+      `/accounting/products/categories/${id}/soft-delete`,
     );
   } catch (error: any) {
     toast.error(error?.message || "Failed to soft delete product category");
@@ -1373,12 +1402,12 @@ export const getProduct = async (id: number): Promise<ProductData> => {
 
 export const updateProduct = async (
   id: number,
-  data: ProductCreateUpdatePayload
+  data: ProductCreateUpdatePayload,
 ): Promise<ProductData> => {
   try {
     const response = await axiosInstance.put(
       `/accounting/products/${id}`,
-      data
+      data,
     );
     return extractData<ProductData>(response.data);
   } catch (error: any) {
@@ -1396,12 +1425,9 @@ export const deleteProduct = async (id: number): Promise<void> => {
   }
 };
 
-
-
-
 // Product Categories (separate from products)
 export const getProductCategories = async (
-  params: PaginationParams = {}
+  params: PaginationParams = {},
 ): Promise<PaginationWrapper<ProductCategoryData>> => {
   try {
     const response = await axiosInstance.get("/accounting/product-categories", {
@@ -1450,14 +1476,13 @@ export const getProductCategories = async (
   }
 };
 
-
 // Stripe Payment Methods
 export const getPaymentMethods = async (
-  profileId: number
+  profileId: number,
 ): Promise<PaymentMethodData[]> => {
   try {
     const response = await axiosInstance.get(
-      `/accounting/stripe/payment-methods/${profileId}`
+      `/accounting/stripe/payment-methods/${profileId}`,
     );
 
     // Handle the actual API response structure
@@ -1503,12 +1528,12 @@ export const getPaymentMethods = async (
 
 export const createPaymentMethod = async (
   profileId: number,
-  data: any
+  data: any,
 ): Promise<PaymentMethodData> => {
   try {
     const response = await axiosInstance.post(
       `/accounting/stripe/payment-methods/${profileId}`,
-      data
+      data,
     );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
@@ -1519,12 +1544,12 @@ export const createPaymentMethod = async (
 
 export const updatePaymentMethod = async (
   paymentMethodId: string,
-  data: any
+  data: any,
 ): Promise<PaymentMethodData> => {
   try {
     const response = await axiosInstance.put(
       `/accounting/stripe/payment-methods/${paymentMethodId}`,
-      data
+      data,
     );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
@@ -1534,11 +1559,11 @@ export const updatePaymentMethod = async (
 };
 
 export const deletePaymentMethod = async (
-  paymentMethodId: string
+  paymentMethodId: string,
 ): Promise<void> => {
   try {
     await axiosInstance.delete(
-      `/accounting/stripe/payment-methods/${paymentMethodId}`
+      `/accounting/stripe/payment-methods/${paymentMethodId}`,
     );
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete payment method");
@@ -1548,7 +1573,7 @@ export const deletePaymentMethod = async (
 
 export const setDefaultPaymentMethod = async (
   profileId: number,
-  paymentMethodId: string
+  paymentMethodId: string,
 ): Promise<void> => {
   try {
     await axiosInstance.post(`/accounting/stripe/set-default/${profileId}`, {
@@ -1564,7 +1589,7 @@ export const validateCard = async (data: any): Promise<any> => {
   try {
     const response = await axiosInstance.post(
       "/accounting/stripe/validate-card",
-      data
+      data,
     );
     return extractData<any>(response.data);
   } catch (error: any) {
@@ -1576,7 +1601,7 @@ export const validateCard = async (data: any): Promise<any> => {
 export const testCardValidation = async (): Promise<any> => {
   try {
     const response = await axiosInstance.get(
-      "/accounting/stripe/test-card-validation"
+      "/accounting/stripe/test-card-validation",
     );
     return extractData<any>(response.data);
   } catch (error: any) {
@@ -1587,17 +1612,17 @@ export const testCardValidation = async (): Promise<any> => {
 
 export const createPaymentMethodWithElements = async (
   profileId: number,
-  data: any
+  data: any,
 ): Promise<PaymentMethodData> => {
   try {
     const response = await axiosInstance.post(
       `/accounting/stripe/create-payment-method/${profileId}`,
-      data
+      data,
     );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
     toast.error(
-      error?.message || "Failed to create payment method with elements"
+      error?.message || "Failed to create payment method with elements",
     );
     throw error;
   }
@@ -1605,12 +1630,12 @@ export const createPaymentMethodWithElements = async (
 
 export const createAndConfirmPaymentMethod = async (
   profileId: number,
-  data: any
+  data: any,
 ): Promise<PaymentMethodData> => {
   try {
     const response = await axiosInstance.post(
       `/accounting/stripe/create-and-confirm-payment-method/${profileId}`,
-      data
+      data,
     );
 
     // Handle the actual API response structure
@@ -1650,19 +1675,19 @@ export const createAndConfirmPaymentMethod = async (
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
     toast.error(
-      error?.message || "Failed to create and confirm payment method"
+      error?.message || "Failed to create and confirm payment method",
     );
     throw error;
   }
 };
 
 export const savePaymentMethod = async (
-  data: any
+  data: any,
 ): Promise<PaymentMethodData> => {
   try {
     const response = await axiosInstance.post(
       "/accounting/stripe/save-payment-method",
-      data
+      data,
     );
     return extractData<PaymentMethodData>(response.data);
   } catch (error: any) {
@@ -1674,7 +1699,7 @@ export const savePaymentMethod = async (
 export const getPublishableKey = async (): Promise<string> => {
   try {
     const response = await axiosInstance.get(
-      "/accounting/stripe/publishable-key"
+      "/accounting/stripe/publishable-key",
     );
     return extractData<string>(response.data);
   } catch (error: any) {
@@ -1682,10 +1707,6 @@ export const getPublishableKey = async (): Promise<string> => {
     throw error;
   }
 };
-
-
-
-
 
 // Direct Payment Interfaces
 export interface CreateDirectPaymentData {
@@ -1699,7 +1720,11 @@ export interface CreateDirectPaymentData {
 // Payment Intent Response Interface
 export interface PaymentIntentResponse {
   id: string;
-  status: 'succeeded' | 'requires_action' | 'requires_payment_method' | 'canceled';
+  status:
+    | "succeeded"
+    | "requires_action"
+    | "requires_payment_method"
+    | "canceled";
   client_secret: string;
   amount: number;
   currency: string;
@@ -1713,28 +1738,30 @@ export interface ApiResponse<T> {
 }
 
 // Create direct payment function
-export const createDirectPayment = async (data: CreateDirectPaymentData): Promise<PaymentIntentResponse> => {
+export const createDirectPayment = async (
+  data: CreateDirectPaymentData,
+): Promise<PaymentIntentResponse> => {
   try {
     const response = await axiosInstance.post(
-      '/accounting/stripe/create-payment-intent',
-      data
+      "/accounting/stripe/create-payment-intent",
+      data,
     );
-    
+
     // Handle the actual API response structure
-    
+
     if (response.data?.code === 200 && response.data?.data?.success) {
       // The actual payment intent data should be in response.data.data.data
       // If it's an empty array, we might need to handle this case
       const paymentData = response.data.data;
-      
+
       // if (Array.isArray(paymentData) && paymentData.length === 0) {
       //   // Handle case where data is empty array
       //   throw new Error("No payment intent data returned from server");
       // }
-      
+
       return paymentData as PaymentIntentResponse;
     }
-    
+
     // Fallback to extractData if structure is different
     return extractData<PaymentIntentResponse>(response.data);
   } catch (error: any) {

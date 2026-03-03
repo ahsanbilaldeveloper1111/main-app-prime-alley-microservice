@@ -3,10 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import {
-  ListCallLogs,
-  DownloadStreamingExport,
-} from "@utils/calls";
+import { ListCallLogs, DownloadStreamingExport } from "@utils/calls";
 import { Column } from "@components/CustomDataTable";
 import { Modal, Row, Tab, Tabs, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -215,7 +212,10 @@ const CallTrendDepartment = () => {
 
         if (response?.summary) {
           setSummary(response.summary);
-        } else if (response?.data || (response && typeof response === "object")) {
+        } else if (
+          response?.data ||
+          (response && typeof response === "object")
+        ) {
           // Fallback: data exists or response is object
         }
         setDataLoaded(true);
@@ -290,7 +290,7 @@ const CallTrendDepartment = () => {
     const isCompletelyCleared =
       Object.keys(filters).length === 0 ||
       (Object.keys(filters).length === 1 &&
-        Object.prototype.hasOwnProperty.call(filters, "is_incoming_only"));
+        Object.hasOwn(filters, "is_incoming_only"));
 
     setCurrentFilters(filters);
     if (!filtersReady) setFiltersReady(true);

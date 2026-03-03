@@ -1212,9 +1212,8 @@ const InvoiceList = () => {
   // View invoice modal states
   const [showViewInvoiceModal, setShowViewInvoiceModal] =
     useState<boolean>(false);
-  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<
-    any | null
-  >(null);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] =
+    useState<InvoiceData | null>(null);
 
   // Exchange rate states
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
@@ -2958,8 +2957,10 @@ const InvoiceList = () => {
                       </p>
 
                       {selectedInvoiceForView?.company?.profile?.tax_id &&
-                        selectedInvoiceForView?.company?.profile?.tax_id >
-                          0 && (
+                        Number.parseInt(
+                          selectedInvoiceForView?.company?.profile?.tax_id ??
+                            "0",
+                        ) > 0 && (
                           <p className="mb-0 fw-bold">
                             <b>TRN No.:</b>{" "}
                             {selectedInvoiceForView?.company?.profile?.tax_id ||

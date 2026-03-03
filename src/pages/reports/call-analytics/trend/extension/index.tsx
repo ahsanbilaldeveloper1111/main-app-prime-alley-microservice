@@ -3,10 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import {
-  ListCallLogs,
-  DownloadStreamingExport,
-} from "@utils/calls";
+import { ListCallLogs, DownloadStreamingExport } from "@utils/calls";
 import { Column } from "@components/CustomDataTable";
 import { Modal, Row, Tab, Tabs, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -306,7 +303,7 @@ const CallTrendExtension = () => {
     const isCompletelyCleared =
       Object.keys(filters).length === 0 ||
       (Object.keys(filters).length === 1 &&
-        Object.prototype.hasOwnProperty.call(filters, "is_incoming_only"));
+        Object.hasOwn(filters, "is_incoming_only"));
 
     setCurrentFilters(filters);
 
@@ -586,9 +583,7 @@ const CallTrendExtension = () => {
 
   let donutContent: React.ReactNode;
   if (loading || !dataLoaded) {
-    donutContent = (
-      <ChartLoadingSpinner height={CHART_LOADING_HEIGHT} />
-    );
+    donutContent = <ChartLoadingSpinner height={CHART_LOADING_HEIGHT} />;
   } else if (
     summary.answered_calls === 0 &&
     summary.unanswered_calls === 0 &&

@@ -348,10 +348,7 @@ const CallIncomingDepartment = () => {
     const isCompletelyCleared =
       Object.keys(formattedFilters).length === 0 ||
       (Object.keys(formattedFilters).length === 1 &&
-        Object.prototype.hasOwnProperty.call(
-          formattedFilters,
-          "is_incoming_only",
-        ));
+        Object.hasOwn(formattedFilters, "is_incoming_only"));
 
     setCurrentFilters(formattedFilters);
     currentFiltersRef.current = formattedFilters;
