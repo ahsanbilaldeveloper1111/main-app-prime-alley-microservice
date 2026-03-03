@@ -30,7 +30,7 @@ const PulseCustomers = () => {
   }>({ open: false, mode: 'device_types', row: null });
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 10,
+    limit: 100,
     total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
@@ -301,7 +301,7 @@ const PulseCustomers = () => {
         </Row>
       )}
 
-      <Row className="mt-3 align-items-center g-2">
+      {/* <Row className="mt-3 align-items-center g-2">
         <Col md={6} className="text-muted">
           Showing <strong>{totalCustomersOnPage}</strong> of <strong>{pagination.total}</strong> customers
         </Col>
@@ -336,7 +336,7 @@ const PulseCustomers = () => {
             />
           </Pagination>
         </Col>
-      </Row>
+      </Row> */}
 
       <Modal show={detailsModal.open} onHide={closeDetails} centered size="lg">
         <Modal.Header closeButton>
