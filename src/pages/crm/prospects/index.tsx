@@ -667,7 +667,7 @@ const CrmProspectsManagement = () => {
     legal_basis: [] as string[],
     company_domain: "",
     scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id?: number }>,
+    tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
     source: "",
     custom_fields: [] as Array<{
@@ -755,7 +755,7 @@ const CrmProspectsManagement = () => {
     setContactFormLoadError(null);
     setContactFormLoading(true);
     getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any> }) => {
+      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
         if (cancelled) return;
         const d = item.data || {};
         const nameParts = (item.name || "").trim().split(/\s+/);
@@ -766,14 +766,14 @@ const CrmProspectsManagement = () => {
           const m = moment(v);
           return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
         };
-        const rawTags = item?.data?.tags ?? d.tags ?? [];
+        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
         const tagsArray = Array.isArray(rawTags)
           ? rawTags.map((t: any) =>
               typeof t === "string"
                 ? { value: t, label: t }
                 : {
-                    value: t.name ?? t.value ?? "",
-                    label: t.name ?? t.label ?? t.value ?? "",
+                    value: t.name ?? t.value ?? String(t.id ?? ""),
+                    label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
                   },
             )
           : [];
@@ -792,17 +792,28 @@ const CrmProspectsManagement = () => {
             // keep phoneNumber as-is, phoneCountryCode ""
           }
         }
-        const rawCustomFields =
-          d.custom_fields ?? (item as any)?.custom_fields ?? [];
-        const customFieldsArray = Array.isArray(rawCustomFields)
-          ? rawCustomFields
-              .map((f: any) => ({
-                id: String(f?.id ?? `${Date.now()}-${Math.random()}`),
-                field_name: String(f?.field_name ?? f?.title ?? "").trim(),
-                field_value: String(f?.field_value ?? f?.value ?? "").trim(),
-              }))
-              .filter((f) => f.field_name || f.field_value)
-          : [];
+        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
+        const reservedDataKeys = new Set([
+          "email",
+          "assigned_to",
+          "uploaded_by",
+          "disposition",
+          "tags",
+          "note",
+          "contact_owner",
+          "lifecycle_stage",
+          "legal_basis",
+        ]);
+        const customFieldsArray = Object.entries(d)
+          .filter(([k]) => !reservedDataKeys.has(k))
+          .map(([field_name, field_value]) => ({
+            id: `${Date.now()}-${Math.random()}-${field_name}`,
+            field_name,
+            field_value: Array.isArray(field_value)
+              ? (field_value as string[]).join(", ")
+              : String(field_value ?? "").trim(),
+          }))
+          .filter((f) => f.field_name || f.field_value);
         setContactForm({
           firstName,
           lastName,
@@ -810,17 +821,17 @@ const CrmProspectsManagement = () => {
           phone_country_code: phoneCountryCode,
           phoneNumber,
           campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "Lead",
+          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
+          lifecycle_stage: d.lifecycle_stage ?? "",
           disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
+          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
           ),
-          tags: tagsArray,
+          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
           note: item.note ?? d.note ?? "",
-          source: d.source ?? (item as any).source ?? "",
+          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
           custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
@@ -1407,7 +1418,9 @@ const CrmProspectsManagement = () => {
     const loadTags = async () => {
       try {
         const tags = await getCrmDataTags();
-        const tagOptions = tags.map((tag: any) => ({
+        const tagOptions = tags
+        .filter((tag: any) => tag.id != null)
+        .map((tag: any) => ({
           value: tag.name,
           label: tag.name,
           id: tag.id,
@@ -3464,6 +3477,21 @@ const CrmProspectsManagement = () => {
           field_value: String(f.field_value ?? "").trim(),
         }))
         .filter((f) => f.field_name || f.field_value);
+      const dataPayload: Record<string, any> = {
+        email: contactForm.email.trim(),
+        assigned_to: assignedTo,
+        uploaded_by: uploadedBy,
+        disposition: contactForm.disposition || undefined,
+        note: contactForm.note || undefined,
+        contact_owner: contactForm.contact_owner ?? undefined,
+        // lifecycle_stage: contactForm.lifecycle_stage || undefined,
+        legal_basis: contactForm.legal_basis?.length
+          ? contactForm.legal_basis
+          : undefined,
+      };
+      customFieldsForPayload.forEach((f) => {
+        dataPayload[f.field_name] = f.field_value;
+      });
       setCreateContactLoading(true);
       try {
         await createCrmData({
@@ -3474,24 +3502,10 @@ const CrmProspectsManagement = () => {
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
           source: contactForm.source?.trim() || undefined,
-          data: {
-            email: contactForm.email.trim(),
-            assigned_to: assignedTo,
-            uploaded_by: uploadedBy,
-            disposition: contactForm.disposition || undefined,
-            tags: contactForm.tags?.length
-              ? contactForm.tags.map((t) => t.value || t.label)
-              : undefined,
-            note: contactForm.note || undefined,
-            contact_owner: contactForm.contact_owner ?? undefined,
-            lifecycle_stage: contactForm.lifecycle_stage || undefined,
-            legal_basis: contactForm.legal_basis?.length
-              ? contactForm.legal_basis
-              : undefined,
-            custom_fields: customFieldsForPayload.length
-              ? customFieldsForPayload
-              : undefined,
-          },
+          tag_ids: contactForm.tags?.length
+          ? contactForm.tags.map((t) => t.id)
+          : [],
+          data: dataPayload,
         });
         fetchCrmData();
         setContactForm({
@@ -3502,7 +3516,7 @@ const CrmProspectsManagement = () => {
           phoneNumber: "",
           campaign_id: null,
           contact_owner: null,
-          lifecycle_stage: "Lead",
+          lifecycle_stage: "",
           disposition: "",
           legal_basis: [],
           company_domain: "",
@@ -3552,6 +3566,19 @@ const CrmProspectsManagement = () => {
         field_value: String(f.field_value ?? "").trim(),
       }))
       .filter((f) => f.field_name || f.field_value);
+    const dataPayload: Record<string, any> = {
+      email: contactForm.email.trim(),
+      disposition: contactForm.disposition || undefined,
+      note: contactForm.note || undefined,
+      contact_owner: contactForm.contact_owner ?? undefined,
+      // lifecycle_stage: contactForm.lifecycle_stage || undefined,
+      legal_basis: contactForm.legal_basis?.length
+        ? contactForm.legal_basis
+        : undefined,
+    };
+    customFieldsForPayload.forEach((f) => {
+      dataPayload[f.field_name] = f.field_value;
+    });
     setCreateContactLoading(true);
     try {
       await updateCrmData(editingContactId, {
@@ -3561,22 +3588,10 @@ const CrmProspectsManagement = () => {
         company_domain: contactForm.company_domain?.trim() || undefined,
         source: contactForm.source?.trim() || undefined,
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
-        data: {
-          email: contactForm.email.trim(),
-          disposition: contactForm.disposition || undefined,
-          tags: contactForm.tags?.length
-            ? contactForm.tags.map((t) => t.value || t.label)
-            : undefined,
-          note: contactForm.note || undefined,
-          contact_owner: contactForm.contact_owner ?? undefined,
-          lifecycle_stage: contactForm.lifecycle_stage || undefined,
-          legal_basis: contactForm.legal_basis?.length
-            ? contactForm.legal_basis
-            : undefined,
-          custom_fields: customFieldsForPayload.length
-            ? customFieldsForPayload
-            : undefined,
-        },
+        data: dataPayload,
+        tag_ids: contactForm.tags?.length
+          ? contactForm.tags.map((t) => t.id)
+          : [],
       });
       fetchCrmData();
       setShowCreateContactSidebar(false);
@@ -4097,7 +4112,7 @@ const CrmProspectsManagement = () => {
                         placeholder="Enter source"
                       />
                     </div>
-                    <div
+                    {/* <div
                       className="contact-form-field"
                       style={{ marginBottom: "20px" }}
                     >
@@ -4146,7 +4161,7 @@ const CrmProspectsManagement = () => {
                           )}
                         </Dropdown.Menu>
                       </Dropdown>
-                    </div>
+                    </div> */}
                     <div
                       className="contact-form-field"
                       style={{ marginBottom: "20px" }}
