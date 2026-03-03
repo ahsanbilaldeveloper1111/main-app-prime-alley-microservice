@@ -389,7 +389,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           }}
         >
           <p style={{ fontSize: "14px", color: "#666", margin: 0 }}>
-            {enr ? "Enrichment data for this company is shown below." : "HubSpot does not have enrichment data for this record, yet."}
+            {enr ? "Enrichment data for this company is shown below." : "We do not have enrichment data for this record, yet."}
           </p>
         </div>
 

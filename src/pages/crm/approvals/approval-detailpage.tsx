@@ -310,7 +310,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             color: '#92400e',
             margin: 0,
           }}>
-            HubSpot does not have enrichment data for this record, yet.
+            We does not have enrichment data for this record, yet.
           </p>
         </div> */}
 

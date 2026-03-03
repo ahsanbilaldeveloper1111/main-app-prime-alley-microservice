@@ -1,4 +1,4 @@
-import React, { ReactElement, useState, useRef, useEffect } from 'react'
+import React, { ReactElement, useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { Search, ChevronLeft, Clock } from 'lucide-react'
 import Layout from '@layout/index'
 import Users from '@pages/controlhub/users'
@@ -42,6 +42,10 @@ import AIChatFAQsGlobal from '@pages/chat/ai-faqs/global'
 import GsmAssign from '@pages/gsm/assign'
 import GsmSync from '@pages/gsm/sync'
 import CompanyPO from '@pages/gsm/company/po'
+import UserDefaults from '@components/UserDefaults'
+import GenericTable from '@components/GenericTable'
+import CurrencyTabContent from '@components/CurrencyTabContent'
+import GeneralTabContent from '@components/GeneralTabContent'
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SidebarItem = {
   id: string
@@ -274,77 +278,759 @@ const Divider = () => (
   />
 )
 
-// ─── General Tab ──────────────────────────────────────────────────────────────
-const GeneralTabContent: React.FC = () => (
-  <div>
-    <p
-      style={{
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        fontSize: '14px',
-        color: '#555',
-        marginBottom: '24px',
-      }}
-    >
-      These defaults will be applied to the entire account.
-    </p>
-    <Divider />
 
-    <InputField label="Account name" value="Prime Alley Technology" helpIcon />
-    <SelectField
-      label="Time zone"
-      value="UTC +00:00 London"
-      options={['UTC +00:00 London', 'UTC -05:00 New York', 'UTC +01:00 Paris', 'UTC +08:00 Singapore']}
-      helpIcon
-    />
-    <SelectField
-      label="Fiscal year"
-      value="January - December"
-      options={[
-        'January - December',
-        'April - March',
-        'July - June',
-        'October - September',
-      ]}
-      helpIcon
-    />
+// ─── Notification Profiles Tab ────────────────────────────────────────────────
+const NotificationProfilesTabContent: React.FC = () => {
+  const [showModal, setShowModal] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const [profiles, setProfiles] = useState<string[]>([])
 
-    <Divider />
+  const handleCreate = () => {
+    if (profileName.trim()) {
+      setProfiles(prev => [...prev, profileName.trim()])
+      setProfileName('')
+      setShowModal(false)
+    }
+  }
+  const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
 
-    <h2
-      style={{
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        fontSize: '20px',
-        fontWeight: 600,
-        color: '#141414',
-        marginBottom: '8px',
-      }}
-    >
-      Company Information
+const Divider = () => (
+  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
+)
+
+  return (
+    <div>
+      {/* Intro */}
+      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', marginBottom: '8px', fontWeight: 300 }}>
+        These defaults will be used for user defaults and presets.
+      </p>
+
+      <Divider />
+
+      {/* Section heading */}
+      <h2
+        style={{
+          fontFamily: baseFont,
+          fontSize: '16px',
+          fontWeight: 600,
+          color: '#141414',
+          marginBottom: '6px',
+        }}
+      >
+        Notification Profiles
+      </h2>
+      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '20px' }}>
+        Set notification defaults for a group of users within a preset. To add or edit Presets go to{' '}
+        <a
+          href="#"
+          style={{
+            color: '#0091ae',
+            textDecoration: 'none',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          Presets
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M3.5 1H11M11 1V8.5M11 1L1 11" stroke="#0091ae" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </a>
+      </p>
+
+      {/* Create button */}
+      <button
+        onClick={() => setShowModal(true)}
+        style={{
+          padding: '9px 18px',
+          fontSize: '14px',
+          fontFamily: baseFont,
+          fontWeight: 500,
+          color: '#141414',
+          background: '#fff',
+          border: '1px solid #d0d0d0',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          transition: 'border-color 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = '#141414')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = '#d0d0d0')}
+      >
+        Create notification profile
+      </button>
+
+      {/* Existing profiles list */}
+      {profiles.length > 0 && (
+        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {profiles.map((name, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 18px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                fontFamily: baseFont,
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#141414',
+                background: '#fff',
+              }}
+            >
+              <span>{name}</span>
+              <button
+                onClick={() => setProfiles(prev => prev.filter((_, i) => i !== idx))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#888',
+                  fontSize: '18px',
+                  lineHeight: 1,
+                  padding: '0 4px',
+                  fontFamily: baseFont,
+                }}
+                title="Remove profile"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Modal ── */}
+      {showModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: '6px',
+              width: '480px',
+              maxWidth: '95vw',
+              padding: '32px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+              fontFamily: baseFont,
+            }}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h3 style={{ fontFamily: baseFont, fontSize: '18px', fontWeight: 600, color: '#141414', margin: 0 }}>
+                Create notification profile
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '22px', lineHeight: 1, padding: '0 4px' }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Profile name field */}
+            <div style={{ marginBottom: '24px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontFamily: baseFont,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}
+              >
+                Profile name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Sales Team Default"
+                value={profileName}
+                onChange={e => setProfileName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '14px',
+                  fontFamily: baseFont,
+                  fontWeight: 300,
+                  color: '#141414',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  outline: 'none',
+                  background: '#fff',
+                  boxSizing: 'border-box',
+                  height: '38px',
+                } as React.CSSProperties}
+                onFocus={e => (e.currentTarget.style.borderColor = '#0091ae')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#d0d0d0')}
+              />
+            </div>
+
+            {/* Modal actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => { setShowModal(false); setProfileName('') }}
+                style={{
+                  padding: '9px 20px',
+                  fontSize: '14px',
+                  fontFamily: baseFont,
+                  fontWeight: 300,
+                  color: '#141414',
+                  background: '#fff',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!profileName.trim()}
+                style={{
+                  padding: '9px 20px',
+                  fontSize: '14px',
+                  fontFamily: baseFont,
+                  fontWeight: 500,
+                  color: '#fff',
+                  background: profileName.trim() ? '#141414' : '#a0a0a0',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: profileName.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'background 0.15s',
+                }}
+              >
+                Create profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+// ─── Data Hosting Tab ─────────────────────────────────────────────────────────
+const DataHostingTabContent: React.FC = () => {
+  const [currentLocation] = useState('European Union (Germany)')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState('')
+
+  const canSchedule = selectedLocation !== ''
+// ─── Shared primitives ────────────────────────────────────────────────────────
+const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
+
+const Divider = () => (
+  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
+)
+
+const ExternalLinkIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, display: 'inline', marginLeft: '3px', verticalAlign: 'middle' }}>
+    <path d="M3.5 1H11M11 1V8.5M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+)
+
+const locations = [
+  'United States',
+  'European Union (Germany)',
+  'Asia Pacific (Australia)',
+  'Asia Pacific (Singapore)',
+  'Canada',
+  'United Kingdom',
+]
+  return (
+    <>
+      {/* ── Main content ── */}
+      <div>
+        <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+          View or change the data hosting location for your account.
+        </p>
+
+        <Divider />
+
+        <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 600, color: '#141414', marginBottom: '20px' }}>
+          Data Hosting
+        </h2>
+
+        {/* Your data hosting location */}
+        <div style={{ marginBottom: '24px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontFamily: baseFont,
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#141414',
+              marginBottom: '10px',
+            }}
+          >
+            Your data hosting location
+            <span
+              title="The region where your account data is stored and processed."
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                border: '1.5px solid #888',
+                fontSize: '10px',
+                color: '#888',
+                cursor: 'default',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}
+            >
+              i
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Location badge */}
+            <div
+              style={{
+                padding: '8px 14px',
+                border: '1px solid #d0d0d0',
+                borderRadius: '4px',
+                fontFamily: baseFont,
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                background: '#fff',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {currentLocation}
+            </div>
+
+            {/* Change link */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: baseFont,
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#0091ae',
+                padding: 0,
+                textDecoration: 'none',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+              onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+            >
+              Change
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Overlay ── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            
+            
+          }}
+        />
+      )}
+
+      {/* ── Slide-in Sidebar ── */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: sidebarOpen ? 0 : '-600px',
+          width: '575px',
+          height: '100vh',
+          background: '#fff',
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+          zIndex: 99999,
+          transition: 'right 0.28s cubic-bezier(0.4,0,0.2,1)',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: baseFont,
+        }}
+      >
+        {/* Sidebar header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '28px 32px 24px',
+            borderBottom: '1px solid #e8e8e8',
+            flexShrink: 0,
+          }}
+        >
+          <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 700, color: '#141414', margin: 0 }}>
+            Schedule a data migration
+          </h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#555',
+              fontSize: '22px',
+              lineHeight: 1,
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Sidebar body — scrollable */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '28px 32px',
+          }}
+        >
+          {/* Intro paragraph */}
+          <p style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414', marginBottom: '20px', lineHeight: '1.6' }}>
+            To change where your data is hosted you'll need to schedule a data migration. Here's what you need to know:
+          </p>
+
+          {/* Bullet points */}
+          <ul
+            style={{
+              margin: '0 0 28px 0',
+              padding: '0 0 0 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            {[
+              <>
+                Your account will be <span style={{ color: '#0091ae' }}>unavailable during the migration</span>. Most finish within
+                24 hours; some can take up to 36. Your public content will remain online.
+              </>,
+              <>
+                After the migration completes, your data and settings will remain unchanged, but{' '}
+                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                  some steps<ExternalLinkIcon />
+                </a>{' '}
+                may be needed to keep everything running smoothly.
+              </>,
+              <>
+                If you have active Sandboxes, <span style={{ color: '#0091ae' }}>they'll be selected too, but only eligible ones will be migrated</span>—you may need to take action.
+              </>,
+              <>
+                For more details, check our{' '}
+                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                  FAQ<ExternalLinkIcon />
+                </a>{' '}
+                or{' '}
+                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                  contact support<ExternalLinkIcon />
+                </a>
+                .
+              </>,
+            ].map((item, i) => (
+              <li
+                key={i}
+                style={{
+                  fontFamily: baseFont,
+                  fontSize: '14px',
+                  fontWeight: 300,
+                  color: '#141414',
+                  lineHeight: '1.6',
+                  listStyleType: 'disc',
+                }}
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+
+          {/* New location field */}
+          <div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontFamily: baseFont,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#141414',
+                marginBottom: '10px',
+              }}
+            >
+              New data hosting location
+              <span style={{ color: '#cc3300', marginLeft: '2px' }}>*</span>
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selectedLocation}
+                onChange={e => setSelectedLocation(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 40px 10px 14px',
+                  fontSize: '14px',
+                  fontFamily: baseFont,
+                  fontWeight: selectedLocation ? 400 : 300,
+                  color: selectedLocation ? '#141414' : '#888',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  outline: 'none',
+                  background: '#fff',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  height: '42px',
+                } as React.CSSProperties}
+                onFocus={e => (e.currentTarget.style.borderColor = '#0091ae')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#d0d0d0')}
+              >
+                <option value="" disabled>Choose a location</option>
+                {locations
+                  .filter(l => l !== currentLocation)
+                  .map(loc => (
+                    <option key={loc} value={loc}>{loc}</option>
+                  ))}
+              </select>
+              <span
+                style={{
+                  position: 'absolute',
+                  right: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  color: '#555',
+                  fontSize: '13px',
+                }}
+              >
+                ▾
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar footer */}
+        <div
+          style={{
+            padding: '20px 32px',
+            borderTop: '1px solid #e8e8e8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: '12px',
+            flexShrink: 0,
+            background: '#fff',
+          }}
+        >
+          <button
+            disabled={!canSchedule}
+            style={{
+              padding: '9px 20px',
+              fontSize: '14px',
+              fontFamily: baseFont,
+              fontWeight: 400,
+              color: canSchedule ? '#141414' : '#aaa',
+              background: '#fff',
+              border: `1px solid ${canSchedule ? '#d0d0d0' : '#e0e0e0'}`,
+              borderRadius: '4px',
+              cursor: canSchedule ? 'pointer' : 'not-allowed',
+              transition: 'border-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { if (canSchedule) e.currentTarget.style.borderColor = '#141414' }}
+            onMouseLeave={e => { if (canSchedule) e.currentTarget.style.borderColor = '#d0d0d0' }}
+          >
+            Schedule data migration
+          </button>
+
+          <button
+            onClick={() => { setSidebarOpen(false); setSelectedLocation('') }}
+            style={{
+              padding: '9px 20px',
+              fontSize: '14px',
+              fontFamily: baseFont,
+              fontWeight: 500,
+              color: '#141414',
+              background: '#fff',
+              border: '1px solid #141414',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+// ─── Feature Releases Tab ─────────────────────────────────────────────────────
+const FeatureReleasesTabContent: React.FC = () => {
+  const [gradualRelease, setGradualRelease] = useState(false)
+  const [emailNotifications, setEmailNotifications] = useState(true)
+// ─── Shared primitives ────────────────────────────────────────────────────────
+const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
+
+const Divider = () => (
+  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
+)
+
+const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div style={{ marginBottom: '20px' }}>
+    <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 700, color: '#141414', marginBottom: '6px' }}>
+      {title}
     </h2>
-    <p style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '14px', color: '#555', marginBottom: '24px' }}>
-      This information will be used as a default where needed. If you're looking to update your company information for billing, visit{' '}
-      <a href="#" style={{ color: '#0091ae', textDecoration: 'none' }}>
-        Account &amp; Billing
-      </a>
-      .
+    <p style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414', lineHeight: '1.6', margin: 0 }}>
+      {children}
     </p>
-
-    <InputField label="Company name" value="Prime Alley Technology" />
-    <InputField label="Company domain" value="primealley.com" />
-    <InputField label="Company address" value="office 2208" />
-    <InputField label="Company address line 2" value="" />
-
-    <SelectField
-      label="Country"
-      value="United Arab Emirates"
-      options={['United Arab Emirates', 'United States', 'United Kingdom', 'Pakistan', 'Germany']}
-    />
-    <InputField label="City" value="Dubai" />
-    <InputField label="State / Region" value="" />
-    <InputField label="Postal code / ZIP" value="" />
-    <InputField label="Phone" value="" helpIcon />
   </div>
 )
+  return (
+    <div>
+      {/* Intro */}
+      <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '8px' }}>
+        Set defaults related to Feature Releases.
+      </p>
+
+      <Divider />
+
+      {/* ── Gradual Releases ── */}
+      <SectionHeading title="Gradual Releases">
+        When new features and tools are released, you can opt in to get them at the end of the gradual release. This will give more
+        time to test changes and prepare users. Upcoming release dates can be found in the{' '}
+        <a
+          href="#"
+          style={{ color: '#0091ae', fontWeight: 600, textDecoration: 'none' }}
+          onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+          onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+        >
+          Product Updates page
+        </a>
+        .
+      </SectionHeading>
+
+      {/* Gradual release checkbox */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          marginBottom: '32px',
+          cursor: 'pointer',
+        }}
+        onClick={() => setGradualRelease(v => !v)}
+      >
+        <div
+          style={{
+            width: '18px',
+            height: '18px',
+            border: `1.5px solid ${gradualRelease ? '#141414' : '#aaa'}`,
+            borderRadius: '3px',
+            background: gradualRelease ? '#141414' : '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginTop: '1px',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+        >
+          {gradualRelease && (
+            <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+              <path d="M1 4L4 7.5L10 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <div>
+          <div style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414', lineHeight: '1.5' }}>
+            Put this account at the end of gradual feature releases
+          </div>
+          <div style={{ fontFamily: baseFont, fontSize: '13px', fontWeight: 300, color: '#555', marginTop: '3px', lineHeight: '1.5' }}>
+            Note: Opting into this setting will <strong style={{ fontWeight: 700 }}>only</strong> apply to all future releases. Changes to this preference apply to the entire account.
+          </div>
+        </div>
+      </div>
+
+      {/* ── Email Notifications ── */}
+      <SectionHeading title="Email Notifications">
+        Get weekly emails about the latest product updates. Changes to this preference will only apply to you.
+      </SectionHeading>
+
+      {/* Email notifications checkbox */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          cursor: 'pointer',
+        }}
+        onClick={() => setEmailNotifications(v => !v)}
+      >
+        <div
+          style={{
+            width: '18px',
+            height: '18px',
+            border: `1.5px solid ${emailNotifications ? '#141414' : '#aaa'}`,
+            borderRadius: '3px',
+            background: emailNotifications ? '#141414' : '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+        >
+          {emailNotifications && (
+            <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+              <path d="M1 4L4 7.5L10 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414' }}>
+          Turn on email notifications
+        </span>
+      </div>
+    </div>
+  )
+}
+
+
+
 
 // ─── Dummy tab content ────────────────────────────────────────────────────────
 const DummyTabContent: React.FC<{ title: string; description: string }> = ({ title, description }) => (
@@ -378,11 +1064,11 @@ const AccountDefaultsPage: React.FC = () => {
 
   const tabContentMap: Record<string, React.ReactNode> = {
     general: <GeneralTabContent />,
-    'user-defaults': <DummyTabContent title="User Defaults" description="Set default preferences for all users in your account." />,
-    'notification-profiles': <DummyTabContent title="Notification Profiles" description="Manage notification profiles for your team." />,
-    currency: <DummyTabContent title="Currency" description="Configure currency settings for your account." />,
-    'data-hosting': <DummyTabContent title="Data Hosting" description="Choose where your data is hosted and stored." />,
-    'feature-releases': <DummyTabContent title="Feature Releases" description="Control which feature releases are enabled for your account." />,
+    'user-defaults': <UserDefaults />,
+    'notification-profiles': <NotificationProfilesTabContent />,
+    currency: <CurrencyTabContent />,
+    'data-hosting': <DataHostingTabContent />,
+    'feature-releases': <FeatureReleasesTabContent />,
   }
 
   return (

@@ -1,0 +1,18 @@
+.settings-user-defaults-wrapper input, .settings-user-defaults-wrapper select, .settings-general-tab-content-wrapper input, .settings-general-tab-content-wrapper select {
+    width: 450px !important;
+    height: 40px !important;
+    font-weight: 300 !important;
+    font-size: 16px !important;
+    color: #141414 !important;
+   
+}
+.generic-table-card {
+    border: none !important;
+    
+}
+.generic-table-responsive {
+    margin: 14px 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+}

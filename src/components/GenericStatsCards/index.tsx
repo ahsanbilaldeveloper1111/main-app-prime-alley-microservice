@@ -41,7 +41,10 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       display: 'grid',
       gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinWidth}, 1fr))`,
       gap: '16px',
-      marginBottom: '16px'
+      marginBottom: '16px',
+      background: '#FFFFFF',
+      borderRadius: '10px',
+      border: '1px solid #cccccc'
     }}>
       {data.map((card, index) => {
         const IconComponent = card.icon;
@@ -52,9 +55,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           <div 
             key={index}
             style={{
-              background: '#FFFFFF',
               
-              padding: '20px',
+              
+              padding: '20px 0 40px 0',
               
             }}
           >
