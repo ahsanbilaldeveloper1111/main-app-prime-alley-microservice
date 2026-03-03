@@ -4568,6 +4568,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       maxHeight: "280px",
                       overflowY: "auto",
                       minWidth: "240px",
+                      ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
                     }}
                   >
                     {meetingTimezones.map((tz) => (
@@ -5947,156 +5948,133 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status
     if (section.id === "about-prospect") {
-      const existingFields = (section.fields ?? []).filter(
-        (f) => f.label !== "Status",
-      );
       if (recordType === "prospect" && prospectData) {
-        const raw = prospectData as unknown as Record<string, unknown>;
-        // API (getAllCrmDataById) returns the prospect directly; use it as prospectRecord
-        const prospectRecord = raw;
-        const nestedData =
-          (prospectRecord.data as Record<string, unknown>) ?? {};
-        const campaign = prospectRecord.campaign as
-          | { name?: string }
-          | undefined;
-        const formatDateOnly = (v: string | null | undefined) =>
-          v
-            ? new Date(v).toLocaleDateString("en-US", {
-                month: "short",
-                day: "2-digit",
-                year: "numeric",
-              })
-            : "N/A";
-        const formatDateTime = (v: string | null | undefined) =>
-          v
-            ? new Date(v).toLocaleDateString("en-US", {
+        const prospect = prospectData as any;
+        const data = prospect.data ?? {};
+        console.log("data", data);
+        const nestedData = data.data ?? {};
+        console.log("nestedData", nestedData);
+      
+        const formatDateTime = (value?: string) =>
+          value
+            ? new Date(value).toLocaleDateString("en-US", {
                 month: "short",
                 day: "2-digit",
                 year: "numeric",
               }) +
               " " +
-              new Date(v).toLocaleTimeString("en-US", {
+              new Date(value).toLocaleTimeString("en-US", {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: true,
               })
-            : "N/A";
-
-        const baseFields: SidebarField[] = [
-          {
+            : undefined;
+      
+        const fields: SidebarField[] = [];
+            
+        if (data.name) {
+          fields.push({
             label: "Name",
-            value: (prospectRecord.name as string) ?? "N/A",
-            copyable: true,
-          },
-          {
-            label: "Phone",
-            value: (prospectRecord.phone as string) ?? "N/A",
-            type: "phone",
-            copyable: true,
-            externalLink: prospectRecord.phone
-              ? `tel:${prospectRecord.phone}`
-              : undefined,
-          },
-          {
+            value: data.name,
+          });
+        }
+      
+        if (nestedData.email) {
+          fields.push({
             label: "Email",
-            value: (nestedData.email as string) ?? "N/A",
+            value: nestedData.email,
             type: "email",
             copyable: true,
-            show: !!nestedData.email,
-            externalLink: nestedData.email
-              ? `mailto:${nestedData.email}`
-              : undefined,
-          },
-          {
-            label: "Owner",
-            value: (() => {
-              const raw = (nestedData.contact_owner as string) ?? "";
-              if (!raw) return "—";
-              return resolveUserLabel ? resolveUserLabel(raw) : raw;
-            })(),
-            hasDetails: true,
-            onDetailsClick: () => {},
-          },
-          ...(campaign?.name
-            ? [
-                {
-                  label: "Campaign",
-                  value: campaign.name,
-                  show: true,
-                  hasDetails: true,
-                  onDetailsClick: () => {},
-                } as SidebarField,
-              ]
-            : []),
-          {
-            label: "Company Domain",
-            value: (prospectRecord.company_domain as string) ?? "—",
+          });
+        }
+      
+        if (data.phone) {
+          fields.push({
+            label: "Phone",
+            value: data.phone,
+            type: "phone",
             copyable: true,
-          },
-          {
-            label: "Created Date",
-            value: formatDateOnly(prospectRecord.created_at as string),
-            type: "date",
-          },
-          {
-            label: "Last Updated",
-            value: formatDateOnly(prospectRecord.updated_at as string),
-            type: "date",
-          },
-          ...(prospectRecord.scheduled_call_at
-            ? [
-                {
-                  label: "Scheduled Call At",
-                  value: formatDateTime(
-                    prospectRecord.scheduled_call_at as string,
-                  ),
-                  type: "datetime" as const,
-                } as SidebarField,
-              ]
-            : []),
-        ];
-        const excludeFromDataFields = new Set([
-          "email",
-          "is_viewed",
-          "id",
-          "phone",
-          "created_at",
-          "updated_at",
-          "user_extension",
-          "name",
-          "company_id",
-          "assigned_to",
-          "contact_owner",
-          "uploaded_by",
-        ]);
-        const dataDataFields: SidebarField[] = [];
-        for (const [key, value] of Object.entries(nestedData)) {
-          if (excludeFromDataFields.has(key)) continue;
-          if (key === "campaign_id") continue;
-          if (key === "scheduled_call_at" && value) {
-            dataDataFields.push({
+          });
+        }
+      
+        if (data.scheduled_call_at) {
+          const formatted = formatDateTime(data.scheduled_call_at);
+          if (formatted) {
+            fields.push({
               label: "Scheduled Call At",
-              value: formatDateTime(value as string),
+              value: formatted,
               type: "datetime",
             });
-            continue;
           }
-          const formatted = formatDataFieldValue(value);
-          if (formatted === undefined) continue;
-          const label = humanizeDataKey(key);
-          dataDataFields.push(
-            Array.isArray(formatted)
-              ? { label, value: formatted, type: "tags" as const }
-              : { label, value: formatted, copyable: true },
-          );
         }
+      
+        if (data.campaign?.name) {
+          fields.push({
+            label: "Campaign Name",
+            value: data.campaign.name,
+          });
+        }
+      
+        if (data.company?.name) {
+          fields.push({
+            label: "Company Name",
+            value: data.company.name,
+          });
+        }
+      
+        if (data.company_domain) {
+          fields.push({
+            label: "Company Domain",
+            value: data.company_domain,
+          });
+        }
+
+        if (Array.isArray(data.tags) && data.tags.length > 0) {
+          fields.push({
+            label: "Tags",
+            value: data.tags.map((t: any) => t.name),
+            type: "tags",
+          });
+        }
+      
+        const excludedKeys = new Set([
+          "email",
+          "assigned_to",
+          "uploaded_by",
+          "contact_owner",
+        ]);
+      
+        Object.entries(nestedData).forEach(([key, value]) => {
+          if (excludedKeys.has(key)) return;
+          if (value === null || value === undefined || value === "") return;
+      
+          const label = key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+      
+          if (Array.isArray(value)) {
+            if (value.length === 0) return;
+      
+            fields.push({
+              label,
+              value,
+              type: "tags",
+            });
+          } else {
+            fields.push({
+              label,
+              value: String(value),
+            });
+          }
+        });
+      
         return {
           ...section,
-          fields: [...baseFields, ...dataDataFields],
+          fields,
           isLoading: prospectLoading,
         };
       }
-      return { ...section, fields: existingFields };
+      return { ...section };
     }
 
     return section;
@@ -6489,7 +6467,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
         {/* Section Content */}
         {!isCollapsed && (
-          <div style={{ padding: "20px" }}>
+          <div style={{ padding: "20px", paddingRight: "10px" }}>
             {section.id === "notes" ? (
               sidebarNotesLoading ? (
                 <div
@@ -6640,6 +6618,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                             flexDirection: "column",
                             gap: "0",
                             minWidth: 0,
+                            ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
                           }}
                         >
                           {displayTrail.map((entry, index) => {
@@ -6868,6 +6847,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       display: "flex",
                       flexDirection: "column",
                       gap: "8px",
+                      ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
                     }}
                   >
                     {sidebarCallRecordings
@@ -7045,11 +7025,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             ) : section.customContent ? (
               section.customContent
             ) : section.fields && section.fields.length > 0 ? (
-              <div>
-                {section.fields.map((field, index) =>
-                  renderField(field, index),
-                )}
-              </div>
+              section.id === "about-prospect" ? (
+                <div
+                  style={{
+                    maxHeight: "280px",
+                    overflowY: "auto",
+                    overflowX: "hidden",
+                    ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
+                  }}
+                >
+                  {section.fields.map((field, index) =>
+                    renderField(field, index),
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {section.fields.map((field, index) =>
+                    renderField(field, index),
+                  )}
+                </div>
+              )
             ) : section.emptyState ? (
               (() => {
                 const es = (section as SidebarSection).emptyState;

@@ -667,7 +667,7 @@ const CrmProspectsManagement = () => {
     legal_basis: [] as string[],
     company_domain: "",
     scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id?: number }>,
+    tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
     source: "",
     custom_fields: [] as Array<{
@@ -829,7 +829,7 @@ const CrmProspectsManagement = () => {
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
           ),
-          tags: tagsArray,
+          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
           note: item.note ?? d.note ?? "",
           source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
           custom_fields: customFieldsArray,
@@ -1418,7 +1418,9 @@ const CrmProspectsManagement = () => {
     const loadTags = async () => {
       try {
         const tags = await getCrmDataTags();
-        const tagOptions = tags.map((tag: any) => ({
+        const tagOptions = tags
+        .filter((tag: any) => tag.id != null)
+        .map((tag: any) => ({
           value: tag.name,
           label: tag.name,
           id: tag.id,
@@ -3480,9 +3482,6 @@ const CrmProspectsManagement = () => {
         assigned_to: assignedTo,
         uploaded_by: uploadedBy,
         disposition: contactForm.disposition || undefined,
-        tags: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.value || t.label)
-          : undefined,
         note: contactForm.note || undefined,
         contact_owner: contactForm.contact_owner ?? undefined,
         // lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -3503,6 +3502,9 @@ const CrmProspectsManagement = () => {
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
           source: contactForm.source?.trim() || undefined,
+          tag_ids: contactForm.tags?.length
+          ? contactForm.tags.map((t) => t.id)
+          : [],
           data: dataPayload,
         });
         fetchCrmData();
@@ -3567,9 +3569,6 @@ const CrmProspectsManagement = () => {
     const dataPayload: Record<string, any> = {
       email: contactForm.email.trim(),
       disposition: contactForm.disposition || undefined,
-      tags: contactForm.tags?.length
-        ? contactForm.tags.map((t) => t.value || t.label)
-        : undefined,
       note: contactForm.note || undefined,
       contact_owner: contactForm.contact_owner ?? undefined,
       // lifecycle_stage: contactForm.lifecycle_stage || undefined,
@@ -3590,6 +3589,9 @@ const CrmProspectsManagement = () => {
         source: contactForm.source?.trim() || undefined,
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
+        tag_ids: contactForm.tags?.length
+          ? contactForm.tags.map((t) => t.id)
+          : [],
       });
       fetchCrmData();
       setShowCreateContactSidebar(false);
