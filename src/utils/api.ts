@@ -51,6 +51,8 @@ apiClient.interceptors.request.use(
               console.error('Failed to refresh token:', refreshError);
               // Clear tokens and redirect to login
               if (typeof window !== 'undefined') {
+                // Best-effort: clear server-side NextAuth session payload before wiping cookies
+                fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
                 sessionStorage.clear();
                 clearAllLocalStorage();
                 clearSessionCookiesClient(true);
@@ -85,6 +87,8 @@ apiClient.interceptors.request.use(
           console.error('Failed to refresh token:', refreshError);
           // Clear tokens and redirect to login
           if (typeof window !== 'undefined') {
+            // Best-effort: clear server-side NextAuth session payload before wiping cookies
+            fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
             sessionStorage.clear();
             clearAllLocalStorage();
             clearSessionCookiesClient(true);
@@ -138,6 +142,8 @@ apiClient.interceptors.response.use(
         console.error('Token refresh failed:', refreshError);
         // Refresh failed, redirect to login
         if (typeof window !== 'undefined') {
+          // Best-effort: clear server-side NextAuth session payload before wiping cookies
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
           sessionStorage.clear();
           clearAllLocalStorage();
           clearSessionCookiesClient(true);
@@ -179,10 +185,17 @@ export const authAPI = {
 
   // Logout function
   logout: async () => {
-    //console.log('Logging out...');
     try {
-      sessionStorage.clear();
-      clearAllLocalStorage();
+      // Clear server-side NextAuth session payload + cookies
+      // (prevents "browser session ended but server token still exists")
+      await apiClient.post(
+        '/auth/logout',
+        {},
+        {
+          withCredentials: true,
+          timeout: 10000,
+        }
+      );
     } catch (error) {
       console.error('Logout API call failed:', error);
       // Continue with logout even if API call fails
@@ -281,6 +294,8 @@ export const authAPI = {
       console.error('Token refresh failed:', error);
       // If refresh fails, clear tokens and redirect to login
       if (typeof window !== 'undefined') {
+        // Best-effort: clear server-side NextAuth session payload before wiping cookies
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         sessionStorage.clear();
         clearAllLocalStorage();
         clearSessionCookiesClient(true);

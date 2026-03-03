@@ -285,14 +285,20 @@ export const routePermissions: RoutePermission[] = [
         path: '/pulse',
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
-            {path: '/dashboard',   permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]},
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD] },
+            { path: '/customers', permissions: [PERMISSIONS.NETOPS_SERVICES] },
             {  path: '/devices',permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]},
             {path: '/services', permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]},
             { path: '/alerts',permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]},
             {path: '/uptime-sla',permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]},
             {path: '/server-insights',permissions: [PERMISSIONS.NETOPS_SERVICES]},
             {path: '/application-monitoring',permissions: [PERMISSIONS.NETOPS_SERVICES]},
-            { path: '/hosts', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            {
+                path: '/hosts', permissions: [PERMISSIONS.NETOPS_SERVICES],
+                children: [
+                    { path: '/:hostid', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+                ]
+            },
             { path: '/host-groups', permissions: [PERMISSIONS.NETOPS_SERVICES] },
             { path: '/templates', permissions: [PERMISSIONS.NETOPS_SERVICES] },
             { path: '/events', permissions: [PERMISSIONS.NETOPS_SERVICES]},

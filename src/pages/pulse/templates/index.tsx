@@ -3,217 +3,173 @@ import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import {  getHosts, ZebbixAlert, ZebbixHost } from '@utils/zebbix';
-import { getTemplates } from '@utils/zabbix';
+import { getTemplates, ZabbixTemplate, ZabbixTemplateGroupRef } from '@utils/zabbix';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
+import AppSelect from '@components/AppSelect';
 
-const SEVERITY_LABELS: Record<string, string> = {
-  '0': 'Not classified',
-  '1': 'Information',
-  '2': 'Warning',
-  '3': 'Average',
-  '4': 'High',
-  '5': 'Disaster',
-};
-
-const formatClock = (clock: string) => {
-  const num = parseInt(clock, 10);
-  if (isNaN(num)) return clock;
-  const d = new Date(num * 1000);
-  return d.toLocaleString();
-};
+type TemplateGroupOption = { value: string; label: string };
 
 const NetopsTemplates = () => {
-  const [alerts, setAlerts] = useState<ZebbixAlert[]>([]);
-  const [hosts, setHosts] = useState<ZebbixHost[]>([]);
-  const [selectedHostId, setSelectedHostId] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [searchValue, setSearchValue] = useState('');
-  const [tablePagination, setTablePagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    totalRows: 0,
+  const [templates, setTemplates] = useState<ZabbixTemplate[]>([]);
+  const [search, setSearch] = useState('');
+  const [groupOptions, setGroupOptions] = useState<TemplateGroupOption[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<TemplateGroupOption | null>(null);
+  const [pagination, setPagination] = useState({
+    offset: 0,
+    limit: 10,
+    total: 0,
     pageSizeOptions: [10, 15, 25, 50, 100] as number[],
   });
 
-  const tableColumns: TableColumn<ZebbixAlert>[] = [
+  const fetchTemplates = useCallback(
+    async (offset: number, limit: number, searchTerm?: string, groupName?: string) => {
+      setLoading(true);
+      try {
+        const response = await getTemplates({
+          offset,
+          limit,
+          ...(searchTerm?.trim() ? { search: searchTerm.trim() } : {}),
+          ...(groupName?.trim() ? { group: groupName.trim() } : {}),
+        });
+        setTemplates(response.templates ?? []);
+        setPagination((prev) => ({
+          ...prev,
+          offset: response.offset,
+          limit: response.limit,
+          total: response.total,
+        }));
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch templates');
+        setTemplates([]);
+        setPagination((prev) => ({ ...prev, offset: 0, total: 0 }));
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    fetchTemplates(0, pagination.limit, undefined, selectedGroup?.value);
+  }, [fetchTemplates, pagination.limit, selectedGroup?.value]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTemplateGroups = async () => {
+      setGroupsLoading(true);
+      try {
+        const response = await getTemplates({ offset: 0, limit: 2000 });
+        const all = response.templates ?? [];
+
+        const names = new Set<string>();
+        all.forEach((t) => {
+          (t.groups ?? []).forEach((g: ZabbixTemplateGroupRef) => {
+            if (g?.name) names.add(g.name);
+          });
+        });
+
+        if (cancelled) return;
+
+        const options = Array.from(names)
+          .map((name) => ({ value: name, label: name }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+        setGroupOptions(options);
+      } catch (error) {
+        console.error('Error fetching template groups:', error);
+        setGroupOptions([]);
+      } finally {
+        if (!cancelled) setGroupsLoading(false);
+      }
+    };
+
+    loadTemplateGroups();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSearch = () => fetchTemplates(0, pagination.limit, search, selectedGroup?.value);
+  const handleRefresh = () => fetchTemplates(0, pagination.limit, search, selectedGroup?.value);
+
+  const tableColumns: TableColumn<ZabbixTemplate>[] = [
     { key: 'templateid', label: 'Template ID', sortable: true },
     { key: 'name', label: 'Name', sortable: true },
     {
-      key: 'host',
-      label: 'Template Groups',
+      key: 'groups',
+      label: 'Groups',
       sortable: true,
-      render: (row) => row.hosts?.[0]?.host ?? '-',
-    },
-  ];
-
-  const fetchHosts = useCallback(async () => {
-    try {
-      const response = await getHosts();
-      if (response.error || !response.result) return;
-      const list = response.result ?? [];
-      setHosts(Array.isArray(list) ? list : []);
-      if (list.length > 0 && !selectedHostId) {
-        setSelectedHostId((list[0] as ZebbixHost).hostid);
-      }
-    } catch (error) {
-      console.error('Error fetching hosts:', error);
-    }
-  }, []);
-
-  const fetchTemplates = useCallback(async () => {
-    if (!selectedHostId) {
-      setAlerts([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await getTemplates({
-        // hostids: [selectedHostId]
-        output: ["templateid", "name"],
-        selectHosts: ["host"],
-      });
-      if (response?.error) {
-        toast.error(response.error.message || 'Failed to fetch templates');
-        setAlerts([]);
-        return;
-      }
-      const list =
-        Array.isArray((response as any)?.result)
-          ? (response as any).result
-          : Array.isArray((response as any)?.data?.result)
-            ? (response as any).data.result
-            : Array.isArray((response as any)?.data)
-              ? (response as any).data
-              : [];
-      setAlerts(list);
-      setTablePagination((prev) => ({
-        ...prev,
-        totalRows: list.length,
-        currentPage: 1,
-      }));
-    } catch (error) {
-      console.error('Error fetching alerts:', error);
-      toast.error('Failed to fetch alerts');
-      setAlerts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedHostId]);
-
-  useEffect(() => {
-    fetchHosts();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    fetchTemplates();
-  }, [selectedHostId, refreshKey, fetchTemplates]);
-
-  const handleRefresh = () => setRefreshKey((k) => k + 1);
-
-  const filteredAlerts = searchValue.trim()
-    ? alerts.filter(
-        (a) =>
-          a.name?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          a.eventid?.toLowerCase().includes(searchValue.toLowerCase()) ||
-          a.hosts?.[0]?.host?.toLowerCase().includes(searchValue.toLowerCase())
-      )
-    : alerts;
-
-  const paginatedData = filteredAlerts.slice(
-    (tablePagination.currentPage - 1) * tablePagination.rowsPerPage,
-    tablePagination.currentPage * tablePagination.rowsPerPage
-  );
-
-  const summaryCards: SummaryCard[] = [
-    {
-      id: 'total-alerts',
-      title: 'Total Alerts',
-      value: alerts.length,
-      description: 'Alerts for selected host',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
+      render: (row) => <span>{row.groups?.map((g) => g.name).join(', ') ?? '-'}</span>,
     },
   ];
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/templates" subTitle="Templates" />
+      <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Templates" />
 
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Templates</h2>
-              </Col>
-              <Col md={8} className="d-flex justify-content-end align-items-center gap-2 flex-wrap">
-                {/* <select
-                  className="form-select"
-                  value={selectedHostId}
-                  onChange={(e) => setSelectedHostId(e.target.value)}
-                  style={{ maxWidth: '280px' }}
-                >
-                  <option value="">Select host</option>
-                  {hosts.map((h) => (
-                    <option key={h.hostid} value={h.hostid}>
-                      {h.name ?? h.host ?? h.hostid}
-                    </option>
-                  ))}
-                </select> */}
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search alerts..."
-                  value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-                  }}
-                  style={{ maxWidth: '240px' }}
-                />
-                <Button variant="info" onClick={handleRefresh} disabled={loading}>
-                  <FiRefreshCw size={14} /> Refresh
-                </Button>
-              </Col>
-            </Row>
+          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
+            <div style={{ minWidth: '260px', maxWidth: '320px' }}>
+              <AppSelect<TemplateGroupOption>
+                instanceId="pulse-templates-group"
+                placeholder="All template groups"
+                isClearable
+                isLoading={groupsLoading}
+                options={groupOptions}
+                value={selectedGroup}
+                onChange={(opt) => {
+                  const next = (opt ?? null) as TemplateGroupOption | null;
+                  setSelectedGroup(next);
+                  fetchTemplates(0, pagination.limit, search, next?.value);
+                }}
+              />
+            </div>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search templates..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              style={{ maxWidth: '240px' }}
+            />
+            <Button variant="primary" onClick={handleSearch} disabled={loading}>
+              Search
+            </Button>
+            <Button variant="info" onClick={handleRefresh} disabled={loading}>
+              <FiRefreshCw size={14} /> Refresh
+            </Button>
           </div>
         </Col>
       </Row>
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
-
-      <GenericTable<ZebbixAlert>
-        data={paginatedData}
+      <GenericTable<ZabbixTemplate>
+        data={templates}
         columns={tableColumns}
         loading={loading}
-        emptyMessage={selectedHostId ? 'No templates found for this host.' : 'Select a host to view templates.'}
+        emptyMessage="No templates found."
         loadingMessage="Loading templates..."
         pagination={{
-          currentPage: tablePagination.currentPage,
-          rowsPerPage: tablePagination.rowsPerPage,
-          totalRows: filteredAlerts.length,
-          pageSizeOptions: tablePagination.pageSizeOptions,
+          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+          rowsPerPage: pagination.limit,
+          totalRows: pagination.total,
+          pageSizeOptions: pagination.pageSizeOptions,
         }}
         onPaginationChange={(page, rowsPerPage) => {
-          setTablePagination((prev) => ({
-            ...prev,
-            currentPage: page,
-            rowsPerPage,
-          }));
+          fetchTemplates((page - 1) * rowsPerPage, rowsPerPage, search, selectedGroup?.value);
         }}
         sortable={true}
         hover={true}
         striped={false}
-        uniqueKey="eventid"
+        uniqueKey="templateid"
       />
     </React.Fragment>
   );

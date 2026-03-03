@@ -1,113 +1,167 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getItemsByHostId, getHostById, ZabbixItem, ZabbixHost } from '@utils/zabbix';
-import { Button, Row, Col } from 'react-bootstrap';
+import { getHosts, ZabbixHost } from '@utils/zabbix';
+import { Badge, Button, Card, Col, Nav, Row, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
-import { FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
+import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
+import Link from 'next/link';
 
-const HostItemsDetail = () => {
+const HostDetails = () => {
   const router = useRouter();
-  const hostid = router.query.hostid as string | undefined;
-  const [items, setItems] = useState<ZabbixItem[]>([]);
-  const [host, setHost] = useState<ZabbixHost | null>(null);
+  const hostid = useMemo(() => {
+    const raw = router.query.hostid;
+    return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+  }, [router.query.hostid]);
+
   const [loading, setLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [host, setHost] = useState<ZabbixHost | null>(null);
 
-  const tableColumns: TableColumn<ZabbixItem>[] = [
-    { key: 'itemid', label: 'Item ID', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
-    {
-      key: 'key_',
-      label: 'Key',
-      sortable: true,
-      render: (row) => <code>{row.key_ ?? '-'}</code>,
-    },
-    { key: 'lastvalue', label: 'Last Value', sortable: true },
-    { key: 'units', label: 'Units', sortable: true },
-  ];
-
-  const fetchItems = useCallback(async () => {
+  const fetchHost = useCallback(async () => {
     if (!hostid) return;
     setLoading(true);
     try {
-      const [ hostRes] = await Promise.all([
-        getHostById(hostid),
-      ]);
-     
-      if (hostRes.result && Array.isArray(hostRes.result) && hostRes.result.length > 0) {
-        setHost((hostRes.result as ZabbixHost[])[0]);
-      } else {
-        setHost(null);
-      }
+      const res = await getHosts({
+        hostids: [hostid],
+        output: ['hostid', 'host', 'name', 'status', 'description'],
+        selectInterfaces: ['interfaceid', 'ip', 'dns', 'port'],
+        selectGroups: ['groupid', 'name'],
+        selectParentTemplates: ['templateid', 'name'],
+        limit: 1,
+        offset: 0,
+      } as any);
+      const row = res.hosts?.[0] ?? null;
+      setHost(row);
     } catch (error) {
-      console.error('Error fetching host items:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch items');
-      setItems([]);
+      console.error('Error fetching host details:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch host details');
+      setHost(null);
     } finally {
       setLoading(false);
     }
   }, [hostid]);
 
   useEffect(() => {
-    if (hostid) fetchItems();
-  }, [hostid, refreshKey, fetchItems]);
+    if (!router.isReady) return;
+    fetchHost();
+  }, [router.isReady, fetchHost]);
 
-  const handleBack = () => router.push('/pulse/hosts');
-  const handleRefresh = () => setRefreshKey((k) => k + 1);
+  const baseHref = hostid ? `/pulse/hosts/${hostid}` : '/pulse/hosts';
+  const eventsHref = hostid ? `/pulse/hosts/${hostid}/events` : '/pulse/hosts';
+  const graphsHref = hostid ? `/pulse/hosts/${hostid}/graphs` : '/pulse/hosts';
 
-  const hostName = host?.name ?? host?.host ?? `Host ${hostid}`;
+  const isEvents = router.asPath.includes('/events');
+  const isGraphs = router.asPath.includes('/graphs');
+  const isOverview = !isEvents && !isGraphs;
+
+  const statusNum = Number(host?.status);
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
-      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle={hostName} />
+      <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle={host?.name ?? host?.host ?? hostid ?? 'Host'} />
 
       <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={6}>
-                <h2 className="mb-0">Host Items — {hostName}</h2>
-                {hostid && (
-                  <small className="text-muted">Host ID: {hostid}</small>
-                )}
-              </Col>
-              <Col md={6} className="d-flex justify-content-end align-items-center gap-2">
-                <Button variant="outline-secondary" onClick={handleBack}>
-                  <FiArrowLeft size={14} /> Back to Hosts
-                </Button>
-                <Button variant="info" onClick={handleRefresh} disabled={loading}>
-                  <FiRefreshCw size={14} /> Refresh
-                </Button>
-              </Col>
-            </Row>
-          </div>
+        <Col md={12} className="d-flex justify-content-end">
+          <Button variant="info" onClick={fetchHost} disabled={loading || !hostid}>
+            <FiRefreshCw size={14} /> Refresh
+          </Button>
         </Col>
       </Row>
 
-      <GenericTable<ZabbixItem>
-        data={items}
-        columns={tableColumns}
-        loading={loading}
-        emptyMessage="No items found for this host."
-        loadingMessage="Loading items..."
-        sortable={true}
-        hover={true}
-        striped={false}
-        uniqueKey="itemid"
-      />
+      <Nav variant="tabs" className="mb-3">
+        <Nav.Item>
+          <Nav.Link as={Link} href={baseHref} active={isOverview}>
+            Overview
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link as={Link} href={eventsHref} active={isEvents}>
+            Events
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link as={Link} href={graphsHref} active={isGraphs}>
+            Graphs
+          </Nav.Link>
+        </Nav.Item>
+      </Nav>
+
+      <Card>
+        <Card.Body>
+          {loading && !host ? (
+            <div className="py-4 text-center">
+              <Spinner animation="border" role="status" />
+            </div>
+          ) : !hostid ? (
+            <div className="text-muted">Host ID not found.</div>
+          ) : !host ? (
+            <div className="text-muted">Host not found.</div>
+          ) : (
+            <Row className="g-3">
+              <Col md={6}>
+                <div className="text-muted small">Name</div>
+                <div className="fw-semibold">{host.name ?? '-'}</div>
+              </Col>
+              <Col md={6}>
+                <div className="text-muted small">Hostname</div>
+                <div className="fw-semibold">{host.host ?? '-'}</div>
+              </Col>
+
+              <Col md={6}>
+                <div className="text-muted small">Status</div>
+                <div>
+                  {Number.isFinite(statusNum) ? (
+                    statusNum === 1 ? (
+                      <Badge bg="success">Monitored</Badge>
+                    ) : (
+                      <Badge bg="danger">Not monitored</Badge>
+                    )
+                  ) : (
+                    <Badge bg="secondary">{host.status ?? '-'}</Badge>
+                  )}
+                </div>
+              </Col>
+
+              <Col md={6}>
+                <div className="text-muted small">IP(s)</div>
+                <div className="fw-semibold">
+                  {host.interfaces?.length ? host.interfaces.map((i) => i.ip ?? i.dns ?? '').filter(Boolean).join(', ') : '-'}
+                </div>
+              </Col>
+
+              <Col md={6}>
+                <div className="text-muted small">Groups</div>
+                <div className="fw-semibold">
+                  {host.groups?.length ? host.groups.map((g) => g.name ?? g.groupid).join(', ') : '-'}
+                </div>
+              </Col>
+
+              <Col md={6}>
+                <div className="text-muted small">Templates</div>
+                <div className="fw-semibold">
+                  {host.parentTemplates?.length
+                    ? host.parentTemplates.map((t) => t.name ?? t.templateid).join(', ')
+                    : '-'}
+                </div>
+              </Col>
+
+              <Col md={12}>
+                <div className="text-muted small">Description</div>
+                <div style={{ whiteSpace: 'pre-wrap' }}>{(host.description ?? '').trim() || '-'}</div>
+              </Col>
+            </Row>
+          )}
+        </Card.Body>
+      </Card>
     </React.Fragment>
   );
 };
 
-HostItemsDetail.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+HostDetails.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
-export default HostItemsDetail;
+export default HostDetails;

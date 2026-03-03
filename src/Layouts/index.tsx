@@ -11,6 +11,7 @@ import { useDialerModal } from '../contexts/DialerModalContext';
 import NotificationsSidebar from '@components/Notificationssidebar';
 import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
 import { getCurrentUserCompanyImage } from "@utils/company";
+import { useAuth } from '../hooks/useAuth';
 
 import { 
 	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
@@ -60,6 +61,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
 	const { data: session, status } = useSession();
+  const { logout } = useAuth();
 	const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
   const { 
@@ -1616,7 +1618,7 @@ font-weight:600;
                           className="user-dropdown-footer-link"
                           onClick={() => {
                             setShowUserDropdown(false);
-                            signOut({ callbackUrl: getLogoutCallbackUrl(), redirect: true });
+                            logout();
                           }}
                         >
                           Sign out
