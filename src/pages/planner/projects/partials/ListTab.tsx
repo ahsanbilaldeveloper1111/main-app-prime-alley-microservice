@@ -369,7 +369,7 @@ const ListTab: React.FC<ListTabProps> = ({
         /> */}
         <TasksListingPage />
 
-      {loading ? (
+      {/* {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <Spinner animation="border" />
         </div>
@@ -407,7 +407,7 @@ const ListTab: React.FC<ListTabProps> = ({
             itemLabel="tasks"
           />
         </div>
-      )}
+      )} */}
       </div>
 
       {/* Delete Confirmation Modal */}
