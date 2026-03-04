@@ -2,9 +2,9 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericTable, { TableColumn } from '@components/GenericTable';
-import { getEvents, ZabbixEventRow } from '@utils/zabbix';
-import { Button, Row, Col } from 'react-bootstrap';
+import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
+import { acknowledgeEvents, getEvents, ZabbixEventRow } from '@utils/zabbix';
+import { Button, Row, Col, Modal, Form, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
@@ -12,6 +12,7 @@ import '@assets/scss/tabs.scss';
 import { Badge } from 'react-bootstrap';
 import AppSelect from '@components/AppSelect';
 import Link from 'next/link';
+import { CheckCircle2 } from 'lucide-react';
 
 type ValueOption = { value: number; label: string };
 const VALUE_OPTIONS: ValueOption[] = [
@@ -19,10 +20,23 @@ const VALUE_OPTIONS: ValueOption[] = [
   { value: 0, label: 'Recovery' },
 ];
 
+type AckActionOption = { value: 1 | 2 | 4 | 6; label: string };
+const ACK_ACTION_OPTIONS: AckActionOption[] = [
+  { value: 1, label: 'Close' },
+  { value: 2, label: 'Acknowledge' },
+  { value: 4, label: 'Message' },
+  { value: 6, label: 'Acknowledge + Message' },
+];
+
 const NetopsEvents = () => {
   const [events, setEvents] = useState<ZabbixEventRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedValue, setSelectedValue] = useState<ValueOption>(VALUE_OPTIONS[0]);
+  const [ackModalOpen, setAckModalOpen] = useState(false);
+  const [ackTarget, setAckTarget] = useState<ZabbixEventRow | null>(null);
+  const [ackAction, setAckAction] = useState<AckActionOption>(ACK_ACTION_OPTIONS[3]);
+  const [ackMessage, setAckMessage] = useState('');
+  const [ackSaving, setAckSaving] = useState(false);
   const [pagination, setPagination] = useState({
     offset: 0,
     limit: 25,
@@ -140,6 +154,47 @@ const NetopsEvents = () => {
     },
   ];
 
+  const tableActions: TableAction<ZabbixEventRow>[] = [
+    {
+      label: 'Acknowledge',
+      icon: <CheckCircle2 size={16} />,
+      onClick: (row) => {
+        setAckTarget(row);
+        setAckAction(ACK_ACTION_OPTIONS[3]); // 6 = ack + message
+        setAckMessage('');
+        setAckModalOpen(true);
+      },
+    },
+  ];
+
+  const submitAcknowledge = async () => {
+    if (!ackTarget?.eventid) return;
+    const action = ackAction.value;
+    const messageRequired = action === 4 || action === 6;
+    const message = ackMessage.trim();
+    if (messageRequired && !message) {
+      toast.error('Message is required for the selected action');
+      return;
+    }
+    setAckSaving(true);
+    try {
+      await acknowledgeEvents({
+        eventids: [ackTarget.eventid],
+        action,
+        ...(message ? { message } : {}),
+      });
+      toast.success('Event updated');
+      setAckModalOpen(false);
+      setAckTarget(null);
+      fetchEvents(pagination.offset, pagination.limit, selectedValue.value);
+    } catch (error) {
+      console.error('Error acknowledging event:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to acknowledge event');
+    } finally {
+      setAckSaving(false);
+    }
+  };
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Events" />
@@ -169,6 +224,9 @@ const NetopsEvents = () => {
       <GenericTable<ZabbixEventRow>
         data={events}
         columns={tableColumns}
+        actions={tableActions}
+        showActions
+        actionsLabel="Actions"
         loading={loading}
         emptyMessage="No events found."
         loadingMessage="Loading events..."
@@ -186,6 +244,80 @@ const NetopsEvents = () => {
         striped={false}
         uniqueKey="eventid"
       />
+
+      <Modal
+        show={ackModalOpen}
+        onHide={() => {
+          if (ackSaving) return;
+          setAckModalOpen(false);
+          setAckTarget(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Acknowledge Event</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="mb-2">
+            <div className="text-muted" style={{ fontSize: 13 }}>
+              Event ID: <strong>{ackTarget?.eventid ?? '-'}</strong>
+            </div>
+            <div className="text-muted" style={{ fontSize: 13 }}>
+              Customer: <strong>{ackTarget?.customer ?? '-'}</strong>
+            </div>
+            <div className="text-muted" style={{ fontSize: 13 }}>
+              Description: <strong>{ackTarget?.description ?? '-'}</strong>
+            </div>
+          </div>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Action</Form.Label>
+            <AppSelect<AckActionOption>
+              instanceId="events-ack-action"
+              options={ACK_ACTION_OPTIONS}
+              value={ackAction}
+              isSearchable={false}
+              onChange={(opt) => setAckAction((opt ?? ACK_ACTION_OPTIONS[3]) as AckActionOption)}
+            />
+          </Form.Group>
+
+          <Form.Group>
+            <Form.Label>Message</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={ackMessage}
+              onChange={(e) => setAckMessage(e.target.value)}
+              placeholder="Acknowledged and investigating"
+              disabled={ackSaving}
+            />
+            <small className="text-muted">
+              Required for actions: <strong>Message</strong> and <strong>Acknowledge + Message</strong>.
+            </small>
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setAckModalOpen(false);
+              setAckTarget(null);
+            }}
+            disabled={ackSaving}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={submitAcknowledge} disabled={ackSaving}>
+            {ackSaving ? (
+              <span className="d-inline-flex align-items-center gap-2">
+                <Spinner size="sm" animation="border" /> Saving...
+              </span>
+            ) : (
+              'Submit'
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };

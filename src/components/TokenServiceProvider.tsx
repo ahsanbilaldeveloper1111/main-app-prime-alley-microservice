@@ -12,7 +12,7 @@ export const TokenServiceProvider: React.FC<TokenServiceProviderProps> = ({ chil
   const router = useRouter();
 
   useEffect(() => {
-    // Never run token refresh logic on auth pages (prevents loops on /auth/signin when tokens expire)
+    // Don't run token refresh logic on auth pages (prevents signin loops when tokens expire)
     if (router.pathname.startsWith('/auth/')) {
       tokenService.stop();
       return;
@@ -20,16 +20,13 @@ export const TokenServiceProvider: React.FC<TokenServiceProviderProps> = ({ chil
 
     // Initialize token service when session is available
     if (status === 'authenticated' && session) {
-      // Clear any in-flight logout flag once we are authenticated inside the app
       if (typeof window !== 'undefined') {
         (window as any).__authLogoutInProgress = false;
       }
-     // console.log('TokenServiceProvider: Initializing token service');
       tokenService.initializeFromSession(session).catch((error) => {
         console.error('Failed to initialize token service:', error);
       });
     } else if (status === 'unauthenticated') {
-      // console.log('TokenServiceProvider: User not authenticated, stopping token service');
       tokenService.stop();
     }
   }, [session, status, router.pathname]);

@@ -96,6 +96,63 @@ export interface ZabbixHostsListResponse {
   has_more: boolean;
 }
 
+/** Payload for POST manage/hosts (custom backend host create) */
+export interface ZabbixManageHostCreatePayload {
+  hostname: string;
+  visible_name?: string;
+  ip?: string;
+  port?: string;
+  dns?: string;
+  description?: string;
+  groupids: string[];
+  templateids?: string[];
+  use_ip?: number; // 1=use ip, 0=use dns
+
+  snmp_enabled?: boolean;
+  snmp_ip?: string;
+  snmp_port?: string;
+  snmp_dns?: string;
+  snmp_use_ip?: number; // 1=use ip, 0=use dns
+  snmp_version?: number;
+  snmp_community?: string;
+  snmp_bulk?: number;
+  snmp_max_repetitions?: number;
+
+  [key: string]: unknown;
+}
+
+/** Response for POST manage/hosts */
+export interface ZabbixManageHostCreateResponse {
+  success: boolean;
+  hostid: string;
+  hostname: string;
+  visible_name?: string;
+  [key: string]: unknown;
+}
+
+/** Payload for PUT manage/hosts/{hostid} (custom backend host update) */
+export type ZabbixManageHostUpdatePayload = Partial<ZabbixManageHostCreatePayload>;
+
+/** Response for PUT manage/hosts/{hostid} */
+export interface ZabbixManageHostUpdateResponse {
+  success: boolean;
+  hostid: string;
+  [key: string]: unknown;
+}
+
+/** Response for DELETE manage/hosts/{hostid} */
+export interface ZabbixManageHostDeleteResponse {
+  success: boolean;
+  hostid?: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixRefreshHostsCacheResponse {
+  success: boolean;
+  message?: string;
+  [key: string]: unknown;
+}
+
 export interface ZabbixHostCreateParams {
   host: string;
   name?: string;
@@ -135,6 +192,48 @@ export interface ZabbixHostGroupGetParams {
 export interface ZabbixHostGroupUpdateParams {
   groupid: string;
   name: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixHostGroupCreatePayload {
+  name: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixHostGroupCreateResponse {
+  success: boolean;
+  groupid: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixCustomerHostGroupsCreatePayload {
+  customer_name: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixCustomerHostGroupsCreateResponse {
+  success: boolean;
+  customer_name?: string;
+  created?: string[];
+  [key: string]: unknown;
+}
+
+export interface ZabbixHostGroupUpdatePayload {
+  name: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixHostGroupUpdateResponse {
+  success: boolean;
+  groupid: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixHostGroupDeleteResponse {
+  success: boolean;
+  groupid?: string;
   [key: string]: unknown;
 }
 
@@ -240,8 +339,17 @@ export interface ZabbixAlertsListResponse {
 
 // Events acknowledge
 export interface ZabbixEventAcknowledgeParams {
+  /** event IDs to acknowledge/close */
   eventids: string[];
-  action: number;
+  /** 1=close, 2=ack, 4=message, 6=ack+message */
+  action: 1 | 2 | 4 | 6 | number;
+  message?: string;
+  [key: string]: unknown;
+}
+
+export interface ZabbixEventAcknowledgeResponse {
+  success?: boolean;
+  eventids?: string[];
   message?: string;
   [key: string]: unknown;
 }
@@ -425,13 +533,25 @@ export async function getHosts(
     if (!data || !Array.isArray(data.hosts)) {
       throw new Error("Invalid hosts response");
     }
-    const total = data.total ?? data.hosts.length;
-    const offset = data.offset ?? 0;
-    const limit = data.limit ?? 100;
+
+    // Prefer server-provided pagination metadata, but fall back to request values.
+    const offset = data.offset ?? params.offset ?? 0;
+    const limit = data.limit ?? params.limit ?? 100;
     const returned = data.returned ?? data.hosts.length;
+
+    // If server doesn't provide total, infer "has more" and synthesize a growing total
+    // so UI pagination can still work (last page will settle to the real total).
     const hasMore =
       data.has_more ??
-      (total > 0 && offset + data.hosts.length < total);
+      (typeof data.total === 'number'
+        ? offset + data.hosts.length < data.total
+        : limit > 0 && returned >= limit);
+
+    const total =
+      typeof data.total === 'number'
+        ? data.total
+        : offset + returned + (hasMore ? 1 : 0);
+
     return {
       hosts: data.hosts,
       total,
@@ -445,6 +565,82 @@ export async function getHosts(
   }
 }
 
+/**
+ * POST hosts/refresh-cache – refresh hosts cache (custom backend)
+ */
+export async function refreshHostsCache(): Promise<ZabbixRefreshHostsCacheResponse> {
+  try {
+    const { data } = await axiosInstance.post<ZabbixRefreshHostsCacheResponse>(
+      `${ZABBIX_PREFIX}/hosts/refresh-cache`
+    );
+    if (!data || data.success !== true) {
+      throw new Error(data?.message || "Failed to refresh hosts cache");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST manage/hosts – create host (custom backend)
+ */
+export async function createHost(
+  payload: ZabbixManageHostCreatePayload
+): Promise<ZabbixManageHostCreateResponse> {
+  try {
+    const body = buildPayload(payload);
+    const { data } = await axiosInstance.post<ZabbixManageHostCreateResponse>(
+      `${ZABBIX_PREFIX}/manage/hosts`,
+      body
+    );
+    if (!data || data.success !== true || !data.hostid) {
+      throw new Error("Failed to create host");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * PUT manage/hosts/{hostid} – update host (custom backend)
+ */
+export async function updateHost(
+  hostid: string,
+  payload: ZabbixManageHostUpdatePayload
+): Promise<ZabbixManageHostUpdateResponse> {
+  try {
+    const body = buildPayload(payload);
+    const { data } = await axiosInstance.put<ZabbixManageHostUpdateResponse>(
+      `${ZABBIX_PREFIX}/manage/hosts/${hostid}`,
+      body
+    );
+    if (!data || data.success !== true) {
+      throw new Error("Failed to update host");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * DELETE manage/hosts/{hostid} – delete host (custom backend)
+ */
+export async function deleteHost(hostid: string): Promise<ZabbixManageHostDeleteResponse> {
+  try {
+    const { data } = await axiosInstance.delete<ZabbixManageHostDeleteResponse>(
+      `${ZABBIX_PREFIX}/manage/hosts/${hostid}`
+    );
+    if (!data || data.success !== true) {
+      throw new Error("Failed to delete host");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
 
 
 // ---------------------------------------------------------------------------
@@ -485,6 +681,87 @@ export async function getHostGroups(
       returned,
       has_more: hasMore,
     };
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST manage/hostgroups – create host group (custom backend)
+ */
+export async function addHostGroup(
+  payload: ZabbixHostGroupCreatePayload
+): Promise<ZabbixHostGroupCreateResponse> {
+  try {
+    const body = buildPayload(payload);
+    const { data } = await axiosInstance.post<ZabbixHostGroupCreateResponse>(
+      `${ZABBIX_PREFIX}/manage/hostgroups`,
+      body
+    );
+    if (!data || data.success !== true || !data.groupid) {
+      throw new Error("Failed to create host group");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * POST manage/customer-hostgroups – create standard customer hostgroups (Servers/Firewalls/Routers/Switches)
+ */
+export async function addCustomerHostGroups(
+  payload: ZabbixCustomerHostGroupsCreatePayload
+): Promise<ZabbixCustomerHostGroupsCreateResponse> {
+  try {
+    const body = buildPayload(payload);
+    const { data } = await axiosInstance.post<ZabbixCustomerHostGroupsCreateResponse>(
+      `${ZABBIX_PREFIX}/manage/customer-hostgroups`,
+      body
+    );
+    if (!data || data.success !== true) {
+      throw new Error("Failed to create customer host groups");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * PUT manage/hostgroups/{groupid} – update host group (custom backend)
+ */
+export async function updateHostGroup(
+  groupid: string,
+  payload: ZabbixHostGroupUpdatePayload
+): Promise<ZabbixHostGroupUpdateResponse> {
+  try {
+    const body = buildPayload(payload);
+    const { data } = await axiosInstance.put<ZabbixHostGroupUpdateResponse>(
+      `${ZABBIX_PREFIX}/manage/hostgroups/${groupid}`,
+      body
+    );
+    if (!data || data.success !== true) {
+      throw new Error("Failed to update host group");
+    }
+    return data;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * DELETE manage/hostgroups/{groupid} – delete host group (custom backend)
+ */
+export async function deleteHostGroup(groupid: string): Promise<ZabbixHostGroupDeleteResponse> {
+  try {
+    const { data } = await axiosInstance.delete<ZabbixHostGroupDeleteResponse>(
+      `${ZABBIX_PREFIX}/manage/hostgroups/${groupid}`
+    );
+    if (!data || data.success !== true) {
+      throw new Error("Failed to delete host group");
+    }
+    return data;
   } catch (error) {
     throw error;
   }
@@ -717,19 +994,22 @@ export async function getHostEvents(
 
 /**
  * POST events/acknowledge – acknowledge or close events (event.acknowledge)
- * action: 1 = close problem, 6 = acknowledge
+ * payload: { eventids: ["..."], message?: "...", action: 1|2|4|6 }
  */
 export async function acknowledgeEvents(
   params: ZabbixEventAcknowledgeParams
-): Promise<ZabbixJsonRpcResponse<{ eventids: string[] }>> {
+): Promise<ZabbixEventAcknowledgeResponse> {
   try {
     const payload = buildPayload(params);
-    const { data } = await axiosInstance.get<ZabbixJsonRpcResponse<{ eventids: string[] }>>(
+    const { data } = await axiosInstance.post<ZabbixEventAcknowledgeResponse>(
       `${ZABBIX_PREFIX}/events/acknowledge`,
-      { params: payload }
+      payload
     );
-    if (data.error) {
-      throw new Error(data.error.message || "Zabbix API error");
+    if (!data) {
+      throw new Error("Invalid acknowledge response");
+    }
+    if (data.success === false) {
+      throw new Error(data.message || "Failed to acknowledge event");
     }
     return data;
   } catch (error) {

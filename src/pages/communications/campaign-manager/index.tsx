@@ -21,6 +21,7 @@ import {
   Loader,
 } from 'lucide-react';
 
+import AppSelect from '@components/AppSelect';
 import CallWidget from '../campaign-partials/CallWidget';
 import WrapUpModal from '../campaign-partials/WrapUp';
 import type { CallVariableConfig } from '../campaign-partials/WrapUp';
@@ -40,6 +41,7 @@ import {
   setFinesseCampaignEnabled,
   importFinesseCampaignContacts,
   getFinesseCampaignsContactsStatus,
+  getFinesseCampaignContactsConfig,
   sendFinesseDialogAction,
   getFinesseWrapUpReasons,
   getEffectiveTeamId,
@@ -51,6 +53,19 @@ import {
 } from '@utils/finesse';
 import { useFinesseCapabilities } from '@hooks/live-calls/useFinesseCapabilities';
 import { useFinesseStomp, type FinessePreviewEvent } from '@hooks/live-calls/useFinesseStomp';
+
+type ContactHeaderValueOption = { value: string; label: string };
+
+const CONTACT_HEADER_VALUE_OPTIONS: ContactHeaderValueOption[] = [
+  { value: 'Phone1', label: 'Phone1' },
+  { value: 'First Name', label: 'First Name' },
+  { value: 'Last Name', label: 'Last Name' },
+  { value: 'Phone2', label: 'Phone2' },
+  { value: 'Phone3', label: 'Phone3' },
+  { value: 'Account Number', label: 'Account Number' },
+  { value: 'Dial Time', label: 'Dial Time' },
+  { value: 'None', label: 'None' },
+];
 
 export interface CampaignRow {
   id: number;
@@ -138,7 +153,8 @@ const LiveCallsCampaignsManagement = () => {
       const [showUploadModal, setShowUploadModal] = useState(false);
       const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
       const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-      const [columnMapping, setColumnMapping] = useState<Array<{id: number, name: string, order: number}>>([]);
+      const [columnMapping, setColumnMapping] = useState<Array<{id: number, key: string, value: string, order: number}>>([]);
+      const [columnsLoading, setColumnsLoading] = useState(false);
       const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
       const [wrapUpReasons, setWrapUpReasons] = useState<Array<{ value: string; label: string }>>([]);
       const [wrapUpReasonsLoading, setWrapUpReasonsLoading] = useState(false);
@@ -635,13 +651,8 @@ const LiveCallsCampaignsManagement = () => {
         setSelectedCampaignId(campaignId);
         setShowUploadModal(true);
         setUploadedFile(null);
-        setColumnMapping([
-          { id: 1, name: 'Phone Number', order: 1 },
-          { id: 2, name: 'First Name', order: 2 },
-          { id: 3, name: 'Last Name', order: 3 },
-          { id: 4, name: 'Email', order: 4 },
-          { id: 5, name: 'Company', order: 5 }
-        ]);
+        // Columns are loaded from getFinesseCampaignContactsConfig (manual.fieldsOrder)
+        setColumnMapping([]);
       };
     
       const handleCloseUploadModal = () => {
@@ -649,7 +660,66 @@ const LiveCallsCampaignsManagement = () => {
         setSelectedCampaignId(null);
         setUploadedFile(null);
         setColumnMapping([]);
+        setColumnsLoading(false);
       };
+
+      const buildColumnMappingFromConfig = useCallback((raw: any) => {
+        // Typical response shape: { status, statusCode, responseData: { importConfig: { manual: { fieldsOrder: [...] } } } }
+        const cfg = raw?.data ?? raw?.responseData ?? raw;
+        const fieldsOrder =
+          cfg?.importConfig?.manual?.fieldsOrder ??
+          cfg?.importConfig?.manual?.fields_order ??
+          cfg?.manual?.fieldsOrder ??
+          cfg?.manual?.fields_order;
+
+        if (Array.isArray(fieldsOrder)) {
+          const rows = fieldsOrder
+            .map((f: any, idx: number) => {
+              const key = String(f?.name ?? '').trim();
+              const value = String(f?.value ?? '').trim();
+              const positionRaw = f?.position ?? idx + 1;
+              const position = Number(positionRaw);
+              const order = Number.isFinite(position) ? position : idx + 1;
+              return { id: idx + 1, key, value, order };
+            })
+            .filter((r: any) => r.key);
+          rows.sort((a: any, b: any) => a.order - b.order);
+          // Reassign stable id/order
+          return rows.map((r: any, idx: number) => ({
+            id: idx + 1,
+            key: r.key,
+            value: r.value,
+            order: idx + 1,
+          }));
+        }
+
+        return [];
+      }, []);
+
+      // Load columns config when upload modal opens
+      useEffect(() => {
+        const run = async () => {
+          if (!showUploadModal) return;
+          if (selectedCampaignId == null) return;
+          const { username, teamId } = getFinesseContext();
+          if (!username || teamId == null) return;
+
+          setColumnsLoading(true);
+          try {
+            const resp = await getFinesseCampaignContactsConfig(teamId, username, selectedCampaignId);
+            const mapped = buildColumnMappingFromConfig(resp);
+            if (mapped.length > 0) {
+              setColumnMapping(mapped);
+            }
+          } catch (err: any) {
+            // Keep current mapping (defaults) but inform user
+            toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to load contact columns config.');
+          } finally {
+            setColumnsLoading(false);
+          }
+        };
+        void run();
+      }, [showUploadModal, selectedCampaignId, getFinesseContext, buildColumnMappingFromConfig]);
     
       const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -660,7 +730,10 @@ const LiveCallsCampaignsManagement = () => {
     
       const handleAddColumn = () => {
         const newId = Math.max(...columnMapping.map(c => c.id), 0) + 1;
-        setColumnMapping([...columnMapping, { id: newId, name: '', order: columnMapping.length + 1 }]);
+        setColumnMapping([
+          ...columnMapping,
+          { id: newId, key: `column${newId}`, value: '', order: columnMapping.length + 1 },
+        ]);
       };
     
       const handleRemoveColumn = (id: number) => {
@@ -672,9 +745,9 @@ const LiveCallsCampaignsManagement = () => {
         setColumnMapping(newMapping);
       };
     
-      const handleColumnNameChange = (id: number, newName: string) => {
+      const handleColumnValueChange = (id: number, newValue: string) => {
         setColumnMapping(columnMapping.map(col => 
-          col.id === id ? { ...col, name: newName } : col
+          col.id === id ? { ...col, value: newValue } : col
         ));
       };
     
@@ -703,13 +776,28 @@ const LiveCallsCampaignsManagement = () => {
           toast.error('Please select a file to upload.');
           return;
         }
+        if (!columnMapping || columnMapping.length === 0) {
+          toast.error('No column mapping found. Please load config or add at least one column.');
+          return;
+        }
         const { username, teamId } = getFinesseContext();
         if (!username || teamId == null) {
           toast.error('user not found.');
           return;
         }
         try {
-          await importFinesseCampaignContacts(teamId, username, selectedCampaignId, uploadedFile);
+          const contactHeaders: Record<string, string> = {};
+          columnMapping.forEach((c) => {
+            const k = String(c?.key ?? '').trim();
+            if (!k) return;
+            contactHeaders[k] = String(c?.value ?? '').trim();
+          });
+
+          await importFinesseCampaignContacts(teamId, username, selectedCampaignId, uploadedFile, {
+            allowDuplicateContacts: true,
+            importType: 'MANUAL',
+            contactHeaders,
+          });
           toast.success('Contacts imported successfully.');
           handleCloseUploadModal();
           const response = await getFinesseCampaigns(teamId, username);
@@ -2341,51 +2429,46 @@ const LiveCallsCampaignsManagement = () => {
                   <Grid size={20} />
                   Column Mapping
                 </div>
+
+                {columnsLoading && (
+                  <div style={{ marginTop: '8px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    Loading columns from config...
+                  </div>
+                )}
                 
                 <div className="column-list">
                   {columnMapping.map((column, index) => (
                     <div key={column.id} className="column-item">
                       <div className="column-order">{column.order}</div>
-                      <input
-                        type="text"
-                        className="column-input"
-                        placeholder="Enter column name..."
-                        value={column.name}
-                        onChange={(e) => handleColumnNameChange(column.id, e.target.value)}
-                      />
-                      <div className="column-controls">
-                        <button
-                          className="column-btn"
-                          onClick={() => handleMoveColumn(column.id, 'up')}
-                          disabled={index === 0}
-                          title="Move up"
-                        >
-                          <ChevronDown size={16} style={{ transform: 'rotate(180deg)' }} />
-                        </button>
-                        <button
-                          className="column-btn"
-                          onClick={() => handleMoveColumn(column.id, 'down')}
-                          disabled={index === columnMapping.length - 1}
-                          title="Move down"
-                        >
-                          <ChevronDown size={16} />
-                        </button>
-                        <button
-                          className="column-btn delete"
-                          onClick={() => handleRemoveColumn(column.id)}
-                          title="Remove column"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <div style={{ minWidth: '88px', fontWeight: 600, color: '#475569' }}>{column.key}</div>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <AppSelect<ContactHeaderValueOption>
+                          instanceId={`contact-header-value-${column.id}`}
+                          isSearchable={false}
+                          isClearable={false}
+                          isDisabled={columnsLoading}
+                          options={CONTACT_HEADER_VALUE_OPTIONS}
+                          value={
+                            CONTACT_HEADER_VALUE_OPTIONS.find((o) => o.value === column.value) ??
+                            CONTACT_HEADER_VALUE_OPTIONS.find((o) => o.value === 'None') ??
+                            null
+                          }
+                          onChange={(opt) =>
+                            handleColumnValueChange(
+                              column.id,
+                              ((opt as ContactHeaderValueOption | null)?.value ?? 'None') as string
+                            )
+                          }
+                          placeholder="Select value"
+                        />
                       </div>
+                      
                     </div>
                   ))}
                 </div>
 
-                <button className="add-column-btn" onClick={handleAddColumn}>
-                  <Plus size={20} />
-                  Add Column
-                </button>
+                
               </div>
 
               {/* Preview Info */}
