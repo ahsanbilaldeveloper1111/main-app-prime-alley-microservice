@@ -4,7 +4,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import UserCard from './UserCard'
 import { getSectionColor, getSectionIcon, getSectionTitle } from '@components/live-calls/utils/helpers'
-import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, Menu, Search, Filter, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
+import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall } from 'lucide-react';
 
 interface SectionContainerProps {
   sectionKey: string

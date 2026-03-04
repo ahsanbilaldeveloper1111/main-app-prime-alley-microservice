@@ -10,7 +10,7 @@ import {
   getCrmProducts,
   CrmProduct,
 } from "@utils/crm";
-import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";

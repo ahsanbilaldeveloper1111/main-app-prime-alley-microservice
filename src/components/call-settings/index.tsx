@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import {
-  Calendar,
   Clock,
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
   BarChart3,
   Copy,
-  TrendingUp,
-  Phone,
-  Users,
-  Activity
+  TrendingUp
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 

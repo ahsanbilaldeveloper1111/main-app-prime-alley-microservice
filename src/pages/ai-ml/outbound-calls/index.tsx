@@ -5,11 +5,10 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 
 import { Column } from "@components/CustomDataTable";
-import { Button, Card, Form, Row, Col, Spinner, Table, Tooltip, Badge } from "react-bootstrap";
+import { Button, Card, Form, Row, Col, Table } from "react-bootstrap";
 import { useSession } from "next-auth/react";
-import moment from "moment";
 import PageHeader from "@components/PageHeader";
-import { Plus, Edit, Trash2, Info, Ticket, List, CheckCircle, Tag, Phone } from "lucide-react";
+import { Plus, Phone } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";

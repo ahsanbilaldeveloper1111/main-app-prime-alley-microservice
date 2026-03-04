@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import GenericFilter from './GenericFilter';
-import { createCallRecordingsFiltersConfig, createTicketFiltersConfig } from './filterConfigs';
+import { createTicketFiltersConfig } from './filterConfigs';
 import { useHierarchyData } from './useHierarchyData';
 import { useSession } from "next-auth/react";
 import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from "@utils/ticket-module";

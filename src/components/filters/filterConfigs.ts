@@ -1,5 +1,4 @@
 import { FilterTab } from './GenericFilter';
-import moment from 'moment';
 
 // User Filters Configuration
 export const userFiltersConfig: FilterTab[] = [

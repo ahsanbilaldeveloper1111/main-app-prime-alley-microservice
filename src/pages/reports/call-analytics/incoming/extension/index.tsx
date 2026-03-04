@@ -1,53 +1,40 @@
-import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
-import Layout from '@layout/index';
-import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
-import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
-import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
-import { useSession } from 'next-auth/react';
-import CallLogsFilters from '@components/filters/CallLogsFilters';
-import BarFilters from '@components/BarFilters';
-import SelectBox from '@components/SelectBox';
-import { useHierarchyData } from '@components/filters/useHierarchyData';
-import AnimatedNumber from '@components/AnimatedNumber';
-import ChartBar from '@components/ChartBar';
-import ChartDonut from '@components/ChartDonut';
-import PageSummaryGrid from '@components/PageSummaryGrid';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import '@assets/scss/report-style.scss';
-import '@assets/scss/tabs.scss';
-import { motion, AnimatePresence } from "framer-motion";
-import { easeInOut, easeOut, easeIn } from "framer-motion";
-import moment from 'moment';
+import "@assets/scss/datatable-style.scss";
+import React, {
+  ReactElement,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
+import { ListCallLogs, DownloadCallsExport } from "@utils/calls";
+import { Column } from "@components/CustomDataTable";
+import { Modal, Row, Tab, Tabs, Form, Col } from "react-bootstrap";
+import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
+import BarFilters from "@components/BarFilters";
+import SelectBox from "@components/SelectBox";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import ChartBar from "@components/ChartBar";
+import ChartDonut from "@components/ChartDonut";
+import PageSummaryGrid from "@components/PageSummaryGrid";
+import "@assets/scss/report-style.scss";
+import "@assets/scss/tabs.scss";
+import { motion, AnimatePresence, easeOut, easeIn } from "framer-motion";
+import moment from "moment";
 
 import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
-
-
 
 interface Summary {
   total_calls: number;
   answered_calls: number;
   unanswered_calls: number;
   total_cost: number;
-  total_duration:number;
-  avg_duration:number;
-  avg_ring_time:number;
+  total_duration: number;
+  avg_duration: number;
+  avg_ring_time: number;
 }
 
 interface ChartData {
@@ -70,69 +57,224 @@ interface ChartData {
   max_duration: number[];
 }
 
-import dynamic from 'next/dynamic';
-import { ApexOptions } from 'apexcharts';
-import { formatCurrency, formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
+import {
+  formatMinutesAndSeconds,
+  ModuleSlug,
+  GlobalDateTimeFormat,
+  formatDateTimeToLocal,
+  getAutoTimezone,
+} from "@utils/Helper";
+
+const EMPTY_SUMMARY: Summary = {
+  total_calls: 0,
+  answered_calls: 0,
+  unanswered_calls: 0,
+  total_cost: 0,
+  total_duration: 0,
+  avg_duration: 0,
+  avg_ring_time: 0,
+};
+
+function formatStartDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let m: moment.Moment;
+  if (hasTime) {
+    m = moment(value + ":00");
+  } else if (value.includes("T")) {
+    m = moment(value);
+  } else {
+    m = moment(value).startOf("day");
+  }
+  return m.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
+
+function formatEndDatetimeToUTC(value: string): string {
+  if (!value) return value;
+  const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+  let m: moment.Moment;
+  if (hasTime) {
+    const timePart = value.split("T")[1];
+    m = timePart === "23:59" ? moment(value + ":59") : moment(value + ":00");
+  } else if (value.includes("T")) {
+    m = moment(value);
+  } else {
+    m = moment(value).endOf("day");
+  }
+  return m.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+}
+
+function DateRangeDisplay({
+  show,
+  start,
+  end,
+}: Readonly<{
+  show: boolean;
+  start: string;
+  end: string;
+}>) {
+  if (!show) return null;
+  return (
+    <p className="mb-0">
+      Date Range:{" "}
+      <span className="status-badge primary">
+        {formatDateTimeToLocal(start, GlobalDateTimeFormat)}
+      </span>{" "}
+      to{" "}
+      <span className="status-badge primary">
+        {formatDateTimeToLocal(end, GlobalDateTimeFormat)}
+      </span>
+    </p>
+  );
+}
+
+type ChartTabPanelProps = Readonly<{
+  activeTab: string;
+  tabKey: string;
+  chartData: { series: any[]; categories: string[] } | null;
+  dataType: "calls" | "time" | "cost" | "custom";
+  chartLoading: boolean;
+  tabVariants: typeof TAB_VARIANTS;
+  onFullScreenClick: () => void;
+}>;
+
+const TAB_VARIANTS = {
+  hidden: { opacity: 0, x: 20, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: { duration: 0.3, ease: easeOut },
+  },
+  exit: {
+    opacity: 0,
+    x: -20,
+    scale: 0.95,
+    transition: { duration: 0.2, ease: easeIn },
+  },
+};
+
+function ChartTabPanel({
+  activeTab,
+  tabKey,
+  chartData,
+  dataType,
+  chartLoading,
+  tabVariants,
+  onFullScreenClick,
+}: ChartTabPanelProps) {
+  if (activeTab !== tabKey) return null;
+  return (
+    <motion.div
+      key={tabKey}
+      variants={tabVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      <Row>
+        <Col md={12}>
+          <div className="card report-shadow">
+            <div className="card-body">
+              {chartLoading && (
+                <div
+                  className="d-flex align-items-center justify-content-center"
+                  style={{ height: "300px" }}
+                >
+                  <div className="spinner-border text-primary">
+                    <output className="visually-hidden">
+                      Loading chart...
+                    </output>
+                  </div>
+                </div>
+              )}
+              {!chartLoading && chartData && (
+                <ChartBar
+                  series={chartData.series}
+                  categories={chartData.categories}
+                  dataType={dataType}
+                  height={300}
+                  maxDisplayedItems={5}
+                  showViewAllButton={true}
+                  viewAllButtonText="View All"
+                  showFullScreenButton={true}
+                  onFullScreenClick={onFullScreenClick}
+                />
+              )}
+            </div>
+          </div>
+        </Col>
+      </Row>
+    </motion.div>
+  );
+}
 
 const CallIncomingExtension = () => {
-    const { data:session, status } = useSession();
+  const { data: session } = useSession();
 
-    const [showDateRange, setShowDateRange] = useState(false);
-    const [startDateTime, setStartDateTime] = useState<string>('');
-    const [endDateTime, setEndDateTime] = useState<string>('');
-    const [isExporting, setIsExporting] = useState(false);
+  const [showDateRange, setShowDateRange] = useState(false);
+  const [startDateTime, setStartDateTime] = useState<string>("");
+  const [endDateTime, setEndDateTime] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
-    const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState('calls_chart');
-    
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("calls_chart");
 
-    // Animation variants for tab transitions
-    const tabVariants = {
-        hidden: { 
-            opacity: 0, 
-            x: 20,
-            scale: 0.95
-        },
-        visible: { 
-            opacity: 1, 
-            x: 0,
-            scale: 1,
-            transition: {
-                duration: 0.3,
-                ease: easeOut
-            }
-        },
-        exit: { 
-            opacity: 0, 
-            x: -20,
-            scale: 0.95,
-            transition: {
-                duration: 0.2,
-                ease: easeIn
-            }
-        }
-    };
+  const columns: Column[] = [
+    {
+      key: "Extension",
+      name: "Extension",
+      selector: (row: any) => row.Extension,
+      sortable: true,
+    },
+    {
+      key: "Calls",
+      name: "Total Calls",
+      selector: (row: any) => row.Calls,
+      sortable: true,
+    },
+    {
+      key: "Answered",
+      name: "Answered",
+      selector: (row: any) => row.Answered,
+      sortable: true,
+    },
+    {
+      key: "Unanswered",
+      name: "Un Answered",
+      selector: (row: any) => row.Unanswered,
+      sortable: true,
+    },
 
-    const columns: Column[] = [
-        { key: 'Extension', name: 'Extension', selector: (row: any) => row.Extension, sortable: true },
-        { key: 'Calls', name: 'Total Calls', selector: (row: any) => row.Calls, sortable: true },
-    { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
-    { key: 'Unanswered', name: 'Un Answered', selector: (row: any) => row.Unanswered, sortable: true },
+    {
+      key: "AvgRingTime",
+      name: "Avg Ring Time",
+      selector: (row: any) => row.AvgRingTime,
+      sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.AvgRingTime),
+    },
+    {
+      key: "MaxRingTime",
+      name: "Max Ring Time",
+      selector: (row: any) => row.MaxRingTime,
+      sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.MaxRingTime),
+    },
 
-    { key: 'AvgRingTime', name: 'Avg Ring Time', selector: (row: any) => row.AvgRingTime, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.AvgRingTime)
-     },
-    { key: 'MaxRingTime', name: 'Max Ring Time', selector: (row: any) => row.MaxRingTime, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.MaxRingTime)
-     },
-
-    { key: 'Duration', name: 'Total Duration', selector: (row: any) => row.Duration, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.Duration)
-     },
-    { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.AvgDuration)
-     },
+    {
+      key: "Duration",
+      name: "Total Duration",
+      selector: (row: any) => row.Duration,
+      sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.Duration),
+    },
+    {
+      key: "AvgDuration",
+      name: "Avg Duration",
+      selector: (row: any) => row.AvgDuration,
+      sortable: true,
+      cell: (row: any) => formatMinutesAndSeconds(row.AvgDuration),
+    },
 
     // { key: 'Cost', name: 'Total Cost', selector: (row: any) => row.Cost, sortable: true,
     //   cell: (row: any) => formatCurrency(row.Cost)
@@ -140,421 +282,429 @@ const CallIncomingExtension = () => {
     // { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row['Avg Cost'], sortable: true,
     //   cell: (row: any) => formatCurrency(Number(row['Avg Cost']))
     //  },
-    ];
+  ];
 
   // Initialize filters with default values immediately to prevent first API call without dates
   const getDefaultFilters = () => {
     const now = moment();
-    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-    const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    const startDateInput = now
+      .clone()
+      .startOf("day")
+      .format("YYYY-MM-DDTHH:mm");
+    const endDateInput = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
+    const startDateUTC =
+      now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+    const endDateUTC =
+      now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
     return {
       pending: {
         start_datetime: startDateInput,
         end_datetime: endDateInput,
-        is_incoming_only: 'true'
+        is_incoming_only: "true",
       },
       current: {
         start_datetime: startDateUTC,
         end_datetime: endDateUTC,
-        is_incoming_only: 'true'
-      }
+        is_incoming_only: "true",
+      },
     };
   };
-  
+
   const defaultFilters = getDefaultFilters();
-  
-    const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
-    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
-    const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
 
-    const [dataLoaded, setDataLoaded] = useState(false);
-    const filtersReady = true; // Always ready since filters are initialized immediately
-    
-    // Use ref to track if initial fetch has been done
-    const initialFetchDone = React.useRef(false);
-    // Use ref to track last filters used for charts to prevent unnecessary refetches
-    const lastChartFilters = React.useRef<string>('');
-    
-    // Refs to prevent duplicate API calls
-    const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
-    const isFetchingRef = useRef(false);
-    const lastFetchTimeRef = useRef(0);
-    const lastFetchParamsRef = useRef<string>('');
-    
-    const {
-      hierarchyDataExtensions,
-      hierarchyDataDepartments,
-      loading: hierarchyLoading
-    } = useHierarchyData(ModuleSlug.CALL_REPORTS);
-    const [summary, setSummary] = useState<Summary>({
-        total_calls: 0,
-        answered_calls: 0,
-        unanswered_calls: 0,
-        total_cost: 0,
-        total_duration:0,
-        avg_duration:0,
-        avg_ring_time:0
-    });
+  const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
+    defaultFilters.current,
+  );
+  const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(
+    defaultFilters.pending,
+  );
 
-    const [showPageLoader, setShowPageLoader] = useState(false);
-    const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        // Prevent duplicate calls - but always allow the first call
-        const now = Date.now();
-        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
-        
-        // Skip if already fetching with same params within 500ms
-        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-            return;
-        }
-        
-        // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
-        if (lastFetchParamsRef.current !== '' && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
-            return;
-        }
-        
-        isFetchingRef.current = true;
-        lastFetchTimeRef.current = now;
-        lastFetchParamsRef.current = paramsKey;
-        
-        setLoading(true);
-        setShowPageLoader(true);
-        
-        try {
-            const response = await ListCallLogs({ 
-                page, 
-                perPage, 
-                search, 
-                filters: currentFiltersRef.current, 
-                reportType: 'incomingStatsExtension', 
-                moduleSlug: ModuleSlug.CALL_REPORTS 
-            }, 'call-logs/statsIncomingByExtension');
-              
-            if (response?.summary) {
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const filtersReady = true; // Always ready since filters are initialized immediately
 
-                setShowDateRange(true);
-                const dataFilters = response?.filters;
-                setStartDateTime(dataFilters?.start_datetime);
-                setEndDateTime(dataFilters?.end_datetime);
+  // Use ref to track if initial fetch has been done
+  const initialFetchDone = React.useRef(false);
+  // Use ref to track last filters used for charts to prevent unnecessary refetches
+  const lastChartFilters = React.useRef<string>("");
 
-                setSummary(response.summary);
-                setDataLoaded(true);
-            } else {
-                setDataLoaded(true);
-            }
-            
-            setLoading(false);
-            return response;
-        } catch {
-            setLoading(false);
-            setDataLoaded(true);
-            toast.error('Failed to fetch call data');
-            return null;
-        } finally {
-            setShowPageLoader(false);
-            isFetchingRef.current = false;
-        }
-    }, []);
+  // Refs to prevent duplicate API calls
+  const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
+  const lastFetchParamsRef = useRef<string>("");
 
-    const [simpleDonut, setSimpleDonut] = React.useState<{ series: number[]; labels: string[] } | null>(null);
+  const {
+    hierarchyDataExtensions,
+    hierarchyDataDepartments,
+    loading: hierarchyLoading,
+  } = useHierarchyData(ModuleSlug.CALL_REPORTS);
+  const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
 
-    useEffect(() => {
-        if(summary && dataLoaded) {
-          const answeredCalls = Number(summary.answered_calls) || 0;
-          const unansweredCalls = Number(summary.unanswered_calls) || 0;
-          
-          // Check if both values are 0, if so don't set chart data (will show empty state)
-          if (answeredCalls === 0 && unansweredCalls === 0) {
-            setSimpleDonut(null);
-          } else {
-            // Set chart data only when there's actual data
-            setSimpleDonut({
-              series: [answeredCalls, unansweredCalls],
-              labels: ['Answered Calls', 'Unanswered Calls']
-            });
-          }
-        }
-    }, [summary, dataLoaded]);
+  const [showPageLoader, setShowPageLoader] = useState(false);
+  const fetchCallLogs = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      // Prevent duplicate calls - but always allow the first call
+      const now = Date.now();
+      const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
 
-    // Trigger initial data fetch when filters become ready
-    // Ensure initial fetch happens when session is ready
-    useEffect(() => {
-        if (session && session.user?.permissions?.includes('list-call-logs')) {
-            initialFetchDone.current = true;
-        }
-    }, [session]);
-
-    
-    const handleFiltersChange = (filters: any) => {
-        // Convert datetime values from local timezone to UTC before sending to API
-        const formattedFilters: any = { ...filters };
-        
-        if (formattedFilters.start_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-            // Convert to UTC ISO format
-            let startMoment = moment(formattedFilters.start_datetime);
-            
-            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (!formattedFilters.start_datetime.includes('T')) {
-                // If only date, set to 00:00:00
-                startMoment = moment(formattedFilters.start_datetime).startOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        if (formattedFilters.end_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-            // Convert to UTC ISO format
-            let endMoment = moment(formattedFilters.end_datetime);
-            
-            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (!formattedFilters.end_datetime.includes('T')) {
-                // If only date, set to 23:59:59
-                endMoment = moment(formattedFilters.end_datetime).endOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        // Check if filters actually changed
-        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
-        
-        // Check if this is a complete clear (empty object or only has default values)
-        const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
-            (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
-        
-        // Update both state and ref immediately
-        setCurrentFilters(formattedFilters);
-        currentFiltersRef.current = formattedFilters;
-        
-        // Reset data loaded state when filters actually change or when cleared
-        if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-            setDataLoaded(false);
-            // Reset chart filters ref to allow chart refetch
-            lastChartFilters.current = '';
-            setSummary({
-                total_calls: 0,
-                answered_calls: 0,
-                unanswered_calls: 0,
-                total_cost: 0,
-                total_duration: 0,
-                avg_duration: 0,
-                avg_ring_time: 0
-            });
-            
-            // Trigger refresh
-            setRefreshKey(prev => prev + 1);
-        }
-    };
-
-    const handleExport = async () => {
-      setIsExporting(true);
-      try {
-        const exportPayload = {
-          ...currentFilters,
-          timezone: getAutoTimezone()
-        };
-        await DownloadCallsExport(exportPayload, 'call-logs/report/extension/download');
-      } catch {
-        toast.error('Export failed');
-      } finally {
-        setIsExporting(false);
+      // Skip if already fetching with same params within 500ms
+      if (
+        isFetchingRef.current &&
+        lastFetchParamsRef.current === paramsKey &&
+        now - lastFetchTimeRef.current < 500
+      ) {
+        return;
       }
-    };
 
-    const [chartCalls, setChartCalls] = useState<{ series: any[]; categories: string[] } | null>(null);
-    const [chartRingTime, setChartRingTime] = useState<{ series: any[]; categories: string[] } | null>(null);
-    const [chartCost, setChartCost] = useState<{ series: any[]; categories: string[] } | null>(null);
-    const [chartDuration, setChartDuration] = useState<{ series: any[]; categories: string[] } | null>(null);
-    
-    const [chartLoading, setChartLoading] = useState(false);
-    const [showChartModal, setShowChartModal] = useState(false);
-    const [currentChartData, setCurrentChartData] = useState<{ series: any[]; categories: string[] } | null>(null);
-    const [currentChartTitle, setCurrentChartTitle] = useState('');
+      // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
+      if (
+        lastFetchParamsRef.current !== "" &&
+        lastFetchParamsRef.current === paramsKey &&
+        now - lastFetchTimeRef.current < 100
+      ) {
+        return;
+      }
 
-    useEffect(() => {
-      // Only fetch charts when filters are ready and not empty
-      // Check if filters have actually changed
-      const currentFiltersString = JSON.stringify(currentFilters);
-      const filtersChanged = lastChartFilters.current !== currentFiltersString;
-      
-      if (session && filtersChanged && currentFilters && Object.keys(currentFilters).length > 0) {
-        lastChartFilters.current = currentFiltersString;
-        const fetchCharts = async () => {
-          setChartLoading(true);
-          try {
-            const response = await ListCallLogs({ page: 1, perPage: 15, search: "", filters: currentFilters,reportType: 'chartIncomingExtension', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/stats/extension/chart');
-           
-            const chartData = response?.chart_data;
-            
-            if(chartData && Array.isArray(chartData) && chartData.length > 0) {
-             
-              
-              const newChartData: ChartData = {
-                country: [],
-                answered_calls: [],
-                unanswered_calls: [],
-                total_calls: [],
-                max_ring_time: [],
-                avg_ring_time: [],
-                min_ring_time: [],
-                min_cost: [],
-                avg_cost: [],
-                max_cost: [],
-                min_duration: [],
-                avg_duration: [],
-                max_duration: [],
-              };
-              
-              
-              chartData.forEach((item: any, index: number) => {
-               
-                if (item && item.label) {
-                  newChartData.country.push(item.label);
-                  newChartData.answered_calls.push(Number(item.answered_calls) || 0);
-                  newChartData.unanswered_calls.push(Number(item.unanswered_calls) || 0);
-                  newChartData.total_calls.push(Number(item.total_calls) || 0);
-                  newChartData.max_ring_time.push(Number(item.max_ring_time) || 0);
-                  newChartData.avg_ring_time.push(Number(item.avg_ring_time) || 0);
-                  newChartData.min_ring_time.push(Number(item.min_ring_time) || 0);
-                  newChartData.min_cost.push(Number(item.min_cost) || 0);
-                  newChartData.avg_cost.push(Number(item.avg_cost) || 0);
-                  newChartData.max_cost.push(Number(item.max_cost) || 0);
-                  newChartData.min_duration.push(Number(item.min_duration) || 0);
-                  newChartData.avg_duration.push(Number(item.avg_duration) || 0);
-                  newChartData.max_duration.push(Number(item.max_duration) || 0);
-                } 
-              });
-              
-              
-              console.log("Chart data",newChartData);
-              
-              
-              const dataLength = newChartData.country.length;
-              
-              if (dataLength > 0 && 
-                  newChartData.answered_calls.length === dataLength &&
-                  newChartData.unanswered_calls.length === dataLength &&
-                  newChartData.total_calls.length === dataLength) {
-                
-                // Calls Chart
-                setChartCalls({
-                  series: [
-                    { name: 'Total', data: newChartData.total_calls },
-                    { name: 'Answered', data: newChartData.answered_calls },
-                    { name: 'Unanswered', data: newChartData.unanswered_calls }
-                  ],
-                  categories: newChartData.country
-                });
+      isFetchingRef.current = true;
+      lastFetchTimeRef.current = now;
+      lastFetchParamsRef.current = paramsKey;
 
-                // Ring Time Chart
-                setChartRingTime({
-                  series: [
-                    { name: 'Max Ring Time', data: newChartData.max_ring_time },
-                    { name: 'Avg Ring Time', data: newChartData.avg_ring_time },
-                    { name: 'Min Ring Time', data: newChartData.min_ring_time }
-                  ],
-                  categories: newChartData.country
-                });
+      setLoading(true);
+      setShowPageLoader(true);
 
-                // Cost Chart
-                setChartCost({
-                  series: [
-                    { name: 'Max Cost', data: newChartData.max_cost },
-                    { name: 'Avg Cost', data: newChartData.avg_cost },
-                    { name: 'Min Cost', data: newChartData.min_cost }
-                  ],
-                  categories: newChartData.country
-                });
+      try {
+        const response = await ListCallLogs(
+          {
+            page,
+            perPage,
+            search,
+            filters: currentFiltersRef.current,
+            reportType: "incomingStatsExtension",
+            moduleSlug: ModuleSlug.CALL_REPORTS,
+          },
+          "call-logs/statsIncomingByExtension",
+        );
 
-                // Duration Chart
-                setChartDuration({
-                  series: [
-                    { name: 'Max Duration', data: newChartData.max_duration },
-                    { name: 'Avg Duration', data: newChartData.avg_duration },
-                    { name: 'Min Duration', data: newChartData.min_duration }
-                  ],
-                  categories: newChartData.country
-                });
+        if (response?.summary) {
+          setShowDateRange(true);
+          const dataFilters = response?.filters;
+          setStartDateTime(dataFilters?.start_datetime);
+          setEndDateTime(dataFilters?.end_datetime);
 
-                
+          setSummary(response.summary);
+          setDataLoaded(true);
+        } else {
+          setDataLoaded(true);
+        }
 
-              } else {
-                console.error('Chart data arrays have different lengths or no data');
-                setChartCalls(null);
-                setChartRingTime(null);
-                setChartCost(null);
-                setChartDuration(null);
+        setLoading(false);
+        return response;
+      } catch {
+        setLoading(false);
+        setDataLoaded(true);
+        toast.error("Failed to fetch call data");
+        return null;
+      } finally {
+        setShowPageLoader(false);
+        isFetchingRef.current = false;
+      }
+    },
+    [],
+  );
+
+  const [simpleDonut, setSimpleDonut] = React.useState<{
+    series: number[];
+    labels: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (summary && dataLoaded) {
+      const answeredCalls = Number(summary.answered_calls) || 0;
+      const unansweredCalls = Number(summary.unanswered_calls) || 0;
+
+      // Check if both values are 0, if so don't set chart data (will show empty state)
+      if (answeredCalls === 0 && unansweredCalls === 0) {
+        setSimpleDonut(null);
+      } else {
+        // Set chart data only when there's actual data
+        setSimpleDonut({
+          series: [answeredCalls, unansweredCalls],
+          labels: ["Answered Calls", "Unanswered Calls"],
+        });
+      }
+    }
+  }, [summary, dataLoaded]);
+
+  // Trigger initial data fetch when filters become ready
+  // Ensure initial fetch happens when session is ready
+  useEffect(() => {
+    if (session?.user?.permissions?.includes("list-call-logs")) {
+      initialFetchDone.current = true;
+    }
+  }, [session]);
+
+  const handleFiltersChange = (filters: any) => {
+    // Convert datetime values from local timezone to UTC before sending to API
+    const formattedFilters: any = { ...filters };
+    if (formattedFilters.start_datetime) {
+      formattedFilters.start_datetime = formatStartDatetimeToUTC(
+        formattedFilters.start_datetime,
+      );
+    }
+    if (formattedFilters.end_datetime) {
+      formattedFilters.end_datetime = formatEndDatetimeToUTC(
+        formattedFilters.end_datetime,
+      );
+    }
+
+    // Check if filters actually changed
+    const filtersChanged =
+      JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
+
+    // Check if this is a complete clear (empty object or only has default values)
+    const isCompletelyCleared =
+      Object.keys(formattedFilters).length === 0 ||
+      (Object.keys(formattedFilters).length === 1 &&
+        Object.hasOwn(formattedFilters, "is_incoming_only"));
+
+    // Update both state and ref immediately
+    setCurrentFilters(formattedFilters);
+    currentFiltersRef.current = formattedFilters;
+
+    // Reset data loaded state when filters actually change or when cleared
+    if ((filtersChanged && filtersReady) || isCompletelyCleared) {
+      setDataLoaded(false);
+      // Reset chart filters ref to allow chart refetch
+      lastChartFilters.current = "";
+      setSummary(EMPTY_SUMMARY);
+
+      // Trigger refresh
+      setRefreshKey((prev) => prev + 1);
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const exportPayload = {
+        ...currentFilters,
+        timezone: getAutoTimezone(),
+      };
+      await DownloadCallsExport(
+        exportPayload,
+        "call-logs/report/extension/download",
+      );
+    } catch {
+      toast.error("Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const [chartCalls, setChartCalls] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+  const [chartRingTime, setChartRingTime] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+
+  const [chartDuration, setChartDuration] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+
+  const [chartLoading, setChartLoading] = useState(false);
+  const [showChartModal, setShowChartModal] = useState(false);
+  const [currentChartData, setCurrentChartData] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+  const [currentChartTitle, setCurrentChartTitle] = useState("");
+
+  useEffect(() => {
+    // Only fetch charts when filters are ready and not empty
+    // Check if filters have actually changed
+    const currentFiltersString = JSON.stringify(currentFilters);
+    const filtersChanged = lastChartFilters.current !== currentFiltersString;
+
+    if (
+      session &&
+      filtersChanged &&
+      currentFilters &&
+      Object.keys(currentFilters).length > 0
+    ) {
+      lastChartFilters.current = currentFiltersString;
+      const fetchCharts = async () => {
+        setChartLoading(true);
+        try {
+          const response = await ListCallLogs(
+            {
+              page: 1,
+              perPage: 15,
+              search: "",
+              filters: currentFilters,
+              reportType: "chartIncomingExtension",
+              moduleSlug: ModuleSlug.CALL_REPORTS,
+            },
+            "call-logs/stats/extension/chart",
+          );
+
+          const chartData = response?.chart_data;
+
+          if (chartData && Array.isArray(chartData) && chartData.length > 0) {
+            const newChartData: ChartData = {
+              country: [],
+              answered_calls: [],
+              unanswered_calls: [],
+              total_calls: [],
+              max_ring_time: [],
+              avg_ring_time: [],
+              min_ring_time: [],
+              min_cost: [],
+              avg_cost: [],
+              max_cost: [],
+              min_duration: [],
+              avg_duration: [],
+              max_duration: [],
+            };
+
+            chartData.forEach((item: any) => {
+              if (item?.label) {
+                newChartData.country.push(item.label);
+                newChartData.answered_calls.push(
+                  Number(item.answered_calls) || 0,
+                );
+                newChartData.unanswered_calls.push(
+                  Number(item.unanswered_calls) || 0,
+                );
+                newChartData.total_calls.push(Number(item.total_calls) || 0);
+                newChartData.max_ring_time.push(
+                  Number(item.max_ring_time) || 0,
+                );
+                newChartData.avg_ring_time.push(
+                  Number(item.avg_ring_time) || 0,
+                );
+                newChartData.min_ring_time.push(
+                  Number(item.min_ring_time) || 0,
+                );
+                newChartData.min_cost.push(Number(item.min_cost) || 0);
+                newChartData.avg_cost.push(Number(item.avg_cost) || 0);
+                newChartData.max_cost.push(Number(item.max_cost) || 0);
+                newChartData.min_duration.push(Number(item.min_duration) || 0);
+                newChartData.avg_duration.push(Number(item.avg_duration) || 0);
+                newChartData.max_duration.push(Number(item.max_duration) || 0);
               }
+            });
+
+            console.log("Chart data", newChartData);
+
+            const dataLength = newChartData.country.length;
+
+            if (
+              dataLength > 0 &&
+              newChartData.answered_calls.length === dataLength &&
+              newChartData.unanswered_calls.length === dataLength &&
+              newChartData.total_calls.length === dataLength
+            ) {
+              // Calls Chart
+              setChartCalls({
+                series: [
+                  { name: "Total", data: newChartData.total_calls },
+                  { name: "Answered", data: newChartData.answered_calls },
+                  { name: "Unanswered", data: newChartData.unanswered_calls },
+                ],
+                categories: newChartData.country,
+              });
+
+              // Ring Time Chart
+              setChartRingTime({
+                series: [
+                  { name: "Max Ring Time", data: newChartData.max_ring_time },
+                  { name: "Avg Ring Time", data: newChartData.avg_ring_time },
+                  { name: "Min Ring Time", data: newChartData.min_ring_time },
+                ],
+                categories: newChartData.country,
+              });
+
+              // Duration Chart
+              setChartDuration({
+                series: [
+                  { name: "Max Duration", data: newChartData.max_duration },
+                  { name: "Avg Duration", data: newChartData.avg_duration },
+                  { name: "Min Duration", data: newChartData.min_duration },
+                ],
+                categories: newChartData.country,
+              });
             } else {
-              console.log('No chart data available');
+              console.error(
+                "Chart data arrays have different lengths or no data",
+              );
               setChartCalls(null);
               setChartRingTime(null);
-              setChartCost(null);
               setChartDuration(null);
             }
-          } catch (error) {
-            console.error('Error fetching chart data:', error);
+          } else {
+            console.log("No chart data available");
             setChartCalls(null);
             setChartRingTime(null);
-            setChartCost(null);
             setChartDuration(null);
-          } finally {
-            setChartLoading(false);
           }
-        };
-
-        fetchCharts();
-      } else {
-        // Reset chart when filters are not ready
-        setChartCalls(null);
-        setChartRingTime(null);
-        setChartCost(null);
-        setChartDuration(null);
-        setChartLoading(false);
-      }
-    }, [currentFilters, session]);
-
-
-    const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
-
-    const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
-        if (chartData) {
-            setCurrentChartData(chartData);
-            setCurrentChartTitle(title);
-            setCurrentChartDataType(dataType);
-            setShowChartModal(true);
+        } catch (error) {
+          console.error("Error fetching chart data:", error);
+          setChartCalls(null);
+          setChartRingTime(null);
+          setChartDuration(null);
+        } finally {
+          setChartLoading(false);
         }
-    };
+      };
 
-    const handleTabChange = (key: string | null) => {
-        if (key) {
-            setActiveTab(key);
-        }
-    };
+      fetchCharts();
+    } else {
+      // Reset chart when filters are not ready
+      setChartCalls(null);
+      setChartRingTime(null);
+      setChartDuration(null);
+      setChartLoading(false);
+    }
+  }, [currentFilters, session]);
 
-   
-    
-    return (
-        <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Incoming Calls By Extension" showPageLoader={showPageLoader} />
+  const [currentChartDataType, setCurrentChartDataType] = useState<
+    "calls" | "time" | "cost" | "custom"
+  >("custom");
 
+  const handleOpenChartModal = (
+    chartData: { series: any[]; categories: string[] } | null,
+    title: string,
+    dataType: "calls" | "time" | "cost" | "custom",
+  ) => {
+    if (chartData) {
+      setCurrentChartData(chartData);
+      setCurrentChartTitle(title);
+      setCurrentChartDataType(dataType);
+      setShowChartModal(true);
+    }
+  };
 
-            <Row className="mb-3">
+  const handleTabChange = (key: string | null) => {
+    if (key) {
+      setActiveTab(key);
+    }
+  };
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Incoming Calls By Extension"
+        showPageLoader={showPageLoader}
+      />
+
+      <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
@@ -563,32 +713,31 @@ const CallIncomingExtension = () => {
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
-
-                  {showDateRange && (
-                            <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          
-                            </>
-                          )}
+                  <DateRangeDisplay
+                    show={showDateRange}
+                    start={startDateTime}
+                    end={endDateTime}
+                  />
                   {/* {session?.user?.permissions?.includes('') && ( */}
-                    <div className="d-flex align-items-center gap-2">
-                      <button 
-                        className="btn btn-outline-secondary" 
-                        onClick={() => handleExport()}
-                        disabled={isExporting}
-                      >
-                        {isExporting ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Exporting...
-                          </>
-                        ) : (
-                          'Export'
-                        )}
-                      </button>
-                    </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      className="btn btn-outline-secondary"
+                      onClick={() => handleExport()}
+                      disabled={isExporting}
+                    >
+                      {isExporting ? (
+                        <>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            aria-hidden="true"
+                          />
+                          <output>Exporting...</output>
+                        </>
+                      ) : (
+                        "Export"
+                      )}
+                    </button>
+                  </div>
                   {/* )} */}
                 </div>
               </Col>
@@ -597,572 +746,531 @@ const CallIncomingExtension = () => {
         </Col>
       </Row>
 
+      <Row>
+        <Col md={6}>
+          <Row>
+            <PageSummaryGrid
+              gridColumns={2}
+              cards={[
+                {
+                  id: "total-calls",
+                  title: "Total Calls",
+                  value: summary.total_calls,
+                  valueType: "number",
+                  description: "Total number of incoming calls",
+                  delay: 0,
+                  showAnimatedNumber: true,
+                },
+                {
+                  id: "avg-ring-time",
+                  title: "Avg Ring Time",
+                  value: summary.avg_ring_time,
+                  valueType: "seconds",
+                  description: "Average call time",
+                  delay: 1,
+                  showAnimatedNumber: true,
+                },
+                {
+                  id: "avg-duration",
+                  title: "Avg Duration",
+                  value: summary.avg_duration,
+                  valueType: "seconds",
+                  description: "Average duration of calls",
+                  delay: 2,
+                  showAnimatedNumber: true,
+                },
 
-            <Row>
-                <Col md={6}>
-                    <Row>
-                        <PageSummaryGrid
-                            gridColumns={2}
-                            cards={[
-                                {
-                                    id: 'total-calls',
-                                    title: 'Total Calls',
-                                    value: summary.total_calls,
-                                    valueType: 'number',
-                                    description: 'Total number of incoming calls',
-                                    delay: 0,
-                                    showAnimatedNumber: true
-                                },
-                                {
-                                    id: 'avg-ring-time',
-                                    title: 'Avg Ring Time',
-                                    value: summary.avg_ring_time,
-                                    valueType: 'seconds',
-                                    description: 'Average call time',
-                                    delay: 1,
-                                    showAnimatedNumber: true
-                                },
-                                {
-                                    id: 'avg-duration',
-                                    title: 'Avg Duration',
-                                    value: summary.avg_duration,
-                                    valueType: 'seconds',
-                                    description: 'Average duration of calls',
-                                    delay: 2,
-                                    showAnimatedNumber: true
-                                },
-                                
-                                    {
-                                        id: 'total-duration',
-                                        title: 'Duration',
-                                        value: summary.total_duration,
-                                        description: 'Total call duration',
-                                        valueType: 'seconds',
-                                        delay: 0.7,
-                                        animationDuration: 1000,
-                                        fontStyle: 'style-2'
-                                    }
-                            ]}
-                            
-                        />
-                    </Row>
-                </Col>
+                {
+                  id: "total-duration",
+                  title: "Duration",
+                  value: summary.total_duration,
+                  description: "Total call duration",
+                  valueType: "seconds",
+                  delay: 0.7,
+                  animationDuration: 1000,
+                  fontStyle: "style-2",
+                },
+              ]}
+            />
+          </Row>
+        </Col>
 
-                <Col md={6}>
-                <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.1 * 0 }}
-                        >
-                    <div className="report-grid ">
-                    <p className="text-muted mb-0">Total Calls</p>
-                        <div className="chart-one " >
-                            {loading || !dataLoaded ? (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="visually-hidden">Loading...</span>
-                                    </div>
-                                </div>
-                            ) : (summary.answered_calls === 0 && summary.unanswered_calls === 0 && summary.total_duration === 0) ? (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <p className="text-muted mb-0">No data available</p>
-                                </div>
-                            ) : simpleDonut ? (
-                                <ChartDonut 
-                                    series={simpleDonut.series} 
-                                    labels={simpleDonut.labels}
-                                    dataType="calls"
-                                    height={200}
-                                    width={500}
-                                    showDataLabels={true}
-                                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                                />
-                            ) : (
-                                <div className="d-flex align-items-center justify-content-center" style={{ height: '180px' }}>
-                                    <p className="text-muted mb-0">Loading chart...</p>
-                                </div>
-                            )}
+        <Col md={6}>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 * 0 }}
+          >
+            <div className="report-grid ">
+              <p className="text-muted mb-0">Total Calls</p>
+              <div className="chart-one ">
+                {(() => {
+                  if (loading || !dataLoaded) {
+                    return (
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ height: "180px" }}
+                      >
+                        <div className="spinner-border text-primary">
+                          <output className="visually-hidden">
+                            Loading...
+                          </output>
                         </div>
-                    </div>
-                    </motion.div>
-                </Col>
-            </Row>
-
-            <Row>
-
-                <Col md={12}>
-                    <h4 className="">Core Metrics</h4>
-                </Col>
-
-                <Col md={12}>
-                    <Tabs
-                        defaultActiveKey="calls_chart"
-                        id="system-tabs"
-                        className="mb-3"
-                        activeKey={activeTab}
-                        onSelect={handleTabChange}
+                      </div>
+                    );
+                  }
+                  const hasNoData =
+                    summary.answered_calls === 0 &&
+                    summary.unanswered_calls === 0 &&
+                    summary.total_duration === 0;
+                  if (hasNoData) {
+                    return (
+                      <div
+                        className="d-flex align-items-center justify-content-center"
+                        style={{ height: "180px" }}
+                      >
+                        <p className="text-muted mb-0">No data available</p>
+                      </div>
+                    );
+                  }
+                  if (simpleDonut) {
+                    return (
+                      <ChartDonut
+                        series={simpleDonut.series}
+                        labels={simpleDonut.labels}
+                        dataType="calls"
+                        height={200}
+                        width={500}
+                        showDataLabels={true}
+                        dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
+                      />
+                    );
+                  }
+                  return (
+                    <div
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ height: "180px" }}
                     >
-                        <Tab eventKey="calls_chart" title="Calls by Extension">
-                           <AnimatePresence mode="wait">
-                             {activeTab === 'calls_chart' && (
-                               <motion.div
-                                 key="calls_chart"
-                                 variants={tabVariants}
-                                 initial="hidden"
-                                 animate="visible"
-                                 exit="exit"
-                               >
-                                 <Row>
-                                  <Col md={12}>
-                                      <div className="card report-shadow">
-                                          <div className="card-body">
-                                          
-                                          {chartLoading ? (
-                                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
-                                                      <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
-                                              </div>
-                                          ) : chartCalls ? (
-                                              <ChartBar 
-                                                  series={chartCalls.series}
-                                                  categories={chartCalls.categories}
-                                                  dataType="calls"
-                                                  height={300}
-                                                  maxDisplayedItems={5}
-                                                  showViewAllButton={true}
-                                                  viewAllButtonText="View All"
-                                                  showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Extension', 'calls')}
-                                              />
-                                          ) : (
-                                            <div className=""></div>
-                                          )}
-                                          </div>
-                                      </div>
-                                  </Col>
-                                 </Row>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                        </Tab>
+                      <p className="text-muted mb-0">Loading chart...</p>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </motion.div>
+        </Col>
+      </Row>
 
+      <Row>
+        <Col md={12}>
+          <h4 className="">Core Metrics</h4>
+        </Col>
 
-                        <Tab eventKey="duration_chart" title="Duration by Extension">
-                           <AnimatePresence mode="wait">
-                             {activeTab === 'duration_chart' && (
-                               <motion.div
-                                 key="duration_chart"
-                                 variants={tabVariants}
-                                 initial="hidden"
-                                 animate="visible"
-                                 exit="exit"
-                               >
-                                 <Row>
-                                  <Col md={12}>
-                                      <div className="card report-shadow">
-                                          <div className="card-body">
-                                          
-                                          {chartLoading ? (
-                                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
-                                                      <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
-                                              </div>
-                                          ) : chartDuration ? (
-                                              <ChartBar 
-                                                  series={chartDuration.series}
-                                                  categories={chartDuration.categories}
-                                                  dataType="time"
-                                                  height={300}
-                                                  maxDisplayedItems={5}
-                                                  showViewAllButton={true}
-                                                  viewAllButtonText="View All"
-                                                  showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Extension', 'time')}
-                                              />
-                                          ) : (
-                                            <div className=""></div>
-                                          )}
-                                          </div>
-                                      </div>
-                                  </Col>
-                                 </Row>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                        </Tab>
-
-                        <Tab eventKey="ring_chart" title="Ring Time by Extension">
-                           <AnimatePresence mode="wait">
-                             {activeTab === 'ring_chart' && (
-                               <motion.div
-                                 key="ring_chart"
-                                 variants={tabVariants}
-                                 initial="hidden"
-                                 animate="visible"
-                                 exit="exit"
-                               >
-                                 <Row>
-                                  <Col md={12}>
-                                      <div className="card report-shadow">
-                                          <div className="card-body">
-                                          
-                                          {chartLoading ? (
-                                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
-                                                      <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
-                                              </div>
-                                          ) : chartRingTime ? (
-                                              <ChartBar 
-                                                  series={chartRingTime.series}
-                                                  categories={chartRingTime.categories}
-                                                  dataType="time"
-                                                  height={300}
-                                                  maxDisplayedItems={5}
-                                                  showViewAllButton={true}
-                                                  viewAllButtonText="View All"
-                                                  showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Extension', 'time')}
-                                              />
-                                          ) : (
-                                              <div className=""></div>
-                                          )}
-                                          </div>
-                                      </div>
-                                  </Col>
-                                 </Row>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                        </Tab>
-
-                        {/* <Tab eventKey="cost_chart" title="Cost by Extension">
-                           <AnimatePresence mode="wait">
-                             {activeTab === 'cost_chart' && (
-                               <motion.div
-                                 key="cost_chart"
-                                 variants={tabVariants}
-                                 initial="hidden"
-                                 animate="visible"
-                                 exit="exit"
-                               >
-                                 <Row>
-                                  <Col md={12}>
-                                      <div className="card report-shadow">
-                                          <div className="card-body">
-                                          
-                                          {chartLoading ? (
-                                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                                  <div className="spinner-border text-primary" role="status">
-                                                      <span className="visually-hidden">Loading chart...</span>
-                                                  </div>
-                                              </div>
-                                          ) : chartCost ? (
-                                              <ChartBar 
-                                                  series={chartCost.series}
-                                                  categories={chartCost.categories}
-                                                  dataType="cost"
-                                                  height={300}
-                                                  maxDisplayedItems={5}
-                                                  showViewAllButton={true}
-                                                  viewAllButtonText="View All"
-                                                  showFullScreenButton={true}
-                                                  onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Extension', 'cost')}
-                                              />
-                                          ) : (
-                                            <div className=""></div>
-                                          )}
-                                          </div>
-                                      </div>
-                                  </Col>
-                                 </Row>
-                               </motion.div>
-                             )}
-                           </AnimatePresence>
-                        </Tab> */}
-
-                    </Tabs>
-                </Col>
-            </Row>
-
-            {session?.user?.permissions?.includes('list-call-logs') && (
-              <>
-            <BarFilters
-            leftContent={
-              <>
-                {showDateRange && (
-                  <p className="mb-0">
-                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                  </p>
+        <Col md={12}>
+          <Tabs
+            defaultActiveKey="calls_chart"
+            id="system-tabs"
+            className="mb-3"
+            activeKey={activeTab}
+            onSelect={handleTabChange}
+          >
+            <Tab eventKey="calls_chart" title="Calls by Extension">
+              <AnimatePresence mode="wait">
+                {activeTab === "calls_chart" && (
+                  <ChartTabPanel
+                    activeTab={activeTab}
+                    tabKey="calls_chart"
+                    chartData={chartCalls}
+                    dataType="calls"
+                    chartLoading={chartLoading}
+                    tabVariants={TAB_VARIANTS}
+                    onFullScreenClick={() =>
+                      handleOpenChartModal(
+                        chartCalls,
+                        "Calls by Extension",
+                        "calls",
+                      )
+                    }
+                  />
                 )}
+              </AnimatePresence>
+            </Tab>
+
+            <Tab eventKey="duration_chart" title="Duration by Extension">
+              <AnimatePresence mode="wait">
+                {activeTab === "duration_chart" && (
+                  <ChartTabPanel
+                    activeTab={activeTab}
+                    tabKey="duration_chart"
+                    chartData={chartDuration}
+                    dataType="time"
+                    chartLoading={chartLoading}
+                    tabVariants={TAB_VARIANTS}
+                    onFullScreenClick={() =>
+                      handleOpenChartModal(
+                        chartDuration,
+                        "Duration by Extension",
+                        "time",
+                      )
+                    }
+                  />
+                )}
+              </AnimatePresence>
+            </Tab>
+
+            <Tab eventKey="ring_chart" title="Ring Time by Extension">
+              <AnimatePresence mode="wait">
+                {activeTab === "ring_chart" && (
+                  <ChartTabPanel
+                    activeTab={activeTab}
+                    tabKey="ring_chart"
+                    chartData={chartRingTime}
+                    dataType="time"
+                    chartLoading={chartLoading}
+                    tabVariants={TAB_VARIANTS}
+                    onFullScreenClick={() =>
+                      handleOpenChartModal(
+                        chartRingTime,
+                        "Ring Time by Extension",
+                        "time",
+                      )
+                    }
+                  />
+                )}
+              </AnimatePresence>
+            </Tab>
+          </Tabs>
+        </Col>
+      </Row>
+
+      {session?.user?.permissions?.includes("list-call-logs") && (
+        <>
+          <BarFilters
+            leftContent={
+              <DateRangeDisplay
+                show={showDateRange}
+                start={startDateTime}
+                end={endDateTime}
+              />
+            }
+            searchValue=""
+            onSearchChange={() => {}}
+            onSearch={() => {}}
+            searchPlaceholder="Search call stats..."
+            showSearch={false}
+            filters={pendingFilters}
+            onSubmit={() => {
+              // Convert and apply filters, then trigger all APIs
+              const filtersToApply = {
+                ...pendingFilters,
+                is_incoming_only: "true",
+              };
+              handleFiltersChange(filtersToApply);
+              // fetchCallLogs will be triggered by refreshKey change
+              // Chart data will be triggered by useEffect watching currentFilters
+            }}
+            onReset={() => {
+              // Preserve current date filters, clear all other filters
+              const resetPendingFilters: Record<string, any> = {
+                start_datetime:
+                  (pendingFilters as any)?.start_datetime ||
+                  defaultFilters.pending.start_datetime,
+                end_datetime:
+                  (pendingFilters as any)?.end_datetime ||
+                  defaultFilters.pending.end_datetime,
+                is_incoming_only: "true",
+              };
+              const resetCurrentFilters: Record<string, any> = {
+                start_datetime:
+                  (currentFilters as any)?.start_datetime ||
+                  defaultFilters.current.start_datetime,
+                end_datetime:
+                  (currentFilters as any)?.end_datetime ||
+                  defaultFilters.current.end_datetime,
+                is_incoming_only: "true",
+              };
+              setPendingFilters(resetPendingFilters);
+              setCurrentFilters(resetCurrentFilters);
+              currentFiltersRef.current = resetCurrentFilters;
+              handleFiltersChange(resetPendingFilters);
+            }}
+            filterContent={
+              <>
+                {/* Call Status */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Call Status</Form.Label>
+                    <SelectBox
+                      isSearchable={false}
+                      value={(pendingFilters as any)?.call_status || null}
+                      onChange={(value) => {
+                        setPendingFilters({
+                          ...pendingFilters,
+                          call_status: (value as string) || "",
+                        });
+                      }}
+                      options={[
+                        { value: "Answered", label: "Answered" },
+                        { value: "Not Answered", label: "Not Answered" },
+                        { value: "Both", label: "Both" },
+                      ]}
+                      placeholder="Select call status"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Called Numbers */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Called Numbers</Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Enter called numbers (comma separated)"
+                      value={(
+                        (pendingFilters as any)?.called_numbers || []
+                      ).join(", ")}
+                      onChange={(e) => {
+                        const values = e.target.value
+                          .split(",")
+                          .map((v) => v.trim())
+                          .filter(Boolean);
+                        setPendingFilters({
+                          ...pendingFilters,
+                          called_numbers: values,
+                        });
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Extension */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Extension</Form.Label>
+                    <SelectBox
+                      isMulti
+                      isSearchable={true}
+                      isDisabled={hierarchyLoading}
+                      value={
+                        (pendingFilters as any)?.extension_number?.length > 0
+                          ? (pendingFilters as any)?.extension_number
+                          : null
+                      }
+                      onChange={(value) => {
+                        setPendingFilters({
+                          ...pendingFilters,
+                          extension_number: value ? (value as string[]) : [],
+                        });
+                      }}
+                      options={
+                        (hierarchyDataExtensions as any)?.map((ext: any) => ({
+                          value: ext.id,
+                          label: ext.name,
+                        })) || []
+                      }
+                      placeholder="Select extensions"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Traffic Type */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Traffic Type</Form.Label>
+                    <SelectBox
+                      isSearchable={false}
+                      value={(pendingFilters as any)?.traffic_type || null}
+                      onChange={(value) => {
+                        setPendingFilters({
+                          ...pendingFilters,
+                          traffic_type: (value as string) || "",
+                        });
+                      }}
+                      options={[
+                        { value: "", label: "All" },
+                        { value: "internal", label: "Internal" },
+                        { value: "external", label: "External" },
+                      ]}
+                      placeholder="Select traffic type"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Destination Type */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Destination Type</Form.Label>
+                    <SelectBox
+                      isSearchable={false}
+                      value={(pendingFilters as any)?.destination_type || null}
+                      onChange={(value) => {
+                        setPendingFilters({
+                          ...pendingFilters,
+                          destination_type: (value as string) || "",
+                        });
+                      }}
+                      options={[
+                        { value: "", label: "All" },
+                        { value: "local", label: "Local" },
+                        { value: "national", label: "National" },
+                        { value: "international", label: "International" },
+                      ]}
+                      placeholder="Select destination type"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Departments */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Departments</Form.Label>
+                    <SelectBox
+                      isMulti
+                      isSearchable={true}
+                      isDisabled={hierarchyLoading}
+                      value={
+                        (pendingFilters as any)?.department?.length > 0
+                          ? (pendingFilters as any)?.department
+                          : null
+                      }
+                      onChange={(value) => {
+                        setPendingFilters({
+                          ...pendingFilters,
+                          department: value ? (value as string[]) : [],
+                        });
+                      }}
+                      options={
+                        (hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name,
+                        })) || []
+                      }
+                      placeholder="Select departments"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Date Range - Start */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>Start Date & Time</Form.Label>
+                    <Form.Control
+                      type="datetime-local"
+                      value={(pendingFilters as any)?.start_datetime || ""}
+                      max={moment().format("YYYY-MM-DDTHH:mm")}
+                      onChange={(e) => {
+                        const datetimeValue = e.target.value;
+                        const endDate =
+                          (pendingFilters as any)?.end_datetime || "";
+
+                        // If start date is greater than end date, adjust end date to start date
+                        let updatedFilters: any = {
+                          ...pendingFilters,
+                          start_datetime: datetimeValue,
+                        };
+
+                        if (
+                          datetimeValue &&
+                          endDate &&
+                          moment(datetimeValue).isAfter(moment(endDate))
+                        ) {
+                          updatedFilters.end_datetime = datetimeValue;
+                        }
+
+                        setPendingFilters(updatedFilters);
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Date Range - End */}
+                <Col md={4}>
+                  <Form.Group>
+                    <Form.Label>End Date & Time</Form.Label>
+                    <Form.Control
+                      type="datetime-local"
+                      value={(pendingFilters as any)?.end_datetime || ""}
+                      min={(pendingFilters as any)?.start_datetime || ""}
+                      max={moment().format("YYYY-MM-DDTHH:mm")}
+                      onChange={(e) => {
+                        const datetimeValue = e.target.value;
+                        const startDate =
+                          (pendingFilters as any)?.start_datetime || "";
+
+                        // If end date is less than start date, adjust start date to end date
+                        let updatedFilters: any = {
+                          ...pendingFilters,
+                          end_datetime: datetimeValue,
+                        };
+
+                        if (
+                          datetimeValue &&
+                          startDate &&
+                          moment(datetimeValue).isBefore(moment(startDate))
+                        ) {
+                          updatedFilters.start_datetime = datetimeValue;
+                        }
+
+                        setPendingFilters(updatedFilters);
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
               </>
             }
-              searchValue=""
-              onSearchChange={() => {}}
-              onSearch={() => {}}
-              searchPlaceholder="Search call stats..."
-              showSearch={false}
-              filters={pendingFilters}
-              onSubmit={() => {
-                // Convert and apply filters, then trigger all APIs
-                const filtersToApply = { ...pendingFilters, is_incoming_only: 'true' };
-                handleFiltersChange(filtersToApply);
-                // fetchCallLogs will be triggered by refreshKey change
-                // Chart data will be triggered by useEffect watching currentFilters
-              }}
-              onReset={() => {
-                // Preserve current date filters, clear all other filters
-                const resetPendingFilters: Record<string, any> = {
-                  start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
-                  is_incoming_only: 'true'
-                };
-                const resetCurrentFilters: Record<string, any> = {
-                  start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
-                  is_incoming_only: 'true'
-                };
-                setPendingFilters(resetPendingFilters);
-                setCurrentFilters(resetCurrentFilters);
-                currentFiltersRef.current = resetCurrentFilters;
-                handleFiltersChange(resetPendingFilters);
-              }}
-              filterContent={
-                <>
-                  
+          />
 
-                  {/* Call Status */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Call Status</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.call_status || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, call_status: value as string || '' });
-                        }}
-                        options={[
-                          { value: 'Answered', label: 'Answered' },
-                          { value: 'Not Answered', label: 'Not Answered' },
-                          { value: 'Both', label: 'Both' }
-                        ]}
-                        placeholder="Select call status"
-                      />
-                    </Form.Group>
-                  </Col>
+          <GenericListPage
+            columns={columns}
+            fetchData={fetchCallLogs}
+            title="Call Logs"
+            searchPlaceholder="Search call stats..."
+            defaultPageSize={15}
+            filters={currentFilters}
+            refreshKey={refreshKey}
+            tableStyle="table-style-2"
+            search={false}
+          />
+        </>
+      )}
 
-                  {/* Called Numbers */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Called Numbers</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter called numbers (comma separated)"
-                        value={((pendingFilters as any)?.called_numbers || []).join(', ')}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
-                          setPendingFilters({ ...pendingFilters, called_numbers: values });
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Extension */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Extension</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.extension_number?.length > 0 ? (pendingFilters as any)?.extension_number : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, extension_number: value ? (value as string[]) : [] });
-                        }}
-                        options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
-                          value: ext.id,
-                          label: ext.name
-                        })) || []}
-                        placeholder="Select extensions"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Traffic Type */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Traffic Type</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.traffic_type || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, traffic_type: value as string || '' });
-                        }}
-                        options={[
-                          { value: '', label: 'All' },
-                          { value: 'internal', label: 'Internal' },
-                          { value: 'external', label: 'External' }
-                        ]}
-                        placeholder="Select traffic type"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Destination Type */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Destination Type</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.destination_type || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, destination_type: value as string || '' });
-                        }}
-                        options={[
-                          { value: '', label: 'All' },
-                          { value: 'local', label: 'Local' },
-                          { value: 'national', label: 'National' },
-                          { value: 'international', label: 'International' }
-                        ]}
-                        placeholder="Select destination type"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Departments */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Departments</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
-                        }}
-                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
-                          value: dept.id,
-                          label: dept.name
-                        })) || []}
-                        placeholder="Select departments"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Date Range - Start */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Start Date & Time</Form.Label>
-                      <Form.Control
-                        type="datetime-local"
-                        value={(pendingFilters as any)?.start_datetime || ''}
-                        max={moment().format('YYYY-MM-DDTHH:mm')}
-                        onChange={(e) => {
-                          const datetimeValue = e.target.value;
-                          const endDate = (pendingFilters as any)?.end_datetime || '';
-                          
-                          // If start date is greater than end date, adjust end date to start date
-                          let updatedFilters: any = {
-                              ...pendingFilters,
-                              start_datetime: datetimeValue
-                          };
-                          
-                          if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
-                              updatedFilters.end_datetime = datetimeValue;
-                          }
-                          
-                          setPendingFilters(updatedFilters);
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Date Range - End */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>End Date & Time</Form.Label>
-                      <Form.Control
-                        type="datetime-local"
-                        value={(pendingFilters as any)?.end_datetime || ''}
-                        min={(pendingFilters as any)?.start_datetime || ''}
-                        max={moment().format('YYYY-MM-DDTHH:mm')}
-                        onChange={(e) => {
-                          const datetimeValue = e.target.value;
-                          const startDate = (pendingFilters as any)?.start_datetime || '';
-                          
-                          // If end date is less than start date, adjust start date to end date
-                          let updatedFilters: any = {
-                              ...pendingFilters,
-                              end_datetime: datetimeValue
-                          };
-                          
-                          if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
-                              updatedFilters.start_datetime = datetimeValue;
-                          }
-                          
-                          setPendingFilters(updatedFilters);
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-                </>
-              }
-            />
-            
-
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchCallLogs}
-                 title="Call Logs"
-                 searchPlaceholder="Search call stats..."
-                 defaultPageSize={15}
-                 filters={currentFilters}
-                 refreshKey={refreshKey}
-                 tableStyle='table-style-2'
-                 search={false} 
-             />
-             </>
-            )}
-
-            {/* Chart Modal */}
-            <Modal 
-                show={showChartModal} 
-                onHide={() => setShowChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
+      {/* Chart Modal */}
+      <Modal
+        show={showChartModal}
+        onHide={() => setShowChartModal(false)}
+        size="xl"
+        centered
+        className="chart-modal"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>{currentChartTitle}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {currentChartData ? (
+            <div className="chart-container" style={{ minHeight: "500px" }}>
+              <ChartBar
+                series={currentChartData.series}
+                categories={currentChartData.categories}
+                height={500}
+                dataType={currentChartDataType}
+              />
+            </div>
+          ) : (
+            <div
+              className="d-flex align-items-center justify-content-center"
+              style={{ height: "500px" }}
             >
-                <Modal.Header closeButton>
-                    <Modal.Title>{currentChartTitle}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {currentChartData ? (
-                        <div className="chart-container" style={{ minHeight: '500px' }}>
-                            <ChartBar 
-                                series={currentChartData.series}
-                                categories={currentChartData.categories}
-                                height={500}
-                                dataType={currentChartDataType}
-                            />
-                        </div>
-                    ) : (
-                        <div className="d-flex align-items-center justify-content-center" style={{ height: '500px' }}>
-                            <p className="text-muted mb-0">No chart data available</p>
-                        </div>
-                    )}
-                </Modal.Body>
-            </Modal>
-
-        
-        </React.Fragment>
-    );
+              <p className="text-muted mb-0">No chart data available</p>
+            </div>
+          )}
+        </Modal.Body>
+      </Modal>
+    </React.Fragment>
+  );
 };
 
 CallIncomingExtension.getLayout = (page: ReactElement) => {
-    return <Layout>{page}</Layout>;
+  return <Layout>{page}</Layout>;
 };
 
 export default CallIncomingExtension;

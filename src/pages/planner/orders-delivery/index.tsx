@@ -13,26 +13,10 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import StatsCards from "@components/GenericStatsCards";
 import OrderEditModal from "@components/OrderEditModal";
 import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
   FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
 } from "react-icons/fi";
 import {
   getOrders,
@@ -56,11 +40,9 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
   Table,
-  InputGroup,
   Modal,
   Spinner
 } from "react-bootstrap";
@@ -69,9 +51,6 @@ import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper"
 import {
   Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -80,11 +59,6 @@ import {
   X,
   Users,
   PlusCircle,
-  Zap,
-  Star,
-  Clock,
-  Search,
-  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -98,13 +72,10 @@ import {
   Activity,
   FileText,
   ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
   History,
   Mail,
   Phone,
   Building2,
-  Package,
   Link2,
   User,
   Paperclip,
@@ -112,7 +83,6 @@ import {
   Download as DownloadIcon,
   RotateCcw,
   AlertCircle,
-  Handshake,
   Info,
 } from "lucide-react";
 import {
@@ -127,7 +97,6 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Spinner } from 'react-bootstrap';
-import { FileText, Calendar, CheckCircle2, AlertCircle, Clock, Edit, Trash2 } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';

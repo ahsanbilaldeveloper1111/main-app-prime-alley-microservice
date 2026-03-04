@@ -89,7 +89,6 @@ import FAQTypes from "@pages/faqs/types";
 
 // Import Staff Insights & Work Planner components
 import RequestCategories from "@pages/workforce/request-categories";
-import RequestSubCategories from "@pages/workforce/sub-categories";
 import WorkPlannerStatuses from "@pages/planner/statuses";
 
 // Import AI Chat components

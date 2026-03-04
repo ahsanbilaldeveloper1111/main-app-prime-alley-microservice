@@ -7,9 +7,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import  { useState } from 'react';
-import { 
-  Grid3x3, Bell, Plus, Search, ChevronDown, MoreVertical,
-  Users, Shield, User, X, Edit2, Trash2
+import { Plus, Search, ChevronDown, MoreVertical,
+  Users, Shield, User, Edit2, Trash2
 } from 'lucide-react';
 import { Row, Col } from 'react-bootstrap';
 import StatsCard from '@components/work-planner/stats-cards';

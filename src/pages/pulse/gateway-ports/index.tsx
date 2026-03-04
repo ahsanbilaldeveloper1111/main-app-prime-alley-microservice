@@ -1,54 +1,45 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import React, { ReactElement, useCallback, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { ListPorts } from "@utils/ports";
-import { getGsmData, UpdatePortMobileNumber } from "@utils/GsmManagement";
+import { UpdatePortMobileNumber } from "@utils/GsmManagement";
 
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
-import Select from "@components/AppSelect";
 
 import "@assets/scss/common.scss";
-import { motion } from "framer-motion";
 
 import GsmPortFilter from "@components/filters/GsmPortFilter";
 
-import AnimatedNumber from "@components/AnimatedNumber";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
-import imgStatus1 from "@assets/images/widget/img-status-1.svg";
-import imgStatus2 from "@assets/images/widget/img-status-2.svg";
-import imgStatus3 from "@assets/images/widget/img-status-3.svg";
-import imgStatus4 from "@assets/images/widget/img-status-4.svg";
 import { FiEdit } from "react-icons/fi";
 import DatatableActionButton from "@components/DatatableActionButton";
 
 const GsmPorts = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const columns: Column[] = [
-    
-    ...(session?.user?.is_admin === "1" ? [
-    {
-      key: "ip_address",
-      name: "Device Name ",
-      selector: (row: any) => row?.gsm?.name,
-      sortable: true,
-    },
-  
-    {
-      key: "port_number",
-      name: "Port",
-      selector: (row: any) => row.port_number,
-      sortable: true,
-    },
-  ] : []),
+    ...(session?.user?.is_admin === "1"
+      ? [
+          {
+            key: "ip_address",
+            name: "Device Name ",
+            selector: (row: any) => row?.gsm?.name,
+            sortable: true,
+          },
 
+          {
+            key: "port_number",
+            name: "Port",
+            selector: (row: any) => row.port_number,
+            sortable: true,
+          },
+        ]
+      : []),
 
     {
       key: "mobile_number",
@@ -106,98 +97,102 @@ const GsmPorts = () => {
       ),
     },
 
-    ...(session?.user?.permissions?.includes('imei-gsm-ports') ? [
-    {
-      key: "imei",
-      name: "IMEI",
-      selector: (row: any) => row.imei,
-      sortable: true,
-    },
-    ] : []),
+    ...(session?.user?.permissions?.includes("imei-gsm-ports")
+      ? [
+          {
+            key: "imei",
+            name: "IMEI",
+            selector: (row: any) => row.imei,
+            sortable: true,
+          },
+        ]
+      : []),
 
-    ...(session?.user?.permissions?.includes('imsi-gsm-ports') ? [
-    {
-      key: "imsi",
-      name: "IMSI",
-      selector: (row: any) => row.imsi,
-      sortable: true,
-    },
-    ] : []),
+    ...(session?.user?.permissions?.includes("imsi-gsm-ports")
+      ? [
+          {
+            key: "imsi",
+            name: "IMSI",
+            selector: (row: any) => row.imsi,
+            sortable: true,
+          },
+        ]
+      : []),
 
-    ...(session?.user?.permissions?.includes('iccid-gsm-ports') ? [
-    {
-      key: "iccid",
-      name: "ICCID",
-      selector: (row: any) => row.iccid,
-      sortable: true,
-    },
-    ] : []),
-    
-    ...(session?.user?.is_admin === "1" ? [
-      {
-        key: "status",
-        name: "Port Status",
-        selector: (row: any) => row.port_status,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props?.status === "up" && (
-              <span className="status-badge success">Active</span>
-            )}
-            {props?.status === "down" && (
-              <span className="status-badge danger">Not Active</span>
-            )}
-          </div>
-        ),
-      },
+    ...(session?.user?.permissions?.includes("iccid-gsm-ports")
+      ? [
+          {
+            key: "iccid",
+            name: "ICCID",
+            selector: (row: any) => row.iccid,
+            sortable: true,
+          },
+        ]
+      : []),
 
-      {
-        key: "companyies",
-        name: "Company",
-        selector: (row: any) => row.companies,
-        sortable: true,
-        cell: (props: any) => <div>{props?.companies?.[0]?.name}</div>,
-      },
-      {
-        key: "Action",
-        name: "action",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <div className="d-flex gap-3">
-            {/* {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
+    ...(session?.user?.is_admin === "1"
+      ? [
+          {
+            key: "status",
+            name: "Port Status",
+            selector: (row: any) => row.port_status,
+            sortable: true,
+            cell: (props: any) => (
+              <div>
+                {props?.status === "up" && (
+                  <span className="status-badge success">Active</span>
+                )}
+                {props?.status === "down" && (
+                  <span className="status-badge danger">Not Active</span>
+                )}
+              </div>
+            ),
+          },
+
+          {
+            key: "companyies",
+            name: "Company",
+            selector: (row: any) => row.companies,
+            sortable: true,
+            cell: (props: any) => <div>{props?.companies?.[0]?.name}</div>,
+          },
+          {
+            key: "Action",
+            name: "action",
+            selector: (row: any) => row.id,
+            sortable: false,
+            cell: (props: any) => (
+              <div className="d-flex gap-3">
+                {/* {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
                       props?.unassigned_ports?.length > 0 && (
                         <button className="btn btn-sm btn-outline-primary" onClick={() => handleUpdateMobileNumber(props.id)}>Update Mobile Number</button>
                     )}     */}
-  
-            <DatatableActionButton
-              actions={[
-                ...(session?.user?.permissions?.includes(
-                  "update-mobile-number-gsm-ports"
-                )
-                  ? [
-                      {
-                        label: "Update Mobile Number",
-                        icon: <FiEdit className="me-2" />,
-                        onClick: () => handleUpdateMobileNumber(props.id, props.mobile_number),
-                        className: "action-edit",
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-          </div>
-        ),
-      },
 
-
-    ] : []),
-    
-
-
-
-
-    
+                <DatatableActionButton
+                  actions={[
+                    ...(session?.user?.permissions?.includes(
+                      "update-mobile-number-gsm-ports",
+                    )
+                      ? [
+                          {
+                            label: "Update Mobile Number",
+                            icon: <FiEdit className="me-2" />,
+                            onClick: () =>
+                              handleUpdateMobileNumber(
+                                props.id,
+                                props.mobile_number,
+                              ),
+                            className: "action-edit",
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -258,11 +253,19 @@ const GsmPorts = () => {
     },
   ];
 
-  const fetchGsmPorts = useCallback(async (page = 1, perPage = 15, search = "") => {
-    const data = await ListPorts({ page, perPage, search, filters: currentFilters });
-    setPortSummary(data?.summary);
-    return data;
-  }, [currentFilters]);
+  const fetchGsmPorts = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      const data = await ListPorts({
+        page,
+        perPage,
+        search,
+        filters: currentFilters,
+      });
+      setPortSummary(data?.summary);
+      return data;
+    },
+    [currentFilters],
+  );
 
   const handleFiltersChange = (filters: any) => {
     setCurrentFilters(filters);
@@ -270,7 +273,7 @@ const GsmPorts = () => {
 
   const handleExport = async (
     exportType: string,
-    filters: Record<string, any>
+    filters: Record<string, any>,
   ) => {
     // try {
     //     const response = await ExportCallLogs({ page: 1, perPage: 15, search: "", filters, isExport: true, exportType });
@@ -281,7 +284,10 @@ const GsmPorts = () => {
     // }
   };
 
-  const handleUpdateMobileNumber = async (id: number, currentMobileNumber?: string) => {
+  const handleUpdateMobileNumber = async (
+    id: number,
+    currentMobileNumber?: string,
+  ) => {
     setSelectedPortId(id);
     setMobileNumber(currentMobileNumber || "");
     setShowUpdateMobileNumberModal(true);
@@ -327,14 +333,17 @@ const GsmPorts = () => {
     }
 
     setIsUpdating(true);
-    
+
     try {
-      const success = await UpdatePortMobileNumber(selectedPortId.toString(), mobileNumber.trim());
-      
+      const success = await UpdatePortMobileNumber(
+        selectedPortId.toString(),
+        mobileNumber.trim(),
+      );
+
       if (success) {
         setShowUpdateMobileNumberModal(false);
         setShowUpdateMobileNumberSubmitModal(true);
-        setRefreshKey(prev => prev + 1); // Refresh the data
+        setRefreshKey((prev) => prev + 1); // Refresh the data
         setMobileNumber(""); // Clear the form
         setSelectedPortId(null); // Clear selected port
       } else {
@@ -356,7 +365,9 @@ const GsmPorts = () => {
           <div className="page-header-title style-2">
             <Row className="align-items-center">
               <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">Carrier Ports</h2>
+                <h2 className="mb-0 d-flex align-items-center">
+                  Carrier Ports
+                </h2>
               </Col>
               <Col md={9} className="d-flex justify-content-end">
                 <div className="action-buttons">
@@ -500,7 +511,7 @@ const GsmPorts = () => {
                 value={mobileNumber}
                 onChange={(e) => setMobileNumber(e.target.value)}
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !isUpdating) {
+                  if (e.key === "Enter" && !isUpdating) {
                     submitMobileNumberUpdate();
                   }
                 }}
@@ -525,7 +536,11 @@ const GsmPorts = () => {
               >
                 {isUpdating ? (
                   <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    ></span>
                     Updating...
                   </>
                 ) : (

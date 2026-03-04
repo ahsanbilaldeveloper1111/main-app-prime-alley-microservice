@@ -21,7 +21,7 @@ import {
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
-import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, FileText, Plus, Edit, Trash2, Package, History, Calendar, RefreshCw } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, ArrowLeft, Plus, Edit, Trash2, Package, History, Calendar, RefreshCw } from "lucide-react";
 import Select from 'react-select';
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";

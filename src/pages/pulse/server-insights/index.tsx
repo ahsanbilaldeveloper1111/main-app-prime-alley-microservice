@@ -4,30 +4,22 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 import  { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { getSystemMetrics, getAlerts, SystemMetric, SystemMetricsResponse, Alert } from "@utils/netops";
 import { 
-  Search, 
   Server, 
-  Globe, 
-  Layout as LayoutIcon, 
-  Database, 
-  Star,
+  Globe,
   ChevronRight,
   AlertCircle,
   CheckCircle,
   AlertTriangle,
   XCircle,
   ChevronDown,
-  LayoutGrid,
-  List,
   Cpu,
   HardDrive,
   Activity,

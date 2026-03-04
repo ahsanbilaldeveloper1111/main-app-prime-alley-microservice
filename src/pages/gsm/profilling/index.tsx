@@ -2,10 +2,9 @@ import React, { ReactElement, useEffect, useRef, useState } from 'react';
 import Layout from '@layout/index';
 import '@assets/scss/datatable-style.scss';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Card, Col, Dropdown, Row } from 'react-bootstrap';
+import { Col, Dropdown, Row } from 'react-bootstrap';
 import dynamic from 'next/dynamic';
 import data  from '@common/JsonData/GsmInbox';
-import AnimatedNumber from '@components/AnimatedNumber';
 
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';
 

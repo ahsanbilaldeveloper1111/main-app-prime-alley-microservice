@@ -3,7 +3,7 @@ import {
   Search, ChevronDown, Plus, MoreVertical, Calendar,
   MessageSquare, Paperclip, CheckSquare, Users, Grid3x3, Bell,
   Folder, FileText, Clock, CheckCircle2, AlertCircle, LayoutGrid,
-  X, CalendarDays, Tag, User
+  X
 } from 'lucide-react';
 import { Row, Col, Button, Offcanvas, Badge, Nav } from 'react-bootstrap';
 import StatsCard from '@components/work-planner/stats-cards';

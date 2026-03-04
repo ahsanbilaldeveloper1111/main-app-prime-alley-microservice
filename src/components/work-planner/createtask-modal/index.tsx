@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Button, Form, Row, Col, Badge } from 'react-bootstrap';
+import { Modal, Button, Form, Row, Col } from 'react-bootstrap';
 import { 
   X, 
   Calendar, 
-  User, 
   FileText, 
   Tag,
   Users,
@@ -14,12 +13,7 @@ import {
   Search,
   Link as LinkIcon,
   FolderOpen,
-  Circle,
-  AlertCircle,
-  Check,
-  Ticket,
-  FileSpreadsheet,
-  Phone
+  Check
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask, listTasks } from '@utils/tasks';

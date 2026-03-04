@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Button, Overlay, Popover } from 'react-bootstrap';
-import { FiMoreVertical,FiArrowDown,FiArrowUp, FiChevronDown } from 'react-icons/fi';
+import { FiChevronDown } from 'react-icons/fi';
 
 interface ActionItem {
   label: string;

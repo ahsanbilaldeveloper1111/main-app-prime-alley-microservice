@@ -9,10 +9,8 @@ import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
 // Import partial components
-import UsersTabs from './partials/UsersTabs';
 import UsersHeader from './partials/UsersHeader';
 import OverviewTab from './partials/OverviewTab';
-import InsightTab from './partials/InsightTab';
 import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
 import ResetPasswordModal from '@components/ResetPasswordModal';

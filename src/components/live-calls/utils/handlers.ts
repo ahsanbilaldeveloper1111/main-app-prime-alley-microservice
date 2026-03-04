@@ -1,5 +1,5 @@
 import React from 'react'
-import { ShowPopup, PendingMonitoringData, CtiDevice } from './types'
+import { ShowPopup, PendingMonitoringData } from './types'
 import { executeMonitoring } from './monitoringHelpers'
 
 /**

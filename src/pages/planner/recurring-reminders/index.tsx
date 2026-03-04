@@ -14,7 +14,7 @@ import "@assets/scss/tabs.scss";
 import { listTasks, getTask, updateTask, deleteTask, listProjects } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
-import { Spinner, Button, Form, Dropdown } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import GenericSidebar from '@components/GenericSidebar';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
@@ -22,16 +22,11 @@ import CreateRecurringTaskModal from '@components/work-planner/createrecurringta
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import {
   Plus,
-  Search,
   Settings,
-  ChevronDown,
   MoreVertical,
-  Grid3x3,
   Bell,
-  User,
   Calendar,
   Check,
-  Square,
   Lock,
   Mail,
   Server,

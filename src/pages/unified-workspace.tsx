@@ -1,9 +1,7 @@
 import React,{ReactElement, useEffect, useState,useRef} from 'react'
 import Layout from '@layout/index'
-import ImageStatus6 from '@assets/images/widget/img-status-6.svg'
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
@@ -12,13 +10,9 @@ const { BASE_URL, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CON
 
 
 import { Container, Row, Col, Card, Button, Form, Badge } from 'react-bootstrap';
-import ExpandableSidebar from '@components/updated-sidebar'
-import KPIOverview , { KPIItem } from '@components/KPIS-overview';
 import KPIMeter from '@components/kpis-meter';
-import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import { 
   Users, 
-  FileText, 
   Ticket, 
   ShoppingCart, 
   UserPlus, 
@@ -29,40 +23,15 @@ import {
   Activity,
   DollarSign,
   CheckCircle,
-  Clock,
-  AlertCircle,
-  BarChart3,
-  PieChart,
-  Calendar,
-  ArrowUp,
-  ArrowDown,
-  Bell,
   ChevronLeft,
-  ChevronRight,
-  Menu
+  ChevronRight
 } from 'lucide-react';
 
-import { 
-   
-    Pie, 
-    Cell, 
-    ResponsiveContainer, 
-    Tooltip,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Legend,
-    LineChart,
-    Line,
-    Area,
-    AreaChart,
-    ComposedChart 
-  } from 'recharts';
 
-  import "@assets/scss/ticketsnew.scss";
-  import { Analytics1, Analytics2, Analytics3, Analytics4, Analytics5, Analytics6, Analytics7, Analytics8, Analytics9, Analytics10, Analytics11, Analytics12, Analytics13, Analytics14, Analytics15 } from '@components/analytics-types';
+
+
+import "@assets/scss/ticketsnew.scss";
+  import { Analytics1, Analytics2, Analytics3, Analytics4, Analytics5, Analytics6, Analytics7 } from '@components/analytics-types';
 
 // Module type definition
 interface Module {
