@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Row, Col, Form, Button, Card, Badge, Modal, Pagination } from 'react-bootstrap';
-import { Mail, Clock, Sparkles } from 'lucide-react';
+import { Mail, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import { generateEmail, getEmails, sendEmail } from '@utils/communication';

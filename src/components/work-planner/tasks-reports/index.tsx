@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
-  FileText, Download, Calendar, AlertCircle, CheckCircle2,
-  ChevronDown, Search, X, MoreVertical
+  FileText, Calendar, AlertCircle, CheckCircle2, X, MoreVertical
 } from 'lucide-react';
 import { Row, Col } from 'react-bootstrap';
 import StatsCard from '@components/work-planner/stats-cards';

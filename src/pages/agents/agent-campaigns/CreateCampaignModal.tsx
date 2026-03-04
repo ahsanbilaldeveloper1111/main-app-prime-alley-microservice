@@ -3,7 +3,7 @@ import { Modal, Row, Col, Button } from "react-bootstrap";
 import { CreateCampaign, ListVoiceBots } from "@utils/aiml";
 import { toast } from "react-toastify";
 import parsePhoneNumber from "libphonenumber-js";
-import { Upload, Rocket } from "lucide-react";
+import { Upload } from "lucide-react";
 
 interface CampaignData {
   campaignName: string;

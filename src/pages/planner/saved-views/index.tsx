@@ -8,8 +8,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import  { useState } from 'react';
-import { 
-  Grid3x3, Bell, Plus, Search, ChevronDown, MoreVertical,
+import { Search, ChevronDown, MoreVertical,
   Folder, Users, Clock, X, Check
 } from 'lucide-react';
 import { Row, Col } from 'react-bootstrap';

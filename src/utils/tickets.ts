@@ -1,8 +1,6 @@
 import { toast } from "react-toastify";
 import { reportApiErrorFromCatch } from "./sentryLogger";
 import axiosInstance from "./axios";
-import tokenService from "./tokenService";
-import axios from "axios";
 
 
 interface PaginationParams {

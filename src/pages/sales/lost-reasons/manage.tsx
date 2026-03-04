@@ -1,6 +1,5 @@
-import React, { ReactElement, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Card,
@@ -12,12 +11,11 @@ import {
   Alert,
 } from "react-bootstrap";
 import Link from "next/link";
-import { FiArrowLeft, FiSave, FiXCircle, FiInfo } from "react-icons/fi";
+import { FiArrowLeft, FiSave, FiInfo } from "react-icons/fi";
 import { 
   createOrderLostReason, 
   updateOrderLostReason, 
-  getOrderLostReason,
-  OrderLostReasonData
+  getOrderLostReason
 } from "@utils/sales";
 import { toast } from "react-toastify";
 

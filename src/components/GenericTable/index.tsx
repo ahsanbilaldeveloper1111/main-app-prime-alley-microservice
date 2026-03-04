@@ -20,12 +20,8 @@ import {
   X,
   Plus,
   Filter,
-  Download,
-  Save,
   MoreVertical,
   Menu,
-  ChevronDown,
-  ExternalLink,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import { StatsCardData } from "@components/GenericStatsCards";

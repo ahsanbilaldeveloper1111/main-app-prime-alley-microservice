@@ -27,7 +27,6 @@ import {
   Badge,
   Spinner,
 } from "react-bootstrap";
-import Select from "react-select";
 import {
   PlusCircle,
   Eye,

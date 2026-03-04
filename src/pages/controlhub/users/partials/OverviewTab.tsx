@@ -3,8 +3,6 @@ import { Row, Col, Form } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import UsersList from './UsersList';
-import UserGrowthChart from './UserGrowthChart';
-import DepartmentDistributionChart from './DepartmentDistributionChart';
 import RecentActivities from './RecentActivities';
 import { Column } from '@components/CustomDataTable';
 import BarFilters from '@components/BarFilters';

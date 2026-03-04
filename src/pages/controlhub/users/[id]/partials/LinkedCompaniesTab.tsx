@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Card, Col, Row, Button } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import Select, { MultiValue } from 'react-select';
 import FormModal from '@pages/partial/FormModal';

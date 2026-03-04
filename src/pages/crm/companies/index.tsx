@@ -11,7 +11,6 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import {
   Button,
   Card,
@@ -24,7 +23,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -45,49 +43,32 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
-  FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
-  FiMoreVertical,
 } from "react-icons/fi";
 import {
   Users,
   Calendar,
-  XCircle,
-  Clock as ClockIcon,
-  ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  UserPlus,
   ArrowUp,
   ArrowDown,
   Download,
-  CheckSquare,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
   Eye,
-  Trash2,
   MoreVertical,
   Phone as PhoneIcon,
   Phone,
   Mail,
-  User,
-  History,
-  FileText,
   Target,
   Layers,
-  Link as LinkIcon,
-  Linkedin,
-  ExternalLink,
   ClipboardList,
-  MoreHorizontal,
 } from "lucide-react";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import ConvertToLeadModal from "@components/ConvertToLeadModal";
@@ -95,9 +76,6 @@ import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
@@ -105,17 +83,10 @@ import GenericSidebar, {
   QuickAction,
   SidebarField,
 } from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
-  getCrmData,
-  getCrmDataById,
-  createCrmData,
-  updateCrmData,
   uploadCrmDataCsv,
-  deleteCrmData,
   assignCrmDataAdvanced,
   getCrmDataCounts,
   bulkDeleteCrmData,
@@ -145,19 +116,13 @@ import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import {
   ModuleSlug,
-  formatDuration,
-  formatDateTimeToLocal,
-  GlobalDateFormat,
-  GlobalTimeFormat,
   GlobalDateTimeFormat,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
-import CircularProgressCircle from "@components/CircularProgressCircle";
 
 import renderCreateCompany, {
   type CompanyFormPayload,
@@ -8046,3 +8011,4 @@ CrmCompanyManagement.getLayout = (page: ReactElement) => {
 };
 
 export default CrmCompanyManagement;
+

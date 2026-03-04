@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
 import SimpleCanvas from '@components/SimpleCanvas';
-import { Card } from 'react-bootstrap';
 
 interface GenericListPageProps {
     columns: Column[];

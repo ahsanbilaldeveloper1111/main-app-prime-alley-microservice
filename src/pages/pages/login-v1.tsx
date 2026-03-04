@@ -5,11 +5,9 @@ import React, { ReactElement } from "react";
 
 // img
 import authlogin from "@assets/images/authentication/img-auth-login.png";
-import logodark from "@assets/images/logo-dark.svg";
 
 import Link from "next/link";
 import { Card, Row } from "react-bootstrap";
-import dashboard from "@pages/dashboard";
 
 const Loginv1 = () => {
     return (

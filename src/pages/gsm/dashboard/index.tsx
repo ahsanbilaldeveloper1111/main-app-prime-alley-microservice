@@ -1,30 +1,17 @@
 import React,{ReactElement, useEffect, useState, useMemo} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, Form, Modal, Row } from 'react-bootstrap'
+import { Button, Card, Col, Modal, Row } from 'react-bootstrap'
 import { DashboardData } from '@utils/GsmManagement'
 
-import { toast } from 'react-toastify'
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import imgStatus5 from '@assets/images/widget/img-status-5.svg'
-import imgStatus6 from '@assets/images/widget/img-status-6.svg'
-import imgStatus7 from '@assets/images/widget/img-status-7.svg'
-import imgStatus8 from '@assets/images/widget/img-status-8.svg'
-import imgStatus9 from '@assets/images/widget/img-status-9.svg'
 import  '@assets/scss/common.scss'
-import AnimatedNumber from '@components/AnimatedNumber';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import moment from 'moment';
 const baseUrl = '';
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { set } from 'nprogress'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface SummaryData {

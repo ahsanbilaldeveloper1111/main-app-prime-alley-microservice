@@ -26,7 +26,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -48,11 +47,9 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
@@ -77,7 +74,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Trash2,
   MoreVertical,
   Phone as PhoneIcon,
   Phone,
@@ -86,30 +82,20 @@ import {
   History,
   FileText,
   Target,
-  Layers,
   MessageCircle,
-  MessageSquare,
+  Trash2,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   getCrmDataById,
@@ -147,7 +133,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -561,7 +546,9 @@ const CrmProspectsManagement = () => {
     null,
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteModalMode, setDeleteModalMode] = useState<"single" | "bulk" | null>(null);
+  const [deleteModalMode, setDeleteModalMode] = useState<
+    "single" | "bulk" | null
+  >(null);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
@@ -755,87 +742,109 @@ const CrmProspectsManagement = () => {
     setContactFormLoadError(null);
     setContactFormLoading(true);
     getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
-        if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                    value: t.name ?? t.value ?? String(t.id ?? ""),
-                    label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
-                  },
-            )
-          : [];
-        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
-        let phoneCountryCode = "";
-        let phoneNumber = item.phone ?? "";
-        if (typeof item.phone === "string" && item.phone.trim()) {
-          try {
-            const normalized = item.phone.replace(/\s/g, "");
-            const parsed = parsePhoneNumberInput(normalized);
-            if (parsed) {
-              phoneCountryCode = `+${parsed.countryCallingCode}`;
-              phoneNumber = parsed.nationalNumber;
+      .then(
+        (
+          item: CrmDataItem & {
+            data?: Record<string, any>;
+            source_file?: string;
+            tags?: { id?: number; name?: string }[];
+          },
+        ) => {
+          if (cancelled) return;
+          const d = item.data || {};
+          const nameParts = (item.name || "").trim().split(/\s+/);
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          const toDatetimeLocal = (v: string | null | undefined) => {
+            if (!v) return "";
+            const m = moment(v);
+            return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
+          };
+          const rawTags =
+            (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
+          const tagsArray = Array.isArray(rawTags)
+            ? rawTags.map((t: any) =>
+                typeof t === "string"
+                  ? { value: t, label: t }
+                  : {
+                      value: t.name ?? t.value ?? String(t.id ?? ""),
+                      label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
+                    },
+              )
+            : [];
+          // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
+          let phoneCountryCode = "";
+          let phoneNumber = item.phone ?? "";
+          if (typeof item.phone === "string" && item.phone.trim()) {
+            try {
+              const normalized = item.phone.replace(/\s/g, "");
+              const parsed = parsePhoneNumberInput(normalized);
+              if (parsed) {
+                phoneCountryCode = `+${parsed.countryCallingCode}`;
+                phoneNumber = parsed.nationalNumber;
+              }
+            } catch {
+              // keep phoneNumber as-is, phoneCountryCode ""
             }
-          } catch {
-            // keep phoneNumber as-is, phoneCountryCode ""
           }
-        }
-        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
-        const reservedDataKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "disposition",
-          "tags",
-          "note",
-          "contact_owner",
-          "lifecycle_stage",
-          "legal_basis",
-        ]);
-        const customFieldsArray = Object.entries(d)
-          .filter(([k]) => !reservedDataKeys.has(k))
-          .map(([field_name, field_value]) => ({
-            id: `${Date.now()}-${Math.random()}-${field_name}`,
-            field_name,
-            field_value: Array.isArray(field_value)
-              ? (field_value as string[]).join(", ")
-              : String(field_value ?? "").trim(),
-          }))
-          .filter((f) => f.field_name || f.field_value);
-        setContactForm({
-          firstName,
-          lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phone_country_code: phoneCountryCode,
-          phoneNumber,
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
-          note: item.note ?? d.note ?? "",
-          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
-          custom_fields: customFieldsArray,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
+          // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
+          const reservedDataKeys = new Set([
+            "email",
+            "assigned_to",
+            "uploaded_by",
+            "disposition",
+            "tags",
+            "note",
+            "contact_owner",
+            "lifecycle_stage",
+            "legal_basis",
+          ]);
+          const customFieldsArray = Object.entries(d)
+            .filter(([k]) => !reservedDataKeys.has(k))
+            .map(([field_name, field_value]) => ({
+              id: `${Date.now()}-${Math.random()}-${field_name}`,
+              field_name,
+              field_value: Array.isArray(field_value)
+                ? (field_value as string[]).join(", ")
+                : String(field_value ?? "").trim(),
+            }))
+            .filter((f) => f.field_name || f.field_value);
+          setContactForm({
+            firstName,
+            lastName,
+            email: d.email ?? (item as any).email ?? "",
+            phone_country_code: phoneCountryCode,
+            phoneNumber,
+            campaign_id: item.campaign_id ?? d.campaign_id ?? null,
+            contact_owner:
+              (item as any).user_extension ??
+              d.contact_owner ??
+              (item as any).contact_owner ??
+              null,
+            lifecycle_stage: d.lifecycle_stage ?? "",
+            disposition: d.disposition ?? (item as any).disposition ?? "",
+            legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
+            company_domain:
+              (item as any).company_domain ?? d.company_domain ?? "",
+            scheduled_call_at: toDatetimeLocal(
+              item.scheduled_call_at ?? d.scheduled_call_at,
+            ),
+            tags: tagsArray as Array<{
+              value: string;
+              label: string;
+              id: number;
+            }>,
+            note: item.note ?? d.note ?? "",
+            source:
+              (item as any).source_file ??
+              d.source ??
+              (item as any).source ??
+              "",
+            custom_fields: customFieldsArray,
+          });
+          if (!cancelled) setContactFormLoading(false);
+        },
+      )
       .catch(() => {
         if (!cancelled) {
           setContactFormLoadError("Failed to load prospect");
@@ -887,9 +896,9 @@ const CrmProspectsManagement = () => {
     tags: null as string[] | null,
   });
   /** View mode: table or board; dropdown shows only the other option to switch */
-  const [prospectsViewMode, setProspectsViewMode] = useState<
-    "table" | "board"
-  >("table");
+  const [prospectsViewMode, setProspectsViewMode] = useState<"table" | "board">(
+    "table",
+  );
 
   // Column customization and pagination states
   const defaultSelectedColumns = [
@@ -1295,16 +1304,35 @@ const CrmProspectsManagement = () => {
         }
       }
       const preferredTopLevelOrder = [
-        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
-        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
-        "note", "company_name", "company_domain", "company_id", "created_at",
-        "updated_at", "tags", "crm_summary",
+        "id",
+        "name",
+        "phone",
+        "user_extension",
+        "campaign_id",
+        "source_file",
+        "directory",
+        "is_viewed",
+        "scheduled_call_at",
+        "uploaded_by",
+        "created_by",
+        "note",
+        "company_name",
+        "company_domain",
+        "company_id",
+        "created_at",
+        "updated_at",
+        "tags",
+        "crm_summary",
       ];
       const orderedTopLevel = [
         ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
+        ...Array.from(topLevelKeys)
+          .filter((k) => !preferredTopLevelOrder.includes(k))
+          .sort((a, b) => a.localeCompare(b)),
       ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
+      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
+        a.localeCompare(b),
+      );
       const nestedDataKeysSet = new Set(orderedNestedData);
       const headers = [
         ...orderedTopLevel,
@@ -1322,13 +1350,21 @@ const CrmProspectsManagement = () => {
           return row?.company_name != null ? String(row.company_name) : "";
         }
         if (header === "crm_summary") {
-          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
+          const summary =
+            row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+          return summary != null
+            ? typeof summary === "string"
+              ? summary
+              : String(summary)
+            : "";
         }
-        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
+        const raw = nestedDataKeysSet.has(header)
+          ? (row?.data?.[header] ?? row?.[header])
+          : row?.[header];
         if (raw == null) return "";
         if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+        if (typeof raw === "number" || typeof raw === "boolean")
+          return String(raw);
         try {
           return JSON.stringify(raw);
         } catch {
@@ -1342,7 +1378,9 @@ const CrmProspectsManagement = () => {
       };
       const csvContent = [
         headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
+        ...allData.map((row) =>
+          headers.map((h) => escapeCsv(getCellValue(row, h))).join(","),
+        ),
       ].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
@@ -1419,12 +1457,12 @@ const CrmProspectsManagement = () => {
       try {
         const tags = await getCrmDataTags();
         const tagOptions = tags
-        .filter((tag: any) => tag.id != null)
-        .map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
+          .filter((tag: any) => tag.id != null)
+          .map((tag: any) => ({
+            value: tag.name,
+            label: tag.name,
+            id: tag.id,
+          }));
         setAvailableTags(tagOptions);
       } catch (error) {
         console.error("Failed to load tags:", error);
@@ -1703,9 +1741,7 @@ const CrmProspectsManagement = () => {
         setTotalAllProspects(response.pagination.total || 0);
       }
 
-      setMetrics(
-        response.metrics || {},
-      );
+      setMetrics(response.metrics || {});
     } catch (error: any) {
       // Only handle error if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -2477,8 +2513,7 @@ const CrmProspectsManagement = () => {
       if (!prospect?.id) return;
       const name = prospect.name ?? "";
       const phone = prospect.phone ?? "";
-      const campaignId =
-        prospect.campaign_id ?? prospect.campaign?.id ?? null;
+      const campaignId = prospect.campaign_id ?? prospect.campaign?.id ?? null;
       const existingData = (prospect.data as Record<string, unknown>) ?? {};
       try {
         await updateCrmData(prospect.id, {
@@ -3358,91 +3393,91 @@ const CrmProspectsManagement = () => {
           <ChevronDown size={16} />
         </button>
 
-      {showAddContactsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setEditingContactId(null);
-              setContactForm({
-                firstName: "",
-                lastName: "",
-                email: "",
-                phone_country_code: "",
-                phoneNumber: "",
-                campaign_id: null,
-                contact_owner: null,
-                lifecycle_stage: "Lead",
-                disposition: "",
-                legal_basis: [],
-                company_domain: "",
-                scheduled_call_at: "",
-                tags: [],
-                note: "",
-                source: "",
-                custom_fields: [],
-              });
-              setShowCreateContactSidebar(true);
-            }}
+        {showAddContactsDropdown && (
+          <div
             style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
+              position: "absolute",
+              top: "100%",
+              right: 0,
+              marginTop: "4px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: "5px",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+              minWidth: "160px",
+              zIndex: 1000,
+              overflow: "hidden",
             }}
           >
-            Create new
-          </button>
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setShowUploadModal(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#d97706",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Import
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => {
+                setShowAddContactsDropdown(false);
+                setEditingContactId(null);
+                setContactForm({
+                  firstName: "",
+                  lastName: "",
+                  email: "",
+                  phone_country_code: "",
+                  phoneNumber: "",
+                  campaign_id: null,
+                  contact_owner: null,
+                  lifecycle_stage: "Lead",
+                  disposition: "",
+                  legal_basis: [],
+                  company_domain: "",
+                  scheduled_call_at: "",
+                  tags: [],
+                  note: "",
+                  source: "",
+                  custom_fields: [],
+                });
+                setShowCreateContactSidebar(true);
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                backgroundColor: "transparent",
+                border: "none",
+                textAlign: "left",
+                fontSize: "14px",
+                color: "#141414",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f7fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              Create new
+            </button>
+            <button
+              onClick={() => {
+                setShowAddContactsDropdown(false);
+                setShowUploadModal(true);
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                backgroundColor: "transparent",
+                border: "none",
+                textAlign: "left",
+                fontSize: "14px",
+                color: "#d97706",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f7fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              Import
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3470,7 +3505,7 @@ const CrmProspectsManagement = () => {
       const phoneForPayload =
         contactForm.phone_country_code && contactForm.phoneNumber?.trim()
           ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-          : contactForm.phoneNumber?.trim() ?? "";
+          : (contactForm.phoneNumber?.trim() ?? "");
       const customFieldsForPayload = (contactForm.custom_fields ?? [])
         .map((f) => ({
           field_name: String(f.field_name ?? "").trim(),
@@ -3503,8 +3538,8 @@ const CrmProspectsManagement = () => {
           company_domain: contactForm.company_domain?.trim() || undefined,
           source: contactForm.source?.trim() || undefined,
           tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
+            ? contactForm.tags.map((t) => t.id)
+            : [],
           data: dataPayload,
         });
         fetchCrmData();
@@ -3559,7 +3594,7 @@ const CrmProspectsManagement = () => {
     const phoneForPayload =
       contactForm.phone_country_code && contactForm.phoneNumber?.trim()
         ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-        : contactForm.phoneNumber?.trim() ?? "";
+        : (contactForm.phoneNumber?.trim() ?? "");
     const customFieldsForPayload = (contactForm.custom_fields ?? [])
       .map((f) => ({
         field_name: String(f.field_name ?? "").trim(),
@@ -3904,14 +3939,16 @@ const CrmProspectsManagement = () => {
                           international
                           defaultCountry="US"
                           value={
-                            contactForm.phone_country_code && contactForm.phoneNumber
+                            contactForm.phone_country_code &&
+                            contactForm.phoneNumber
                               ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
                               : contactForm.phoneNumber || undefined
                           }
                           onChange={(value) => {
                             if (value) {
                               try {
-                                const phoneNumber = parsePhoneNumberInput(value);
+                                const phoneNumber =
+                                  parsePhoneNumberInput(value);
                                 if (phoneNumber) {
                                   setContactForm({
                                     ...contactForm,
@@ -4024,7 +4061,7 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Owner
+                        Associate with
                       </label>
                       <Select
                         value={(() => {
@@ -4056,7 +4093,7 @@ const CrmProspectsManagement = () => {
                             ext.extension ||
                             String(ext.id || ""),
                         }))}
-                        placeholder="Select owner"
+                        placeholder="Select associate with"
                         isClearable
                         isSearchable
                         styles={{
@@ -4480,7 +4517,11 @@ const CrmProspectsManagement = () => {
                     {/* Custom fields (user-defined) */}
                     <div
                       className="contact-form-field"
-                      style={{ marginBottom: contactForm.custom_fields?.length ? "12px" : "0px" }}
+                      style={{
+                        marginBottom: contactForm.custom_fields?.length
+                          ? "12px"
+                          : "0px",
+                      }}
                     >
                       <button
                         type="button"
@@ -4572,7 +4613,9 @@ const CrmProspectsManagement = () => {
                                   ...prev,
                                   custom_fields: (prev.custom_fields ?? []).map(
                                     (cf, i) =>
-                                      i === idx ? { ...cf, field_value: v } : cf,
+                                      i === idx
+                                        ? { ...cf, field_value: v }
+                                        : cf,
                                   ),
                                 }));
                               }}
@@ -4598,9 +4641,9 @@ const CrmProspectsManagement = () => {
                               onClick={() =>
                                 setContactForm((prev) => ({
                                   ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).filter(
-                                    (cf) => cf.id !== f.id,
-                                  ),
+                                  custom_fields: (
+                                    prev.custom_fields ?? []
+                                  ).filter((cf) => cf.id !== f.id),
                                 }))
                               }
                               style={{
@@ -4616,12 +4659,14 @@ const CrmProspectsManagement = () => {
                                 color: "#718096",
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = "#fef2f2";
+                                e.currentTarget.style.backgroundColor =
+                                  "#fef2f2";
                                 e.currentTarget.style.borderColor = "#ef4444";
                                 e.currentTarget.style.color = "#ef4444";
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "transparent";
+                                e.currentTarget.style.backgroundColor =
+                                  "transparent";
                                 e.currentTarget.style.borderColor = "#8a8a8a";
                                 e.currentTarget.style.color = "#718096";
                               }}
@@ -5611,34 +5656,37 @@ const CrmProspectsManagement = () => {
                 statsCards={prospectsStatsCards}
                 // When Board View is selected, show board content instead of table
                 customBody={
-  prospectsViewMode === "board" ? (
-    <KanbanBoard
-      columns={prospectsToKanbanColumns(
-        dataList,
-        getInitials,
-        getRandomColor
-      )}
-      onCardClick={(card) => handleViewData(card.raw)}
-      onCardMove={(cardId, fromCol, toCol) => {
-        // Optionally call updateCrmData here to persist the lifecycle_stage change
-        const prospect = dataList.find(p => p.id === cardId);
-        if (prospect) {
-          updateCrmData(Number(cardId), {
-            name: prospect.name || "",
-            phone: prospect.phone || "",
-            campaign_id: prospect.campaign_id,
-            data: { ...prospect.data, lifecycle_stage: toCol },
-            scheduled_call_at: prospect.scheduled_call_at || undefined,
-            company_domain: prospect.data?.company_domain || undefined,
-            company_name: prospect.data?.company_name || undefined,
-            source: prospect.data?.source || undefined,
-          });
-        }
-      }}
-      searchValue={prospectsSearch}
-    />
-  ) : undefined
-}
+                  prospectsViewMode === "board" ? (
+                    <KanbanBoard
+                      columns={prospectsToKanbanColumns(
+                        dataList,
+                        getInitials,
+                        getRandomColor,
+                      )}
+                      onCardClick={(card) => handleViewData(card.raw)}
+                      onCardMove={(cardId, fromCol, toCol) => {
+                        // Optionally call updateCrmData here to persist the lifecycle_stage change
+                        const prospect = dataList.find((p) => p.id === cardId);
+                        if (prospect) {
+                          updateCrmData(Number(cardId), {
+                            name: prospect.name || "",
+                            phone: prospect.phone || "",
+                            campaign_id: prospect.campaign_id,
+                            data: { ...prospect.data, lifecycle_stage: toCol },
+                            scheduled_call_at:
+                              prospect.scheduled_call_at || undefined,
+                            company_domain:
+                              prospect.data?.company_domain || undefined,
+                            company_name:
+                              prospect.data?.company_name || undefined,
+                            source: prospect.data?.source || undefined,
+                          });
+                        }
+                      }}
+                      searchValue={prospectsSearch}
+                    />
+                  ) : undefined
+                }
               />
             </div>
           </div>
@@ -8327,14 +8375,20 @@ const CrmProspectsManagement = () => {
             }
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
-            crmSummary={selectedProspect?.data?.crm_summary ?? selectedProspect?.crm_summary ?? undefined}
+            crmSummary={
+              selectedProspect?.data?.crm_summary ??
+              selectedProspect?.crm_summary ??
+              undefined
+            }
             recordLink={{
               label: "View record",
               onClick: () => {
                 const prospectId = selectedProspect?.id;
                 if (prospectId != null) {
                   setShowProspectSidebar(false);
-                  router.push(`/crm/prospects/prospects-detailpage?id=${prospectId}`);
+                  router.push(
+                    `/crm/prospects/prospects-detailpage?id=${prospectId}`,
+                  );
                 }
               },
             }}
@@ -8452,9 +8506,14 @@ const CrmProspectsManagement = () => {
                   action: {
                     label: "Log activity",
                     onClick: () => {
-                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
+                      const id =
+                        selectedProspect?.id ??
+                        selectedProspect?.data?.id ??
+                        "";
                       if (id) {
-                        router.push(`/crm/prospects/prospects-detailpage?id=${id}`);
+                        router.push(
+                          `/crm/prospects/prospects-detailpage?id=${id}`,
+                        );
                         handleCloseProspectSidebar();
                       }
                     },
@@ -8691,7 +8750,8 @@ const CrmProspectsManagement = () => {
                 prospectsFilters.nextCallDateFrom;
             }
             if (prospectsFilters.nextCallDateTo) {
-              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+              filtersToApply.scheduled_call_to =
+                prospectsFilters.nextCallDateTo;
             }
 
             handleFiltersChange(filtersToApply);
@@ -8772,187 +8832,187 @@ const CrmProspectsManagement = () => {
       >
         <hr />
         <h6 className="mb-3">Export filters</h6>
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Associate with</Form.Label>
-                <Form.Select
-                  value={
-                    exportFilters.user_extension
-                      ? String(exportFilters.user_extension)
-                      : ""
-                  }
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.user_extension = v;
-                      else delete next.user_extension;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All owners</option>
-                  {extensions.map((ext) => (
-                    <option
-                      key={String(ext.id || ext.extension)}
-                      value={String(ext.id || ext.extension)}
-                    >
-                      {ext.display_name ||
-                        ext.name ||
-                        ext.id ||
-                        ext.extension ||
-                        ""}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Lead status</Form.Label>
-                <Form.Select
-                  value={exportFilters.disposition || ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.disposition = v;
-                      else delete next.disposition;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All status</option>
-                  <option value="hot_lead">Hot Lead</option>
-                  <option value="warm_lead">Warm Lead</option>
-                  <option value="cold_lead">Cold Lead</option>
-                  <option value="interested">Interested</option>
-                  <option value="callback_requested">Callback Requested</option>
-                  <option value="no_answer">No Answer</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="follow_up">Follow Up</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Create date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.created_at_from;
-                    const to = exportFilters.created_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.created_at_from;
-                        delete next.created_at_to;
+        <Row>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Associate with</Form.Label>
+              <Form.Select
+                value={
+                  exportFilters.user_extension
+                    ? String(exportFilters.user_extension)
+                    : ""
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.user_extension = v;
+                    else delete next.user_extension;
+                    return next;
+                  });
+                }}
+              >
+                <option value="">All owners</option>
+                {extensions.map((ext) => (
+                  <option
+                    key={String(ext.id || ext.extension)}
+                    value={String(ext.id || ext.extension)}
+                  >
+                    {ext.display_name ||
+                      ext.name ||
+                      ext.id ||
+                      ext.extension ||
+                      ""}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Lead status</Form.Label>
+              <Form.Select
+                value={exportFilters.disposition || ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.disposition = v;
+                    else delete next.disposition;
+                    return next;
+                  });
+                }}
+              >
+                <option value="">All status</option>
+                <option value="hot_lead">Hot Lead</option>
+                <option value="warm_lead">Warm Lead</option>
+                <option value="cold_lead">Cold Lead</option>
+                <option value="interested">Interested</option>
+                <option value="callback_requested">Callback Requested</option>
+                <option value="no_answer">No Answer</option>
+                <option value="not_interested">Not Interested</option>
+                <option value="follow_up">Follow Up</option>
+              </Form.Select>
+            </Form.Group>
+          </Col>
+        </Row>
+        <Row>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Create date</Form.Label>
+              <Form.Select
+                value={(() => {
+                  const from = exportFilters.created_at_from;
+                  const to = exportFilters.created_at_to;
+                  if (!from || !to) return "all";
+                  const days = moment(to).diff(moment(from), "days");
+                  if (days === 0) return "today";
+                  if (days >= 6 && days <= 8) return "week";
+                  if (days >= 28 && days <= 31) return "month";
+                  return "all";
+                })()}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v === "all") {
+                      delete next.created_at_from;
+                      delete next.created_at_to;
+                    } else {
+                      const today = moment().format("YYYY-MM-DD");
+                      if (v === "today") {
+                        next.created_at_from = today;
+                        next.created_at_to = today;
+                      } else if (v === "week") {
+                        next.created_at_from = moment()
+                          .subtract(7, "days")
+                          .format("YYYY-MM-DD");
+                        next.created_at_to = today;
                       } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.created_at_from = today;
-                          next.created_at_to = today;
-                        } else if (v === "week") {
-                          next.created_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        } else {
-                          next.created_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        }
+                        next.created_at_from = moment()
+                          .subtract(30, "days")
+                          .format("YYYY-MM-DD");
+                        next.created_at_to = today;
                       }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Last activity date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.last_called_at_from;
-                    const to = exportFilters.last_called_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.last_called_at_from;
-                        delete next.last_called_at_to;
+                    }
+                    return next;
+                  });
+                }}
+              >
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+              </Form.Select>
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Last activity date</Form.Label>
+              <Form.Select
+                value={(() => {
+                  const from = exportFilters.last_called_at_from;
+                  const to = exportFilters.last_called_at_to;
+                  if (!from || !to) return "all";
+                  const days = moment(to).diff(moment(from), "days");
+                  if (days === 0) return "today";
+                  if (days >= 6 && days <= 8) return "week";
+                  if (days >= 28 && days <= 31) return "month";
+                  return "all";
+                })()}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v === "all") {
+                      delete next.last_called_at_from;
+                      delete next.last_called_at_to;
+                    } else {
+                      const today = moment().format("YYYY-MM-DD");
+                      if (v === "today") {
+                        next.last_called_at_from = today;
+                        next.last_called_at_to = today;
+                      } else if (v === "week") {
+                        next.last_called_at_from = moment()
+                          .subtract(7, "days")
+                          .format("YYYY-MM-DD");
+                        next.last_called_at_to = today;
                       } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.last_called_at_from = today;
-                          next.last_called_at_to = today;
-                        } else if (v === "week") {
-                          next.last_called_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        } else {
-                          next.last_called_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        }
+                        next.last_called_at_from = moment()
+                          .subtract(30, "days")
+                          .format("YYYY-MM-DD");
+                        next.last_called_at_to = today;
                       }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-          <Form.Group className="mb-0">
-            <Form.Label>Search (optional)</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Filter by name, phone, etc."
-              value={exportFilters.search || ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setExportFilters((prev) => {
-                  const next = { ...prev };
-                  if (v) next.search = v;
-                  else delete next.search;
-                  return next;
-                });
-              }}
-            />
-          </Form.Group>
+                    }
+                    return next;
+                  });
+                }}
+              >
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+              </Form.Select>
+            </Form.Group>
+          </Col>
+        </Row>
+        <Form.Group className="mb-0">
+          <Form.Label>Search (optional)</Form.Label>
+          <Form.Control
+            type="text"
+            placeholder="Filter by name, phone, etc."
+            value={exportFilters.search || ""}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              setExportFilters((prev) => {
+                const next = { ...prev };
+                if (v) next.search = v;
+                else delete next.search;
+                return next;
+              });
+            }}
+          />
+        </Form.Group>
       </CrmExportModal>
       {/* Add Tab Modal */}
       <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>

@@ -4,11 +4,7 @@ import {
   PhoneOff,
   CheckCircle,
   MoreVertical,
-  Mic,
-  MicOff,
   Pause,
-  Phone,
-  Users,
   ChevronDown
 } from 'lucide-react';
 

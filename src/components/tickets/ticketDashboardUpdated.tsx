@@ -1,5 +1,5 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Table, ProgressBar, Form, Alert, Modal, InputGroup, Dropdown, Breadcrumb  } from 'react-bootstrap';
+import React, { useState, useEffect, ChangeEvent } from 'react';
+import { Container, Row, Col, Card, Button, Badge, Table, Form, Alert, Modal, InputGroup, Dropdown  } from 'react-bootstrap';
 
 import { 
   LayoutDashboard, 
@@ -25,7 +25,6 @@ import {
   Upload, 
   Info,
   Plus,
-  MessageSquare,
   Send,
 
 
@@ -42,14 +41,9 @@ import {
   Tag,
   FileText,
 
-  BarChart2,
-
-   PieChart,
-
-   BarChart3, Grid, TrendingUp, Grid3x3, Box, FolderTree, Home, Bell, Users
+  BarChart2, Grid3x3, FolderTree, Bell, Users
   
 } from 'lucide-react';
-import CompanyLogo from "@assets/images/ringedge-logo.png";
 import CompanyLogo2 from "@assets/images/ringedge-logo-black-n-blue.png";
 import {
     BarChart as ReBarChart,
@@ -57,9 +51,6 @@ import {
     XAxis,
     YAxis,
     Tooltip as RechartsTooltip,
-    Pie as RePie,
-    PieChart as RePieChart,
-    Cell,
     Legend as RechartsLegend,
     ResponsiveContainer,
     CartesianGrid,

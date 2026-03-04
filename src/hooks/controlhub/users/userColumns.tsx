@@ -1,7 +1,5 @@
 import React, { useMemo } from 'react';
 import { Column } from '@components/CustomDataTable';
-import { FiEdit } from 'react-icons/fi';
-import DatatableActionButton from '@components/DatatableActionButton';
 import { Button, Dropdown } from 'react-bootstrap';
 import { Eye, Key } from 'lucide-react';
 

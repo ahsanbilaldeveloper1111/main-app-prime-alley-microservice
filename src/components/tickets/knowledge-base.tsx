@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Row, Col, Card, Button, Form, Badge } from 'react-bootstrap';
+import { Row, Col, Card, Button, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,
   ChevronRight,
-  Lock,
   BookOpen,
   Video,
   Users,
   FileQuestion,
-  Shield,
-  DollarSign,
-  Link2,
-  Phone,
-  Bot,
-  BarChart3,
   Eye,
   Calendar, 
   TrendingUp,

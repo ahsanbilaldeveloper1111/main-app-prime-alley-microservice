@@ -3,7 +3,7 @@ import { Modal, Button, Form, Row, Col, Card, Badge, Table } from "react-bootstr
 import Select from 'react-select';
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
-import { CheckCircle, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Package, X } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Package } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   createDeal,

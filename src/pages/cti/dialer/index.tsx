@@ -1,4 +1,4 @@
-import React, { ReactElement, useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
@@ -8,8 +8,6 @@ import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
 import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getAllUserDevices, mergeCalls,transferCalls, RemoveCall, attendCall} from '../../../utils/dialer'
 import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
-import Select from 'react-select'
-import { FaLastfmSquare } from 'react-icons/fa'
 import { usePermissions } from '../../../utils/permissionUtils'
 
 import "@assets/scss/common.scss";

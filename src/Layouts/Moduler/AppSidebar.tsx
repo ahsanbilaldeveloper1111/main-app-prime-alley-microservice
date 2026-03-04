@@ -1,21 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
+import React, { useState, useEffect } from "react";
+import {
+  LayoutDashboard,
   Users,
   ChevronDown,
   ChevronRight,
   FileText,
-  
   Eye,
   ShoppingBag,
   Briefcase,
-  PieChart,
-  Link as LinkIcon,
   Target,
   Megaphone,
   Database,
-  TrendingUp,
-  XCircle,
   BarChart3,
   Phone,
   Languages,
@@ -26,10 +21,7 @@ import {
   List,
   Package,
   Layers,
-  Tags,
   CreditCard,
-  Building,
-  MapPin,
   Settings,
   History,
   ChartNoAxesCombined,
@@ -39,31 +31,24 @@ import {
   Workflow,
   NotebookText,
   DollarSign,
-  PhoneCallIcon,
   MonitorSpeaker,
   Monitor,
   Server,
   Group,
-  ShieldPlus,
   Shield,
   NotebookTabs,
-  HelpCircle,
   Info,
   CircleQuestionMark,
-  Boxes
-} from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
+  Boxes,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/router";
 
-import { authAPI } from "@utils/api";
-import { useAuth } from "../../hooks/useAuth";
-import { useTmsPermissions } from "../../hooks/useTmsPermissions";
-import { HEADER_CONSTANTS} from "@constants/headerConstants";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
-import Translate from '@pages/ai-ml/translate';
 
 // Destructure constants for easier use
-const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
+const { MENU_LABELS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
 
 interface SubMenuItem {
   id: string;
@@ -93,82 +78,80 @@ interface SidebarProps {
   setSidebarOpen: (open: boolean) => void;
 }
 
-const ApplicationSidebar: React.FC<SidebarProps> = ({ 
-  sidebarOpen, 
-  setSidebarOpen
+const ApplicationSidebar: React.FC<SidebarProps> = ({
+  sidebarOpen,
+  setSidebarOpen,
 }) => {
-  //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
-  const [expandedModules, setExpandedModules] = useState<string[]>([ 'billing']);
+  const [expandedModules, setExpandedModules] = useState<string[]>(["billing"]);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
   const router = useRouter();
-  
+
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
 
   const mainMenuItems: MainMenuItem[] = [
-
     {
-      id: 'dashboard',
-      key: 'dashboard',
-      permission: '',
+      id: "dashboard",
+      key: "dashboard",
+      permission: "",
       icon: <LayoutDashboard size={20} />,
       color: MENU_COLORS.DASHBOARD,
       title: MENU_LABELS.DASHBOARD,
       label: MENU_LABELS.DASHBOARD,
-      url: '/dashboard',
+      url: "/dashboard",
     },
-    
+
     {
-      id: 'crm',
-      key: 'crm',
+      id: "crm",
+      key: "crm",
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={20} />,
       color: MENU_COLORS.CRM,
       title: MENU_LABELS.CRM,
       label: MENU_LABELS.CRM,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'crm-dashboard',
+          id: "crm-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CRM_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DASHBOARD,
-          url: '/crm/dashboard'
+          url: "/crm/dashboard",
         },
         {
-          id: 'crm-data-management',
+          id: "crm-data-management",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <Database size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/prospects'
+          url: "/crm/prospects",
         },
         {
-          id: 'crm-leads',
+          id: "crm-leads",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.LEADS,
           icon: <Target size={16} />,
           permission: PERMISSIONS.VIEW_CRM_LEADS,
-          url: '/crm/leads'
+          url: "/crm/leads",
         },
         {
-          id: 'crm-deals',
+          id: "crm-deals",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS,
           icon: <Target size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: '/crm/deals'
+          url: "/crm/deals",
         },
         {
-          id: 'crm-orders',
+          id: "crm-orders",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
           icon: <Target size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: '/crm/orders'
+          url: "/crm/orders",
         },
         {
-          id: 'crm-products',
+          id: "crm-products",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
           icon: <Package size={16} />,
           permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
-          url: '/crm/products'
+          url: "/crm/products",
         },
         // {
         //   id: 'crm-tasks',
@@ -178,111 +161,111 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         //   url: '/crm/tasks'
         // },
         {
-          id: 'crm-stages',
+          id: "crm-stages",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_STAGES,
-          url: '/crm/stages'
+          url: "/crm/stages",
         },
-      
+
         {
-          id: 'crm-campaigns',
+          id: "crm-campaigns",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
-          url: '/crm/campaigns'
+          url: "/crm/campaigns",
         },
         {
-          id: 'crm-history',
-          title: 'Activity Tracker',
+          id: "crm-history",
+          title: "Activity Tracker",
           icon: <History size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: '/crm/activities'
+          url: "/crm/activities",
         },
         {
-          id: 'crm-reports',
-          title: 'Reports',
+          id: "crm-reports",
+          title: "Reports",
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_REPORTS,
-          url: '/crm/reports'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/crm/reports",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'live-calls',
-      key: 'live-calls',
+      id: "live-calls",
+      key: "live-calls",
       permission: PERMISSIONS.CTI_SERVICES,
       icon: <PhoneCall size={20} />,
       color: MENU_COLORS.LIVE_CALLS,
       title: MENU_LABELS.LIVE_CALLS,
       label: MENU_LABELS.LIVE_CALLS,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'live-calls-dashboard',
+          id: "live-calls-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.LIVE_VIEW,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CTI,
-          url: '/live-calls'
+          url: "/live-calls",
         },
         {
-          id: 'live-calls-monitoring',
+          id: "live-calls-monitoring",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CALL_MONITORING,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.CTI_MONITORING,
-          url: '/cti/monitoring'
+          url: "/cti/monitoring",
         },
         {
-          id: 'live-calls-dialer',
+          id: "live-calls-dialer",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DIALER,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.DIAL_CALL_CTI,
-          url: '/cti/dialer'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/cti/dialer",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'call-history',
-      key: 'call-history',
+      id: "call-history",
+      key: "call-history",
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
       icon: <History size={20} />,
       color: MENU_COLORS.CALL_HISTORY,
       title: MENU_LABELS.CALL_HISTORY,
       label: MENU_LABELS.CALL_HISTORY,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'call-history-dashboard',
+          id: "call-history-dashboard",
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
-          url: '/call-logs/dashboard'
+          url: "/call-logs/dashboard",
         },
         {
-          id: 'call-history-logs',
+          id: "call-history-logs",
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_LOGS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_LOGS,
-          url: '/call-logs'
+          url: "/call-logs",
         },
         {
-          id: 'call-history-recordings',
+          id: "call-history-recordings",
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_RECORDINGS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
-          url: '/call-recordings'
+          url: "/call-recordings",
         },
         {
-          id: 'call-reports',
-          key: 'call-reports',
+          id: "call-reports",
+          key: "call-reports",
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
           icon: <ChartNoAxesCombined size={20} />,
           title: MENU_LABELS.CALL_REPORTS,
-          url: '/call-reports',
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/call-reports",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     // {
@@ -297,431 +280,530 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     // },
 
     {
-      id: 'ai-ml',
-      key: 'ai-ml',
+      id: "ai-ml",
+      key: "ai-ml",
       permission: PERMISSIONS.AI_ML_SERVICES,
       icon: <FileChartPie size={20} />,
       color: MENU_COLORS.AI_INSIGHTS,
       title: MENU_LABELS.AI_INSIGHTS,
       label: MENU_LABELS.AI_INSIGHTS,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'ai-ml-analysis',
+          id: "ai-ml-analysis",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYSIS,
           icon: <CassetteTape size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/ai-ml/analysis'
+          url: "/ai-ml/analysis",
         },
         {
-          id: 'ai-ml-analyze-recordings',
+          id: "ai-ml-analyze-recordings",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYZE_RECORDINGS,
           icon: <AudioLines size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: '/ai-ml/analyze-recordings'
+          url: "/ai-ml/analyze-recordings",
         },
         {
-          id: 'ai-ml-translate',
+          id: "ai-ml-translate",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TRANSLATE,
           icon: <Languages size={16} />,
           permission: PERMISSIONS.TRANSLATE_AIML,
-          url: '/ai-ml/translate'
+          url: "/ai-ml/translate",
         },
         {
-          id: 'ai-ml-outbound-calls',
+          id: "ai-ml-outbound-calls",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/outbound-calls'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/ai-ml/outbound-calls",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
     {
-      id: 'dncr',
-      key: 'dncr',
+      id: "dncr",
+      key: "dncr",
       permission: PERMISSIONS.DNCR_SERVICES,
       icon: <Ban size={20} />,
       color: MENU_COLORS.DNCR,
       title: MENU_LABELS.DNCR,
       label: MENU_LABELS.DNCR,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'dncr-check-number',
+          id: "dncr-check-number",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CHECK_NUMBER,
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/check-number'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/dncr/check-number",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'accounts',
-      key: 'accounts',
+      id: "accounts",
+      key: "accounts",
       permission: PERMISSIONS.ACCOUNTS_SERVICES,
       icon: <CreditCard size={20} />,
       color: MENU_COLORS.BILLING,
       title: MENU_LABELS.BILLING,
       label: MENU_LABELS.BILLING,
-      url: '',
+      url: "",
       subItems: [
+        {
+          id: "customer-dashboard",
+          title: "Customer Dashboard",
+          icon: <LayoutDashboard size={16} />,
+          url: "/accounting/customer/dashboard",
+          permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING,
+        },
+        {
+          id: "account-overview",
+          title: "Account Overview",
+          icon: <Eye size={16} />,
+          url: "/accounting/customer/account-overview",
+          permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
+        },
 
-            { 
-              id: 'customer-dashboard', 
-              title: 'Customer Dashboard', 
-              icon: <LayoutDashboard size={16} />, 
-              url: '/accounting/customer/dashboard', 
-              permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
-            },
-            { 
-              id: 'account-overview', 
-              title: 'Account Overview', 
-              icon: <Eye size={16} />, 
-              url: '/accounting/customer/account-overview', 
-              permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
-            },
+        {
+          id: "product-details",
+          title: "Product Details",
+          icon: <ShoppingBag size={16} />,
+          url: "/accounting/customer/product-details",
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING,
+        },
+        {
+          id: "billing-invoices",
+          title: "Invoices",
+          icon: <DollarSign size={16} />,
+          url: "/finance/invoices",
+          permission: PERMISSIONS.VIEW_INVOICES_BILLING,
+        },
+        {
+          id: "billing-history",
+          title: "Billing History",
+          icon: <FileText size={16} />,
+          url: "/accounting/customer/billing-history",
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
+        },
 
-            { 
-              id: 'product-details', 
-              title: 'Product Details', 
-              icon: <ShoppingBag size={16} />, 
-              url: '/accounting/customer/product-details', 
-              permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
-            },
-            { 
-              id: 'billing-invoices', 
-              title: 'Invoices', 
-              icon: <DollarSign size={16} />, 
-              url: '/finance/invoices', 
-              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
-            },
-            { 
-              id: 'billing-history', 
-              title: 'Billing History', 
-              icon: <FileText size={16} />, 
-              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
-            
-            { 
-              id: 'payment-methods', 
-              title: 'Payment Methods', 
-              icon: <CreditCard size={16} />, 
-              url: '/accounting/customer/payment-methods', 
-              permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING 
-            },
-            
+        {
+          id: "payment-methods",
+          title: "Payment Methods",
+          icon: <CreditCard size={16} />,
+          url: "/accounting/customer/payment-methods",
+          permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING,
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
+    },
 
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-    
     {
-      id: 'tickets',
-      key: 'tickets',
+      id: "tickets",
+      key: "tickets",
       permission: PERMISSIONS.TICKETS_SERVICES,
       icon: <Ticket size={20} />,
       color: MENU_COLORS.TICKETS,
       title: MENU_LABELS.TICKETS,
       label: MENU_LABELS.TICKETS,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'tickets-dashboard',
+          id: "tickets-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_DASHBOARD,
-          url: '/tickets/dashboard'
+          url: "/tickets/dashboard",
         },
         {
-          id: 'tickets-list',
+          id: "tickets-list",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_LIST,
           icon: <Ticket size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_LIST,
-          url: '/tickets/list'
+          url: "/tickets/list",
         },
         {
-          id: 'tickets-status',
+          id: "tickets-status",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.STATUS,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_STATUS,
-          url: '/tickets/statuses'
+          url: "/tickets/statuses",
         },
         {
-          id: 'tickets-modules',
+          id: "tickets-modules",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.MODULES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_MODULES,
-          url: '/tickets/modules'
+          url: "/tickets/modules",
         },
         {
-          id: 'tickets-module-categories',
+          id: "tickets-module-categories",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
-          url: '/tickets/modules/categories'
+          url: "/tickets/modules/categories",
         },
         {
-          id: 'tickets-module-subcategories',
+          id: "tickets-module-subcategories",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
           icon: <Layers size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
-          url: '/tickets/modules/sub-categories'
+          url: "/tickets/modules/sub-categories",
         },
 
         {
-          id: 'tickets-types',
+          id: "tickets-types",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_TICKETS_TYPES,
-          url: '/tickets/types'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/tickets/types",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'gsm',
-      key: 'gsm',
+      id: "gsm",
+      key: "gsm",
       permission: PERMISSIONS.GSM_SERVICES,
       icon: <RadioTower size={20} />,
       color: MENU_COLORS.SIM_GATEWAY,
       title: MENU_LABELS.SIM_GATEWAY,
       label: MENU_LABELS.SIM_GATEWAY,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'gsm-dashboard',
+          id: "gsm-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GSM_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_GSM_DASHBOARD,
-          url: '/gsm/dashboard'
+          url: "/gsm/dashboard",
         },
         {
-          id: 'gsm-list',
+          id: "gsm-list",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GSM_LIST,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
-          url: '/gsm/list'
+          url: "/gsm/list",
         },
         {
-          id: 'gsm-assign',
+          id: "gsm-assign",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
-          url: '/gsm/assign'
+          url: "/gsm/assign",
         },
         {
-          id: 'gsm-ports',
+          id: "gsm-ports",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PORTS,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_PORTS,
-          url: '/gsm/ports'
+          url: "/gsm/ports",
         },
         {
-          id: 'gsm-inbox',
+          id: "gsm-inbox",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_INBOX,
-          url: '/gsm/inbox'
+          url: "/gsm/inbox",
         },
         {
-          id: 'gsm-sync',
+          id: "gsm-sync",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.SYNC_GSM,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_SYNC,
-          url: '/gsm/sync'
+          url: "/gsm/sync",
         },
         {
-          id: 'gsm-company-po',
+          id: "gsm-company-po",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_PO,
           icon: <List size={16} />,
           permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
-          url: '/gsm/company/po'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/gsm/company/po",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'tms',
-      key: 'tms',
+      id: "tms",
+      key: "tms",
       permission: PERMISSIONS.TMS_SERVICES,
       icon: <Workflow size={20} />,
       color: MENU_COLORS.AUTOMATION,
       title: MENU_LABELS.AUTOMATION,
       label: MENU_LABELS.AUTOMATION,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'tms-dashboard',
+          id: "tms-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/dashboard'
+          url: "/tms/dashboard",
         },
         {
-          id: 'tms-user-management',
-          title: 'Users',
+          id: "tms-user-management",
+          title: "Users",
           icon: <Users size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/management/users'
+          url: "/tms/management/users",
         },
         {
-          id: 'tms-audit-logs',
-          title: 'Audit Logs',
+          id: "tms-audit-logs",
+          title: "Audit Logs",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/audit-logs'
-        }
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
+          url: "/tms/audit-logs",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'netops',
-      key: 'netops',
+      id: "netops",
+      key: "netops",
       permission: PERMISSIONS.NETOPS_SERVICES,
       icon: <LayoutDashboard size={20} />,
       color: MENU_COLORS.NETOPS,
       title: MENU_LABELS.NETOPS,
       label: MENU_LABELS.NETOPS,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'netops-dashboard',
+          id: "netops-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: '/pulse/dashboard'
+          url: "/pulse/dashboard",
         },
         {
-          id: 'netops-devices',
+          id: "netops-devices",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
           icon: <MonitorSpeaker size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/pulse/devices'
+          url: "/pulse/devices",
         },
         {
-          id: 'netops-services',
+          id: "netops-services",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
-          url: '/pulse/services'
+          url: "/pulse/services",
         },
         {
-          id: 'netops-alerts',
+          id: "netops-alerts",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-          url: '/pulse/alerts'
+          url: "/pulse/alerts",
         },
         {
-          id: 'netops-uptime-sla',
+          id: "netops-uptime-sla",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: '/pulse/uptime-sla'
-        }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/pulse/uptime-sla",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'controlhub',
-      key: 'controlhub',
+      id: "controlhub",
+      key: "controlhub",
       permission: PERMISSIONS.CONTROL_HUB_SERVICES,
       icon: <Settings size={20} />,
       color: MENU_COLORS.CONTROL_HUB,
       title: MENU_LABELS.CONTROL_HUB,
       label: MENU_LABELS.CONTROL_HUB,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'controlhub-users',
+          id: "controlhub-users",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
           icon: <Users size={16} />,
           permission: PERMISSIONS.VIEW_USERS,
-          url: '/controlhub/users'
+          url: "/controlhub/users",
         },
         {
-          id: 'controlhub-teams',
+          id: "controlhub-teams",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
           icon: <Boxes size={16} />,
           permission: PERMISSIONS.VIEW_TEAMS,
-          url: '/controlhub/teams'
+          url: "/controlhub/teams",
         },
         {
-          id: 'controlhub-groups',
+          id: "controlhub-groups",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
           icon: <Group size={16} />,
           permission: PERMISSIONS.VIEW_GROUPS,
-          url: '/controlhub/groups'
+          url: "/controlhub/groups",
         },
         {
-          id: 'controlhub-ranks',
+          id: "controlhub-ranks",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
           icon: <Shield size={16} />,
           permission: PERMISSIONS.VIEW_RANKS,
-          url: '/controlhub/ranks'
-        }
-        
-      ].filter(item => !item.permission || hasPermission(item.permission))
+          url: "/controlhub/ranks",
+        },
+      ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
 
     {
-      id: 'resources',
-      key: 'resources',
-      permission: '',
+      id: "resources",
+      key: "resources",
+      permission: "",
       icon: <NotebookText size={20} />,
       color: MENU_COLORS.RESOURCES,
       title: MENU_LABELS.RESOURCES,
       label: MENU_LABELS.RESOURCES,
-      url: '',
+      url: "",
       subItems: [
         {
-          id: 'resources-faq',
+          id: "resources-faq",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.FAQ,
           icon: <CircleQuestionMark size={16} />,
-          permission: '',
-          url: '/resources/faq'
+          permission: "",
+          url: "/resources/faq",
         },
         {
-          id: 'resources-help-materials',
+          id: "resources-help-materials",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.HELP_MATERIALS,
           icon: <Info size={16} />,
-          permission: '',
-          url: '/resources/help-materials'
+          permission: "",
+          url: "/resources/help-materials",
         },
         {
-          id: 'resources-contact-support',
+          id: "resources-contact-support",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACT_SUPPORT,
           icon: <NotebookTabs size={16} />,
-          permission: '',
-          url: '/resources/contact-support'
-        }
-      ]
-    }
-
-
-  ].filter(item => !item.permission || hasPermission(item.permission));
+          permission: "",
+          url: "/resources/contact-support",
+        },
+      ],
+    },
+  ].filter((item) => !item.permission || hasPermission(item.permission));
 
   const toggleModule = (moduleId: string) => {
-    setExpandedModules(prev => 
-      prev.includes(moduleId) 
-        ? prev.filter(id => id !== moduleId)
-        : [...prev, moduleId]
+    setExpandedModules((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((id) => id !== moduleId)
+        : [...prev, moduleId],
     );
-
   };
 
   const toggleSubModule = (subModuleId: string) => {
-    setExpandedSubModules(prev => 
-      prev.includes(subModuleId) 
-        ? prev.filter(id => id !== subModuleId)
-        : [...prev, subModuleId]
+    setExpandedSubModules((prev) =>
+      prev.includes(subModuleId)
+        ? prev.filter((id) => id !== subModuleId)
+        : [...prev, subModuleId],
     );
   };
 
-  const handleSubItemClick = (screenId: string) => {
-   // setActiveScreen(screenId);
-    //setSidebarOpen(false);
+  const renderModuleHeader = (module: MainMenuItem) => {
+    const isExpanded = expandedModules.includes(module.id);
+    const hasSubItems = Boolean(module.subItems?.length);
+    const headerContent = (
+      <>
+        <div style={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+          <div
+            className="module-icon-wrapper"
+            style={{ backgroundColor: `${module.color}15` }}
+          >
+            {React.cloneElement(
+              module.icon as React.ReactElement,
+              { style: { color: module.color } } as any,
+            )}
+          </div>
+          <span>{module.title}</span>
+        </div>
+        {hasSubItems && (
+          <span className={`chevron-icon ${isExpanded ? "expanded" : ""}`}>
+            {isExpanded ? (
+              <ChevronDown size={18} />
+            ) : (
+              <ChevronRight size={18} />
+            )}
+          </span>
+        )}
+      </>
+    );
+    const buttonProps = {
+      className: `module-header ${isExpanded ? "expanded" : ""}`,
+      style: { borderLeftColor: isExpanded ? module.color : "transparent" },
+    };
+    if (module.url !== "") {
+      return (
+        <Link href={(BASE_URL || "") + (module.url || "/")}>
+          <button {...buttonProps}>{headerContent}</button>
+        </Link>
+      );
+    }
+    return (
+      <button {...buttonProps} onClick={() => toggleModule(module.id)}>
+        {headerContent}
+      </button>
+    );
+  };
+
+  const renderSubItem = (subItem: SubMenuItem) => {
+    const hasNested = Boolean(subItem.subItems?.length);
+    const isSubExpanded = expandedSubModules.includes(subItem.id);
+    const subHeaderContent = (
+      <>
+        <div style={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
+          <span className="sub-item-icon">{subItem.icon}</span>
+          <span>{subItem.title}</span>
+        </div>
+        {hasNested && (
+          <span className={`chevron-icon ${isSubExpanded ? "expanded" : ""}`}>
+            {isSubExpanded ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+          </span>
+        )}
+      </>
+    );
+    const subHeaderProps = {
+      className: `sub-module-header ${isSubExpanded ? "expanded" : ""}`,
+      onClick: () => toggleSubModule(subItem.id),
+    };
+    const nestedList = hasNested && isSubExpanded && subItem.subItems && (
+      <div>
+        {subItem.subItems.map((nestedItem: SubMenuItem) => (
+          <Link key={nestedItem.id} href={nestedItem.url || "/"}>
+            <button className="nested-sub-item">
+              <span className="nested-sub-item-icon">{nestedItem.icon}</span>
+              <span>{nestedItem.title}</span>
+            </button>
+          </Link>
+        ))}
+      </div>
+    );
+
+    if (hasNested) {
+      const wrapped = <button {...subHeaderProps}>{subHeaderContent}</button>;
+      return (
+        <>
+          {subItem.url ? (
+            <Link href={subItem.url || "/"}>{wrapped}</Link>
+          ) : (
+            wrapped
+          )}
+          {nestedList}
+        </>
+      );
+    }
+    if (subItem.url) {
+      return (
+        <Link href={subItem.url || "/"}>
+          <button
+            className={`sub-item ${router.pathname === subItem.url ? "active" : ""} ${isSubExpanded ? "expanded" : ""}`}
+            onClick={() => toggleSubModule(subItem.id)}
+          >
+            {subHeaderContent}
+          </button>
+        </Link>
+      );
+    }
+    return <button {...subHeaderProps}>{subHeaderContent}</button>;
   };
 
   // Automatically expand modules and sub-modules when route changes
@@ -732,7 +814,9 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
         return true;
       }
       if (subItem.subItems && subItem.subItems.length > 0) {
-        return subItem.subItems.some(nestedItem => isSubItemActive(nestedItem));
+        return subItem.subItems.some((nestedItem) =>
+          isSubItemActive(nestedItem),
+        );
       }
       return false;
     };
@@ -742,19 +826,19 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       if (!module.subItems || module.subItems.length === 0) {
         return false;
       }
-      return module.subItems.some(subItem => isSubItemActive(subItem));
+      return module.subItems.some((subItem) => isSubItemActive(subItem));
     };
 
     const modulesToExpand: string[] = [];
     const subModulesToExpand: string[] = [];
 
-    mainMenuItems.forEach(module => {
+    mainMenuItems.forEach((module) => {
       if (hasActiveChild(module)) {
         modulesToExpand.push(module.id);
-        
+
         // Also expand sub-modules that have active children
         if (module.subItems) {
-          module.subItems.forEach(subItem => {
+          module.subItems.forEach((subItem) => {
             if (isSubItemActive(subItem)) {
               subModulesToExpand.push(subItem.id);
             }
@@ -765,24 +849,26 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
 
     // Update expanded modules
     if (modulesToExpand.length > 0) {
-      setExpandedModules(prev => {
+      setExpandedModules((prev) => {
         const combined = [...prev, ...modulesToExpand];
         const newExpanded = Array.from(new Set(combined));
         // Only update state if there's an actual change to prevent infinite loops
-        const hasChange = newExpanded.length !== prev.length || 
-                         !newExpanded.every(id => prev.includes(id));
+        const hasChange =
+          newExpanded.length !== prev.length ||
+          !newExpanded.every((id) => prev.includes(id));
         return hasChange ? newExpanded : prev;
       });
     }
 
     // Update expanded sub-modules
     if (subModulesToExpand.length > 0) {
-      setExpandedSubModules(prev => {
+      setExpandedSubModules((prev) => {
         const combined = [...prev, ...subModulesToExpand];
         const newExpanded = Array.from(new Set(combined));
         // Only update state if there's an actual change to prevent infinite loops
-        const hasChange = newExpanded.length !== prev.length || 
-                         !newExpanded.every(id => prev.includes(id));
+        const hasChange =
+          newExpanded.length !== prev.length ||
+          !newExpanded.every((id) => prev.includes(id));
         return hasChange ? newExpanded : prev;
       });
     }
@@ -1055,225 +1141,62 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <style>{customStyles}</style>
-      
+
       {/* Backdrop for mobile */}
-      <div 
-        className={`sidebar-backdrop ${sidebarOpen ? 'show' : ''}`}
+      <button
+        type="button"
+        className={`sidebar-backdrop ${sidebarOpen ? "show" : ""}`}
+        aria-label="Close sidebar"
         onClick={() => setSidebarOpen(false)}
       />
-      
-      <div 
-        className={`sidebar-card sidebar-scrollbar ${!sidebarOpen ? 'collapsed' : ''}`}
+
+      <div
+        className={`sidebar-card sidebar-scrollbar ${sidebarOpen ? "" : "collapsed"}`}
       >
         <div style={{ padding: 0 }}>
           {/* Header */}
           <div className="sidebar-header">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <div 
-                style={{ 
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: '0.75rem',
-                  padding: '0.5rem',
-                  marginRight: '1rem'
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  backdropFilter: "blur(10px)",
+                  borderRadius: "0.75rem",
+                  padding: "0.5rem",
+                  marginRight: "1rem",
                 }}
               >
                 <Briefcase size={24} color="white" />
               </div>
               <div>
-                <h5 style={{ marginBottom: 0, color: 'white', fontWeight: 'bold' }}>CRM Portal</h5>
-                <small style={{ color: 'white', opacity: 0.75 }}>Management System</small>
+                <h5
+                  style={{
+                    marginBottom: 0,
+                    color: "white",
+                    fontWeight: "bold",
+                  }}
+                >
+                  CRM Portal
+                </h5>
+                <small style={{ color: "white", opacity: 0.75 }}>
+                  Management System
+                </small>
               </div>
             </div>
           </div>
 
           {/* Menu Items */}
-          <div style={{ padding: '0.5rem 0' }}>
+          <div style={{ padding: "0.5rem 0" }}>
             {mainMenuItems.map((module, index) => (
               <div key={module.id}>
-                {/* Module Header */}
-
-                {module.url !== '' ? (
-                  <Link href={(BASE_URL || '') + (module.url || '/')}>
-                    <button
-                      className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
-                      style={{
-                        borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                        <div 
-                          className="module-icon-wrapper"
-                          style={{ backgroundColor: `${module.color}15` }}
-                        >
-                          {React.cloneElement(module.icon as React.ReactElement, { 
-                            style: { color: module.color }
-                          } as any)}
-                        </div>
-                        <span>{module.title}
-                        </span>
-                      </div>
-
-                      {module.subItems && module.subItems.length > 0 && (
-                      <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
-                        {expandedModules.includes(module.id) ? (
-                          <ChevronDown size={18} />
-                        ) : (
-                          <ChevronRight size={18} />
-                        )}
-                      </span>
-                      )}
-                    </button>
-                  </Link>
-                ) : (
-                  <button
-                    className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
-                    style={{
-                      borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
-                    }}
-                    onClick={() => toggleModule(module.id)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                      <div 
-                        className="module-icon-wrapper"
-                        style={{ backgroundColor: `${module.color}15` }}
-                      >
-                        {React.cloneElement(module.icon as React.ReactElement, { 
-                          style: { color: module.color }
-                        } as any)}
-                      </div>
-                      <span>{module.title}</span>
-                    </div>
-                    <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
-                      {expandedModules.includes(module.id) ? (
-                        <ChevronDown size={18} />
-                      ) : (
-                        <ChevronRight size={18} />
-                      )}
-                    </span>
-                  </button>
-                )}
-                {/* Sub Items */}
+                {renderModuleHeader(module)}
                 {expandedModules.includes(module.id) && module.subItems && (
                   <div>
                     {module.subItems.map((subItem: SubMenuItem) => (
-                      <div key={subItem.id}>
-                        {subItem.subItems && subItem.subItems.length > 0 ? (
-                          // This is a nested sub-module with children
-                          <>
-
-                          {subItem.url !== '' ? (
-                            <Link href={subItem.url || '/'}>
-                              <button
-                                className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                                onClick={() => toggleSubModule(subItem.id)}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                  <span className="sub-item-icon">{subItem.icon}</span>
-                                  <span>{subItem.title}</span>
-                                </div>
-                                <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                  {expandedSubModules.includes(subItem.id) ? (
-                                    <ChevronDown size={16} />
-                                  ) : (
-                                    <ChevronRight size={16} />
-                                  )}
-                                </span>
-                              </button>
-                            </Link>
-                          ) : (
-                            <button
-                              className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                              onClick={() => toggleSubModule(subItem.id)}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                <span className="sub-item-icon">{subItem.icon}</span>
-                                <span>{subItem.title}</span>
-                              </div>
-
-                              {subItem.subItems && subItem.subItems.length > 0 && (
-                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                {expandedSubModules.includes(subItem.id) ? (
-                                  <ChevronDown size={16} />
-                                ) : (
-                                  <ChevronRight size={16} />
-                                )}
-                              </span>
-                              )}
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        // Regular sub-item without children
-                        <>
-                        {subItem.url !== '' ? (
-                          <Link href={subItem.url || '/'}>
-                            <button
-                              className={`sub-item 
-                                ${router.pathname === subItem.url ? 'active' : ''}
-                                ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                              onClick={() => toggleSubModule(subItem.id)}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                <span className="sub-item-icon">{subItem.icon}</span>
-                                <span>{subItem.title}</span>
-                              </div>
-
-                              {subItem.subItems && subItem.subItems.length > 0 && (
-                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                {expandedSubModules.includes(subItem.id) ? (
-                                  <ChevronDown size={16} />
-                                ) : (
-                                  <ChevronRight size={16} />
-                                )}
-                              </span>
-                              )}
-                            </button>
-                          </Link>
-                        ) : (
-                          <button
-                            className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                            onClick={() => toggleSubModule(subItem.id)}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                              <span className="sub-item-icon">{subItem.icon}</span>
-                              <span>{subItem.title}</span>
-                            </div>
-                            {subItem.subItems && subItem.subItems.length > 0 && (
-                            <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                              {expandedSubModules.includes(subItem.id) ? (
-                                <ChevronDown size={16} />
-                              ) : (
-                                <ChevronRight size={16} />
-                              )}
-                            </span>
-                            )}
-                          </button>
-                        )}
-                      </>
-                    )}
-                            {/* Nested Sub Items */}
-                            {subItem.subItems && subItem.subItems.length > 0 && expandedSubModules.includes(subItem.id) && (
-                              <div>
-                                {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                                  <Link key={nestedItem.id} href={nestedItem.url || '/'}>
-                                    <button
-                                      className={`nested-sub-item`}
-                                      onClick={() => handleSubItemClick(nestedItem.id)}
-                                    >
-                                      <span className="nested-sub-item-icon">{nestedItem.icon}</span>
-                                      <span>{nestedItem.title}</span>
-                                    </button>
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                      </div>
+                      <div key={subItem.id}>{renderSubItem(subItem)}</div>
                     ))}
                   </div>
                 )}
-
-                {/* Divider between modules */}
                 {index < mainMenuItems.length - 1 && (
                   <div className="module-divider" />
                 )}

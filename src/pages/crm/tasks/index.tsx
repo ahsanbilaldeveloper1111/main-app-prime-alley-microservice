@@ -45,13 +45,9 @@ import {
   Eye,
   Edit,
   Trash2,
-  MoreVertical,
   X,
-  PlusCircle,
   CheckSquare,
   Clock,
-  Search,
-  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -69,7 +65,7 @@ import {
   Activity,
   MessageSquare,
 } from 'lucide-react';
-import { FiSearch, FiFilter } from 'react-icons/fi';
+import { FiSearch } from 'react-icons/fi';
 import { 
   PieChart, 
   Pie, 
@@ -81,9 +77,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend,
 } from 'recharts';
-import Link from "next/link";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 

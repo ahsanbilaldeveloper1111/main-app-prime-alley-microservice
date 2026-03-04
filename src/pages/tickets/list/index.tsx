@@ -19,7 +19,6 @@ import {
   AddComment,
   AddAssigneeComment,
   loadImage,
-  GetTicket,
   DashboardData,
 } from "@utils/tickets";
 import { GetHierarchyData } from "@utils/users";
@@ -38,7 +37,6 @@ import {
 } from "@utils/ticket-module";
 
 import CreatableSelect from "react-select/creatable";
-import TicketsFilters from "@components/filters/TicketFilters";
 import { ModuleSlug } from "@utils/Helper";
 
 import "@assets/scss/common.scss";
@@ -52,18 +50,8 @@ import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircl
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "@components/AppSelect";
 import { useRouter } from "next/router";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+
+
 
 interface SelectOption {
   value: number;

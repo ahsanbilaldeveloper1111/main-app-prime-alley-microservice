@@ -22,7 +22,6 @@ import {
   getCampaignById,
   getCrmDataById,
   getBusinessTypes,
-  getIndustries,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { useSession } from "next-auth/react";
