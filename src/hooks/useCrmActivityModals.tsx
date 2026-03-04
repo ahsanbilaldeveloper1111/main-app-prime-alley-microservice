@@ -64,6 +64,10 @@ export function useCrmActivityModals({
   onMeetingScheduled,
 }: UseCrmActivityModalsParams): UseCrmActivityModalsReturn {
   const { data: session } = useSession();
+  const userEmail =
+    (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
+  const userName =
+    (session?.user as { name?: string } | undefined)?.name ?? "Your Name";
   const extension =
     (session?.user as { extension?: string; phone?: string } | undefined)?.extension ??
     (session?.user as { extension?: string; phone?: string } | undefined)?.phone ??
@@ -114,7 +118,6 @@ export function useCrmActivityModals({
   const handleMeetingSchedule = useCallback(
     async (meetingData: {
       title: string;
-      hostType: "user" | "rotation";
       hostEmail: string;
       startDate: string;
       startTime: string;
@@ -122,8 +125,7 @@ export function useCrmActivityModals({
       attendees: string[];
       location: string;
       reminders: string[];
-      description: string;
-      internalNote: string;
+      summary: string;
     }) => {
       const meeting_date = meetingData.startDate.slice(0, 10);
       const meeting_time =
@@ -155,15 +157,8 @@ export function useCrmActivityModals({
             attendees: meetingData.attendees,
           }),
           ...(meetingData.reminders?.length > 0 && { reminders: meetingData.reminders }),
-          ...([meetingData.description, meetingData.internalNote].filter(
-            Boolean,
-          ).length
-            ? {
-                summary: [meetingData.description, meetingData.internalNote]
-                  .filter(Boolean)
-                  .join("\n\n")
-                  .slice(0, 255),
-              }
+          ...(meetingData.summary?.trim()
+            ? { summary: meetingData.summary.trim().slice(0, 255) }
             : {}),
         });
         setShowMeetingModal(false);
@@ -172,7 +167,7 @@ export function useCrmActivityModals({
         // createMeeting shows toast on error
       }
     },
-    [recordType, recordId, onMeetingScheduled],
+    [recordType, recordId, onMeetingScheduled, extension, tenantId],
   );
 
   const handleEmailSend = useCallback(
@@ -357,8 +352,8 @@ export function useCrmActivityModals({
         onClose={() => setShowEmailModal(false)}
         recipientEmail={recordEmail}
         recipientName={recordName}
-        senderEmail="user@example.com"
-        senderName="Your Name"
+        senderEmail={userEmail}
+        senderName={userName}
         onSend={handleEmailSend}
       />
       <TaskModal
@@ -370,10 +365,12 @@ export function useCrmActivityModals({
       <MeetingModal
         isOpen={showMeetingModal}
         onClose={() => setShowMeetingModal(false)}
-        hostEmail="user@example.com"
-        hostName="Your Name"
+        hostEmail={userEmail}
+        hostName={userName}
         attendeeEmail={recordEmail}
         attendeeName={recordName}
+        recordType={recordType}
+        recordId={recordId}
         onSchedule={handleMeetingSchedule}
       />
       <LogSmsModal

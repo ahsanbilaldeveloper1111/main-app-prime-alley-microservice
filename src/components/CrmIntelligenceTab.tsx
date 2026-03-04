@@ -26,6 +26,7 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
 }) => {
   const enr = company?.enrichment_data ?? null;
   const struct = enr?.structured_data ?? null;
+  const raw = enr?.raw_data ?? null;
 
   const socialLinksDeduped: string[] = [];
   const seenUrl = new Set<string>();
@@ -46,13 +47,53 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
       addUrl(s?.url);
     }
   });
+  raw?.social_links?.forEach((s: any) => {
+    if (typeof s === "string") {
+      addUrl(s);
+    } else {
+      addUrl(s?.url);
+    }
+  });
   const socialLinks = socialLinksDeduped;
 
-  const cityVal = struct?.headquarters?.city ?? "—";
-  const countryVal = struct?.headquarters?.country ?? "—";
-  const relatedCompanyVal = relatedCompany ?? "—";
-  const industryNameVal = industryName ?? "—";
-  const industryDescriptionVal = industryDescription ?? "—";
+  const cityVal = struct?.headquarters?.city ?? company?.city ?? "—";
+  const countryVal = struct?.headquarters?.country ?? company?.country ?? "—";
+  const regionVal = struct?.headquarters?.state ?? "—";
+  const locationAddressParts = [
+    struct?.headquarters?.address ?? (company as { address?: string })?.address,
+    struct?.headquarters?.city ?? company?.city,
+    struct?.headquarters?.country ?? company?.country,
+  ].filter(Boolean) as string[];
+  const locationAddressVal =
+    locationAddressParts.length > 0 ? locationAddressParts.join(", ") : "—";
+  const relatedCompanyVal = company?.name ?? relatedCompany ?? "—";
+  const industryNameVal = industryName ?? company?.industry ?? "—";
+  const deriveCompanyDescription = () => {
+    const combined = (raw?.combined_text ?? "").trim();
+    if (combined) {
+      const lines = combined
+        .split(/\r?\n/g)
+        .map((l: string) => l.trim())
+        .filter(Boolean);
+      const firstMeaningful =
+        lines?.find((l: string) => !l.startsWith("===") && l.length > 3) ?? "";
+      if (firstMeaningful) {
+        return firstMeaningful.length > 240
+          ? `${firstMeaningful.slice(0, 237)}...`
+          : firstMeaningful;
+      }
+    }
+
+    const block = (raw?.address_blocks?.[0] ?? "").trim();
+    if (block) {
+      const cleaned = block.replaceAll(/\s+/g, " ").trim();
+      return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
+    }
+
+    return null;
+  };
+  const industryDescriptionVal =
+    industryDescription ?? deriveCompanyDescription() ?? "—";
   const firstLinkedIn =
     socialLinks.find((u) => detectSocialPlatform(u) === "linkedin") ?? "—";
   const facebookUrl =
@@ -67,14 +108,22 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
   const outreachEmails = (() => {
     const list: { email: string; type?: string | null }[] = [];
     const seen = new Set<string>();
-    struct?.emails?.forEach((e: any) => {
-      const v = (e?.email ?? "").trim();
+    const addEmail = (v0: string | null | undefined, type?: string | null) => {
+      const v = (v0 ?? "").trim();
       if (!v) return;
       const key = v.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
-      list.push({ email: v, type: e?.type ?? null });
+      list.push({ email: v, type: type ?? null });
+    };
+    struct?.emails?.forEach((e: any) => {
+      addEmail(e?.email, e?.type ?? null);
     });
+    raw?.emails?.forEach((e: any) => {
+      if (typeof e === "string") addEmail(e, null);
+      else addEmail(e?.email, e?.type ?? null);
+    });
+    addEmail(company?.email, null);
     return list;
   })();
 
@@ -195,7 +244,27 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
                 fontWeight: "400",
               }}
             >
-              --
+              {regionVal}
+            </div>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div
+              style={{
+                fontSize: "13px",
+                color: "#7c98b6",
+                marginBottom: "6px",
+              }}
+            >
+              Location address
+            </div>
+            <div
+              style={{
+                fontSize: "14px",
+                color: "#141414",
+                fontWeight: "400",
+              }}
+            >
+              {locationAddressVal}
             </div>
           </div>
         </div>
@@ -464,7 +533,7 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
               {outreachEmails.length === 0
                 ? "—"
                 : outreachEmails.map(({ email, type }, idx) => (
-                    <span key={idx}>
+                    <span key={email}>
                       <a
                         href={`mailto:${email}`}
                         style={{ color: "#006162", textDecoration: "none" }}

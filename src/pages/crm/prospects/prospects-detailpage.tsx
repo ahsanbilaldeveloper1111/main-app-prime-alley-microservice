@@ -61,6 +61,7 @@ import CrmActivitiesPanel, {
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
+import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
@@ -1679,32 +1680,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   >
                     Note
                   </label>
-                  <textarea
-                    rows={3}
-                    value={prospectForm?.note}
-                    onChange={(e) =>
-                      setProspectForm({
-                        ...prospectForm,
-                        note: e.target.value,
-                      })
+                  <RichNoteEditor
+                    value={prospectForm?.note ?? ""}
+                    onChange={(html) =>
+                      setProspectForm({ ...prospectForm, note: html })
                     }
                     placeholder="Notes about this contact"
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      border: "1px solid #8a8a8a",
-                      borderRadius: "4px",
-                      fontSize: "14px",
-                      outline: "none",
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                    }}
-                    onFocus={(e) =>
-                      (e.currentTarget.style.borderColor = "#0091ae")
-                    }
-                    onBlur={(e) =>
-                      (e.currentTarget.style.borderColor = "#8a8a8a")
-                    }
+                    minHeight={80}
                   />
                 </div>
               </div>
@@ -1886,12 +1868,14 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   overflow: "hidden",
                 }}
               >
-                {["Edit", "Delete", "Clone", "Export"].map((action) => (
+                {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
                     onClick={() => {
                       if (action === "Edit") {
-                        setShowEditContactSidebar(true);
+                        router.push(
+                          `/crm/prospects?createContact=1&editContactId=${prospectRecordId}`,
+                        );
                       } else if (action === "Delete") {
                         handleOpenDeleteProspect();
                       } else if (action === "Export") {
@@ -2520,7 +2504,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
               
               {!collapsedSections.has("breeze") && (
                 <div style={{ padding: "20px" }}>
-                  {(prospect as any)?.data?.crm_summary?.summary != null && (
+                  {((prospect as any)?.crm_summary?.summary ??
+                    (prospect as any)?.data?.crm_summary?.summary ??
+                    (prospect as any)?.data?.data?.crm_summary?.summary) != null && (
                     <>
                       <div
                         style={{
@@ -2692,6 +2678,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = "transparent";
                         }}
+                        onClick={() => {
+                          globalThis.window?.dispatchEvent(
+                            new CustomEvent("breeze-assistant:open"),
+                          );
+                        }}
                       >
                         <Sparkles size={16} />
                         Ask a question
@@ -2846,6 +2837,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
             recordLoading={prospectLoading}
             recordName={prospectRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            onWhatsAppChatClick={(chat) => {
+              router.push(`/crm/inbox?chat_id=${chat.id}`);
+            }}
             onTasksRefetchReady={(fn: () => void) => setTasksRefetch(() => fn)}
             {...activityModals.crmActivitiesPanelProps}
           />

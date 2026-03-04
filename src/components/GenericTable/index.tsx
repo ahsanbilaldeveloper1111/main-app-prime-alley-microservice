@@ -146,6 +146,8 @@ export interface FilterPill {
   onClick?: () => void;
   showDropdown?: boolean;
   searchable?: boolean;
+  /** Custom dropdown content (use instead of `dropdownOptions` when you need rich controls). */
+  dropdownContent?: React.ReactNode;
   /** When true, pill is shown as active (filter applied) */
   active?: boolean;
   /** When filter is applied, show this label (e.g. selected owner name, "Today", "Hot Lead") */
@@ -190,8 +192,14 @@ export interface ToolbarConfig {
   onFiltersClick?: () => void;
   showFilterPills?: boolean;
   filterPills?: FilterPill[];
+  /** Controls whether the "+ More" pill is rendered in the filter pills row (defaults to true). */
+  showMoreFiltersButton?: boolean;
   showAdvancedFilters?: boolean;
   onAdvancedFiltersClick?: () => void;
+  /** When true, shows `advancedFiltersContent` inline beneath the filter pills row. */
+  advancedFiltersOpen?: boolean;
+  /** Inline advanced filters panel content (rendered when `advancedFiltersOpen` is true). */
+  advancedFiltersContent?: React.ReactNode;
 
   // Sort
   showSortButton?: boolean;
@@ -1022,7 +1030,7 @@ const GenericTable = <T extends Record<string, any>>({
                       Import
                     </Dropdown.Item>
                   )}
-                  <Dropdown.Item>Bulk Actions</Dropdown.Item>
+                  {/* <Dropdown.Item>Bulk Actions</Dropdown.Item> */}
                   <Dropdown.Divider />
                   <Dropdown.Item>Settings</Dropdown.Item>
                 </Dropdown.Menu>
@@ -1095,6 +1103,15 @@ const GenericTable = <T extends Record<string, any>>({
                       <Dropdown.Menu
                         style={{ maxHeight: "280px", overflowY: "auto" }}
                       >
+                        {pill.dropdownContent ? (
+                          <div
+                            className="px-2 py-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {pill.dropdownContent}
+                          </div>
+                        ) : (
+                          <>
                         {pill.searchable &&
                           pill.dropdownOptions &&
                           pill.dropdownOptions.length > 0 && (
@@ -1161,6 +1178,8 @@ const GenericTable = <T extends Record<string, any>>({
                             </Dropdown.Item>
                           </>
                         )}
+                          </>
+                        )}
                       </Dropdown.Menu>
                     </Dropdown>
                   ) : (
@@ -1174,10 +1193,12 @@ const GenericTable = <T extends Record<string, any>>({
                     </button>
                   ),
                 )}
-                <button className="gt-filter-pill-add">
-                  <Plus size={14} className="me-1" />
-                  <span>More</span>
-                </button>
+                {toolbar.showMoreFiltersButton !== false && (
+                  <button className="gt-filter-pill-add">
+                    <Plus size={14} className="me-1" />
+                    <span>More</span>
+                  </button>
+                )}
                 {toolbar.showAdvancedFilters && (
                   <button
                     className="gt-filter-pill-add"
@@ -1188,6 +1209,9 @@ const GenericTable = <T extends Record<string, any>>({
                   </button>
                 )}
               </div>
+              {toolbar.advancedFiltersOpen && toolbar.advancedFiltersContent && (
+                <div className="w-100 mt-2">{toolbar.advancedFiltersContent}</div>
+              )}
             </div>
           )}
 
