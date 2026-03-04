@@ -31,7 +31,7 @@
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   border: 1px solid #ccc;
-  border-radius: 15px 15px 0px 0px !important;
+  border-radius: 15px 15px 0px 0px;
   margin: 14px 25px;
 }
 

@@ -593,7 +593,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             break;
           case 'attendence':
             if (hasPermission(PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT)) {
-              router.push(`/workforce/attendences`);
+              router.push(`/workforce/attendance`);
             }
             break;
 

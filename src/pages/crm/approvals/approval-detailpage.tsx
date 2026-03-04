@@ -27,6 +27,8 @@ import { getDeal, type DealData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
+import CrmProfileSection from "@components/CrmProfileSection";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -292,6 +294,7 @@ const DealRecordPage: NextPageWithLayout = () => {
     : null;
 
   const renderIntelligenceTab = () => {
+    // Deprecated: intelligence UI now handled by CrmIntelligenceTab
     return (
       <div>
         {/* Info Banner */}
@@ -307,7 +310,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             color: '#92400e',
             margin: 0,
           }}>
-            HubSpot does not have enrichment data for this record, yet.
+            We does not have enrichment data for this record, yet.
           </p>
         </div> */}
 
@@ -1821,81 +1824,57 @@ const DealRecordPage: NextPageWithLayout = () => {
             </div>
 
             {/* Contact Profile */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #cccccc",
-                borderRadius: "10px",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  padding: "16px 20px",
-                  borderBottom: "1px solid #eaf0f6",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    color: "#141414",
-                    margin: 0,
-                  }}
-                >
-                  Deal profile
-                </h3>
-              </div>
-
-              <div style={{ padding: "20px" }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: "20px",
-                  }}
-                >
-                  {[
-                    {
-                      label: "Company name",
-                      value: deal?.company_name ?? "--",
-                    },
-                    { label: "Street address", value: "--" },
-                    { label: "City", value: "--" },
-                    { label: "Postal code", value: "--" },
-                    { label: "State/Region", value: "--" },
-                    {
-                      label: "Email",
-                      value:
-                        deal?.decision_maker_email ??
-                        (deal as any)?.main_decision_maker?.email ??
-                        "--",
-                      link: true,
-                    },
-                  ].map((field, index) => (
-                    <div key={index}>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "#666666",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {field.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: field.link ? "#006162" : "#141414",
-                        }}
-                      >
-                        {field.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <CrmProfileSection
+              title="Deal profile"
+              fields={[
+                {
+                  label: "Company name",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.official_company_name ?? deal?.company_name ?? "--",
+                },
+                {
+                  label: "Street address",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.headquarters?.address ??
+                    (deal as any)?.company?.address ??
+                    "--",
+                },
+                {
+                  label: "City",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.headquarters?.city ??
+                    (deal as any)?.company?.city ??
+                    "--",
+                },
+                {
+                  label: "Postal code",
+                  value:
+                    (deal as any)?.company?.postal_code ??
+                    (deal as any)?.company?.zip ??
+                    "--",
+                },
+                {
+                  label: "State/Region",
+                  value:
+                    (deal as any)?.company?.state ??
+                    (deal as any)?.company?.province ??
+                    "--",
+                },
+                {
+                  label: "Email",
+                  value:
+                    (deal as any)?.company?.enrichment_data?.structured_data
+                      ?.emails?.[0]?.email ??
+                    (deal as any)?.decision_maker_email ??
+                    (deal as any)?.contact_email ??
+                    "--",
+                  link: true,
+                },
+              ]}
+            />
           </>
         )}
 
@@ -2031,7 +2010,14 @@ const DealRecordPage: NextPageWithLayout = () => {
             </div>
           </div>
         )}
-        {activeTab === "intelligence" && renderIntelligenceTab()}
+        {activeTab === "intelligence" && (
+          <CrmIntelligenceTab
+            company={(deal as any)?.company ?? null}
+            relatedCompany={deal?.company_name ?? "--"}
+            industryName={(deal as any)?.industries?.[0]?.name ?? deal?.industry ?? null}
+            industryDescription={(deal as any)?.industries?.[0]?.description ?? null}
+          />
+        )}
       </div>
     </div>
   );

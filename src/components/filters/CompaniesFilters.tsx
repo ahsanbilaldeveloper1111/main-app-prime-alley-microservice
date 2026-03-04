@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button, Card, Col, Dropdown, Row } from 'react-bootstrap';
 import Select from 'react-select';
 import { toast } from "react-toastify";
-import { getResellers } from "@utils/accountingOld";
+import { getResellers } from "@utils/accounts";
 import { FiFilter } from "react-icons/fi";
 
 interface CompaniesFiltersProps {

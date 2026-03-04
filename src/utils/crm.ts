@@ -918,12 +918,24 @@ export interface CrmDataPagination {
 }
 
 export interface CrmDataMetrics {
+  /** Total records for the current query/tab. */
+  total_records?: number;
+  /** Total records for "All Prospects" (ignoring tab params like has_scheduled_calls/has_tickets). */
+  total_all_records?: number;
   assigned_records: number;
   unassigned_records: number;
   scheduled_records: number;
   not_scheduled_records: number;
   scheduled_next_hour_records: number;
   scheduled_next_24_hours_records: number;
+  /** Count of overdue scheduled calls. */
+  overdue_scheduled_records?: number;
+  /** Count of converted prospects (has_tickets=true). */
+  converted_prospects_records?: number;
+  /** Count of prospects with scheduled_call_at within last 24 hours. */
+  recently_contacted_last_24h_records?: number;
+  /** Count of prospects with scheduled_call_at null. */
+  not_contacted_records?: number;
 }
 export interface CrmDataResponse {
   success: boolean;
@@ -1215,6 +1227,22 @@ export const getCompanies = async (
       per_page: params.per_page ?? 15,
       total: 0,
     };
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to fetch companies",
+    );
+    throw error;
+  }
+};
+
+export const getMinifiedCompanies = async (
+  params: {} = {},
+): Promise<any[] | null> => {
+  try {
+    const response = await axiosInstance.get("/crm/companies", { params });
+    return response.data?.data ?? [];
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message ||
@@ -2156,6 +2184,8 @@ export const getDeals = async (
     upcoming_meetings?: number;
     deal_types?: Record<string, string>;
   };
+  /** Backend-provided metrics for summary tiles/cards. */
+  metrics?: Record<string, number> | null;
 }> => {
   try {
     const response = await axiosInstance.get("/crm/deals", { params });
@@ -2168,6 +2198,7 @@ export const getDeals = async (
     const dealsArray: DealData[] = paginationData?.data || [];
     const pagination = paginationData || {};
     const summaryTiles = responseData?.summary_tiles || null;
+    const metrics = responseData?.metrics || null;
 
     return {
       dataList: Array.isArray(dealsArray) ? dealsArray : [],
@@ -2181,6 +2212,7 @@ export const getDeals = async (
         last_page: pagination?.last_page || 1,
       },
       summary_tiles: summaryTiles,
+      metrics,
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch deals");
@@ -2528,6 +2560,8 @@ export const getOrders = async (
     last_page: number;
   };
   summary_tiles?: any;
+  /** Backend-provided metrics for summary tiles/cards. */
+  metrics?: Record<string, number> | null;
 }> => {
   try {
     const response = await axiosInstance.get("/crm/orders", { params });
@@ -2539,6 +2573,7 @@ export const getOrders = async (
     const ordersArray: OrderData[] = paginationData?.data || [];
     const pagination = paginationData || {};
     const summaryTiles = responseData?.summary_tiles || null;
+    const metrics = responseData?.metrics || null;
 
     return {
       dataList: Array.isArray(ordersArray) ? ordersArray : [],
@@ -2552,6 +2587,7 @@ export const getOrders = async (
         last_page: pagination?.last_page || 1,
       },
       summary_tiles: summaryTiles,
+      metrics,
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch orders");

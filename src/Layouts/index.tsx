@@ -11,6 +11,7 @@ import { useDialerModal } from '../contexts/DialerModalContext';
 import NotificationsSidebar from '@components/Notificationssidebar';
 import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
 import { getCurrentUserCompanyImage } from "@utils/company";
+import { useAuth } from '../hooks/useAuth';
 
 import { 
 	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
@@ -60,6 +61,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
 	const { data: session, status } = useSession();
+  const { logout } = useAuth();
 	const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
   const { 
@@ -118,9 +120,9 @@ const Layout = ({ children }: LayoutProps) => {
 			.then((blob) => {
 				if (cancelled) return;
 				if (blob && blob.size > 0) {
-					const url = URL.createObjectURL(blob);
-					headerLogoUrlRef.current = url;
-					setHeaderLogoUrl(url);
+					// const url = URL.createObjectURL(blob);
+					// headerLogoUrlRef.current = url; //
+					setHeaderLogoUrl('');
 				} else {
 					setHeaderLogoUrl(null);
 				}
@@ -233,7 +235,9 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const totalUnreadCount = unreadCount;
 
-	const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInCompanyName, setLoggedInCompanyName] = useState('');
+  
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
 	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
 	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
@@ -242,6 +246,7 @@ const Layout = ({ children }: LayoutProps) => {
 		if (status !=="loading" && session) {
 		  if (typeof window !== "undefined") {
 		    setLoggedInName(session.user.name || '');
+		    setLoggedInCompanyName(session.user.company_name || '');
 		    setLoggedInUserUsername(session.user.username || '');
 		    setLoggedInUserRole(session.user.role || '');
 		    setLoggedInUserProfilePicture(session.user?.profile_picture || '');
@@ -613,7 +618,7 @@ const Layout = ({ children }: LayoutProps) => {
         
         /* CRM Prime-style top bar */
         .app-topbar-merged {
-          background: #260646 !important;
+          background: #00385d !important;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
           height: 48px !important;
           padding: 0 16px !important;
@@ -630,7 +635,7 @@ const Layout = ({ children }: LayoutProps) => {
           width: 100%;
           height: 34px;
           padding: 6px 36px 6px 14px;
-          background:rgb(53, 9, 97);
+          background:rgb(2, 68, 112);
           border: 1px solid #958c8c;
           border-radius: 20px;
           color: #fff;
@@ -643,12 +648,12 @@ const Layout = ({ children }: LayoutProps) => {
         }
         
         .crm-prime-search-input:hover {
-          background: rgb(70, 14, 126);
+          background: rgb(1, 83, 138);
         }
         
         .crm-prime-search-input:focus {
           outline: none;
-          background: rgb(70, 14, 126);
+          background: rgb(1, 83, 138);
           border-color: #fff;
           color: #fff;
         }
@@ -834,7 +839,7 @@ const Layout = ({ children }: LayoutProps) => {
         
         .user-dropdown-header {
           padding: 16px 16px 12px;
-          border-bottom: 1px solid #f0f3f5;
+          border-bottom: 1px solid #cccccc;
           display: flex;
           align-items: flex-start;
           gap: 12px;
@@ -869,23 +874,25 @@ const Layout = ({ children }: LayoutProps) => {
         .user-dropdown-name {
           font-size: 16px;
           font-weight: 600;
-          color: #000000;
+          color: #141414;
           line-height: 1.3;
         }
         
         .user-dropdown-email {
-          font-size: 12px;
-          color: #7c98b6;
+          font-size:14px !important;
+            color:#141414;
+            font-weight:100;
           line-height: 1.3;
         }
         
         .user-dropdown-link {
-          color: #0091ae;
-          font-size: 12px;
-          font-weight: 500;
+          color: #006162 !important;
+font-size:14px;
+font-weight:600;
           text-decoration: none;
           display: inline-block;
           margin-top: 4px;
+          text-decoration: underline;
         }
         
         .user-dropdown-link:hover {
@@ -894,8 +901,8 @@ const Layout = ({ children }: LayoutProps) => {
         }
         
         .user-dropdown-section {
-          padding: 0;
-          border-bottom: 1px solid #f0f3f5;
+          padding: 0 0 5px 0;
+          border-bottom: 1px solid #cccccc;
         }
         
         .user-dropdown-section:last-child {
@@ -905,7 +912,7 @@ const Layout = ({ children }: LayoutProps) => {
         .user-dropdown-item {
           display: flex;
           align-items: center;
-          gap: 8px;
+          /*gap: 8px;*/
           padding: 8px 16px;
           color: #000000;
           font-size: 14px;
@@ -916,7 +923,7 @@ const Layout = ({ children }: LayoutProps) => {
           background: transparent;
           width: 100%;
           text-align: left;
-          line-height: 1.4;
+          line-height: 1.7;
 		  font-weight: 600;
         }
         
@@ -927,7 +934,7 @@ const Layout = ({ children }: LayoutProps) => {
         .user-dropdown-item-icon {
           width: 14px;
           height: 14px;
-          color: #7c98b6;
+          color: #666666;
           flex-shrink: 0;
         }
         
@@ -948,9 +955,9 @@ const Layout = ({ children }: LayoutProps) => {
         
         .user-dropdown-section-label {
           padding: 10px 16px 6px;
-          font-size: 11px;
+          font-size: 14px;
           font-weight: 600;
-          color: #7c98b6;
+          color: #8a8a8a !important;
           text-transform: capitalize;
         }
         
@@ -968,13 +975,18 @@ const Layout = ({ children }: LayoutProps) => {
         
         .user-dropdown-account-id {
           font-size: 11px;
-          color: #7c98b6;
+          color: #666666;
           line-height: 1.3;
         }
         
         .user-dropdown-credits {
           display: block;
           padding: 8px 16px;
+        }
+        .user-dropdown-credits-head {
+         display: flex;
+  flex-direction: column;   /* 👈 This makes content go to next line */
+  align-items: flex-start;
         }
         
         .user-dropdown-credits-header {
@@ -991,8 +1003,8 @@ const Layout = ({ children }: LayoutProps) => {
         
         .user-dropdown-credits-count {
           font-size: 11px;
-          color: #7c98b6;
-          margin-top: 2px;
+          color: #666666;
+          margin-top: -3px;
         }
         
         .user-dropdown-view-only {
@@ -1038,11 +1050,11 @@ const Layout = ({ children }: LayoutProps) => {
         }
         
         .user-dropdown-footer-link {
-          color: #0091ae !important;
+          color: #006162 !important;
 			font-size: 12px;
 			font-weight: 500;
 			text-decoration: none;
-			border-bottom: 1px solid #0091ae;
+			border-bottom: 1px solid #006162;
 			cursor: pointer;
         }
         
@@ -1338,7 +1350,7 @@ const Layout = ({ children }: LayoutProps) => {
                                         alignItems: 'center',
                                         justifyContent: 'center'
                                       }}>
-                                        <Bell size={14} color="#0091ae" />
+                                        <Bell size={14} color="#006162" />
                                       </div>
                                     )}
                                   </div>
@@ -1399,7 +1411,7 @@ const Layout = ({ children }: LayoutProps) => {
 
               {/* Settings Icon */}
                 <button className="crm-prime-topbar-icon" title="Settings"
-                onClick={() => router.push('/settings')}
+                onClick={() => router.push('/main-settings')}
                 >
                 <Settings size={18} />
               </button>
@@ -1442,15 +1454,15 @@ const Layout = ({ children }: LayoutProps) => {
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
                 >
                   <div className="crm-prime-user-avatar">
-                    {profileImageUrl ? (
-                      <img src={profileImageUrl} alt={loggedInName || ''} />
+                    {headerLogoUrl ? (
+                      <img src={headerLogoUrl} alt={loggedInCompanyName || ''} />
                     ) : (
-                      loggedInName?.charAt(0)?.toUpperCase() || <User size={14} />
+                      loggedInCompanyName?.charAt(0)?.toUpperCase() || <User size={14} />
                     )}
                   </div>
                   <div className="crm-prime-user-info">
                     <div>
-                      <div className="crm-prime-user-name">{loggedInName || 'User'}</div>
+                      <div className="crm-prime-user-name">{loggedInCompanyName || ''}</div>
                     </div>
                     <ChevronDown size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
                   </div>
@@ -1487,7 +1499,7 @@ const Layout = ({ children }: LayoutProps) => {
                               justifyContent: 'center',
                               fontSize: '16px',
                               fontWeight: 600,
-                              color: '#0091ae'
+                              color: '#006162'
                             }}>
                               {loggedInName?.charAt(0)?.toUpperCase() || 'H'}
                             </div>
@@ -1545,44 +1557,57 @@ const Layout = ({ children }: LayoutProps) => {
                         
                           {session?.user?.permissions?.includes('tickets-tickets') && (
                             <button className="user-dropdown-item" onClick={() => router.push('/tickets/list')}>
-                              <Ticket className="user-dropdown-item-icon" size={14} />
+                              {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
                               <span className="user-dropdown-item-text">Raise a ticket</span>
                             </button>
                           )}
                           
                           
                         <button className="user-dropdown-item">
-                          <CreditCard className="user-dropdown-item-icon" size={14} />
+                          {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
-                          <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#7c98b6' }} />
-                        </button>
-                        <button className="user-dropdown-item">
-                          <FileText className="user-dropdown-item-icon" size={14} />
+                          <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
+                          </button>
+                          
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/billing/dashboard')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
                         </button>
-                        <div className="user-dropdown-credits">
-                          <div className="user-dropdown-credits-header">
-                            <div className="user-dropdown-credits-text">CRM Prime Credits</div>
-                            <span className="user-dropdown-item-badge">New</span>
-                          </div>
+                        )}
+
+                          
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Tasks</span>
+                        </button>
+                        )}
+
+<button className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Calendar</span>
+                        </button>
+
+
+
+
+                          
+                        <button className="user-dropdown-item user-dropdown-credits-head">
+                         
+                            <span className="user-dropdown-item-text">CRM Prime Credits</span>
+                            
+                          
                           <div className="user-dropdown-credits-count">1500 of 1500 credits available</div>
-                        </div>
+                        </button>
                         <button className="user-dropdown-item">
-                          <Briefcase className="user-dropdown-item-icon" size={14} />
+                          {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Product Updates</span>
                         </button>
-                        <button className="user-dropdown-item">
-                          <GraduationCap className="user-dropdown-item-icon" size={14} />
-                          <span className="user-dropdown-item-text">CRM Prime Academy</span>
-                        </button>
-                        <button className="user-dropdown-item">
-                          <HelpCircle className="user-dropdown-item-icon" size={14} />
-                          <span className="user-dropdown-item-text">Training & Services</span>
-                          <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#7c98b6' }} />
-                        </button>
-                        <button className="user-dropdown-item">
-                          <FileText className="user-dropdown-item-icon" size={14} />
-                          <span className="user-dropdown-item-text">Projects (Checklists)</span>
+                        
+                        <button className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Settings</span>
                         </button>
                       </div>
 
@@ -1593,7 +1618,7 @@ const Layout = ({ children }: LayoutProps) => {
                           className="user-dropdown-footer-link"
                           onClick={() => {
                             setShowUserDropdown(false);
-                            signOut({ callbackUrl: getLogoutCallbackUrl(), redirect: true });
+                            logout();
                           }}
                         >
                           Sign out

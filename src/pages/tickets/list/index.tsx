@@ -50,7 +50,7 @@ import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
 import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig, BarChart3, Ticket } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { useRouter } from "next/router";
 import {
   PieChart,

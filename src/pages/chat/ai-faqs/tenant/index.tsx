@@ -355,9 +355,9 @@ const AIChatFAQsTenant = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Tenant FAQs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
 
-      <PageHeader title="Tenant FAQs" showSearch={false} buttons={
+      <PageHeader title="" showSearch={false} buttons={
         <>
         <Button
           variant="primary"

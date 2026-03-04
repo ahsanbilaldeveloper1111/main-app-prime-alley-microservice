@@ -11,6 +11,7 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import AuditLogSidebar, { AuditSidebarField } from "@components/AuditLogSidebar";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -48,6 +49,7 @@ function changesSummaryColumn(): TableColumn<Record<string, unknown>> {
     emptyValue: "—",
   };
 }
+
 
 /** Columns per module name. Use these when a module is selected. */
 const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown>>[]> = {
@@ -481,6 +483,29 @@ const AuditLogsNewPage = () => {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
+  const sidebarFields: AuditSidebarField[] = selectedRow ? [
+  { label: "Category",       value: formatLabel(selectedRow.resource_type as string) },
+  { label: "Subcategory",    value: formatLabel(selectedRow.formatted_action as string) },
+  { label: "Action",         value: "Perform" },
+  {
+    label: "Date of change",
+    value: selectedRow.formatted_timestamp as string,
+  },
+  {
+    label: "Modified by",
+    value: "",
+    isUser: true,
+    userName: (selectedRow.user as any)?.display_name || "Unknown",
+    userEmail: (selectedRow.user as any)?.email || "",
+    sectionBreakAfter: true,
+  },
+  { label: "Country",        value: (selectedRow.country as string) || "—" },
+  { label: "Region",         value: (selectedRow.region as string) || "—" },
+  { label: "Login Type",     value: (selectedRow.login_type as string) || "—" },
+  { label: "User Agent",     value: (selectedRow.user_agent as string) || "—" },
+  { label: "IP Address",     value: (selectedRow.ip_address as string) || "—" },
+] : [];
+
   const visibleAuditModules = useMemo(() => {
     const perms = session?.user?.permissions ?? [];
     return AuditFilterConfig.filter((n) => perms.includes(n.isShow));
@@ -688,15 +713,20 @@ const AuditLogsNewPage = () => {
   const filterPills = useMemo(() => {
     const pills: any[] = [];
     if (visibleAuditModules.length === 0) return pills;
-    pills.push({
-      id: "audit_module",
-      label: selectedAuditModule ? selectedAuditModule.moduleName : "Select Module",
-      showDropdown: true,
-      dropdownOptions: [
-        // { label: "Select module", value: "", onClick: () => handleAuditModuleChange("") },
-        ...visibleAuditModules.map((n) => ({ label: n.moduleName, value: n.moduleName, onClick: () => handleAuditModuleChange(n.moduleName) })),
-      ],
+    
+    // Add individual module pills instead of dropdown
+    visibleAuditModules.forEach((module) => {
+      pills.push({
+        id: `audit_module_${module.moduleName}`,
+        label: module.moduleName,
+        active: selectedAuditModule?.moduleName === module.moduleName,
+        onClick: () => handleAuditModuleChange(module.moduleName),
+        onClear: selectedAuditModule?.moduleName === module.moduleName 
+          ? () => handleAuditModuleChange("")
+          : undefined,
+      });
     });
+    
     if (!selectedAuditModule) return pills;
     pills.push({
       id: "audit_service",
@@ -756,7 +786,8 @@ const AuditLogsNewPage = () => {
   const toolbarConfig: ToolbarConfig = useMemo(() => ({
     showTabs: false,
     showSearch: false,
-    showFiltersButton: true,
+    showFiltersButton: false,
+    showFilterPills: true,
     showSortButton: false,
     showExportButton: false,
     filterPills,
@@ -777,111 +808,104 @@ const AuditLogsNewPage = () => {
 
   return (
     <>
+      <style>{`
+        .gt-toolbar-main,
+        .gt-filter-pills {
+          border: none !important;
+          padding: 0 !important;
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="Audit Logs" mainLink="/audit-logs" subTitle="Audit Logs" />
-      <PageHeader title="Audit Logs" description="View audit logs by module and service" />
-      <div style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}>
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-         
-            <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <GenericTable
-                data={dataList as Record<string, unknown>[]}
-                columns={getColumnsForModule(selectedAuditModule?.moduleName ?? null)}
-                actions={[]}
-                showActions={false}
-                selectable={false}
-                selectedRows={[]}
-                onSelectionChange={() => {}}
-                pagination={pagination}
-                onPaginationChange={handlePaginationChange}
-                sortable
-                defaultSortColumn="formatted_timestamp"
-                defaultSortDirection="desc"
-                onSort={() => {}}
-                onPreviewClick={handlePreviewClick}
-                loading={auditLogsLoading}
-                emptyMessage="No audit logs found matching your criteria"
-                loadingMessage="Loading audit logs..."
-                hover
-                uniqueKey="id"
-                fixedHeight
-                maxHeight="calc(100vh - 280px)"
-                showToolbar
+      <div style={{ backgroundColor: "#ffffff", minHeight: "100vh" }}>
+        <div style={{ padding: "20px" }}>
+          <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", marginBottom: "8px" }}>
+            Audit Logs
+          </h1>
+          <p style={{ fontSize: "14px", fontWeight: 100, color: "#666", marginBottom: "20px" }}>
+            View audit logs by module and service
+          </p>
+          <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <GenericTable
+              data={dataList as Record<string, unknown>[]}
+              columns={getColumnsForModule(selectedAuditModule?.moduleName ?? null)}
+              actions={[]}
+              showActions={false}
+              selectable={false}
+              selectedRows={[]}
+              onSelectionChange={() => {}}
+              pagination={pagination}
+              onPaginationChange={handlePaginationChange}
+              sortable
+              defaultSortColumn="formatted_timestamp"
+              defaultSortDirection="desc"
+              onSort={() => {}}
+              onPreviewClick={handlePreviewClick}
+              loading={auditLogsLoading}
+              emptyMessage="No audit logs found matching your criteria"
+              loadingMessage="Loading audit logs..."
+              hover
+              uniqueKey="id"
+              fixedHeight
+              maxHeight="calc(100vh - 280px)"
+              showToolbar
               toolbar={toolbarConfig}
               statsCards={selectedAuditModule ? auditLogsStatsCards : []}
-              />
-            </div>
-         
+              showToolbarActions={false}
+              noBorder={true}
+            />
+          </div>
         </div>
-        {showSidebar && selectedRow && (
-          <GenericSidebar
-            isOpen={showSidebar}
-            onClose={handleCloseSidebar}
-            
-            title={selectedRow?.formatted_action ? `Audit: ${selectedRow.formatted_action}` : "Audit log"}
-            subtitle={(selectedRow?.formatted_timestamp as string) || ""}
-            quickActions={[]}
-            sections={[
-              {
-                id: "audit-details",
-                title: "Audit log details",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [],
-                fields: getSidebarFieldsForModule(selectedAuditModule?.moduleName ?? null, selectedRow),
-              },
-              {
-                id: "audit-changes",
-                title: "Changes",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [],
-                customContent: <ChangesSummaryTable changes={changesSummary} />,
-              },
-            ]}
-          />
-        )}
-
-        <Modal show={showAuditDateCustomModal} onHide={() => setShowAuditDateCustomModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Custom date range</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Start date</Form.Label>
-              <Form.Control
-                type="date"
-                value={customStartDate}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomStartDate(e.target.value)}
-              />
-            </Form.Group>
-            <Form.Group className="mb-0">
-              <Form.Label>End date</Form.Label>
-              <Form.Control
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={() => setShowAuditDateCustomModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setAuditStartDate(customStartDate);
-                setAuditEndDate(customEndDate);
-                setShowAuditDateCustomModal(false);
-              }}
-            >
-              Apply
-            </Button>
-          </Modal.Footer>
-        </Modal>
       </div>
+
+      {showSidebar && selectedRow && (
+  <AuditLogSidebar
+    isOpen={showSidebar}
+    onClose={handleCloseSidebar}
+    title="Additional details"
+    subtitle={selectedRow.formatted_timestamp as string}
+    fields={sidebarFields}
+    onSaveComment={(comment) => console.log("Comment:", comment)}
+  />
+)}
+
+      <Modal show={showAuditDateCustomModal} onHide={() => setShowAuditDateCustomModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Custom date range</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group className="mb-3">
+            <Form.Label>Start date</Form.Label>
+            <Form.Control
+              type="date"
+              value={customStartDate}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomStartDate(e.target.value)}
+            />
+          </Form.Group>
+          <Form.Group className="mb-0">
+            <Form.Label>End date</Form.Label>
+            <Form.Control
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowAuditDateCustomModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setAuditStartDate(customStartDate);
+              setAuditEndDate(customEndDate);
+              setShowAuditDateCustomModal(false);
+            }}
+          >
+            Apply
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

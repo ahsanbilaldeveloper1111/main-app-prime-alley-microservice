@@ -7,7 +7,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Form, Spinner } from 'react-bootstrap';
 import { AlertCircle, Check, Clock, DollarSign, FileText, Wallet, TrendingUp, Package } from 'lucide-react';
 import Link from 'next/link';
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -29,6 +29,7 @@ import "@assets/scss/tabs.scss";
 
 
 import { GetDashboardCounters, GetProfitLossData, GetTopProducts, GetRecentActivity, GetAnalyticsByMonth, GetCompanyDetails } from "@utils/accounting";
+import { getMinifiedCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 
 
@@ -56,25 +57,43 @@ const CustomerDashboard = () => {
   }>>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('Last 3 months');
   const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+  const [isDashboardLoading, setIsDashboardLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    getCompanyDetails();
+    //getCompanyDetails();
   }, []);
+
   useEffect(() => {
-    getDashboardCounters();
-    getProfitLossData();
-    getTopProducts();
-    getRecentActivity();
-    getAnalyticsByMonth();
-  }, [currency, selectedPeriod]);
+    const fetchCompanies = async () => {
+      const result = await getMinifiedCompanies({
+        send_all:"true"
+      });
+      setCompanies(result ?? [] as any);
+    };
+    fetchCompanies();
+  }, []);
+
+  useEffect(() => {
+    const apiPayload = selectedCompanyId ? { crm_company_id: selectedCompanyId } : {};
+    setIsDashboardLoading(true);
+    Promise.all([
+      getDashboardCounters(apiPayload),
+      getProfitLossData(apiPayload),
+      getTopProducts(apiPayload),
+      getRecentActivity(apiPayload),
+      getAnalyticsByMonth(apiPayload),
+    ]).finally(() => setIsDashboardLoading(false));
+  }, [currency, selectedPeriod, selectedCompanyId]);
 
   const getCompanyDetails = async () => {
     const response = await GetCompanyDetails() as any;
     setCurrency(response?.profile?.currency);
   };
 
-  const getDashboardCounters = async () => {
-    const response = await GetDashboardCounters() as any;
+  const getDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetDashboardCounters(params) as any;
     setDashboardCounters(response);
     setSummaryCards([
       { title: 'Subscriptions', value: formatInteger(response?.products?.total ?? 0), icon: Package, iconColor: '#3b82f6', iconBgColor: 'rgba(59, 130, 246, 0.1)' },
@@ -82,7 +101,7 @@ const CustomerDashboard = () => {
       { title: 'Outstanding Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.outstanding_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)' },
       { title: 'Overdue Invoices', value: formatInteger(response?.invoices?.overdue_invoices_count ?? 0), icon: Clock, iconColor: '#ef4444', iconBgColor: 'rgba(239, 68, 68, 0.1)' },
       { title: 'Overdue Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.overdue_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)', link: { text: 'Pay Now', onClick: () => router.push('/billing/invoices') } },
-      { title: 'Paid This Month', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(52340.5)}`, icon: Wallet, iconColor: '#10B981', iconBgColor: '#D1FAE5', subtitle: 'Last 30 days' }
+      { title: 'Paid This Month', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.paid_amount)}`, icon: Wallet, iconColor: '#10B981', iconBgColor: '#D1FAE5', subtitle: 'Last 30 days' }
     ]);
   };
 
@@ -146,18 +165,18 @@ const CustomerDashboard = () => {
     }
   };
 
-  const getProfitLossData = async () => {
-    const response = await GetProfitLossData();
+  const getProfitLossData = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetProfitLossData(params);
     setProfitLossData(response);
   };
 
-  const getTopProducts = async () => {
-    const response = await GetTopProducts();
+  const getTopProducts = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetTopProducts(params);
     setTopProducts(response as any);
   };
 
-  const getRecentActivity = async () => {
-    const response = await GetRecentActivity();
+  const getRecentActivity = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetRecentActivity(params);
     setRecentActivity(response);
   };
 
@@ -195,10 +214,10 @@ const CustomerDashboard = () => {
     };
   };
 
-  const getAnalyticsByMonth = async () => {
+  const getAnalyticsByMonth = async (params: { crm_company_id?: string | number } = {}) => {
     const dateRange = getDateRange(selectedPeriod);
     console.log('Date Range:', dateRange); // Debug log
-    const response = await GetAnalyticsByMonth(dateRange.start_date, dateRange.end_date) as any;
+    const response = await GetAnalyticsByMonth(dateRange.start_date, dateRange.end_date, params) as any;
 
     // Transform the response data for the chart
     // Use response if available, otherwise use sampleResponse
@@ -279,7 +298,7 @@ const CustomerDashboard = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Billing Dashboard" />
 
 
 <div>
@@ -295,8 +314,8 @@ const CustomerDashboard = () => {
           <nav aria-label="breadcrumb">
             <ol className="breadcrumb mb-0">
               <li className="breadcrumb-item">
-                <a href="/dashboard" className="text-decoration-none">
-                  Accounting
+                <a href="/billing" className="text-decoration-none">
+                  Billing
                 </a>
               </li>
               <li className="breadcrumb-item active fw-bold" aria-current="page">
@@ -305,109 +324,155 @@ const CustomerDashboard = () => {
             </ol>
           </nav>
         </div>
-
+        <div className="mb-3 mb-md-0">
+          <Form.Select
+            size="sm"
+            style={{ width: '220px' }}
+            value={selectedCompanyId}
+            onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
+          >
+            <option value="">All companies</option>
+            {companies.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
+        </div>
       </div>
-        
-                {/* Summary Cards */}
-      {/* <StatsCards data={summaryCards} gridMinWidth="180px" /> */}
-      <StatsCards data={summaryCards} gridMinWidth="180px" valueFontSize="28px" />
-        
-                <Row>
-                  {/* Spending Overview */}
-                  <Col lg={8} className="mb-4">
-                    <Card>
-                      <Card.Body>
-                      <div className="d-flex justify-content-between align-items-center mb-4">
-                        <h5 className="mb-0" style={{ fontWeight: '600' }}>Spending Overview</h5>
-                        <Form.Select 
-                          size="sm" 
-                          style={{ width: '150px' }}
-                          value={selectedPeriod}
-                          onChange={(e) => {
-                            setSelectedPeriod(e.target.value);
-                          }}
-                        >
-                          <option value="Last 3 months">Last 3 months</option>
-                          <option value="Last 6 months">Last 6 months</option>
-                          <option value="This year">This year</option>
-                        </Form.Select>
-                      </div>
-                      <SpendingChart />
 
-                        {/* <Row className="mt-4">
-                          <Col lg={4}>
-                            <div className="text-center border p-2 rounded">
-                            <h6 className="mb-2 text-muted">Open Invoice Amount</h6>
-                              <h4 className="fw-semibold text-primary">{currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h4>
-                            </div>
-                          </Col>
-                          <Col lg={4}>
-                            <div className="text-center border p-2 rounded">
-                              <h6 className="mb-2 text-muted">Open Unpaid Amount</h6>
-                              <h4 className="fw-semibold text-warning">{currency} {formatNumber(dashboardCounters?.invoices?.outstanding_amount)}</h4>
-                            </div>
-                          </Col>
-                          <Col lg={4}>
-                            <div className="text-center border p-2 rounded">
-                              <h6 className="mb-2 text-muted">Paid Amount</h6>
-                              <h4 className="fw-semibold text-success">{currency} {formatNumber(dashboardCounters?.invoices?.paid_amount)}</h4>
-                            </div>
-                          </Col>
-                        </Row> */}
-                      </Card.Body>
-                    </Card>
-                  </Col>
-
-
-                  {/* Active Subscriptions */}
-        <Col lg={4} className="mb-4">
-          <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <Card.Body>
-              <h5 className="mb-4" style={{ fontWeight: '600' }}>Subscriptions</h5>
-              <div style={{ maxHeight: '367px', overflowY: 'auto' }}>
-                {topProducts.map((subscription, index) => (
-                  <div key={index} className="mb-3 pb-2 border-bottom">
-                    <div className="d-flex align-items-center gap-2">
-                      <div 
-                        className="rounded d-flex align-items-center justify-content-center" 
-                        style={{ 
-                          width: '36px', 
-                          height: '36px',
-                          backgroundColor: `rgba(${getStatusBackgroundColor(subscription?.status)}, 0.1)`,
-                          flexShrink: 0
-                        }}
-                      >
-                        <div style={{ color: getStatusIconColor(subscription?.status) }}>
-                          {subscription?.subscriptions || '0'}
-                        </div>
-                      </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <h6 className="mb-0 text-truncate text-capitalize" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
-                          {subscription?.name}
-                        </h6>
-                      </div>
-                      <div style={{ marginLeft: '8px', flexShrink: 0 }}>
-                        <Badge 
-                          bg={getStatusBadgeColor(subscription?.status)}
-                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
-                        >
-                          {subscription?.status}
-                        </Badge>
-                      </div>
+      {isDashboardLoading ? (
+        <>
+          {/* Skeleton for Summary Cards */}
+          <div className="mb-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="border-0 shadow-sm">
+                <Card.Body style={{ padding: '20px' }}>
+                  <div className="placeholder-glow">
+                    <span className="placeholder d-block col-8 mb-2" style={{ height: 14 }} />
+                    <span className="placeholder d-block col-5" style={{ height: 28 }} />
+                  </div>
+                </Card.Body>
+              </Card>
+            ))}
+          </div>
+          {/* Skeleton for Chart + Subscriptions */}
+          <Row>
+            <Col lg={8} className="mb-4">
+              <Card>
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <div className="placeholder-glow">
+                      <span className="placeholder col-4" style={{ height: 24 }} />
                     </div>
                   </div>
-                ))}
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
+                  <div className="placeholder-glow d-flex align-items-end gap-2" style={{ height: 354 }}>
+                    {[40, 65, 45, 80, 55, 70].map((h, i) => (
+                      <span key={i} className="placeholder flex-grow-1 rounded" style={{ height: `${h}%`, minWidth: 24 }} />
+                    ))}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col lg={4} className="mb-4">
+              <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <Card.Body>
+                  <div className="placeholder-glow mb-4">
+                    <span className="placeholder col-5" style={{ height: 24 }} />
+                  </div>
+                  <div className="d-flex flex-column gap-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="d-flex align-items-center gap-2">
+                        <span className="placeholder rounded" style={{ width: 36, height: 36 }} />
+                        <span className="placeholder col-6" style={{ height: 20 }} />
+                        <span className="placeholder col-2" style={{ height: 22 }} />
+                      </div>
+                    ))}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <StatsCards data={summaryCards} gridMinWidth="180px" valueFontSize="28px" />
+
+          <Row>
+            {/* Spending Overview */}
+            <Col lg={8} className="mb-4">
+              <Card>
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="mb-0" style={{ fontWeight: '600' }}>Spending Overview</h5>
+                    <Form.Select
+                      size="sm"
+                      style={{ width: '150px' }}
+                      value={selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                    >
+                      <option value="Last 3 months">Last 3 months</option>
+                      <option value="Last 6 months">Last 6 months</option>
+                      <option value="This year">This year</option>
+                    </Form.Select>
+                  </div>
+                  <SpendingChart />
+                </Card.Body>
+              </Card>
+            </Col>
+
+            {/* Active Subscriptions */}
+            <Col lg={4} className="mb-4">
+              <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <Card.Body>
+                  <h5 className="mb-4" style={{ fontWeight: '600' }}>Subscriptions</h5>
+                  <div style={{ maxHeight: '367px', overflowY: 'auto' }}>
+                    {topProducts.map((subscription, index) => (
+                      <div key={index} className="mb-3 pb-2 border-bottom">
+                        <div className="d-flex align-items-center gap-2">
+                          <div
+                            className="rounded d-flex align-items-center justify-content-center"
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              backgroundColor: `rgba(${getStatusBackgroundColor(subscription?.status)}, 0.1)`,
+                              flexShrink: 0
+                            }}
+                          >
+                            <div style={{ color: getStatusIconColor(subscription?.status) }}>
+                              {subscription?.subscriptions || '0'}
+                            </div>
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <h6 className="mb-0 text-truncate text-capitalize" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                              {subscription?.name}
+                            </h6>
+                          </div>
+                          <div style={{ marginLeft: '8px', flexShrink: 0 }}>
+                            <Badge
+                              bg={getStatusBadgeColor(subscription?.status)}
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                            >
+                              {subscription?.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
 
 
 
 
 
 
-                </Row>
+          </Row>
+        </>
+      )}
               </div>
 
     </React.Fragment>
@@ -419,3 +484,4 @@ CustomerDashboard.getLayout = (page: ReactElement) => {
 };
 
 export default CustomerDashboard;
+

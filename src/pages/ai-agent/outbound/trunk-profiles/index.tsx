@@ -188,43 +188,13 @@ const AIMLTrunkProfile = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Trunk Profiles" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Trunk Profiles"
         showSearch={false}
         buttons={
-          session?.user?.permissions?.includes('add-trunk-aiml') && (
-          <button
-              onClick={() => {
-                setNewTrunkName('');
-                setNewTrunkAddress('');
-                setNewTrunkNumbers('');
-                setShowAddTrunkModal(true);
-              }}
-      style={{
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '8px',
-        padding: '10px 16px',
-        backgroundColor: '#667eea',
-        border: 'none',
-        color: 'white',
-        fontSize: '14px',
-        fontWeight: 500,
-        borderRadius: '6px',
-        cursor: 'pointer',
-        transition: 'all 0.2s'
-      }}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5568d3'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#667eea'}
-    >
-      <Plus size={18} />
-              Add Trunk
-    </button>
-          )
+          <></>
         }>
-        </PageHeader>
+        </PageHeader> */}
     
 
 <div>

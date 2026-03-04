@@ -27,7 +27,7 @@ import {
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical } from "lucide-react";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 
 const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
   { value: "text", label: "Text" },

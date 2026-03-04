@@ -828,7 +828,14 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                 <Form.Control
                                   type="date"
                                   value={pendingDateStart}
-                                  onChange={(e) => setPendingDateStart(e.target.value)}
+                                  max={moment().format('YYYY-MM-DD')}
+                                  onChange={(e) => {
+                                    const newStart = e.target.value;
+                                    setPendingDateStart(newStart);
+                                    if (newStart && pendingDateEnd && newStart > pendingDateEnd) {
+                                      setPendingDateEnd(newStart);
+                                    }
+                                  }}
                                   className="border-0 bg-transparent p-0 text-inherit"
                                   style={{ fontSize: 'inherit', minWidth: '130px', cursor: 'pointer' }}
                                   aria-label="From date"
@@ -840,6 +847,8 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                 <Form.Control
                                   type="date"
                                   value={pendingDateEnd}
+                                  min={pendingDateStart || undefined}
+                                  max={moment().format('YYYY-MM-DD')}
                                   onChange={(e) => setPendingDateEnd(e.target.value)}
                                   className="border-0 bg-transparent p-0 text-inherit"
                                   style={{ fontSize: 'inherit', minWidth: '130px', cursor: 'pointer' }}
@@ -1032,7 +1041,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                       </tbody>
                                     </table>
                                     <div className="d-flex justify-content-center">
-                                          <Link href="/call-reports/stats/extension" className="link-primary">View All</Link>
+                                          <Link href="/reports/call-analytics/stats/extension" className="link-primary">View All</Link>
                                     </div>
                                       </div>
                                       </>
@@ -1087,7 +1096,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                 </tbody>
                               </table>
                               <div className="d-flex justify-content-center">
-                                    <Link href="/call-reports/stats/country" className="link-primary">View All</Link>
+                                    <Link href="/reports/call-analytics/stats/country" className="link-primary">View All</Link>
                               </div>
                                       </div>
                                       </>

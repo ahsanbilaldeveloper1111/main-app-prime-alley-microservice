@@ -196,11 +196,11 @@ const menuItems = [
     isMain: false,
     url: '',
     submenuItems: [
-      { key: 'netops-dashboard', label: 'Dashboard', permission: 'dashboard-netops', href: '/netops/dashboard' },
-      { key: 'netops-devices', label: 'Devices', permission: 'devices-netops', href: '/netops/devices' },
-      { key: 'netops-services', label: 'Services', permission: 'services-netops', href: '/netops/services' },
-      { key: 'netops-alerts', label: 'Alerts', permission: 'alerts-netops', href: '/netops/alerts' },
-      { key: 'netops-uptime-sla', label: 'Uptime & SLA Monitoring', permission: 'monitoring-netops', href: '/netops/uptime-sla' }
+      { key: 'pulse-dashboard', label: 'Dashboard', permission: 'dashboard-netops', href: '/pulse/dashboard' },
+      { key: 'pulse-devices', label: 'Devices', permission: 'devices-netops', href: '/pulse/devices' },
+      { key: 'pulse-services', label: 'Services', permission: 'services-netops', href: '/pulse/services' },
+      { key: 'pulse-alerts', label: 'Alerts', permission: 'alerts-netops', href: '/pulse/alerts' },
+      { key: 'pulse-uptime-sla', label: 'Uptime & SLA Monitoring', permission: 'monitoring-netops', href: '/pulse/uptime-sla' }
     ]
   },
   {

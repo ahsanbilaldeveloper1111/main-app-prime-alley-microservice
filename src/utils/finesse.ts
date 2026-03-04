@@ -9,7 +9,8 @@ export const FINESSE_TOKEN_KEY = 'finesseToken';
 /** Stored selected team id; use this for all APIs (payloads/query params). Default 15 when not set. */
 export const FINESSE_SELECTED_TEAM_ID_KEY = 'finesseSelectedTeamId';
 
-const DEFAULT_TEAM_ID = 15;
+const NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID = process.env.NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID || '2';
+const DEFAULT_TEAM_ID = Number(NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID);
 
 export const getStoredTeamId = (): number => {
   if (typeof globalThis.window === 'undefined') return DEFAULT_TEAM_ID;

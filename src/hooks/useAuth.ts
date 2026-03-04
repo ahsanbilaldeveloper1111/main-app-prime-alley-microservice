@@ -5,6 +5,7 @@ import { useTokenService } from './useTokenService';
 import { sessionStore } from '../utils/sessionStore';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
 import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
+import { authAPI } from '../utils/api';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -29,6 +30,8 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
+      // Clear server-side NextAuth session payload + cookies first (best effort)
+      await authAPI.logout();
       clearTokens();
       clearSessionCookiesClient(true);
       const callbackUrl = getLogoutCallbackUrl();

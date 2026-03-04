@@ -3,29 +3,45 @@
  * Centralized cookie clearing to avoid duplication
  */
 
+const EXPIRED_DATE = 'Thu, 01 Jan 1970 00:00:00 GMT';
+
+const nextAuthCookieNames = [
+  // Session
+  'next-auth.session-token',
+  '__Secure-next-auth.session-token',
+  // CSRF
+  'next-auth.csrf-token',
+  '__Host-next-auth.csrf-token',
+  '__Secure-next-auth.csrf-token',
+  // Callback URL
+  'next-auth.callback-url',
+  '__Secure-next-auth.callback-url',
+  // OAuth / PKCE temporary cookies (harmless to clear even if unused)
+  'next-auth.pkce.code_verifier',
+  '__Secure-next-auth.pkce.code_verifier',
+  'next-auth.state',
+  '__Secure-next-auth.state',
+];
+
+const buildClearCookie = (name: string, secure: boolean): string => {
+  const base = `${name}=; Path=/; SameSite=Lax; Max-Age=0; Expires=${EXPIRED_DATE}`;
+  return secure ? `${base}; Secure` : base;
+};
+
 /**
  * Get cookie clearing options for server-side (Next.js API routes)
  * @param includeNextAuth - Whether to include NextAuth cookies (default: false)
  * @returns Array of cookie strings to clear
  */
 export const getSessionCookieClearOptions = (includeNextAuth: boolean = false): string[] => {
-  const isProduction = process.env.NODE_ENV === 'production';
   const cookieOptions: string[] = [];
 
   // Add NextAuth cookies if requested
   if (includeNextAuth) {
-    cookieOptions.push(
-      'next-auth.session-token=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'next-auth.csrf-token=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    );
-  }
-
-  // Add Secure flag variations for production
-  if (isProduction && includeNextAuth) {
-    cookieOptions.push(
-      'next-auth.session-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-      'next-auth.csrf-token=; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    );
+    for (const name of nextAuthCookieNames) {
+      // Clear both secure and non-secure variants. Browsers will ignore the one that doesn't apply.
+      cookieOptions.push(buildClearCookie(name, false), buildClearCookie(name, true));
+    }
   }
 
   return cookieOptions;

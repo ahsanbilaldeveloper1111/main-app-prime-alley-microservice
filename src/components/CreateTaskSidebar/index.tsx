@@ -809,7 +809,7 @@ const CreateTaskSidebar = ({
           height: "100vh",
           backgroundColor: "#ffffff",
           boxShadow: "-4px 0 20px rgba(0,0,0,0.12)",
-          zIndex: 1001,
+          zIndex: 99999,
           display: "flex",
           flexDirection: "column",
           fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",

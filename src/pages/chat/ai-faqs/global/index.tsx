@@ -285,7 +285,7 @@ const AIChatFAQsGlobal = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Global FAQs" />
 
-      <PageHeader title="Global FAQs" showSearch={false} buttons={
+      <PageHeader title="" showSearch={false} buttons={
         <>
         <Button variant="primary" onClick={() => setShowAddModal(true)}>
           <Plus size={16} className="me-2" />

@@ -240,9 +240,9 @@ const ToolProfiles = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Tools Profiles" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
       <PageHeader
-        title="Tools Profiles"
+        title=""
         showSearch={false}
         buttons={
           <>

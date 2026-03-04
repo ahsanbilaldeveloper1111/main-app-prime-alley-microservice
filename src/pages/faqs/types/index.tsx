@@ -65,8 +65,8 @@ const FAQTypes = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={6}>
-                <h2 className="mb-0">FAQ Types</h2>
-                <p className="text-muted mb-0">View all FAQ types used across FAQ items</p>
+                {/* <h2 className="mb-0">FAQ Types</h2>
+                <p className="text-muted mb-0">View all FAQ types used across FAQ items</p> */}
               </Col>
               <Col md={6} className="d-flex justify-content-end align-items-center">
                 <div style={{ minWidth: '250px' }}>

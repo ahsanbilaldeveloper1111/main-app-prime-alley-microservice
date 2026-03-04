@@ -3,6 +3,7 @@ import React, {
   ReactElement,
   useEffect,
   useMemo,
+  useCallback,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -10,7 +11,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useState } from 'react';
 import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
 import { ChevronRight, Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp, X, Eye, Send } from 'lucide-react';
-import { formatNumber } from "@utils/Helper";
+import { formatNumber, GlobalDateFormat, getCompanyByCrmId } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
 
@@ -20,7 +21,8 @@ import PageHeader from "@components/PageHeader";
 import countries from "world-countries";
 
 import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments } from "@utils/accounting";
-import { getInvoices } from "@utils/accountingOld";
+import { getInvoices } from "@utils/accounts";
+import { getMinifiedCompanies } from "@utils/crm";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 import router from "next/router";
@@ -123,51 +125,91 @@ const AccountOverview = () => {
   });
 
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const getCompanyDetails = async () => {
-    const response = await GetCompanyDetails() as any;
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string>('');
+
+
+  const getCompanyDetails = useCallback(async () => {
+    if (!selectedCompanyId) return;
+    const response = await GetCompanyDetails({ crm_company_id: selectedCompanyId }) as any;
     setCompanyDetails(response);
-  };
+  }, [selectedCompanyId]);
+
+    useEffect(() => {
+      getCompanyDetails();
+    }, [getCompanyDetails]);
 
   useEffect(() => {
-    getCompanyDetails();
+    const fetchCompanies = async () => {
+      const result = await getMinifiedCompanies({ send_all: "true" });
+      const list = result ?? [];
+      setCompanies(list);
+      if (list.length > 0 && list[0]?.id != null) {
+        setSelectedCompanyId(list[0].id);
+        setSelectedCompanyName(list[0].name);
+      }
+    };
+    fetchCompanies();
   }, []);
+
+  const apiPayload = selectedCompanyId ? { crm_company_id: selectedCompanyId } : {};
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const getPaymentMethods = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setPaymentMethods([]);
+      return;
+    }
+    try {
+      const response = await GetPaymentMethods({ crm_company_id: selectedCompanyId }) as any;
+      setPaymentMethods(response?.payment_methods || []);
+    } catch {
+      setPaymentMethods([]);
+    }
+  }, [selectedCompanyId]);
+
   useEffect(() => {
     getPaymentMethods();
-  }, []);
-  const getPaymentMethods = async () => {
-    const response = await GetPaymentMethods() as any;
-    setPaymentMethods(response?.payment_methods || []);
-  };
+  }, [getPaymentMethods]);
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
-  useEffect(() => {
-    getPaymentHistory();
-  }, []);
-  const getPaymentHistory = async () => {
+  const getPaymentHistory = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setPaymentHistory([]);
+      return;
+    }
     try {
-      const response = await GetPayments({ page: 1, per_page: 3,limit: 3 }) as any;
-     // console.log('response payment history', response);
+      const response = await GetPayments({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setPaymentHistory(response?.dataList || []);
     } catch (error) {
       console.error('Error fetching payment history:', error);
+      setPaymentHistory([]);
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    getPaymentHistory();
+  }, [getPaymentHistory]);
 
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
-  useEffect(() => {
-    getRecentInvoices();
-  }, []);
-  const getRecentInvoices = async () => {
+  const getRecentInvoices = useCallback(async () => {
+    if (!selectedCompanyId) {
+      setRecentInvoices([]);
+      return;
+    }
     try {
-      const response = await getInvoices({ page: 1, per_page: 3,limit:3 }) as any;
-      console.log('response recent invoices', response);
+      const response = await getInvoices({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setRecentInvoices(response?.data || []);
     } catch (error) {
       console.error('Error fetching recent invoices:', error);
+      setRecentInvoices([]);
     }
-  };
+  }, [selectedCompanyId]);
+
+  useEffect(() => {
+    getRecentInvoices();
+  }, [getRecentInvoices]);
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
   const [showManageAccountModal, setShowManageAccountModal] = useState(false);
@@ -214,10 +256,12 @@ const AccountOverview = () => {
 
   const [dashboardCounters, setDashboardCounters] = useState<any>(null);
   useEffect(() => {
-    getDashboardCounters();
-  }, []);
-  const getDashboardCounters = async () => {
-    const response = await GetDashboardCounters() as any;
+    if(selectedCompanyId){
+      getDashboardCounters(apiPayload);
+    }
+  }, [selectedCompanyId]);
+  const getDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
+    const response = await GetDashboardCounters(params) as any;
     setDashboardCounters(response);
   };
 
@@ -249,8 +293,24 @@ const AccountOverview = () => {
             </ol>
           </nav>
         </div>
-
+        <div className="mb-3 mb-md-0">
+          <Form.Select
+            size="sm"
+            style={{ width: '220px' }}
+            value={selectedCompanyId}
+            onChange={(e) => {
+              setSelectedCompanyId(e.target.value === '' ? '' : e.target.value);
+              setSelectedCompanyName(getCompanyByCrmId(e.target.value, companies) ?? '');
+            }}
+          >
+            {companies.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
         </div>
+      </div>
 
 <div>
          
@@ -269,10 +329,12 @@ const AccountOverview = () => {
                   <Users size={20} style={{ color: '#3b82f6' }} />
                 </div>
                 <div className="flex-grow-1">
-                  <h5 className="mb-1" style={{ fontWeight: '600', fontSize: '1rem' }}>{companyDetails?.name}</h5>
-                  <p className="text-muted mb-0" style={{ fontSize: '0.70rem' }}>
-                  {companyDetails?.profile?.address}
-                  </p>
+                    <h5 className="mb-1" style={{ fontWeight: '600', fontSize: '1rem' }}>{selectedCompanyName ?? selectedCompanyId}</h5>
+                    {companyDetails && (
+                      <p className="text-muted mb-0" style={{ fontSize: '0.70rem' }}>
+                        {companyDetails?.profile?.address}
+                      </p>
+                    )}
                 </div>
                 {/* <Button 
                   variant="outline-primary" 
@@ -428,7 +490,7 @@ const AccountOverview = () => {
               <div className="d-flex align-items-center gap-2 py-1 border-bottom">
                 <User size={12} style={{ color: '#3b82f6' }} />
                 <p className="mb-0 text-truncate flex-grow-1 text-capitalize" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
-                {companyDetails?.name}
+                {selectedCompanyName}
                 </p>
               </div>
               
@@ -542,7 +604,7 @@ const AccountOverview = () => {
                   <Button 
                     variant="primary" 
                     size="sm"
-                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    onClick={() => router.push('/settings?tab=billing')}
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
                   >
                     Manage Payment Methods
@@ -556,7 +618,7 @@ const AccountOverview = () => {
                   <Button 
                     variant="primary" 
                     size="sm"
-                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    onClick={() => router.push('/settings?tab=billing')}
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
                   >
                     Add Card
@@ -725,7 +787,7 @@ const AccountOverview = () => {
                   variant="outline-primary" 
                   size="sm" 
                   className="d-flex align-items-center"
-                  onClick={() => router.push('/accounting/customer/billing-history')}
+                  onClick={() => router.push('/billing/payment-history')}
                   style={{ textDecoration: 'none', fontSize: '0.75rem' }}
                 >
                   <Eye size={12} className="me-1" /> View All
@@ -828,7 +890,7 @@ const AccountOverview = () => {
                  
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" 
-                  onClick={() => router.push('/accounting/customer/payment-methods')}
+                  onClick={() => router.push('/settings?tab=billing')}
                   style={{ 
                     width: '24px', 
                     height: '24px', 
@@ -843,7 +905,7 @@ const AccountOverview = () => {
 
                 <div 
                   className="d-flex align-items-center gap-2 py-2 px-2" 
-                  onClick={() => router.push('/accounting/customer/product-details')}
+                  onClick={() => router.push('/billing/subscriptions')}
                   style={{ 
                     border: '1px solid #dee2e6', 
                     borderRadius: '4px',

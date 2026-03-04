@@ -225,7 +225,7 @@ const AIMLProfiles = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voice Bot Profiles" />
 
       <PageHeader
-        title="Voice Bot Profiles"
+        title=""
         showSearch={false}
         buttons={
           <button

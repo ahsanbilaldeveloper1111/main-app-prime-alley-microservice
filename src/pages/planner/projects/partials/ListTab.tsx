@@ -8,6 +8,7 @@ import { deleteTask, getTask, getTaskActivities } from '@utils/tasks';
 import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
 import TasksTable, { type TaskRow } from '@pages/planner/partials/TasksTable';
 import TaskFilterSection from '@pages/planner/partials/TaskFilterSection';
+import TasksListingPage from '@pages/planner/tasks';
 import type { PaginationState } from '@pages/planner/partials/TasksTable';
 
 export interface ListTabFilters {
@@ -332,7 +333,7 @@ const ListTab: React.FC<ListTabProps> = ({
     <>
       {/* Summary Cards */}
       {listSummary && summaryCardsData.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ marginBottom: '1.5rem', padding: '15px', background: '#FFFFFF' }}>
           <StatsCards data={summaryCardsData} gridMinWidth="160px" />
         </div>
       )}
@@ -342,7 +343,7 @@ const ListTab: React.FC<ListTabProps> = ({
           <h5 style={styles.cardTitle}>Tasks List</h5>
         </div> */}
 
-        <TaskFilterSection
+        {/* <TaskFilterSection
           searchTerm={searchTerm}
           onSearchTermChange={setSearchTerm}
           filterProject=""
@@ -365,9 +366,10 @@ const ListTab: React.FC<ListTabProps> = ({
           onClearFilters={handleClearFiltersList}
           hideProjectFilter
           searchPlaceholder="Search tasks..."
-        />
+        /> */}
+        <TasksListingPage />
 
-      {loading ? (
+      {/* {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <Spinner animation="border" />
         </div>
@@ -405,7 +407,7 @@ const ListTab: React.FC<ListTabProps> = ({
             itemLabel="tasks"
           />
         </div>
-      )}
+      )} */}
       </div>
 
       {/* Delete Confirmation Modal */}

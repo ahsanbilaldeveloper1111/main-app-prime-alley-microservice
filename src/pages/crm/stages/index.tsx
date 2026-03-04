@@ -1010,19 +1010,19 @@ const StagesManagement = () => {
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Stages Management</h2>
+            {/* <h2 className="mb-1 fw-bold">Stages Management</h2>
             <p className="text-muted mb-0">
               Configure and manage your sales pipeline stages
-            </p>
+            </p> */}
           </div>
           <div className="d-flex flex-wrap gap-2">
-            <Button
+            {/* <Button
               variant={showStagesAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowStagesAnalytics(!showStagesAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
               {showStagesAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button>
+            </Button> */}
             {session?.user?.permissions?.includes("add-crm-stages") && (
               <Button
                 variant="primary"

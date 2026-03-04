@@ -1067,3 +1067,50 @@ export enum RECORD_TYPES {
   COMPANY = "company",
   ORDER = "order",
 }
+
+
+export const FORMAT_CLOCK = (clock: string) => {
+  const num = parseInt(clock, 10);
+  if (isNaN(num)) return clock;
+
+  const d = new Date(num * 1000);
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+
+  const day = pad(d.getDate());
+  const month = d.toLocaleString("en-US", { month: "short" });
+  const year = d.getFullYear();
+
+  let hours = d.getHours();
+  const minutes = pad(d.getMinutes());
+  const seconds = pad(d.getSeconds());
+
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12; // convert to 12-hour format
+  const hourStr = pad(hours);
+
+  return `${day} ${month} ${year} ${hourStr}:${minutes}:${seconds} ${ampm}`;
+};
+
+/**
+ * Find company name by id from a list of { id, name } objects.
+ * @param id - Company id (e.g. 1)
+ * @param companiesObject - Array of objects with at least { id, name }
+ * @returns The matching company name or undefined
+ */
+export function getCompanyByCrmId(
+  id: string | number | null | undefined,
+  companiesObject: { id?: string | number; name?: string }[] | null | undefined
+): string | undefined {
+  console.log('id', id);
+  console.log('companiesObject', companiesObject);
+  if (id == null || id === '' || !Array.isArray(companiesObject) || companiesObject.length === 0) {
+    return undefined;
+  }
+  const idStr = String(id);
+  const idNum = Number(id);
+  const found = companiesObject.find(
+    (c) => String(c.id) === idStr || Number(c.id) === idNum
+  );
+  return found?.name;
+}

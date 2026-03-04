@@ -28,9 +28,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
-import GenericStatsCards, {
-  StatsCardData,
-} from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
+import MetricsSummaryCards from "@components/MetricsSummaryCards";
 import { useRouter } from "next/router";
 
 // Type definitions
@@ -214,6 +213,9 @@ export interface ToolbarConfig {
   showTableViewDropdown?: boolean;
   tableViewLabel?: string;
   onTableViewClick?: () => void;
+  /** When set, dropdown shows only "Table view" and "Board View"; label = current, menu = other option only */
+  currentTableView?: "table" | "board";
+  onTableViewChange?: (view: "table" | "board") => void;
 
   // Pipelines/Groups dropdown
   showPipelineDropdown?: boolean;
@@ -251,6 +253,8 @@ export interface GenericTableProps<T = any> {
 
   // Column customization
   customizableColumns?: boolean;
+  /** When provided, column selection is controlled by the parent (e.g. from ColumnEditorModal) */
+  selectedColumns?: string[];
   defaultSelectedColumns?: string[];
   onColumnChange?: (selectedColumns: string[]) => void;
   columnStorageKey?: string;
@@ -286,6 +290,15 @@ export interface GenericTableProps<T = any> {
 
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
+  
+  // Hide toolbar actions (three dots menu)
+  showToolbarActions?: boolean;
+  
+  // Remove border from table card
+  noBorder?: boolean;
+
+  /** When provided (e.g. when currentTableView === 'board'), render this instead of the table */
+  customBody?: React.ReactNode;
 }
 
 const GenericTable = <T extends Record<string, any>>({
@@ -304,6 +317,7 @@ const GenericTable = <T extends Record<string, any>>({
   selectedRows = [],
   onSelectionChange,
   customizableColumns = false,
+  selectedColumns: selectedColumnsProp,
   defaultSelectedColumns,
   onColumnChange,
   columnStorageKey,
@@ -325,6 +339,9 @@ const GenericTable = <T extends Record<string, any>>({
   fixedHeight = false,
   maxHeight = "calc(100vh - 300px)",
   statsCards,
+  showToolbarActions = true,
+  noBorder = false,
+  customBody,
 }: GenericTableProps<T>) => {
   const router = useRouter();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
@@ -337,15 +354,15 @@ const GenericTable = <T extends Record<string, any>>({
     setSortDirection(defaultSortDirection);
   }, [defaultSortColumn, defaultSortDirection]);
 
-  // Column selection state
+  // Column selection state (uncontrolled when selectedColumns prop is not provided)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    if (selectedColumnsProp && selectedColumnsProp.length > 0) return selectedColumnsProp;
     const defaults = defaultSelectedColumns || columns.map((c) => c.key);
     if (columnStorageKey && typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(columnStorageKey);
         if (saved) {
           const savedCols: string[] = JSON.parse(saved);
-          // Merge in any default columns missing from saved (e.g. newly added columns)
           const missing = defaults.filter(
             (c: string) => !savedCols.includes(c),
           );
@@ -355,6 +372,14 @@ const GenericTable = <T extends Record<string, any>>({
     }
     return defaults;
   });
+
+  // Sync internal column selection when parent controls it (e.g. ColumnEditorModal apply)
+  const effectiveSelectedColumns = selectedColumnsProp ?? selectedColumns;
+  useEffect(() => {
+    if (selectedColumnsProp !== undefined && selectedColumnsProp.length > 0) {
+      setSelectedColumns(selectedColumnsProp);
+    }
+  }, [selectedColumnsProp]);
 
   // Context menu (right‑click) state
   const [contextMenu, setContextMenu] = useState<{
@@ -486,11 +511,11 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  // Filter visible columns
+  // Filter visible columns (use effective so controlled parent updates apply)
   const visibleColumns = useMemo(() => {
     if (!customizableColumns) return columns;
-    return columns.filter((col) => selectedColumns.includes(col.key));
-  }, [columns, selectedColumns, customizableColumns]);
+    return columns.filter((col) => effectiveSelectedColumns.includes(col.key));
+  }, [columns, effectiveSelectedColumns, customizableColumns]);
 
   // Sortable columns for toolbar Sort dropdown
   const sortableColumns = useMemo(
@@ -674,18 +699,19 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
-  // Handle column selection
+  // Handle column selection (when controlled, parent updates via onColumnChange)
   const handleColumnToggle = (columnKey: string) => {
-    const newSelected = selectedColumns.includes(columnKey)
-      ? selectedColumns.filter((k) => k !== columnKey)
-      : [...selectedColumns, columnKey];
+    const current = effectiveSelectedColumns;
+    const newSelected = current.includes(columnKey)
+      ? current.filter((k) => k !== columnKey)
+      : [...current, columnKey];
 
-    setSelectedColumns(newSelected);
-
+    if (selectedColumnsProp === undefined) {
+      setSelectedColumns(newSelected);
+    }
     if (columnStorageKey) {
       localStorage.setItem(columnStorageKey, JSON.stringify(newSelected));
     }
-
     if (onColumnChange) {
       onColumnChange(newSelected);
     }
@@ -820,14 +846,46 @@ const GenericTable = <T extends Record<string, any>>({
                   className="gt-toolbar-btn"
                 >
                   <Menu size={16} className="me-1" />
-                  <span>{toolbar.tableViewLabel || "Table view"}</span>
+                  <span>
+                    {toolbar.currentTableView !== undefined
+                      ? toolbar.currentTableView === "table"
+                        ? "Table view"
+                        : "Board View"
+                      : toolbar.tableViewLabel || "Table view"}
+                  </span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
-                  <Dropdown.Item onClick={toolbar.onTableViewClick}>
-                    Table
-                  </Dropdown.Item>
-                  <Dropdown.Item>Grid</Dropdown.Item>
-                  <Dropdown.Item>List</Dropdown.Item>
+                  {toolbar.currentTableView !== undefined &&
+                  toolbar.onTableViewChange ? (
+                    <>
+                      {toolbar.currentTableView === "table" && (
+                        <Dropdown.Item
+                          onClick={() =>
+                            toolbar.onTableViewChange?.("board")
+                          }
+                        >
+                          Board View
+                        </Dropdown.Item>
+                      )}
+                      {toolbar.currentTableView === "board" && (
+                        <Dropdown.Item
+                          onClick={() =>
+                            toolbar.onTableViewChange?.("table")
+                          }
+                        >
+                          Table view
+                        </Dropdown.Item>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Dropdown.Item onClick={toolbar.onTableViewClick}>
+                        Table
+                      </Dropdown.Item>
+                      <Dropdown.Item>Grid</Dropdown.Item>
+                      <Dropdown.Item>List</Dropdown.Item>
+                    </>
+                  )}
                 </Dropdown.Menu>
               </Dropdown>
             )}
@@ -949,25 +1007,27 @@ const GenericTable = <T extends Record<string, any>>({
             )}
 
             {/* Actions Menu */}
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn gt-icon-btn"
-              >
-                <MoreVertical size={16} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                {toolbar.showImport && (
-                  <Dropdown.Item onClick={toolbar.onImportClick}>
-                    Import
-                  </Dropdown.Item>
-                )}
-                <Dropdown.Item>Bulk Actions</Dropdown.Item>
-                <Dropdown.Divider />
-                <Dropdown.Item>Settings</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
+            {showToolbarActions && (
+              <Dropdown>
+                <Dropdown.Toggle
+                  variant="outline-secondary"
+                  size="sm"
+                  className="gt-toolbar-btn gt-icon-btn"
+                >
+                  <MoreVertical size={16} />
+                </Dropdown.Toggle>
+                <Dropdown.Menu align="end">
+                  {toolbar.showImport && (
+                    <Dropdown.Item onClick={toolbar.onImportClick}>
+                      Import
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Item>Bulk Actions</Dropdown.Item>
+                  <Dropdown.Divider />
+                  <Dropdown.Item>Settings</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
 
             {/* Save */}
             {/* {toolbar.showSaveButton && (
@@ -1136,17 +1196,15 @@ const GenericTable = <T extends Record<string, any>>({
           <div
             style={{
               paddingTop: "16px",
+              paddingLeft: "25px",
+              paddingRight: "25px",
               backgroundColor: "#ffffff",
               paddingBottom: "1px",
               borderLeft: "1px solid #cccccc",
-              borderRight: "1px solid #ccccccc",
+              borderRight: "1px solid #cccccc",
             }}
           >
-            <GenericStatsCards
-              data={statsCards}
-              gridMinWidth="250px"
-              valueFontSize="28px"
-            />
+            <MetricsSummaryCards data={statsCards} />
           </div>
         )}
       </div>
@@ -1323,8 +1381,15 @@ const GenericTable = <T extends Record<string, any>>({
       {/* Toolbar */}
       {renderToolbar()}
 
-      {/* Table */}
-      <Card className="border-1 shadow-sm generic-table-card">
+      {/* Table or custom body (e.g. Board view) */}
+      {customBody != null ? (
+        <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
+          <Card.Body className="p-0">
+            {customBody}
+          </Card.Body>
+        </Card>
+      ) : (
+      <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
         <Card.Body className="p-0">
           <div
             className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}
@@ -1413,7 +1478,7 @@ const GenericTable = <T extends Record<string, any>>({
                                     <Form.Check
                                       type="checkbox"
                                       label={c.label || c.key}
-                                      checked={selectedColumns.includes(c.key)}
+                                      checked={effectiveSelectedColumns.includes(c.key)}
                                       onChange={() => handleColumnToggle(c.key)}
                                     />
                                   </Dropdown.Item>
@@ -1422,7 +1487,8 @@ const GenericTable = <T extends Record<string, any>>({
                                 <Dropdown.Item
                                   onClick={() => {
                                     const allKeys = columns.map((c) => c.key);
-                                    setSelectedColumns(allKeys);
+                                    if (selectedColumnsProp === undefined)
+                                      setSelectedColumns(allKeys);
                                     if (columnStorageKey)
                                       localStorage.setItem(
                                         columnStorageKey,
@@ -1438,7 +1504,8 @@ const GenericTable = <T extends Record<string, any>>({
                                     const defaultKeys =
                                       defaultSelectedColumns ||
                                       columns.map((c) => c.key);
-                                    setSelectedColumns(defaultKeys);
+                                    if (selectedColumnsProp === undefined)
+                                      setSelectedColumns(defaultKeys);
                                     if (columnStorageKey)
                                       localStorage.setItem(
                                         columnStorageKey,
@@ -1487,7 +1554,7 @@ const GenericTable = <T extends Record<string, any>>({
                                   <Form.Check
                                     type="checkbox"
                                     label={c.label || c.key}
-                                    checked={selectedColumns.includes(c.key)}
+                                    checked={effectiveSelectedColumns.includes(c.key)}
                                     onChange={() => handleColumnToggle(c.key)}
                                   />
                                 </Dropdown.Item>
@@ -1496,7 +1563,8 @@ const GenericTable = <T extends Record<string, any>>({
                               <Dropdown.Item
                                 onClick={() => {
                                   const allKeys = columns.map((c) => c.key);
-                                  setSelectedColumns(allKeys);
+                                  if (selectedColumnsProp === undefined)
+                                    setSelectedColumns(allKeys);
                                   if (columnStorageKey)
                                     localStorage.setItem(
                                       columnStorageKey,
@@ -1512,7 +1580,8 @@ const GenericTable = <T extends Record<string, any>>({
                                   const defaultKeys =
                                     defaultSelectedColumns ||
                                     columns.map((c) => c.key);
-                                  setSelectedColumns(defaultKeys);
+                                  if (selectedColumnsProp === undefined)
+                                    setSelectedColumns(defaultKeys);
                                   if (columnStorageKey)
                                     localStorage.setItem(
                                       columnStorageKey,
@@ -1786,6 +1855,7 @@ const GenericTable = <T extends Record<string, any>>({
           )}
         </Card.Body>
       </Card>
+      )}
     </div>
   );
 };
