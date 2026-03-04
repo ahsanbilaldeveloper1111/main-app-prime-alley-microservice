@@ -1129,7 +1129,7 @@ font-weight:600;
             top: 0,
             left: isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
             width: `calc(100% - ${isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED}px)`,
-            zIndex: 9999,
+            zIndex: 999,
             transition: 'left 0.3s ease-in-out, width 0.3s ease-in-out',
           }}
         >

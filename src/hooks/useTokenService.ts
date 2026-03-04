@@ -1,33 +1,9 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import tokenService from '../utils/tokenService';
 
 export const useTokenService = () => {
-  const { data: session, status } = useSession();
-
-  // Initialize token service when session is available
-  useEffect(() => {
-    if (status === 'authenticated' && session) {
-      //console.log('Initializing token service with session data');
-      tokenService.initializeFromSession(session).catch((error) => {
-        console.error('Failed to initialize token service:', error);
-      });
-    } else if (status === 'unauthenticated') {
-      //console.log('User not authenticated, stopping token service');
-      tokenService.stop();
-    }
-  }, [session, status]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Don't stop the service on component unmount as it should run globally
-      // Only stop if the user is not authenticated
-      if (status === 'unauthenticated') {
-        tokenService.stop();
-      }
-    };
-  }, [status]);
+  const { status } = useSession();
 
   // Force refresh token
   const forceRefresh = useCallback(async () => {

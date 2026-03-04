@@ -1,6 +1,6 @@
-import React, { useState, useEffect, type ReactNode } from 'react';
+import React, { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
-import { Loader, Lock } from 'lucide-react';
+import { Loader } from 'lucide-react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import {
   finesseLink,
@@ -25,8 +25,8 @@ export interface FinesseAuthGateProps {
 
 /**
  * Requires NextAuth session and Finesse token + user data.
- * If finesseToken or finesseUserData are not available, shows the Finesse password form.
- * Use on both Campaigns and Agents management pages.
+ * If finesseToken or finesseUserData are not available, auto-links with finesseLink({ teamId }).
+ * No user interaction (Campaign Console/Manager).
  */
 export default function FinesseAuthGate({
   children,
@@ -36,9 +36,9 @@ export default function FinesseAuthGate({
 }: FinesseAuthGateProps) {
   const { data: session, status: sessionStatus } = useSession();
   const [isFinesseAuthenticated, setIsFinesseAuthenticated] = useState(false);
-  const [finessePassword, setFinessePassword] = useState('');
   const [finesseError, setFinesseError] = useState<string | null>(null);
   const [isFinesseLoading, setIsFinesseLoading] = useState(false);
+  const linkInFlightRef = useRef(false);
   // Require both token and user data to be considered authenticated
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -49,42 +49,19 @@ export default function FinesseAuthGate({
     }
   }, []);
 
-  // When team is changed, storage is cleared and this event is fired; show auth form without reload
-  useEffect(() => {
+  const attemptAutoLink = async () => {
     if (typeof window === 'undefined') return;
-    const onRequireReauth = () => setIsFinesseAuthenticated(false);
-    window.addEventListener('finesse-require-reauth', onRequireReauth);
-    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
-  }, []);
-
-  const handleFinesseAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.user || !finessePassword.trim()) {
-      setFinesseError('Please enter your password.');
-      return;
-    }
-    const username =
-      session.user.username != null ? String(session.user.username) : '';
-    const extension =
-      session.user.phone != null ? String(session.user.phone) : '';
-    if (!username || !extension) {
-      setFinesseError('User ID or extension is missing from your session.');
-      return;
-    }
+    if (linkInFlightRef.current) return;
+    linkInFlightRef.current = true;
     setFinesseError(null);
     setIsFinesseLoading(true);
     const teamIdToUse = getStoredTeamId();
     try {
-      const response = await finesseLink({
-        teamId: teamIdToUse as number | string,
-        finesseUserId: username,
-        finessePassword: finessePassword.trim(),
-        extension,
-      });
+      const response = await finesseLink({ teamId: teamIdToUse as number | string });
       if (response?.status === 'success' && response?.responseData) {
         const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
         setFinesseUserData(data);
-        setStoredTeamId(teamIdToUse);
+        setStoredTeamId(Number(teamIdToUse));
         if (response?.token) {
           setFinesseToken(response.token);
         }
@@ -115,8 +92,37 @@ export default function FinesseAuthGate({
       setFinesseError(message);
     } finally {
       setIsFinesseLoading(false);
+      linkInFlightRef.current = false;
     }
   };
+
+  // When team is changed, storage is cleared and this event is fired; re-link without reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRequireReauth = () => {
+      setIsFinesseAuthenticated(false);
+      setFinesseError(null);
+      void attemptAutoLink();
+    };
+    window.addEventListener('finesse-require-reauth', onRequireReauth);
+    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
+  }, []);
+
+  // Auto-link on mount when session is available
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sessionStatus === 'loading') return;
+    if (!session?.user) return;
+    const token = getFinesseToken();
+    const userData = getFinesseUserData();
+    if (token && userData) {
+      setIsFinesseAuthenticated(true);
+      return;
+    }
+    if (!isFinesseAuthenticated) {
+      void attemptAutoLink();
+    }
+  }, [session?.user, sessionStatus, isFinesseAuthenticated]);
 
   // Session loading
   if (sessionStatus === 'loading') {
@@ -177,107 +183,36 @@ export default function FinesseAuthGate({
             className="card"
             style={{ maxWidth: '420px', width: '100%', padding: '32px' }}
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '24px',
-              }}
-            >
-              <Lock size={28} color="#667eea" />
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                }}
-              >
-                Authentication Required
-              </h2>
-            </div>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Connecting to Finesse</h2>
             <p
               style={{
                 color: '#64748b',
                 fontSize: '14px',
                 marginBottom: '24px',
+                marginTop: '10px',
               }}
             >
-              {authMessage ??
-                `Enter your password to access ${pageLabel}.`}
+              {authMessage ?? `Preparing access to ${pageLabel}...`}
             </p>
-            <form onSubmit={handleFinesseAuth}>
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  htmlFor="finesse-password"
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#475569',
-                    marginBottom: '6px',
-                  }}
-                >
-                  Password
-                </label>
-                <input
-                  id="finesse-password"
-                  type="password"
-                  value={finessePassword}
-                  onChange={(e) => setFinessePassword(e.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                  }}
-                />
-              </div>
-              {finesseError && (
-                <div
-                  style={{
-                    marginBottom: '16px',
-                    padding: '10px 14px',
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '8px',
-                    color: '#b91c1c',
-                    fontSize: '14px',
-                  }}
-                >
-                  {finesseError}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={isFinesseLoading}
-                className="btn btn-primary"
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b' }}>
+              <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+              <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
+            </div>
+            {finesseError && (
+              <div
                 style={{
-                  width: '100%',
-                  justifyContent: 'center',
-                  padding: '12px',
+                  marginTop: '16px',
+                  padding: '10px 14px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#b91c1c',
+                  fontSize: '14px',
                 }}
               >
-                {isFinesseLoading ? (
-                  <>
-                    <Loader
-                      size={20}
-                      style={{ animation: 'spin 1s linear infinite' }}
-                    />
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    <Lock size={20} />
-                    Authenticate
-                  </>
-                )}
-              </button>
-            </form>
+                {finesseError}
+              </div>
+            )}
           </div>
         </div>
       </>

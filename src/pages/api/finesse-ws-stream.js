@@ -1,6 +1,6 @@
 /**
- * Finesse WS stream API: client connects via SSE; server proxies to Finesse via STOMP over WebSocket.
- * Streams state, errors, and optional preview dialog events.
+ * Finesse WS stream API: client connects via SSE; server proxies to Finesse via SockJS/STOMP.
+ * Same pattern as cti-stomp-stream. Streams state, errors, and optional preview dialog events.
  *
  * Env: FINESSE_WS_BACKEND or NEXT_PUBLIC_FINESSE_WS_BASE (e.g. http://192.168.30.137:8010).
  *
@@ -10,7 +10,6 @@
  */
 
 import { Client } from '@stomp/stompjs';
-import WebSocket from 'ws';
 
 const KEEP_ALIVE_MS = 30_000;
 const DEFAULT_BACKEND = 'http://localhost:8010';
@@ -131,12 +130,9 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview) {
   subscriptionsSetup.add(connectionKey);
 }
 
-function getWebSocketUrl() {
+function getSockJsUrl() {
   const base = process.env.FINESSE_WS_BACKEND || process.env.NEXT_PUBLIC_FINESSE_WS_BASE || DEFAULT_BACKEND;
-  const normalized = base.replace(/\/$/, '');
-  const wsBase = normalized.startsWith('https') ? normalized.replace(/^https/, 'wss') : normalized.replace(/^http/, 'ws');
-  const path = normalized.endsWith('/ws') ? '' : '/ws';
-  return `${wsBase}${path}`;
+  return base.endsWith('/ws') ? base : `${base.replace(/\/$/, '')}/ws`;
 }
 
 function sendSSEErrorAndEnd(res, connectionKey, message) {
@@ -232,12 +228,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  const wsUrl = getWebSocketUrl();
-  log('Connecting to backend:', wsUrl, 'user:', connectionKey);
+  const sockJsUrl = getSockJsUrl();
+  log('Connecting to backend:', sockJsUrl, 'user:', connectionKey);
 
   try {
+    const { default: SockJS } = await import('sockjs-client');
     const client = new Client({
-      webSocketFactory: () => new WebSocket(wsUrl),
+      webSocketFactory: () => new SockJS(sockJsUrl),
       connectHeaders: { Authorization: `Bearer ${token}` },
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -290,6 +287,6 @@ export default async function handler(req, res) {
     const msg = err?.message ?? String(err);
     if (isDev) console.error('[Finesse WS Stream] STOMP setup failed:', msg);
     cleanup();
-    sendSSEErrorAndEnd(res, connectionKey, `Stream setup failed: ${msg}. Check FINESSE_WS_BACKEND / NEXT_PUBLIC_FINESSE_WS_BASE (e.g. http://host:8010) and that the WebSocket backend is reachable.`);
+    sendSSEErrorAndEnd(res, connectionKey, `Stream setup failed: ${msg}. Check FINESSE_WS_BACKEND (e.g. http://host:8010) and that the backend is reachable.`);
   }
 }

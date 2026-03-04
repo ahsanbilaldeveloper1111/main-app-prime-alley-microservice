@@ -135,9 +135,6 @@ export const normalizeFinesseUserData = (data: FinesseUserData): FinesseUserData
 
 export interface FinesseLinkPayload {
   teamId: number | string;
-  finesseUserId: string;
-  finessePassword: string;
-  extension: string;
 }
 
 /**
@@ -300,6 +297,13 @@ export const sendFinesseDialogAction = async (
 
 // ==================== Campaign Contacts Import ====================
 
+export interface FinesseCampaignContactsImportPayload {
+  allowDuplicateContacts: boolean;
+  importType: 'MANUAL' | 'AUTO';
+  contactHeaders?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 /**
  * POST finesse/admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts/import - Upload + Import Contacts
  */
@@ -307,10 +311,15 @@ export const importFinesseCampaignContacts = async (
   teamId: number | string,
   finesseUserId: string,
   campaignId: number | string,
-  file: File
+  file: File,
+  payload?: FinesseCampaignContactsImportPayload
 ) => {
   const formData = new FormData();
   formData.append('file', file);
+  if (payload) {
+    formData.append('payload', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  }
+
   const response = await axiosInstance.post(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts/import`,
     formData,

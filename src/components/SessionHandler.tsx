@@ -18,29 +18,23 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
       return;
     }
 
-    // Don't run auth enforcement on auth pages; those pages manage their own flow.
-    if (router.pathname.startsWith('/auth/')) {
-      tokenService.stop();
+    const { pathname } = router;
+
+    // Don't run auth enforcement on auth pages.
+    if (pathname.startsWith('/auth/')) {
       return;
     }
 
-    if (status === 'authenticated' && session) {
-      // User is authenticated, initialize token service
-      //console.log('Session authenticated, initializing token service');
-      tokenService.initializeFromSession(session).catch((error) => {
-        console.error('Failed to initialize token service:', error);
-      });
-    } else if (status === 'unauthenticated') {
+    if (status === 'unauthenticated') {
       // User is not authenticated, clear tokens and redirect
-      //console.log('Session unauthenticated, clearing tokens');
       tokenService.clearTokens();
       
       // Only redirect if not already on auth page
-      if (!router.pathname.startsWith('/auth/')) {
+      if (!pathname.startsWith('/auth/')) {
         router.push('/auth/signin');
       }
     }
-  }, [status, session, router.pathname, router]);
+  }, [status, router]);
 
   // Show loading state while session is being determined
   if (status === 'loading') {
