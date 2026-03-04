@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, 
-  Maximize2,
-  Bold,
-  Italic,
-  Underline,
-  Link,
-  List,
-  Image,
-  Paperclip,
-  ChevronDown,
-  MessageSquare,
-  Plus,
-} from 'lucide-react';
+import { X, Maximize2, Paperclip, ChevronDown } from 'lucide-react';
+import RichNoteEditor from '@components/RichNoteEditor';
 
 interface NotesModalProps {
   isOpen: boolean;
@@ -22,36 +10,36 @@ interface NotesModalProps {
 }
 
 const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, onSave }) => {
-  const [noteText, setNoteText] = useState('');
+  const [noteHtml, setNoteHtml] = useState('');
   const [createTask, setCreateTask] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    if (!isOpen) setNoteHtml('');
   }, [isOpen]);
 
   // Auto-save draft simulation
   useEffect(() => {
-    if (noteText.trim()) {
-      const timer = setTimeout(() => {
-        setIsDraftSaved(true);
-      }, 1000);
+    const hasContent = noteHtml.trim() !== '' && noteHtml.trim() !== '<p><br></p>';
+    if (hasContent) {
+      const timer = setTimeout(() => setIsDraftSaved(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, [noteText]);
+  }, [noteHtml]);
 
   if (!isOpen) return null;
 
+  const isEmpty = () => {
+    const t = noteHtml.trim();
+    return t === '' || t === '<p></p>' || t === '<p><br></p>' || t === '<br>';
+  };
+
   const handleSave = () => {
-    onSave(noteText, createTask, createTask ? 'In 3 business days (Friday)' : undefined);
-    setNoteText('');
+    onSave(noteHtml, createTask, createTask ? 'In 3 business days (Friday)' : undefined);
+    setNoteHtml('');
     setCreateTask(false);
     setIsDraftSaved(false);
     setIsMaximized(false);
@@ -61,146 +49,6 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
 
   const handleMaximize = () => {
     setIsMaximized(!isMaximized);
-  };
-
-  // Text formatting functions with toggle support
-  const toggleFormatting = (prefix: string, suffix: string = prefix) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = noteText.substring(start, end);
-    
-    if (selectedText) {
-      // Check if text is already formatted
-      const beforeText = noteText.substring(Math.max(0, start - prefix.length), start);
-      const afterText = noteText.substring(end, end + suffix.length);
-      
-      if (beforeText === prefix && afterText === suffix) {
-        // Remove formatting
-        const newText = 
-          noteText.substring(0, start - prefix.length) + 
-          selectedText + 
-          noteText.substring(end + suffix.length);
-        setNoteText(newText);
-        
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(start - prefix.length, end - prefix.length);
-        }, 0);
-      } else {
-        // Add formatting
-        const newText = noteText.substring(0, start) + prefix + selectedText + suffix + noteText.substring(end);
-        setNoteText(newText);
-        
-        setTimeout(() => {
-          textarea.focus();
-          textarea.setSelectionRange(start + prefix.length, end + prefix.length);
-        }, 0);
-      }
-    } else {
-      // No selection, insert at cursor with placeholder
-      const placeholder = 'text';
-      const newText = noteText.substring(0, start) + prefix + placeholder + suffix + noteText.substring(end);
-      setNoteText(newText);
-      
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(start + prefix.length, start + prefix.length + placeholder.length);
-      }, 0);
-    }
-  };
-
-  const insertText = (text: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    
-    const newText = noteText.substring(0, start) + text + noteText.substring(end);
-    setNoteText(newText);
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + text.length, start + text.length);
-    }, 0);
-  };
-
-  const handleBold = () => {
-    toggleFormatting('**');
-  };
-
-  const handleItalic = () => {
-    toggleFormatting('*');
-  };
-
-  const handleUnderline = () => {
-    toggleFormatting('__');
-  };
-
-  const handleLink = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = noteText.substring(start, end);
-    
-    const linkText = selectedText || 'link text';
-    const linkUrl = 'https://';
-    const markdown = `[${linkText}](${linkUrl})`;
-    
-    const newText = noteText.substring(0, start) + markdown + noteText.substring(end);
-    setNoteText(newText);
-    
-    setTimeout(() => {
-      textarea.focus();
-      const urlStart = start + linkText.length + 3;
-      textarea.setSelectionRange(urlStart, urlStart + linkUrl.length);
-    }, 0);
-  };
-
-  const handleList = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const lines = noteText.substring(0, start).split('\n');
-    const isAtLineStart = lines[lines.length - 1].trim() === '';
-    
-    if (isAtLineStart) {
-      insertText('- ');
-    } else {
-      insertText('\n- ');
-    }
-  };
-
-  const handleCode = () => {
-    toggleFormatting('`');
-  };
-
-  const handleImage = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = noteText.substring(start, end);
-    
-    const altText = selectedText || 'image description';
-    const imageUrl = 'https://';
-    const markdown = `![${altText}](${imageUrl})`;
-    
-    const newText = noteText.substring(0, start) + markdown + noteText.substring(end);
-    setNoteText(newText);
-    
-    setTimeout(() => {
-      textarea.focus();
-      const urlStart = start + altText.length + 4;
-      textarea.setSelectionRange(urlStart, urlStart + imageUrl.length);
-    }, 0);
   };
 
   const handleAttachment = () => {
@@ -215,30 +63,6 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Keyboard shortcuts handler
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          handleBold();
-          break;
-        case 'i':
-          e.preventDefault();
-          handleItalic();
-          break;
-        case 'u':
-          e.preventDefault();
-          handleUnderline();
-          break;
-        case 'k':
-          e.preventDefault();
-          handleLink();
-          break;
-      }
-    }
   };
 
   return (
@@ -344,193 +168,17 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
 
       {/* Note Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '20px', flex: 1 }}>
-          <textarea
-            ref={textareaRef}
+        <div style={{ padding: '20px', flex: 1, minHeight: 0 }}>
+          <RichNoteEditor
+            value={noteHtml}
+            onChange={setNoteHtml}
             placeholder="Start typing to leave a note..."
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            style={{
-              width: '100%',
-              height: isMaximized ? '400px' : '120px',
-              border: 'none',
-              outline: 'none',
-              fontSize: '14px',
-              color: '#141414',
-              fontFamily: 'inherit',
-              resize: 'none',
-              lineHeight: '1.5',
-            }}
+            minHeight={isMaximized ? 400 : 120}
           />
         </div>
-
-        {/* Formatting Toolbar */}
-        <div
-          style={{
-            padding: '12px 20px',
-            borderTop: '1px solid #e2e8f0',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
+        <div style={{ padding: '8px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center' }}>
           <button
-            onClick={handleBold}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Bold (Ctrl+B)"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Bold size={16} />
-          </button>
-          <button
-            onClick={handleItalic}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Italic (Ctrl+I)"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Italic size={16} />
-          </button>
-          <button
-            onClick={handleUnderline}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Underline (Ctrl+U)"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Underline size={16} />
-          </button>
-          <div
-            style={{
-              width: '1px',
-              height: '20px',
-              backgroundColor: '#cbd5e0',
-              margin: '0 4px',
-            }}
-          />
-          <button
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-              fontSize: '13px',
-              fontWeight: '500',
-              gap: '4px',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            More
-            <ChevronDown size={14} />
-          </button>
-          <button
-            onClick={handleLink}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Link (Ctrl+K)"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Link size={16} />
-          </button>
-          <button
-            onClick={handleImage}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Insert Image"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Image size={16} aria-label="Insert Image" />
-          </button>
-          <button
-            onClick={handleCode}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Code"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <MessageSquare size={16} />
-          </button>
-          <button
-            onClick={handleList}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="Bullet List"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <List size={16} />
-          </button>
-          <button
+            type="button"
             onClick={handleAttachment}
             style={{
               background: 'transparent',
@@ -555,23 +203,6 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />
-          <button
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              display: 'flex',
-              alignItems: 'center',
-              borderRadius: '3px',
-            }}
-            title="More options"
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <Plus size={16} />
-          </button>
         </div>
 
         {/* Attachments */}
@@ -726,27 +357,23 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
         </div>
         <button
           onClick={handleSave}
-          disabled={!noteText.trim()}
+          disabled={isEmpty()}
           style={{
             padding: '8px 20px',
-            backgroundColor: noteText.trim() ? '#141414' : '#cbd5e0',
+            backgroundColor: !isEmpty() ? '#141414' : '#cbd5e0',
             color: '#ffffff',
             border: 'none',
             borderRadius: '4px',
             fontSize: '14px',
             fontWeight: '500',
-            cursor: noteText.trim() ? 'pointer' : 'not-allowed',
+            cursor: !isEmpty() ? 'pointer' : 'not-allowed',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (noteText.trim()) {
-              e.currentTarget.style.backgroundColor = '#ff6347';
-            }
+            if (!isEmpty()) e.currentTarget.style.backgroundColor = '#ff6347';
           }}
           onMouseLeave={(e) => {
-            if (noteText.trim()) {
-              e.currentTarget.style.backgroundColor = '#141414';
-            }
+            if (!isEmpty()) e.currentTarget.style.backgroundColor = '#141414';
           }}
         >
           Create note

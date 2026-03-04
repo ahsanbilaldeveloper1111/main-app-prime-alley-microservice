@@ -382,7 +382,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
           </button>
           <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
-            Log sms Message
+            Send SMS
           </h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

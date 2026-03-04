@@ -4960,7 +4960,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
   const recordSummary: RecordSummaryDisplay | undefined =
     crmSummary !== undefined
-      ? { content: (crmSummary?.summary ?? "").trim(), timestamp: "" }
+      ? {
+          content: (crmSummary?.summary ?? "").trim(),
+          timestamp: "",
+          onAskQuestion: () => {
+            globalThis.window?.dispatchEvent(
+              new CustomEvent("breeze-assistant:open"),
+            );
+          },
+        }
       : undefined;
 
   const handleCall = useCallback(
@@ -6509,17 +6517,31 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           marginBottom: "10px",
                         }}
                       >
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            color: "#141414",
-                            margin: "0 0 8px 0",
-                            lineHeight: "1.6",
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          {note.text}
-                        </p>
+                        {note.text &&
+                        note.text.includes("<") &&
+                        note.text.includes(">") ? (
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: "#141414",
+                              margin: "0 0 8px 0",
+                              lineHeight: "1.6",
+                            }}
+                            dangerouslySetInnerHTML={{ __html: note.text }}
+                          />
+                        ) : (
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: "#141414",
+                              margin: "0 0 8px 0",
+                              lineHeight: "1.6",
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            {note.text}
+                          </p>
+                        )}
                         <span style={{ fontSize: "12px", color: "#718096" }}>
                           {updatedAt}
                         </span>

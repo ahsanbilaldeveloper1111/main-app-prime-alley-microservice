@@ -390,6 +390,21 @@ const ConversationList = ({
   const [chatsError, setChatsError] = useState<string | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const [didAutoSelectFromUrl, setDidAutoSelectFromUrl] = useState(false);
+
+  const initialChatIdFromUrl = useRef<number | null>(null);
+  const initialPhoneFromUrl = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const rawChatId = params.get("chat_id") ?? params.get("chatId");
+    const rawPhone = params.get("phone") ?? params.get("phone_number");
+    const chatIdNum = rawChatId != null ? Number(rawChatId) : NaN;
+    initialChatIdFromUrl.current =
+      Number.isFinite(chatIdNum) && chatIdNum > 0 ? chatIdNum : null;
+    initialPhoneFromUrl.current = rawPhone ? String(rawPhone).trim() : null;
+  }, []);
 
   const fetchWhatsAppChats = useCallback(() => {
     setChatsLoading(true);
@@ -415,6 +430,30 @@ const ConversationList = ({
   useEffect(() => {
     refreshChatsRef.current = fetchWhatsAppChats;
   }, [refreshChatsRef, fetchWhatsAppChats]);
+
+  useEffect(() => {
+    if (didAutoSelectFromUrl) return;
+    if (chatsLoading) return;
+    if (selectedChat != null) {
+      setDidAutoSelectFromUrl(true);
+      return;
+    }
+    const wantId = initialChatIdFromUrl.current;
+    const wantPhone = initialPhoneFromUrl.current;
+    if (wantId == null && !wantPhone) {
+      setDidAutoSelectFromUrl(true);
+      return;
+    }
+    const match =
+      (wantId != null ? chats.find((c) => c.id === wantId) : undefined) ??
+      (wantPhone
+        ? chats.find((c) => String(c.phone_number).trim() === wantPhone)
+        : undefined);
+    if (match) {
+      onSelectChat(match);
+    }
+    setDidAutoSelectFromUrl(true);
+  }, [chats, chatsLoading, didAutoSelectFromUrl, onSelectChat, selectedChat]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
