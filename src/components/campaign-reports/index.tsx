@@ -10,6 +10,7 @@ import {
   X,
   Filter,
   ArrowUpDown,
+  ThumbsUp,
   ThumbsDown,
   FileText,
   Timer,
@@ -28,7 +29,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 
 interface Session {

@@ -2,17 +2,52 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 import { Row, Col } from "react-bootstrap";
+import { useSession } from 'next-auth/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
+  Users,
+  Settings,
+  Search,
+  Plus,
+  Filter,
+  Download,
+  Upload,
+  MoreVertical,
   Phone,
+  Mail,
+  Edit,
+  Trash2,
+  Eye,
   Clock,
+  PhoneCall,
+  PhoneOff,
   CheckCircle,
   XCircle,
   AlertCircle,
+  Menu,
   X,
-  RefreshCw
+  ChevronDown,
+  LogOut,
+  UserPlus,
+  BarChart3,
+  Bell,
+  Grid,
+  List,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
+  Zap,
+  User,
+  Mic,
+  MicOff,
+  Pause
 } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 import CallWidget from '../campaign-partials/CallWidget';
 import WrapUpModal from '../campaign-partials/WrapUp';
@@ -32,6 +67,7 @@ import {
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 
 type TeamOption = { id: number; name: string };
 

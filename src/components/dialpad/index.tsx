@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, Search, PhoneOff, Mic, MicOff, Pause, Play, Grid3x3, MessageSquare, Clock, BellOff } from 'lucide-react';
+import { Phone, Search, PhoneOff, Mic, MicOff, Pause, Play, Volume2, VolumeX, Grid3x3, MessageSquare, Clock, BellOff } from 'lucide-react';
 
 const ProDialpad = () => {
   const [phoneNumber, setPhoneNumber] = useState('');

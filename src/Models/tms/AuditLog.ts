@@ -1,4 +1,5 @@
 import { PaginationParams } from '@utils/pagination';
+import { Permission } from './Permission';
 import { Company } from '@models/tms/Company';
 import { User } from '@models/tms/User';
 

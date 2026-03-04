@@ -1,23 +1,33 @@
 import React, { ReactElement, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Card, Row, Col, Button, Badge, ProgressBar, Table, Modal, Form, Dropdown } from "react-bootstrap";
+import { Card, Row, Col, Button, Badge, ProgressBar, Table, Nav, Tab, Alert, Modal, Form, Dropdown } from "react-bootstrap";
 import { 
+  FiHome, 
   FiUser, 
-  FiSettings,
+  FiSettings, 
+  FiBarChart, 
+  FiMail, 
+  FiBell, 
+  FiSearch,
   FiPlus,
   FiEdit,
+  FiTrash2,
   FiEye,
   FiDownload,
   FiUpload,
   FiGrid,
+  FiCalendar,
   FiFileText,
   FiShoppingCart,
   FiUsers,
   FiPieChart,
   FiTrendingUp,
   FiDollarSign,
-  FiPackage
+  FiPackage,
+  FiStar,
+  FiHeart,
+  FiShare2
 } from "react-icons/fi";
 import styles from "../app/single-page.module.css";
 

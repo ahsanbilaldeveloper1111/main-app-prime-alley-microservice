@@ -8,6 +8,7 @@ import parsePhoneNumber from 'libphonenumber-js';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
 import PhoneContainer from '@components/PhoneContainer';
+import { getStorageImageUrl } from '@utils/imageUtils';
 
 // Custom styles to match Bootstrap form control height and styling
 const selectStyles = {

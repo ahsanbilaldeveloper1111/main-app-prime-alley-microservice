@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 /* eslint-enable @typescript-eslint/ban-ts-comment */
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react';
 import { Container, Row, Col, Card, Button, Badge, Table, Form, Modal, Dropdown, ProgressBar, InputGroup } from 'react-bootstrap';
 import Select from 'react-select';
 import ExpandableSidebar from '@components/updated-sidebar'
@@ -57,6 +57,8 @@ import {
   Star,
   PlusCircle,
   CheckSquare,
+  ChevronDown,
+  ChevronUp,
   ShoppingCart,
   AlertTriangle,
   RefreshCw,

@@ -2,6 +2,7 @@ import React from 'react'
 import { Button, Modal } from 'react-bootstrap'
 import { FiX } from 'react-icons/fi'
 import { ShowPopup, ActiveMonitoring } from '@components/live-calls/utils/types'
+import { isDnInActiveCall } from '@components/live-calls/utils/helpers'
 
 interface MonitoringModalProps {
   show: boolean

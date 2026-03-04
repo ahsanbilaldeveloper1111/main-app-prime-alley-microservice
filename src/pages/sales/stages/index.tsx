@@ -5,17 +5,24 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
 import {
+  Card,
+  CardBody,
   Col,
   Row,
   Badge,
   Button,
   Modal,
   Form,
+  Alert,
+  Dropdown,
 } from "react-bootstrap";
 import {
+  FiPlus,
   FiEdit,
   FiTrash2,
   FiCheckCircle,
+  FiXCircle,
+  FiMoreVertical,
 } from "react-icons/fi";
 import Link from "next/link";
 import {

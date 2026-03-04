@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 
 const Container = styled.div`
   padding: 20px;

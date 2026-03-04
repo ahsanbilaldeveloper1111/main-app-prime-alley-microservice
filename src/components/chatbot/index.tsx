@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Form, Button, Spinner } from 'react-bootstrap';
-import { Send, Paperclip, Mic, Smile, X, MessageCircle, Minimize2, Star, Image as ImageIcon, Play, Pause } from 'lucide-react';
+import { Send, Paperclip, Mic, Smile, X, MessageCircle, Minimize2, Maximize2, Star, Image as ImageIcon, Play, Pause, Bot } from 'lucide-react';
 import { sendChatMessage, submitChatSurvey } from '@utils/chat';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';

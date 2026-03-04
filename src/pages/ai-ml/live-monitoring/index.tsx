@@ -4,14 +4,16 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 
 import { useState } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Form, Button, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Badge, Form, Button, Dropdown, ProgressBar } from 'react-bootstrap';
 import { Search, Users, TrendingUp, CheckCircle, Phone, MoreVertical, Copy, Volume2, Download, PhoneOff, ChevronLeft, ChevronRight } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Session {
   id: string;

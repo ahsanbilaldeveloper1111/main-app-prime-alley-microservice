@@ -42,6 +42,7 @@ import {
   Image as ImageIcon,
   List,
   Paperclip,
+  Plus,
   MessageSquare,
   Sparkles,
 } from 'lucide-react';

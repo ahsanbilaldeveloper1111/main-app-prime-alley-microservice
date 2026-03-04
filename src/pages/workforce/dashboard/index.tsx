@@ -4,6 +4,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -23,18 +24,29 @@ import NewRequestModal from "@pages/workforce/NewRequestModal";
 
 import { useState, useEffect, useCallback } from "react";
 import { 
+  Users, 
+  Send, 
   Plus,
   Calendar,
   Upload,
   MoreHorizontal,
+  FileText,
+  Mail,
+  RefreshCw,
+  FileBarChart,
+  ChevronRight,
+  Search,
   ChevronDown,
   Circle
 } from 'lucide-react';
 import { 
   BarChart, 
   Bar, 
+  LineChart, 
+  Line, 
   XAxis, 
   YAxis, 
+  CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
   Cell

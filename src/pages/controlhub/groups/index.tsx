@@ -12,7 +12,7 @@ import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Layers, PackageMinus, Boxes } from 'lucide-react';
-import { MultiValue } from 'react-select';
+import Select, { MultiValue } from 'react-select';
 import { getAllTeams } from '@utils/teams';
 import { toast } from 'react-toastify';
 import { useModuleSelection } from '@hooks/useModuleSelection';

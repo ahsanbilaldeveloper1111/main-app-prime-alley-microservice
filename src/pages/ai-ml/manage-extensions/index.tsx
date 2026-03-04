@@ -8,7 +8,7 @@ import PageHeader from "@components/PageHeader";
 import { getImagicleTriggerExtensions, updateImagicleTrigger } from "@utils/aiml";
 import { toast } from "react-toastify";
 import { Card, Form, Button, Spinner, Table, Modal, Badge } from "react-bootstrap";
-import { RefreshCw, Edit, Inbox } from "lucide-react";
+import { RefreshCw, Save, Edit, Inbox } from "lucide-react";
 import ThemeSelect from "@components/ThemeSelect";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";

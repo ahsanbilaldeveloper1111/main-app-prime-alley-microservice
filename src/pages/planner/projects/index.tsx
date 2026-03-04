@@ -12,19 +12,23 @@ import { listProjects, createProject, updateProject, deleteProject, getProject, 
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import { StatsCardData } from '@components/GenericStatsCards';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { Spinner, Modal } from 'react-bootstrap';
-import { StylesConfig } from 'react-select';
+import Select, { SingleValue, StylesConfig } from 'react-select';
 import { 
   Container, 
   Row, 
   Col, 
+  Card, 
   Button, 
   Form, 
-  Badge,
+  Table, 
+  Badge, 
+  Dropdown,
   Nav,
+  InputGroup,
   Offcanvas,
   ProgressBar
 } from 'react-bootstrap';
@@ -32,12 +36,17 @@ import {
   FolderOpen,
   Folder,
   Plus, 
+  ChevronDown, 
+  Search, 
   X,
   MoreVertical,
   Calendar,
   AlertCircle,
   CalendarDays,
   Users,
+  Grid3x3,
+  Bell,
+  ChevronUp,
   Settings,
   SlidersHorizontal,
   Palette,
@@ -46,9 +55,13 @@ import {
   Monitor,
   Headphones,
   Rocket,
+  MessageCircle,
+  Clock,
   CheckCircle2,
+  UserPlus,
   Edit3,
   Trash2,
+  Link,
   ExternalLink,
   Archive
 } from 'lucide-react';
