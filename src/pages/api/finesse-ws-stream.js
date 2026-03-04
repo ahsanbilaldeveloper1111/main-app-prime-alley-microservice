@@ -29,11 +29,10 @@ const SSE_TYPE = {
 
 /** Headers for SSE; proxy-friendly so nginx/etc. don’t buffer or timeout and return 502 */
 const SSE_HEADERS = {
-  'Content-Type': 'text/event-stream',
+  'Content-Type': 'text/event-stream; charset=utf-8',
   'Cache-Control': 'no-cache, no-store, no-transform, must-revalidate',
   'X-Accel-Buffering': 'no',
   Connection: 'keep-alive',
-  'Transfer-Encoding': 'chunked',
 };
 
 const connectionPool = new Map();
@@ -176,6 +175,15 @@ export default async function handler(req, res) {
 
   try {
     res.writeHead(200, SSE_HEADERS);
+    // Ensure headers are flushed immediately in production.
+    if (res.flushHeaders) res.flushHeaders();
+    // Reduce TCP buffering for low-latency streaming.
+    try {
+      res.socket?.setNoDelay?.(true);
+      res.socket?.setKeepAlive?.(true);
+    } catch {
+      // ignore
+    }
   } catch (err) {
     if (isDev) console.error('[Finesse WS Stream] writeHead failed:', err?.message ?? err);
     return res.status(500).json({ message: 'Failed to start stream' });
@@ -183,6 +191,14 @@ export default async function handler(req, res) {
 
   if (!sseStreams.has(connectionKey)) sseStreams.set(connectionKey, []);
   sseStreams.get(connectionKey).push(res);
+
+  // Write an initial ping so intermediaries don't buffer an empty stream.
+  try {
+    res.write(`data: ${JSON.stringify({ type: SSE_TYPE.PING, timestamp: Date.now() })}\n\n`);
+    if (res.flush) res.flush();
+  } catch {
+    // ignore
+  }
 
   const keepAlive = setInterval(() => {
     if (res.destroyed || res.closed) {
