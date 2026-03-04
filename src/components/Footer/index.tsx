@@ -1,4 +1,6 @@
 import React from 'react';
+import { Row, Col } from 'react-bootstrap';
+import Link from 'next/link';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();

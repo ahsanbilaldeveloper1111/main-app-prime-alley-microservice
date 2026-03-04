@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Card } from 'react-bootstrap';
 import '@assets/scss/audio-player.scss';
 
 interface AudioPlayerProps {

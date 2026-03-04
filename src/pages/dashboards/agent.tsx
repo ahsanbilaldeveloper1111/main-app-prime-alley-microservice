@@ -14,6 +14,7 @@ import {
   ClipboardList,
   CheckCircle2,
   Timer,
+  Clock4,
 } from 'lucide-react';
 import ExpandableSidebar from '@components/updated-sidebar';
 import CompanyLogo2 from '@assets/images/ringedge-logo-black-n-blue.png';

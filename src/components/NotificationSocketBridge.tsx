@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { useNotifications, type AddNotificationPayload } from '../contexts/NotificationContext';
 import {
   useNotificationSocket,

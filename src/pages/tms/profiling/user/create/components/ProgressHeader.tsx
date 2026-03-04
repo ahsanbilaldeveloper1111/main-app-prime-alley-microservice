@@ -1,4 +1,5 @@
 import React from "react";
+import { ProgressBar } from "react-bootstrap";
 
 interface ProgressHeaderProps {
     progress: number;

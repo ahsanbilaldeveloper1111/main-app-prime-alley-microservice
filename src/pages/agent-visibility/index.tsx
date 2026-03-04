@@ -1,9 +1,11 @@
 import React,{ReactElement, useEffect, useState} from 'react'
 import Layout from '@layout/index'
+import ImageStatus6 from '@assets/images/widget/img-status-6.svg'
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Col, Row } from 'react-bootstrap';
+import { Button, Col, Row } from 'react-bootstrap';
+import AnimatedNumber from '@components/AnimatedNumber';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';

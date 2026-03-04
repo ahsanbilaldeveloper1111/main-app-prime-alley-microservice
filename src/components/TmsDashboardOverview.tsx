@@ -1,16 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Row, Col, Spinner, Alert, Modal, Button } from 'react-bootstrap';
 import { useRouter } from 'next/router';
+import AnimatedNumber from '@components/AnimatedNumber';
+import imgStatus1 from '@assets/images/widget/img-status-1.svg';
+import imgStatus2 from '@assets/images/widget/img-status-2.svg';
+import imgStatus3 from '@assets/images/widget/img-status-3.svg';
+import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import { GetCounterData, GetDashboardOverview, CompanyMonthlyInteraction, ComanyMobileUserStats, CompanyUserActivity, TopCompaniesByUserCount, AuditLogSummary, GetListCompanies } from '@utils/tms/analytics';
 import moment from 'moment';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import PageSummaryGrid from '@components/PageSummaryGrid';
-import { FiMaximize2 } from "react-icons/fi";
+import FormModal from "../pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import DatatableActionButton from "@components/DatatableActionButton";
+import { FiEdit, FiTrash2, FiEye, FiPlus, FiMaximize2 } from "react-icons/fi";
 
 import dynamic from 'next/dynamic';
+import { ApexOptions } from 'apexcharts';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface CounterData {

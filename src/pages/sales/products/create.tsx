@@ -9,10 +9,11 @@ import {
   Row,
   Form,
   Button,
+  Alert,
 } from "react-bootstrap";
 import Link from "next/link";
 import { FiArrowLeft, FiSave, FiPackage } from "react-icons/fi";
-import { createProduct } from "@utils/sales";
+import { createProduct, ProductData } from "@utils/sales";
 import { toast } from "react-toastify";
 
 const CreateProduct = () => {

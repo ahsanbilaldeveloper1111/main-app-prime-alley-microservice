@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { getFAQItem, ListFAQItems, ListFAQTopics } from '@utils/faqs';
-import { Row, Col, Card, Button, Badge } from 'react-bootstrap';
+import { Row, Col, Card, Button, Badge, Form } from 'react-bootstrap';
 import {
   ChevronLeft,
   ChevronRight,
   ThumbsUp,
   ThumbsDown,
+  Plus,
+  MessageCircle,
   Eye,
   Calendar,
+  List,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  Folder,
+  Zap,
+  Settings,
+  CreditCard,
+  Lock,
+  Users,
+  FileText,
+  BarChart3,
+  Phone,
+  Bot,
+  Link2,
+  DollarSign,
+  Shield
 } from 'lucide-react';
 
 interface ArticleDetailProps {

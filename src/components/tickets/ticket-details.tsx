@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Row, Col, Card, Form, Badge, Button, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, InputGroup, Badge, Button, Dropdown } from 'react-bootstrap';
 import { 
   ChevronLeft,
+  User,
   Clock,
   Hash,
   Share2,

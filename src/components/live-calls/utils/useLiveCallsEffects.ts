@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { GetCallLegs } from '@utils/dialer'
 import { getLocalStorageCallStatesInfo } from './helpers'
 

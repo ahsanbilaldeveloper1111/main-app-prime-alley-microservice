@@ -4,14 +4,16 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 
 
 import { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Form, InputGroup } from 'react-bootstrap';
-import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Volume2, Mic, Users, Headset, ChevronRight, Search, Filter, ChevronDown, ChevronUp, UserCheck, Clock, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
+import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, ChevronRight, Menu, Search, Filter, ChevronDown, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
 
 
 // import 'bootstrap/dist/css/bootstrap.min.css';

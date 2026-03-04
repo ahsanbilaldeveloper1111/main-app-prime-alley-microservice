@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Row, Col, Form, Button, Card, Badge } from 'react-bootstrap';
-import { MessageCircle, Sparkles } from 'lucide-react';
+import { Star, MessageCircle, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import { generateWhatsApp, getWhatsAppChatMessages, getChats, sendWhatsApp, getWhatsAppTemplates } from '@utils/communication';
-import type { WhatsAppTemplateItem } from '@utils/communication';
+import type { GenerateWhatsAppPayload, WhatsAppTemplateItem } from '@utils/communication';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import parsePhoneNumber from 'libphonenumber-js';

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { ReactElement, useState, useEffect } from "react";
+import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Card,
@@ -8,13 +9,17 @@ import {
   Form,
   Button,
   Alert,
+  ProgressBar,
   Spinner,
 } from "react-bootstrap";
 import {
   FiTrendingUp,
+  FiTrendingDown,
   FiDollarSign,
   FiShoppingCart,
+  FiUsers,
   FiPackage,
+  FiCalendar,
   FiBarChart,
   FiDownload,
   FiRefreshCw,

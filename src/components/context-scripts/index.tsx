@@ -6,6 +6,8 @@ import {
   MoreHorizontal,
   CheckCircle,
   Phone,
+  RefreshCw,
+  Play,
   Volume2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import fcmService, { FCMTokenResponse, NotificationPayload } from '@services/fcmService';
 import notificationAPI from '@services/notificationApi';
+import { toast } from 'react-toastify';
 
 export interface UseFCMReturn {
   token: string | null;

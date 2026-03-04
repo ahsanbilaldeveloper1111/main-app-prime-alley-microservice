@@ -20,10 +20,29 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import { StatsCardData } from "@components/GenericStatsCards";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
-
+import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
+} from "react-icons/fi";
+import { ChevronDown } from "lucide-react";
 import {
   getDeals,
   getStages,
@@ -39,6 +58,18 @@ import {
   deleteMeeting,
   markDealLost,
   getLead,
+  updateDeal,
+  getCrmProducts,
+  getCampaignById,
+  getIndustries,
+  getBusinessTypes,
+  createEstimate,
+  CrmProduct,
+  StageData,
+  IndustryData,
+  DealTemplateData,
+  DealTemplateField,
+  BusinessTypeData,
   PDFDownloadDeal,
   getDealFollowUps,
   createDealFollowUp,
@@ -52,8 +83,11 @@ import {
   Row,
   Col,
   Badge,
+  Dropdown,
   Form,
   Card,
+  Table,
+  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -76,7 +110,12 @@ import {
   MoreVertical,
   X,
   Users,
+  PlusCircle,
+  Zap,
+  Star,
   Clock,
+  Search,
+  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -92,16 +131,25 @@ import {
   ShoppingBag,
   History,
   GitBranch,
+  MessageSquare,
   Send,
   UserCheck,
   User,
   Building2,
+  Mail,
+  Phone,
   Phone as PhoneIcon,
   Paperclip,
+  CheckSquare,
+  Upload,
   Download as DownloadIcon,
   AlertCircle,
   RotateCcw,
   Percent,
+  Package,
+  RefreshCw,
+  ArrowLeft,
+  Copy,
   Trash,
 } from "lucide-react";
 import {
@@ -116,8 +164,11 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber as parsePhoneNumberLib } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
 import "@assets/scss/common.scss";
@@ -127,7 +178,53 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 
-const ignoredKeys = new Set(["stage_id"]);
+const ignoredKeys = ["stage_id"];
+// Phone Container Component (with Badge for tables)
+const PhoneContainer = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <Badge bg="info" className="bg-opacity-10 text-dark">
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+};
 
 // Phone Display Component (without Badge for view dialogs)
 const PhoneDisplay = ({ phone }: { phone: string }) => {
@@ -448,10 +545,9 @@ const CrmDeals = () => {
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
-  const [dealsMetrics, setDealsMetrics] = useState<Record<
-    string,
-    number
-  > | null>(null);
+  const [dealsMetrics, setDealsMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
   const [dealToConvert, setDealToConvert] = useState<number | null>(null);
@@ -477,9 +573,7 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(
-    "table",
-  );
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -662,49 +756,32 @@ const CrmDeals = () => {
 
   // Build API params from filters for export (same shape as fetchDeals)
   const buildDealsExportParams = useCallback(
-    (
-      filters: Record<string, any>,
-      pagination?: { page: number; per_page: number },
-    ) => {
+    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
       if (filters.search) params.search = filters.search;
-      if (filters.include_converted !== undefined)
-        params.include_converted = filters.include_converted;
-      if (filters.include_lost !== undefined)
-        params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined)
-        params.include_archived = filters.include_archived;
+      if (filters.include_converted !== undefined) params.include_converted = filters.include_converted;
+      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
       if (filters.user_extensions?.length) {
         params.user_extensions = filters.user_extensions;
       } else if (filters.assigned_to) {
         params.user_extensions = [filters.assigned_to];
       }
       if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.probability_min != null && filters.probability_min !== "")
-        params.probability_min = Number(filters.probability_min);
-      if (filters.probability_max != null && filters.probability_max !== "")
-        params.probability_max = Number(filters.probability_max);
+      if (filters.probability_min != null && filters.probability_min !== "") params.probability_min = Number(filters.probability_min);
+      if (filters.probability_max != null && filters.probability_max !== "") params.probability_max = Number(filters.probability_max);
       if (filters.deal_type) params.deal_type = filters.deal_type;
       if (filters.industry) params.industry = filters.industry;
-      if (filters.expected_close_date_from)
-        params.expected_close_date_from = filters.expected_close_date_from;
-      if (filters.expected_close_date_to)
-        params.expected_close_date_to = filters.expected_close_date_to;
-      if (filters.follow_up_date_from)
-        params.follow_up_date_from = filters.follow_up_date_from;
-      if (filters.follow_up_date_to)
-        params.follow_up_date_to = filters.follow_up_date_to;
-      if (filters.created_at_from)
-        params.created_at_from = filters.created_at_from;
+      if (filters.expected_close_date_from) params.expected_close_date_from = filters.expected_close_date_from;
+      if (filters.expected_close_date_to) params.expected_close_date_to = filters.expected_close_date_to;
+      if (filters.follow_up_date_from) params.follow_up_date_from = filters.follow_up_date_from;
+      if (filters.follow_up_date_to) params.follow_up_date_to = filters.follow_up_date_to;
+      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
       if (filters.created_at_to) params.created_at_to = filters.created_at_to;
-      if (filters.created_at_month)
-        params.created_at_month = filters.created_at_month;
-      if (filters.ticket_id != null && filters.ticket_id !== "")
-        params.ticket_id = filters.ticket_id;
-      if (filters.has_meetings !== undefined)
-        params.has_meetings = filters.has_meetings;
-      if (filters.approval_status)
-        params.approval_status = filters.approval_status;
+      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
+      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
+      if (filters.has_meetings !== undefined) params.has_meetings = filters.has_meetings;
+      if (filters.approval_status) params.approval_status = filters.approval_status;
       if (filters.sort_by) params.sort_by = filters.sort_by;
       if (filters.sort_order) params.sort_order = filters.sort_order;
       if (pagination) {
@@ -738,8 +815,7 @@ const CrmDeals = () => {
   );
 
   const handleDealsExport = useCallback(async () => {
-    const name =
-      exportFileName.trim() || `deals_${moment().format("YYYY-MM-DD")}`;
+    const name = exportFileName.trim() || `deals_${moment().format("YYYY-MM-DD")}`;
     const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
@@ -827,16 +903,10 @@ const CrmDeals = () => {
         if (currentFilters.stage_id) {
           params.stage_id = currentFilters.stage_id;
         }
-        if (
-          currentFilters.probability_min != null &&
-          currentFilters.probability_min !== ""
-        ) {
+        if (currentFilters.probability_min != null && currentFilters.probability_min !== "") {
           params.probability_min = Number(currentFilters.probability_min);
         }
-        if (
-          currentFilters.probability_max != null &&
-          currentFilters.probability_max !== ""
-        ) {
+        if (currentFilters.probability_max != null && currentFilters.probability_max !== "") {
           params.probability_max = Number(currentFilters.probability_max);
         }
         if (currentFilters.deal_type) {
@@ -867,10 +937,7 @@ const CrmDeals = () => {
         if (currentFilters.created_at_month) {
           params.created_at_month = currentFilters.created_at_month;
         }
-        if (
-          currentFilters.ticket_id != null &&
-          currentFilters.ticket_id !== ""
-        ) {
+        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") {
           params.ticket_id = currentFilters.ticket_id;
         }
         if (currentFilters.has_meetings !== undefined) {
@@ -1311,10 +1378,7 @@ const CrmDeals = () => {
 
       // Handle user_extensions (array for assignee/creator)
       if ("user_extensions" in filters) {
-        if (
-          Array.isArray(filters.user_extensions) &&
-          filters.user_extensions.length > 0
-        ) {
+        if (Array.isArray(filters.user_extensions) && filters.user_extensions.length > 0) {
           newFilters.user_extensions = filters.user_extensions;
         } else {
           delete newFilters.user_extensions;
@@ -2330,75 +2394,78 @@ const CrmDeals = () => {
   };
 
   // Define stats cards for GenericTable
-  const dealsStatsCards: StatsCardData[] = useMemo(() => {
-    const m = dealsMetrics || {};
-    const todaysMeetings = m.todays_meetings ?? 0;
-    const overdueMeetings = m.overdue_meetings ?? 0;
+  const dealsStatsCards: StatsCardData[] = useMemo(
+    () => {
+      const m = dealsMetrics || {};
+      const todaysMeetings = m.todays_meetings ?? 0;
+      const overdueMeetings = m.overdue_meetings ?? 0;
 
-    return [
-      {
-        title: "All Deals",
-        value: m.total_deals ?? 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        subtitle: `${m.won_deals ?? 0} Won / ${m.lost_deals ?? 0} Lost`,
-      },
-      {
-        title: "High-Value Deals",
-        value: m.high_value_deals ?? 0,
-        icon: Calendar,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        additionalText: "Client-defined threshold",
-      },
-      {
-        title: "At-Risk Deals",
-        value: m.at_risk_deals ?? 0,
-        icon: Target,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        additionalText: "Expected closed date slipped.",
-      },
-      {
-        title: "Deals Won",
-        value: m.won_deals ?? 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        metric: {
-          text: `${m.won_deals_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#6366F1",
+      return [
+        {
+          title: "All Deals",
+          value: m.total_deals ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          subtitle: `${m.won_deals ?? 0} Won / ${m.lost_deals ?? 0} Lost`,
         },
-      },
-      {
-        title: "Today's Follow-ups",
-        value: m.todays_follow_ups ?? 0,
-        icon: Calendar,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        metric: {
-          text: `${m.todays_follow_ups ?? 0} Follow-ups / ${todaysMeetings} Meeting${
-            todaysMeetings === 1 ? "" : "s"
-          }`,
-          dotColor: "#10B981",
+        {
+          title: "High-Value Deals",
+          value: m.high_value_deals ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Client-defined threshold",
         },
-      },
-      {
-        title: "Overdue",
-        value: m.overdue_total ?? 0,
-        icon: Target,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
-            overdueMeetings === 1 ? "" : "s"
-          }`,
-          dotColor: "#8B5CF6",
+        {
+          title: "At-Risk Deals",
+          value: m.at_risk_deals ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "Expected closed date slipped.",
         },
-      },
-    ];
-  }, [dealsMetrics]);
+        {
+          title: "Deals Won",
+          value: m.won_deals ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${m.won_deals_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#6366F1",
+          },
+        },
+        {
+          title: "Today's Follow-ups",
+          value: m.todays_follow_ups ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${m.todays_follow_ups ?? 0} Follow-ups / ${todaysMeetings} Meeting${
+              todaysMeetings === 1 ? "" : "s"
+            }`,
+            dotColor: "#10B981",
+          },
+        },
+        {
+          title: "Overdue",
+          value: m.overdue_total ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
+              overdueMeetings === 1 ? "" : "s"
+            }`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [dealsMetrics],
+  );
 
   // Define columns for GenericTable
   const dealsColumns: TableColumn<any>[] = useMemo(
@@ -2671,12 +2738,7 @@ const CrmDeals = () => {
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
-      {
-        id: "all",
-        label: "All deals",
-        count: filterCounts.all,
-        removable: false,
-      },
+      { id: "all", label: "All deals", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
@@ -3015,11 +3077,7 @@ const CrmDeals = () => {
               selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
             }
             onNoteCreate={handleNoteCreate}
-            crmSummary={
-              selectedDeal?.rawData?.crm_summary ??
-              selectedDeal?.crm_summary ??
-              undefined
-            }
+            crmSummary={selectedDeal?.rawData?.crm_summary ?? selectedDeal?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
               onClick: () => {
@@ -5926,7 +5984,7 @@ const CrmDeals = () => {
                   ) {
                     Object.entries(history.changes).forEach(
                       ([key, change]: any) => {
-                        if (ignoredKeys.has(key)) return;
+                        if (ignoredKeys.includes(key)) return;
                         if (
                           change.old !== undefined &&
                           change.new !== undefined
@@ -7042,7 +7100,10 @@ const CrmDeals = () => {
         onApply={(keys) => {
           setSelectedDealsColumns(keys);
           if (typeof window !== "undefined") {
-            localStorage.setItem("dealsSelectedColumns", JSON.stringify(keys));
+            localStorage.setItem(
+              "dealsSelectedColumns",
+              JSON.stringify(keys),
+            );
           }
         }}
       />
@@ -7072,11 +7133,7 @@ const CrmDeals = () => {
                   ...extensions.map((ext: any) => ({
                     value: String(ext.id ?? ext.extension),
                     label:
-                      ext.display_name ||
-                      ext.name ||
-                      ext.id ||
-                      ext.extension ||
-                      "",
+                      ext.display_name || ext.name || ext.id || ext.extension || "",
                   })),
                 ]}
                 value={
@@ -7088,14 +7145,14 @@ const CrmDeals = () => {
                         );
                         return {
                           value: id,
-                          label: ext ? ext.display_name || ext.name || id : id,
+                          label: ext
+                            ? ext.display_name || ext.name || id
+                            : id,
                         };
                       })()
                     : null
                 }
-                onChange={(
-                  selected: { value: string; label: string } | null,
-                ) => {
+                onChange={(selected: { value: string; label: string } | null) => {
                   const v = selected?.value;
                   setExportFilters((prev) => {
                     const next = { ...prev };
@@ -7439,11 +7496,9 @@ const CrmDeals = () => {
               dealsFilters.expectedCloseDateTo;
           }
           // Booleans: send explicitly so unchecking clears the filter
-          filtersToApply.include_converted =
-            dealsFilters.includeConverted || undefined;
+          filtersToApply.include_converted = dealsFilters.includeConverted || undefined;
           filtersToApply.include_lost = dealsFilters.includeLost || undefined;
-          filtersToApply.include_archived =
-            dealsFilters.includeArchived || undefined;
+          filtersToApply.include_archived = dealsFilters.includeArchived || undefined;
           filtersToApply.has_meetings = dealsFilters.hasMeetings || undefined;
           if (dealsFilters.createdAtFrom) {
             filtersToApply.created_at_from = dealsFilters.createdAtFrom;

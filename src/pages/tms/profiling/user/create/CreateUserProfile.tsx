@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { Card } from "react-bootstrap";
 import { useFormErrors } from "@hooks/tms/useFormErrors";
 import {
     MobileUser,
     CallingAccess,
+    ExtensionRange,
     DNCRCallingAccess,
+    DeviceType,
     FacInfoCallingAccess,
     CompanyIccid,
 } from "@models/tms/Company";
@@ -13,15 +16,21 @@ import {
     useGetAvailableExtensions,
     useGetCompany,
 } from "@hooks/tms/company";
-import { Company, User, UserType } from "@models/tms";
+import { Company, User, UserType, UserProfile } from "@models/tms";
+import { useOrganizationUnits } from "@hooks/tms/customerProfiling";
 // import { useGetUser, useUsers } from "@hooks/useUsers";
 import {
     VerifyUserInfoParams,
+    UserInfoAction,
+    CreateUpdateLdapUserParams,
     VerifyLdapUserParams,
+    PhoneProduct,
 } from "@models/tms/UnfidiedOp";
 import {
     useAddUserInfo,
+    useCreateLdapUser,
     useGetUserProfilingDraft,
+    useUpdateLdapUser,
     useUpdateUserInfo,
     useVerifyLdapUser,
     useVerifyUserInfo,
@@ -44,11 +53,12 @@ import {
     useUpdateProfilingErrorLogs,
 } from "@hooks/tms/UnifiedOp";
 
-import { generateCustomId } from "@utils/Helper";
+import { generateCustomId, generateComplexId } from "@utils/Helper";
 import { toast } from "react-toastify";
 
 
 import countries from "world-countries";
+import _ from "lodash";
 import { useRouter } from "next/router";
 import Head from "next/head";
 
@@ -57,6 +67,8 @@ import Head from "next/head";
 import ProgressHeader from "./components/ProgressHeader";
 import CreateLdapUserForm from "./components/CreateLdapUserForm";
 import CallingAccessForm from "./components/CallingAccessForm";
+import ConfirmationForm from "./components/ConfirmationForm";
+import APIProgressSection from "./components/APIProgressSection";
 
 interface CreateUserProfileProps {
     initialUserData?: any;

@@ -16,7 +16,14 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import ColumnEditorModal from "@components/ColumnEditorModal";
+import CrmExportModal from "@components/CrmExportModal";
+import GenericSidebar, {
+  SidebarSection,
+  QuickAction,
+  SidebarField,
+} from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -35,6 +42,8 @@ import {
   updateLead,
   getCampaigns,
   getCampaignById,
+  getCrmData,
+  getCrmDataById,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
@@ -43,6 +52,7 @@ import type {
   StageData,
   CampaignData,
   CrmDataItem,
+  IndustryData,
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -51,8 +61,11 @@ import {
   Row,
   Col,
   Badge,
+  Dropdown,
   Form,
   Card,
+  Table,
+  InputGroup,
   Modal,
   Popover,
   OverlayTrigger,
@@ -76,14 +89,17 @@ import {
   Target,
   CheckCircle,
   TrendingUp,
+  BarChart3,
   Plus,
   Eye,
   Edit,
   Trash2,
   Handshake,
+  MoreVertical,
   X,
   Users,
   Clock,
+  Search,
   Filter,
   Layers,
   Calendar,
@@ -107,6 +123,8 @@ import {
   UserCheck,
   AlertCircle,
   RotateCcw,
+  CheckSquare,
+  Download,
 } from "lucide-react";
 import {
   PieChart,
@@ -135,9 +153,6 @@ import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
-import CrmExportModal from "@components/CrmExportModal";
-import ColumnEditorModal from "@components/ColumnEditorModal";
-import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -164,6 +179,141 @@ interface LeadData {
 }
 
 const ignoredKeys = ["stage_id", "contact_persons"];
+// Phone Container Component (with Badge for tables)
+const PhoneContainer = ({
+  phone,
+  onClick,
+}: {
+  phone: string;
+  onClick?: () => void;
+}) => {
+  const [showPopover, setShowPopover] = useState(false);
+
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+
+  const phoneBadge = (
+    <Badge
+      bg="info"
+      className="bg-opacity-10 text-dark"
+      style={{ cursor: onClick ? "pointer" : "default" }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+
+  if (!onClick) {
+    return phoneBadge;
+  }
+
+  const popover = (
+    <Popover
+      id={`phone-popover-${phone}`}
+      style={{
+        maxWidth: "160px",
+        pointerEvents: "auto",
+        border: "none",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+        borderRadius: "8px",
+      }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <Popover.Body
+        className="p-0"
+        style={{
+          padding: "8px",
+          borderRadius: "8px",
+        }}
+      >
+        <Button
+          variant="default"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+            setShowPopover(false);
+          }}
+          className="d-flex align-items-center justify-content-center gap-2 w-100"
+          style={{
+            fontSize: "13px",
+            fontWeight: "600",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid #dee2e6",
+            backgroundColor: "transparent",
+            color: "#212529",
+            boxShadow: "none",
+            transition: "all 0.2s ease",
+            minHeight: "36px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.backgroundColor = "#f8f9fa";
+            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          <Phone size={18} style={{ strokeWidth: 2.5 }} />
+          <span>Call</span>
+        </Button>
+      </Popover.Body>
+    </Popover>
+  );
+
+  return (
+    <OverlayTrigger
+      show={showPopover}
+      placement="top"
+      overlay={popover}
+      trigger={[]}
+    >
+      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
+    </OverlayTrigger>
+  );
+};
 
 // Phone Display Component (without Badge for view dialogs)
 const PhoneDisplay = ({ phone }: { phone: string }) => {
@@ -471,9 +621,7 @@ const CrmLeads = () => {
   >(null);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [leadsViewMode, setLeadsViewMode] = useState<"table" | "board">(
-    "table",
-  );
+  const [leadsViewMode, setLeadsViewMode] = useState<"table" | "board">("table");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1074,28 +1222,20 @@ const CrmLeads = () => {
 
   // Build API params from filters for export (Leads list API accepted params)
   const buildLeadsExportParams = useCallback(
-    (
-      filters: Record<string, any>,
-      pagination?: { page: number; per_page: number },
-    ) => {
+    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
       if (filters.assigned_to) params.assigned_to = filters.assigned_to;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.lead_potential)
-        params.lead_potential = filters.lead_potential;
+      if (filters.lead_potential) params.lead_potential = filters.lead_potential;
       if (filters.search) params.search = filters.search;
-      if (filters.include_lost !== undefined)
-        params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined)
-        params.include_archived = filters.include_archived;
+      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
       if (filters.campaign_id) params.campaign_id = filters.campaign_id;
       if (filters.source) params.source = filters.source;
-      if (filters.lead_score_min != null)
-        params.lead_score_min = filters.lead_score_min;
-      if (filters.lead_score_max != null)
-        params.lead_score_max = filters.lead_score_max;
+      if (filters.lead_score_min != null) params.lead_score_min = filters.lead_score_min;
+      if (filters.lead_score_max != null) params.lead_score_max = filters.lead_score_max;
       if (pagination) {
         params.page = pagination.page;
         params.per_page = pagination.per_page;
@@ -2589,78 +2729,81 @@ const CrmLeads = () => {
   }, [leadsData, extensions, summaryTiles, totalLeads]);
 
   // Stats cards data for metrics
-  const leadsStatsCards: StatsCardData[] = useMemo(() => {
-    const m = leadMetrics || {};
-    const todaysMeetings = m.todays_meetings ?? 0;
-    const overdueMeetings = m.overdue_meetings ?? 0;
-    return [
-      {
-        title: "All Leads",
-        value: m.total_leads ?? 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        metric: {
-          text: `${m.total_leads_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#6366F1",
+  const leadsStatsCards: StatsCardData[] = useMemo(
+    () => {
+      const m = leadMetrics || {};
+      const todaysMeetings = m.todays_meetings ?? 0;
+      const overdueMeetings = m.overdue_meetings ?? 0;
+      return [
+        {
+          title: "All Leads",
+          value: m.total_leads ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${m.total_leads_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "Today's Follow-ups",
-        value: m.todays_follow_ups ?? 0,
-        icon: Calendar,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        metric: {
-          text: `${m.follow_ups_next_hour ?? 0} in next hour`,
-          dotColor: "#F59E0B",
+        {
+          title: "Today's Follow-ups",
+          value: m.todays_follow_ups ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${m.follow_ups_next_hour ?? 0} in next hour`,
+            dotColor: "#F59E0B",
+          },
         },
-      },
-      {
-        title: "Today's Meetings",
-        value: todaysMeetings,
-        icon: Target,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: `${m.meetings_next_hour ?? 0} in next hour`,
-          dotColor: "#F59E0B",
+        {
+          title: "Today's Meetings",
+          value: todaysMeetings,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.meetings_next_hour ?? 0} in next hour`,
+            dotColor: "#F59E0B",
+          },
         },
-      },
-      {
-        title: "Overdue",
-        value: m.overdue_total ?? 0,
-        icon: Clock,
-        iconColor: "#F97316",
-        iconBgColor: "#FFEDD5",
-        metric: {
-          text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
-            overdueMeetings === 1 ? "" : "s"
-          }`,
-          dotColor: "#F97316",
+        {
+          title: "Overdue",
+          value: m.overdue_total ?? 0,
+          icon: Clock,
+          iconColor: "#F97316",
+          iconBgColor: "#FFEDD5",
+          metric: {
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
+              overdueMeetings === 1 ? "" : "s"
+            }`,
+            dotColor: "#F97316",
+          },
         },
-      },
-      {
-        title: "High-Priority Leads",
-        value: m.high_priority_leads ?? 0,
-        icon: TrendingUp,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        additionalText: "Leads with hot potential & high probability",
-      },
-      {
-        title: "Converted Leads",
-        value: m.converted_leads ?? 0,
-        icon: CheckCircle,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: `${m.converted_leads_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#8B5CF6",
+        {
+          title: "High-Priority Leads",
+          value: m.high_priority_leads ?? 0,
+          icon: TrendingUp,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Leads with hot potential & high probability",
         },
-      },
-    ];
-  }, [leadMetrics]);
+        {
+          title: "Converted Leads",
+          value: m.converted_leads ?? 0,
+          icon: CheckCircle,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.converted_leads_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [leadMetrics],
+  );
 
   // Custom select styles
   const customSelectStyles = {
@@ -2990,16 +3133,11 @@ const CrmLeads = () => {
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
-      {
-        id: "all",
-        label: "All leads",
-        count: filterCounts.all,
-        removable: false,
-      },
+      { id: "all", label: "All leads", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
-    onTabRemove: (tabId: string) => {
+    onTabRemove: (tabId) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
@@ -3014,41 +3152,42 @@ const CrmLeads = () => {
     onPaginationReset: () =>
       setLeadsPagination((prev) => ({ ...prev, currentPage: 1 })),
     stages,
-    rightActions: session?.user?.permissions?.includes("add-crm-leads") ? (
-      <div
-        style={{
-          position: "absolute",
-          right: "40px",
-          top: "18px",
-          width: "auto",
-        }}
-      >
-        <button
-          onClick={() => setShowCreateLeadModal(true)}
+    rightActions:
+      session?.user?.permissions?.includes("add-crm-leads") ? (
+        <div
           style={{
-            padding: "9px 13px",
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
+            position: "absolute",
+            right: "40px",
+            top: "18px",
+            width: "auto",
           }}
         >
-          Add Lead
-        </button>
-      </div>
-    ) : undefined,
+          <button
+            onClick={() => setShowCreateLeadModal(true)}
+            style={{
+              padding: "9px 13px",
+              backgroundColor: "#000000",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "12px",
+              fontWeight: "500",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#1a1a1a";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#000000";
+            }}
+          >
+            Add Lead
+          </button>
+        </div>
+      ) : undefined,
   });
 
   if (!session?.user?.permissions?.includes("list-crm-leads")) {
@@ -3847,11 +3986,7 @@ const CrmLeads = () => {
               selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined
             }
             onNoteCreate={handleNoteCreate}
-            crmSummary={
-              selectedLead?.rawData?.crm_summary ??
-              selectedLead?.crm_summary ??
-              undefined
-            }
+            crmSummary={selectedLead?.rawData?.crm_summary ?? selectedLead?.crm_summary ?? undefined}
             record={{
               id: selectedLead?.id || selectedLead?.rawData?.id,
               type: RECORD_TYPES.LEAD,
@@ -3883,8 +4018,7 @@ const CrmLeads = () => {
                 {
                   label: "Convert to Deal",
                   onClick: () => {
-                    const leadId =
-                      selectedLead?.id ?? selectedLead?.rawData?.id;
+                    const leadId = selectedLead?.id ?? selectedLead?.rawData?.id;
                     if (leadId) {
                       setShowLeadSidebar(false);
                       setConvertingLeadId(Number(leadId));
@@ -9848,160 +9982,160 @@ const CrmLeads = () => {
         <hr />
         <h6 className="mb-3">Export filters</h6>
         <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Owner</Form.Label>
-              <Form.Select
-                value={
-                  exportFilters.assigned_to
-                    ? String(exportFilters.assigned_to)
-                    : ""
-                }
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.assigned_to = v;
-                    else delete next.assigned_to;
-                    return next;
-                  });
-                }}
-              >
-                <option value="">All owners</option>
-                {extensions.map((ext) => (
-                  <option
-                    key={String(ext.id || ext.extension)}
-                    value={String(ext.id || ext.extension)}
-                  >
-                    {ext.display_name ||
-                      ext.name ||
-                      ext.id ||
-                      ext.extension ||
-                      ""}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Lead Stage</Form.Label>
-              <Form.Select
-                value={exportFilters.stage_id || ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.stage_id = v;
-                    else delete next.stage_id;
-                    return next;
-                  });
-                }}
-              >
-                <option value="">All stages</option>
-                {stages.map((stage) => (
-                  <option key={stage.id} value={String(stage.id)}>
-                    {stage.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-        <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Lead Potential</Form.Label>
-              <Form.Select
-                value={exportFilters.lead_potential || ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.lead_potential = v;
-                    else delete next.lead_potential;
-                    return next;
-                  });
-                }}
-              >
-                <option value="">All potential</option>
-                <option value="Hot">Hot</option>
-                <option value="Warm">Warm</option>
-                <option value="Cold">Cold</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Create date</Form.Label>
-              <Form.Select
-                value={(() => {
-                  const from = exportFilters.date_from;
-                  const to = exportFilters.date_to;
-                  if (!from || !to) return "all";
-                  const days = moment(to).diff(moment(from), "days");
-                  if (days === 0) return "today";
-                  if (days >= 6 && days <= 8) return "week";
-                  if (days >= 28 && days <= 31) return "month";
-                  return "all";
-                })()}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v === "all") {
-                      delete next.date_from;
-                      delete next.date_to;
-                    } else {
-                      const today = moment().format("YYYY-MM-DD");
-                      if (v === "today") {
-                        next.date_from = today;
-                        next.date_to = today;
-                      } else if (v === "week") {
-                        next.date_from = moment()
-                          .subtract(7, "days")
-                          .format("YYYY-MM-DD");
-                        next.date_to = today;
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Owner</Form.Label>
+                <Form.Select
+                  value={
+                    exportFilters.assigned_to
+                      ? String(exportFilters.assigned_to)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.assigned_to = v;
+                      else delete next.assigned_to;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All owners</option>
+                  {extensions.map((ext) => (
+                    <option
+                      key={String(ext.id || ext.extension)}
+                      value={String(ext.id || ext.extension)}
+                    >
+                      {ext.display_name ||
+                        ext.name ||
+                        ext.id ||
+                        ext.extension ||
+                        ""}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Lead Stage</Form.Label>
+                <Form.Select
+                  value={exportFilters.stage_id || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.stage_id = v;
+                      else delete next.stage_id;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All stages</option>
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={String(stage.id)}>
+                      {stage.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Lead Potential</Form.Label>
+                <Form.Select
+                  value={exportFilters.lead_potential || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.lead_potential = v;
+                      else delete next.lead_potential;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All potential</option>
+                  <option value="Hot">Hot</option>
+                  <option value="Warm">Warm</option>
+                  <option value="Cold">Cold</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Create date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.date_from;
+                    const to = exportFilters.date_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.date_from;
+                        delete next.date_to;
                       } else {
-                        next.date_from = moment()
-                          .subtract(30, "days")
-                          .format("YYYY-MM-DD");
-                        next.date_to = today;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.date_from = today;
+                          next.date_to = today;
+                        } else if (v === "week") {
+                          next.date_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.date_to = today;
+                        } else {
+                          next.date_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.date_to = today;
+                        }
                       }
-                    }
-                    return next;
-                  });
-                }}
-              >
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 days</option>
-                <option value="month">Last 30 days</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-        <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Search</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Filter by name, company, etc."
-                value={exportFilters.search || ""}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.search = v;
-                    else delete next.search;
-                    return next;
-                  });
-                }}
-              />
-            </Form.Group>
-          </Col>
-        </Row>
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Search</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Filter by name, company, etc."
+                  value={exportFilters.search || ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.search = v;
+                      else delete next.search;
+                      return next;
+                    });
+                  }}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
       </CrmExportModal>
 
       {/* Add modal at the end */}

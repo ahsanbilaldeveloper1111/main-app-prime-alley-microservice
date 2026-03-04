@@ -1,3 +1,4 @@
+import { THEME_MODE } from "../../Common/layoutConfig";
 import Link from "next/link";
 import Image from "next/image";
 import React, { useEffect, useRef, useState } from "react";
@@ -9,7 +10,7 @@ import avatar2 from "../../assets/images/user/avatar-2.jpg";
 import { useSession } from "next-auth/react";
 import { authAPI } from "../../utils/api";
 import { useAuth } from "../../hooks/useAuth";
-import { FiChevronDown } from "react-icons/fi";
+import { FiArrowDown, FiChevronDown } from "react-icons/fi";
 import router from "next/router";
 
 

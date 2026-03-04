@@ -38,6 +38,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  createTaskNote,
   type CrmNoteItem,
   type CrmMeetingListItem,
   type AuditTrailEntry,
@@ -2173,11 +2174,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                       urgency: editingTaskForm.urgency,
                                       notes:
                                         editingTaskForm.notes.trim() !== ""
-                                          ? [
-                                              {
-                                                note: editingTaskForm.notes.trim(),
-                                              },
-                                            ]
+                                          ? [{ note: editingTaskForm.notes.trim() }]
                                           : undefined,
                                     });
                                     setEditingTaskId(null);
@@ -2603,23 +2600,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               {meeting.status ? ` · ${meeting.status}` : ""}
                             </p>
                             {meeting.meet_link && (
-                              <p
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#2563eb",
-                                  margin: "6px 0 0 0",
-                                  lineHeight: "1.5",
-                                }}
-                              >
-                                <a
-                                  href={meeting.meet_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    color: "inherit",
-                                    textDecoration: "underline",
-                                  }}
-                                >
+                              <p style={{ fontSize: '13px', color: '#2563eb', margin: '6px 0 0 0', lineHeight: '1.5' }}>
+                                <a href={meeting.meet_link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
                                   Join meeting
                                 </a>
                               </p>

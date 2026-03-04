@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Col, Row, Button, Tabs, Tab } from 'react-bootstrap';
+import { useSession } from 'next-auth/react';
 import { Permission } from '@typings/controlhub/users';
 import { UpdateExtendedPermission, UpdateBlockedPermission } from '@utils/users';
 

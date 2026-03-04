@@ -7,16 +7,18 @@ import { Column } from '@components/CustomDataTable';
 import { Button, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import { getServices, getMonitoringDashboard, deleteService, createService, updateService, getDevices, Service, Device } from '@utils/netops';
-import { convertUTCToUserTimezone } from '@utils/Helper';
+import { getServices, getMonitoringDashboard, deleteService, createService, updateService, getDevices, Service, MonitoringDashboardResponse, Device } from '@utils/netops';
+import { convertUTCToUserTimezone, GlobalDateFormat, GlobalTimeFormat } from '@utils/Helper';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 
 
 interface Summary {

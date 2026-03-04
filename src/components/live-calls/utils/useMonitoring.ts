@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShowPopup, PendingMonitoringData, AvailableDevice } from './types'
+import { ShowPopup, PendingMonitoringData, AvailableDevice, CtiDevice } from './types'
 import { 
   getUserDevices, 
   hasMultipleDevices, 

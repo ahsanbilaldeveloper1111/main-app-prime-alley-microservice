@@ -9,6 +9,8 @@ import {
   deleteProduct,
   getIndustries,
   CrmProduct,
+  CreateProductPayload,
+  UpdateProductPayload,
   IndustryData,
 } from "@utils/crm";
 import {

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { useRouter } from 'next/router';
+import { Button, Spinner } from 'react-bootstrap';
 import { 
   FileText, Users, AlertCircle, Clock, CheckCircle2
 } from 'lucide-react';
+import TasksReports from '@components/work-planner/tasks-reports';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import { getProject, getRecentActivity, getOverdueTasks, listTasks } from '@utils/tasks';
 import { formatDateForTable } from '@utils/Helper';

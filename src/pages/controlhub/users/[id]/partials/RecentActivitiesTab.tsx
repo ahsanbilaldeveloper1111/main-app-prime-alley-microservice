@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row } from 'react-bootstrap';
+import { Card, Col, Row } from 'react-bootstrap';
 
 interface RecentActivitiesTabProps {
     activities?: Array<{

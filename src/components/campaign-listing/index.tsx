@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { Row, Col } from 'react-bootstrap';
+import { Container, Row, Col } from 'react-bootstrap';
 import {
   Search,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   MoreVertical,
   Users,
   MessageSquare,
   TrendingUp,
   Edit,
   BarChart3,
+  Download,
   Copy,
   Pause,
+  Play,
   Calendar,
   CheckCircle,
   XCircle,
