@@ -35,6 +35,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Plus,
+  Pencil,
+  Trash2,
   Download,
 } from "lucide-react";
 import ApprovalDetailSidebar from "./sidebar";

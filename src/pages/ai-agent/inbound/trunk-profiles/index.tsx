@@ -12,14 +12,20 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
+import FormModal from "@pages/partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
 
 import { getTrunksInbound } from "@utils/ai-agent/inbound";
 
 
-import { Row, Col } from 'react-bootstrap';
+import { Row, Col, Form } from 'react-bootstrap';
 import {
   Search,
-  Phone
+  Plus,
+  Edit,
+  Phone,
+  MoreVertical,
+  Trash2
 } from 'lucide-react';
 
 interface Trunk {

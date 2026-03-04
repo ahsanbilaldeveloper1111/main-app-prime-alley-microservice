@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Button, Form, Badge, Dropdown } from "react-bootstrap";
+import { Modal, Button, Form, Row, Col, Card, Badge, Table, Dropdown } from "react-bootstrap";
+import Select from 'react-select';
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, Package, X } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   createDeal,
@@ -23,7 +24,7 @@ import {
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
-import { convertCurrency } from '@utils/currency';
+import { convertCurrency, formatCurrency } from '@utils/currency';
 import { useSession } from "next-auth/react";
 
 export interface ConvertLeadToDealModalProps {

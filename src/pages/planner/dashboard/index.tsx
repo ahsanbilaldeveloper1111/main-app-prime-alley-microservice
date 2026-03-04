@@ -10,7 +10,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { 
-  Plus, LayoutGrid, ChevronDown, Folder
+  Plus, LayoutGrid, ChevronDown,
+  MoreVertical, Folder
 } from 'lucide-react';
 import { Button, Spinner } from 'react-bootstrap';
 import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/partials/ProjectTabsContent';

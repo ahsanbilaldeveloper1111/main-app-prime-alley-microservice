@@ -4,6 +4,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -11,10 +12,13 @@ import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
+  Modal,
   Row,
   Col,
   Badge,
   Dropdown,
+  Form,
+  Alert,
 } from "react-bootstrap";
 import {
   FiEdit,
@@ -32,6 +36,7 @@ import {
   deleteProduct,
   ProductData,
 } from "@utils/sales";
+import ProductsFilters from "@components/filters/ProductsFilters";
 
 const ProductsList = () => {
   const { data: session, status } = useSession();

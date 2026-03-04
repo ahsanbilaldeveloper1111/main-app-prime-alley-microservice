@@ -11,9 +11,15 @@ import {
   Linkedin,
   ExternalLink,
   Plus,
+  Play,
+  MoreHorizontal,
+  Calendar,
+  TrendingUp,
+  Zap,
   ChevronDown,
   GripVertical,
   Info,
+  HelpCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import CompanyData from "@pages/crm/companies";
@@ -24,7 +30,7 @@ import CreateTaskSidebar from "@components/CreateTaskSidebar";
 import UserActivityByCategory from "@components/UserActivityByCategory";
 import TwoCharts from "@components/TwoCharts";
 import SchedulePage from "@components/SchedulePage";
-import { useSession } from "next-auth/react";
+import {useSession} from "next-auth/react";
 
 // ─── Styles (inline via style tag approach using className strings) ───────────
 
@@ -402,6 +408,58 @@ function SectionHeader({
   );
 }
 
+function OutreachIllustration() {
+  return (
+    <svg width="80" height="70" viewBox="0 0 80 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="30" width="60" height="32" rx="4" fill="#e8f0fe" />
+      <rect x="18" y="38" width="20" height="3" rx="1.5" fill="#93b4f5" />
+      <rect x="18" y="44" width="32" height="3" rx="1.5" fill="#c5d7fb" />
+      <rect x="18" y="50" width="26" height="3" rx="1.5" fill="#c5d7fb" />
+      <circle cx="55" cy="20" r="10" fill="#fde68a" />
+      <circle cx="55" cy="20" r="6" fill="#f59e0b" />
+      <line x1="55" y1="8" x2="55" y2="5" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="55" y1="35" x2="55" y2="32" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="43" y1="20" x2="40" y2="20" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="70" y1="20" x2="67" y2="20" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CalendarIllustration() {
+  return (
+    <svg width="80" height="75" viewBox="0 0 80 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="12" y="18" width="56" height="48" rx="4" fill="#fff3cd" stroke="#ffc107" strokeWidth="1.5" />
+      <rect x="12" y="18" width="56" height="14" rx="4" fill="#ffc107" />
+      <rect x="22" y="12" width="6" height="12" rx="3" fill="#e65100" />
+      <rect x="52" y="12" width="6" height="12" rx="3" fill="#e65100" />
+      {[0, 1, 2, 3].map((row) =>
+        [0, 1, 2, 3, 4, 5, 6].map((col) => (
+          <rect
+            key={`${row}-${col}`}
+            x={20 + col * 6}
+            y={38 + row * 7}
+            width="4"
+            height="4"
+            rx="1"
+            fill="#fde68a"
+          />
+        ))
+      )}
+    </svg>
+  );
+}
+
+function StalledIllustration() {
+  return (
+    <svg width="80" height="75" viewBox="0 0 80 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="8" y="40" width="18" height="28" rx="2" fill="#c7d2fe" />
+      <rect x="31" y="28" width="18" height="40" rx="2" fill="#818cf8" />
+      <rect x="54" y="16" width="18" height="52" rx="2" fill="#4f46e5" />
+      <polyline points="17,38 40,26 63,14" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="4 3" />
+    </svg>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 const navTabs = ["Summary", "Companies", "Deals", "Tasks", "Calendar"];
@@ -411,20 +469,22 @@ type NextPageWithLayout = React.FC & {
 };
 
 const SalesDashboard: NextPageWithLayout = () => {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  
+
+
 
   const [activeTab, setActiveTab] = useState("Summary");
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeTaskFilter, setActiveTaskFilter] = useState("All tasks");
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
-    new Set(),
-  );
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
-
+  
+  
   const toggleSection = (sectionId: string) => {
-    setCollapsedSections((prev) => {
+    setCollapsedSections(prev => {
       const newSet = new Set(prev);
       if (newSet.has(sectionId)) {
         newSet.delete(sectionId);
@@ -468,70 +528,46 @@ const SalesDashboard: NextPageWithLayout = () => {
       {/* ── Content ── */}
       <div style={styles.content}>
         {activeTab === "Summary" && (
-          <>
-            {/* ── Tasks Section ── */}
-            <div style={styles.section}>
-              <SectionHeader
-                title="Tasks"
-                actionSlot={
-                  <a style={styles.viewAllLink}>
-                    View all <ExternalLink size={11} />
-                  </a>
-                }
-                onToggle={() => toggleSection("tasks")}
-                isCollapsed={collapsedSections.has("tasks")}
-              />
+        <>
+        {/* ── Tasks Section ── */}
+        <div style={styles.section}>
+          <SectionHeader
+            title="Tasks"
+            actionSlot={
+              <a style={styles.viewAllLink}>
+                View all <ExternalLink size={11} />
+              </a>
+            }
+            onToggle={() => toggleSection("tasks")}
+            isCollapsed={collapsedSections.has("tasks")}
+          />
 
-              {!collapsedSections.has("tasks") && (
-                <>
-                  {/* Filter tabs */}
-                  <div style={styles.taskFilters}>
-                    <div style={styles.taskFiltersContainer}>
-                      {[
-                        "All tasks",
-                        "Due today",
-                        "Overdue",
-                        "Due tomorrow",
-                      ].map((f, index, arr) => (
-                        <button
-                          key={f}
-                          style={{
-                            ...styles.taskFilterBtn,
-                            ...(activeTaskFilter === f
-                              ? styles.taskFilterBtnActive
-                              : {}),
-                            ...(index === arr.length - 1
-                              ? styles.taskFilterBtnLast
-                              : {}),
-                          }}
-                          onClick={() => setActiveTaskFilter(f)}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
-                      <button
-                        style={styles.btn}
-                        onClick={() => setShowCreate(true)}
-                      >
-                        <span
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                          }}
-                        >
-                          <Plus size={12} /> Create task
-                        </span>
-                      </button>
-                      {/* <button
+          {!collapsedSections.has("tasks") && (
+          <>
+          {/* Filter tabs */}
+          <div style={styles.taskFilters}>
+            <div style={styles.taskFiltersContainer}>
+              {["All tasks", "Due today", "Overdue", "Due tomorrow"].map((f, index, arr) => (
+                <button
+                  key={f}
+                  style={{
+                    ...styles.taskFilterBtn,
+                    ...(activeTaskFilter === f ? styles.taskFilterBtnActive : {}),
+                    ...(index === arr.length - 1 ? styles.taskFilterBtnLast : {}),
+                  }}
+                  onClick={() => setActiveTaskFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button style={styles.btn} onClick={() => setShowCreate(true)}>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Plus size={12} /> Create task
+                </span>
+              </button>
+              {/* <button
   style={{ ...styles.btn, ...styles.btnPrimary }}
   onClick={() => setIsModalOpen(true)}
 >
@@ -539,150 +575,119 @@ const SalesDashboard: NextPageWithLayout = () => {
     <Play size={12} /> Start tasks
   </span>
 </button> */}
-                    </div>
-                  </div>
-
-                  {/* Stats Grid */}
-                  <div style={styles.statsGrid}>
-                    {[
-                      {
-                        label: "All tasks",
-                        value: "7",
-                        icon: <CheckSquare size={16} color="#666" />,
-                      },
-                      {
-                        label: "High priority",
-                        value: "3",
-                        icon: <AlertTriangle size={16} color="#666" />,
-                      },
-                      {
-                        label: "To-dos",
-                        value: "4",
-                        icon: <List size={16} color="#666" />,
-                      },
-                      {
-                        label: "Calls",
-                        value: "2",
-                        icon: <Phone size={16} color="#666" />,
-                      },
-                      {
-                        label: "Emails",
-                        value: "1",
-                        icon: <Mail size={16} color="#666" />,
-                      },
-                      {
-                        label: "LinkedIn",
-                        value: "0",
-                        icon: <Linkedin size={16} color="#22c55e" />,
-                        done: true,
-                      },
-                    ].map((stat, i) => (
-                      <div
-                        key={stat.label}
-                        style={{
-                          ...styles.statCard,
-                        }}
-                      >
-                        <div style={styles.statLabel}>
-                          {stat.label}
-                          {stat.done ? (
-                            <span
-                              style={{
-                                width: "18px",
-                                height: "18px",
-                                borderRadius: "50%",
-                                backgroundColor: "#22c55e",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <svg
-                                width="10"
-                                height="8"
-                                viewBox="0 0 10 8"
-                                fill="none"
-                              >
-                                <path
-                                  d="M1 4l2.5 2.5L9 1"
-                                  stroke="white"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </span>
-                          ) : (
-                            stat.icon
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            ...styles.statValue,
-                            color: stat.value === "0" ? "#141414" : "#006162",
-                            fontWeight: stat.value === "0" ? 400 : 700,
-                          }}
-                        >
-                          {stat.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
+          </div>
 
-            {/* ── User Activity By Category ── */}
-            <div style={styles.section}>
-              <SectionHeader
-                title="User activity by category"
-                infoIcon
-                onToggle={() => toggleSection("userActivity")}
-                isCollapsed={collapsedSections.has("userActivity")}
-              />
-              {!collapsedSections.has("userActivity") && (
-                <div style={{ padding: "12px 16px 16px" }}>
-                  <UserActivityByCategory />
+          {/* Stats Grid */}
+          <div style={styles.statsGrid}>
+            {[
+              { label: "All tasks", value: "7", icon: <CheckSquare size={16} color="#666" /> },
+              { label: "High priority", value: "3", icon: <AlertTriangle size={16} color="#666" /> },
+              { label: "To-dos", value: "4", icon: <List size={16} color="#666" /> },
+              { label: "Calls", value: "2", icon: <Phone size={16} color="#666" /> },
+              { label: "Emails", value: "1", icon: <Mail size={16} color="#666" /> },
+              { label: "LinkedIn", value: "0", icon: <Linkedin size={16} color="#22c55e" />, done: true },
+            ].map((stat, i) => (
+              <div
+                key={stat.label}
+                style={{
+                  ...styles.statCard,
+                  
+                }}
+              >
+                <div style={styles.statLabel}>
+                  {stat.label}
+                  {stat.done ? (
+                    <span
+                      style={{
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "50%",
+                        backgroundColor: "#22c55e",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    stat.icon
+                  )}
                 </div>
-              )}
-            </div>
-
-            <div style={styles.section}>
-              <SectionHeader
-                title="Activity"
-                infoIcon
-                onToggle={() => toggleSection("twoCharts")}
-                isCollapsed={collapsedSections.has("twoCharts")}
-              />
-              {!collapsedSections.has("twoCharts") && (
-                <div style={{ padding: "12px 16px 16px" }}>
-                  <TwoCharts />
+                <div
+                  style={{
+                    ...styles.statValue,
+                    color: stat.value === "0" ? "#141414" : "#006162",
+                    fontWeight: stat.value === "0" ? 400 : 700,
+                  }}
+                >
+                  {stat.value}
                 </div>
-              )}
-            </div>
+              </div>
+            ))}
+          </div>
           </>
+          )}
+        </div>
+
+        {/* ── User Activity By Category ── */}
+        <div style={styles.section}>
+          <SectionHeader
+            title="User activity by category"
+            infoIcon
+            onToggle={() => toggleSection("userActivity")}
+            isCollapsed={collapsedSections.has("userActivity")}
+          />
+          {!collapsedSections.has("userActivity") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <UserActivityByCategory />
+            </div>
+          )}
+        </div>
+
+        <div style={styles.section}>
+          <SectionHeader
+            title="Activity"
+            infoIcon
+            onToggle={() => toggleSection("twoCharts")}
+            isCollapsed={collapsedSections.has("twoCharts")}
+          />
+          {!collapsedSections.has("twoCharts") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <TwoCharts />
+            </div>
+          )}
+        </div>
+
+       
+        </>
         )}
 
         {activeTab === "Companies" && (
-          //   <div style={styles.section}>
-          //     <SectionHeader title="Companies" />
-          //     <div style={styles.emptyState}>
-          //       <div style={styles.emptyTitle}>Companies View</div>
-          //       <p style={styles.emptyText}>
-          //         This is the Companies tab content. Company management features will be displayed here.
-          //       </p>
-          //     </div>
-          //   </div>
+        //   <div style={styles.section}>
+        //     <SectionHeader title="Companies" />
+        //     <div style={styles.emptyState}>
+        //       <div style={styles.emptyTitle}>Companies View</div>
+        //       <p style={styles.emptyText}>
+        //         This is the Companies tab content. Company management features will be displayed here.
+        //       </p>
+        //     </div>
+        //   </div>
 
-          <CompanyData />
+        <CompanyData />
         )}
 
         {activeTab === "Deals" && (
-          //
-          <DealsData />
+        //   
+        <DealsData />
         )}
 
-        {activeTab === "Tasks" && <TasksData />}
+        {activeTab === "Tasks" && (
+        <TasksData />
+        )}
 
         {activeTab === "Calendar" && (
           <SchedulePage />
@@ -730,61 +735,44 @@ const SalesDashboard: NextPageWithLayout = () => {
         Got feedback?
       </div>
       <AssociateTaskModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        taskName="AI bot offer"
-        onAddAssociations={() => console.log("Add associations clicked")}
-        onMarkComplete={() => {
-          console.log("Marked complete");
-          setIsModalOpen(false);
-        }}
-        onSkipTask={() => {
-          console.log("Skipped task");
-          setIsModalOpen(false);
-        }}
-      />
+  isOpen={isModalOpen}
+  onClose={() => setIsModalOpen(false)}
+  taskName="AI bot offer"
+  onAddAssociations={() => console.log("Add associations clicked")}
+  onMarkComplete={() => { console.log("Marked complete"); setIsModalOpen(false); }}
+  onSkipTask={() => { console.log("Skipped task"); setIsModalOpen(false); }}
+/>
 
-      {/* ── Create / Edit task sidebar (new component) ── */}
-      <CreateTaskSidebar
-        isOpen={showCreate}
-        onClose={() => {
-          setShowCreate(false);
-          setEditId(null);
-        }}
-        onSubmit={(formData, addAnother) => {
-          console.log(
-            "Task form submitted:",
-            formData,
-            "Add another:",
-            addAnother,
-          );
-          // TODO: Call API to create/update task here
-          // await createTask(formData) or await updateTask(editId, formData)
-          toast.success(editId ? "Task updated" : "Task created");
-          // Optionally refresh task list here if needed
-          if (!addAnother) {
-            setShowCreate(false);
-            setEditId(null);
-          }
-        }}
-        taskId={editId}
-        loading={saving}
-        assigneeOptions={[
-          { value: "U001", label: "John Smith" },
-          { value: "U002", label: "Sarah Johnson" },
-          { value: "U003", label: "Mike Davis" },
-          { value: "U004", label: "Emily Chen" },
-        ]}
-        queueOptions={[
-          { value: "queue-1", label: "Sales Queue" },
-          { value: "queue-2", label: "Support Queue" },
-        ]}
-        recordOptions={[
-          { value: "contact-1", label: "Contact Records" },
-          { value: "company-1", label: "Company Records" },
-          { value: "deal-1", label: "Deal Records" },
-        ]}
-      />
+ {/* ── Create / Edit task sidebar (new component) ── */}
+ <CreateTaskSidebar
+            isOpen={showCreate}
+            onClose={() => { setShowCreate(false); setEditId(null); }}
+            onSubmit={(formData, addAnother) => {
+              console.log("Task form submitted:", formData, "Add another:", addAnother);
+              // TODO: Call API to create/update task here
+              // await createTask(formData) or await updateTask(editId, formData)
+              toast.success(editId ? "Task updated" : "Task created");
+              // Optionally refresh task list here if needed
+              if (!addAnother) { setShowCreate(false); setEditId(null); }
+            }}
+            taskId={editId}
+            loading={saving}
+            assigneeOptions={[
+              { value: "U001", label: "John Smith" },
+              { value: "U002", label: "Sarah Johnson" },
+              { value: "U003", label: "Mike Davis" },
+              { value: "U004", label: "Emily Chen" },
+            ]}
+            queueOptions={[
+              { value: "queue-1", label: "Sales Queue" },
+              { value: "queue-2", label: "Support Queue" },
+            ]}
+            recordOptions={[
+              { value: "contact-1", label: "Contact Records" },
+              { value: "company-1", label: "Company Records" },
+              { value: "deal-1", label: "Deal Records" },
+            ]}
+          />
     </div>
   );
 };

@@ -8,13 +8,14 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import PageHeader from "@components/PageHeader";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { useSession } from "next-auth/react";
 import axiosInstance from "@utils/axios";
 import { getCurrentUserCompanyImage } from "@utils/company";
 import { toast } from "react-toastify";
-import { Upload } from "lucide-react";
+import { Upload, Trash2, Building2 } from "lucide-react";
 import ThemeSelect from "@components/ThemeSelect";
 
 interface CompanyOption {

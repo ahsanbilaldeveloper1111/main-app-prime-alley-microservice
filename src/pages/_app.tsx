@@ -7,10 +7,13 @@ import { wrapper } from "@toolkit/index";
 import { AppProps } from "next/app";
 import type { NextPage } from "next";
 import { appWithTranslation } from "next-i18next";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer } from 'react-toastify';
 import * as Sentry from "@sentry/nextjs";
 import Providers from "@components/providers";
+
 import favicon from "@assets/images/favicon-analisys.ico";
+// import faviconBlack from "@assets/images/favicon-black.png";
+
 import Router, { useRouter } from "next/router";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
@@ -60,11 +63,7 @@ class SentryErrorBoundary extends Component<
           <button
             type="button"
             onClick={() => this.setState({ hasError: false })}
-            style={{
-              marginTop: "1rem",
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-            }}
+            style={{ marginTop: "1rem", padding: "0.5rem 1rem", cursor: "pointer" }}
           >
             Try again
           </button>
@@ -84,31 +83,23 @@ type AppPropsWithLayout = AppProps & {
 };
 
 // Wrapper component to conditionally render chatbot based on auth status and permissions
-const AppContent: React.FC<{
-  Component: NextPageWithLayout;
-  pageProps: any;
-  getLayout: (page: ReactElement) => ReactNode;
-}> = ({ Component, pageProps, getLayout }) => {
+const AppContent: React.FC<{ Component: NextPageWithLayout; pageProps: any; getLayout: (page: ReactElement) => ReactNode }> = ({ Component, pageProps, getLayout }) => {
   const { data: session, status } = useSession();
   const { hasPermission } = usePermissions();
   const router = useRouter();
 
   // Check if current route should exclude chatbot
-  const isLiveCallsPage = router.pathname.startsWith("/live-calls");
-  const isLoginPage =
-    router.pathname.startsWith("/auth/signin") ||
-    router.pathname.startsWith("/pages/login") ||
-    router.pathname === "/login";
+  const isLiveCallsPage = router.pathname.startsWith('/live-calls');
+  const isLoginPage = router.pathname.startsWith('/auth/signin') || 
+                      router.pathname.startsWith('/pages/login') ||
+                      router.pathname === '/login';
   const shouldShowChatbot = !isLiveCallsPage && !isLoginPage;
 
   return (
     <>
       <NotificationSocketBridge />
       {getLayout(<Component {...pageProps} />)}
-      {status === "authenticated" &&
-        session &&
-        hasPermission("live-chat-users") &&
-        shouldShowChatbot && <ChatbotWidget />}
+      {status === 'authenticated' && session && hasPermission('live-chat-users') && shouldShowChatbot && <ChatbotWidget />}
     </>
   );
 };
@@ -132,7 +123,7 @@ const MyApp: any = ({ Component, pageProps, ...rest }: AppPropsWithLayout) => {
   return (
     <>
       <Head>
-        <link rel="icon" href={favicon.src} type="image/x-icon" />
+        <link rel='icon' href={favicon.src} type="image/x-icon" />
         <meta
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
@@ -141,11 +132,7 @@ const MyApp: any = ({ Component, pageProps, ...rest }: AppPropsWithLayout) => {
       </Head>
       <Providers store={store}>
         <SentryErrorBoundary>
-          <AppContent
-            Component={Component}
-            pageProps={pageProps}
-            getLayout={getLayout}
-          />
+          <AppContent Component={Component} pageProps={pageProps} getLayout={getLayout} />
         </SentryErrorBoundary>
       </Providers>
       <ToastContainer />

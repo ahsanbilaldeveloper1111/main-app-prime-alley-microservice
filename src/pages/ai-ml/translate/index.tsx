@@ -1,8 +1,8 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Form, InputGroup, Row, Spinner } from 'react-bootstrap';
+import { Button, Form, InputGroup, Modal, Row, Spinner } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';

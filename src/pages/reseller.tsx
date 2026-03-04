@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Card, Row, Col, Button, Badge, Form, Table } from 'react-bootstrap';
+import { Card, Row, Col, Button, Badge, Form, Table, ProgressBar } from 'react-bootstrap';
 import { 
   LayoutDashboard,
   Users,
@@ -17,6 +17,7 @@ import {
   Trash2,
   Download,
   Filter,
+  Search,
   ChevronLeft,
   ChevronRight,
   Calendar,

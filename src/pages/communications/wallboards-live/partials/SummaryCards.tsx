@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, Col, Row } from 'react-bootstrap'
-import { Headset, PhoneCall, UserCheck, Clock, UserX, PhoneIncoming } from 'lucide-react'
+import { Headset, PhoneCall, UserCheck, Clock, UserX, PhoneIncoming, Hourglass } from 'lucide-react'
 import { calculateLongestCallDuration } from '@components/live-calls/utils/helpers'
 
 interface SummaryCardsProps {

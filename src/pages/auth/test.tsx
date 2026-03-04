@@ -1,12 +1,15 @@
 import NonLayout from "@layout/NonLayout";
+import Image from "next/image";
 import React, { ReactElement, useState, useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Script from "next/script";
+import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
+import Footer from "@components/Footer";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({

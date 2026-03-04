@@ -10,10 +10,13 @@ import {
   FiSettings,
   FiUsers,
   FiFileText,
+  FiDollarSign,
+  FiBarChart2,
 } from "react-icons/fi";
 import {
   getSalesDashboardData,
   SalesDashboardData,
+  getSalesAnalytics,
 } from "@utils/sales";
 import { toast } from "react-toastify";
 

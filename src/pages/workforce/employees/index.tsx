@@ -10,12 +10,14 @@ import EditEmployeeModal from "@pages/workforce/EditEmployeeModal";
 import {
   getUserProfiles,
   getUserProfile,
+  updateUserProfile,
   deleteUserProfile,
   getEmployeeDashboardCounters,
   getEmployeeDashboardGraphDepartmentHeadcount,
   createJourney,
   type UserProfile,
   type UserProfileAddress,
+  type UserProfilePayload,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
@@ -24,9 +26,10 @@ import { Button, Form, Modal } from "react-bootstrap";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Search, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
+import { Search, ChevronDown, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
+import Select, { SingleValue } from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -50,7 +53,7 @@ interface EmployeeDashboardCountersData {
 }
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useSession } from "next-auth/react";
-import { Country } from "country-state-city";
+import { Country, State, City } from "country-state-city";
 
 interface Document {
   id: string;

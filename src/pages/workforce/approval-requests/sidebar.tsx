@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Modal } from "react-bootstrap";
+import { Button, Modal } from "react-bootstrap";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
 import {
@@ -17,6 +17,7 @@ import {
   Edit3,
   UserPlus,
   File,
+  ExternalLink,
   Pencil,
   Trash2,
 } from "lucide-react";

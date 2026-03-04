@@ -3,9 +3,12 @@ import { toast } from 'react-toastify';
 import { 
   X, 
   User,
+  Mail,
   Phone,
   Calendar,
   Briefcase,
+  MapPin,
+  ChevronRight,
   Clock,
   Building2,
   UserCheck,

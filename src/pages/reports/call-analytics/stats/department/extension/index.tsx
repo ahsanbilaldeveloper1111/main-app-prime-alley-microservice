@@ -15,7 +15,7 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
-import { formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 import "@assets/scss/common.scss";
 
 

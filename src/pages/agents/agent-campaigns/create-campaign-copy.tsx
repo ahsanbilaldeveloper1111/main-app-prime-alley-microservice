@@ -23,6 +23,7 @@ import {
     BarChart3,
     ChevronLeft,
     ChevronRight,
+    Calendar,
     Clock,
     Rocket,
     CheckCircle2,

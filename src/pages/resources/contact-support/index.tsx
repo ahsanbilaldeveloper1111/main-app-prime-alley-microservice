@@ -2,10 +2,10 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Button, Row, Card, Form, Alert } from "react-bootstrap";
+import { Button, Modal, Row, Card, Form, Alert } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
-import { FiMail, FiPhone, FiMessageSquare, FiClock, FiSend } from "react-icons/fi";
+import { FiMail, FiPhone, FiMessageSquare, FiClock, FiMapPin, FiSend } from "react-icons/fi";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";

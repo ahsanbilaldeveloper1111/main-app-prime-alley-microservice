@@ -19,15 +19,19 @@ import "react-datepicker/dist/react-datepicker.css";
 import parsePhoneNumber from "libphonenumber-js";
 import { 
     DollarSign, 
+    Phone, 
     BarChart3,
     ChevronLeft,
     ChevronRight,
+    Calendar,
     Clock,
     Rocket,
     CheckCircle2,
+    XCircle,
     Edit2,
     Upload,
-    TrendingUp
+    TrendingUp,
+    Users
   } from 'lucide-react';
 import ContextScriptScreen from '@components/context-scripts';
 import CallSettingsScreen from '@components/call-settings';

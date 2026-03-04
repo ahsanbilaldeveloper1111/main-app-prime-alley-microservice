@@ -15,8 +15,15 @@ import {
 } from "react-bootstrap";
 import Link from "next/link";
 import Select from "react-select";
-
-
+import {
+  FiArrowLeft,
+  FiPlus,
+  FiTrash2,
+  FiPackage,
+  FiDollarSign,
+  FiCalendar,
+  FiUser,
+} from "react-icons/fi";
 import {
   createOrder,
   listOrderStages,

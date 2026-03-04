@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 import { useNotifications, NotificationItem } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
+import ProfileSidebar from '@components/profile-sidebar';
 import { useDialerModal } from '../contexts/DialerModalContext';
 import NotificationsSidebar from '@components/Notificationssidebar';
 import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
@@ -13,24 +14,31 @@ import { getCurrentUserCompanyImage } from "@utils/company";
 import { useAuth } from '../hooks/useAuth';
 
 import { 
-	Bell, ChevronLeft, ChevronRight,ChevronDown,
+	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
+  Link,
   Phone,
   Search,
   X,
+  PhoneCall,
   User,
   HelpCircle,
   Settings,
+  Eye,
   ExternalLink,
+  LogOut,
+  Shield,
+  BookOpen,
   GraduationCap,
   Briefcase,
   FileText,
   CreditCard,
   Sparkles,
+  MessageCircle,
   Plus,
   Ticket,
   MonitorCheck,
     } from 'lucide-react';
-import { Button } from 'react-bootstrap';
+import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';

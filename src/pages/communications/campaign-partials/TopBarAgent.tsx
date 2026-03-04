@@ -3,8 +3,11 @@ import {
   Search,
   ChevronDown,
   CheckCircle,
+  XCircle,
   User,
-  LogOut
+  Settings,
+  LogOut,
+  Users
 } from 'lucide-react';
 
 interface StatusOption {

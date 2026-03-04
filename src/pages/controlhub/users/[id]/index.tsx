@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
-import { getUserById, getUserPermissions, GetCustomFields, updateUserStatus } from '@utils/users';
+import { getUserById, getUserPermissions, GetCustomFields, GetModules, getParentUsers, updateUserStatus, GetCompanies } from '@utils/users';
 import { getAllRoles } from '@utils/roles';
 import { getAllGroups } from '@utils/groups';
 import { ModuleSlug } from '@utils/Helper';
@@ -16,6 +16,7 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal';
 
 // Import partial components
 import OverviewTab from './partials/OverviewTab';
+import PermissionsTab from './partials/PermissionsTab';
 import CustomFieldsTab from './partials/CustomFieldsTab';
 import UserCallingAccess from './partials/UserCallingAccess';
 import { User, Permission, Role, Group, Module } from '@typings/controlhub/users';

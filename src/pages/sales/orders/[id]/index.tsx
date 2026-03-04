@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { ReactElement, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
 import { 
   Card, 
   CardBody, 
@@ -18,8 +19,17 @@ import Select from 'react-select';
 import Link from "next/link";
 
 import { 
+  FiArrowLeft, 
   FiEdit, 
-  FiTrash2,
+  FiTrash2, 
+  FiCalendar,
+  FiUser,
+  FiMapPin,
+  FiPhone,
+  FiMail,
+  FiPackage,
+  FiDollarSign,
+  FiFileText,
   FiAlertTriangle
 } from 'react-icons/fi';
 import { 

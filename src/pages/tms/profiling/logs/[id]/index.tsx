@@ -1,18 +1,20 @@
 import React,{ReactElement, useEffect, useState,useMemo} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, ProgressBar, Row, Spinner } from 'react-bootstrap'
+import { Button, Card, Col, Form, Modal, ProgressBar, Row, Tab, Table, Tabs, Spinner } from 'react-bootstrap'
 import Swal from 'sweetalert2'
 import { toast } from 'react-toastify'
 import { useSession } from 'next-auth/react'
 
 import { useRouter } from 'next/router'
 import { ListCustomerProfilingLogs } from "@utils/tms/tmsProfiling";
-import { UserProfilingErrorLogStatus } from '@models/tms/UnfidiedOp'
+import { iErrorDetails, UserProfilingErrorLogStatus } from '@models/tms/UnfidiedOp'
 import '@assets/scss/profiling-error-log.scss';
 
 
-import ProgressTracker from "./ProgressTracker";
+import ProgressTracker, {
+      ProgressStep,
+  } from "./ProgressTracker";
 
   import { useProgressTracker } from "@hooks/tms/useProgressTracker";
 import { useUserProfile } from "@hooks/tms/UserProfile";
