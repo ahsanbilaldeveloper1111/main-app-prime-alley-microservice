@@ -98,7 +98,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
       />
       
       {/* Bottom Row - Recent Activity & Overdue Tasks */}
-      <div style={{...styles.grid, ...styles.gridTwo, marginTop: '1.5rem'}}>
+      {/* <div style={{...styles.grid, ...styles.gridTwo, marginTop: '1.5rem'}}>
         <RecentActivitySection
           activities={recentActivity}
           loading={loadingActivities}
@@ -113,7 +113,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
           styles={styles}
           showViewAll={true}
         />
-      </div>
+      </div> */}
     </>
   );
 };

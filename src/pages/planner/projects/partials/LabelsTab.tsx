@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
 import { canManage } from '@utils/work-planner';
-import { useSession } from 'next-auth/react';
+import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+
 interface LabelsTabProps {
   selectedProject: any;
   labels: any[];
@@ -23,6 +26,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const isAllow = useMemo(() => {
     return canManage(labels, selectedProject, session);
   }, [labels, selectedProject, session]);
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -30,6 +34,22 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const [formData, setFormData] = useState({ name: '', color: '#4680FF' });
   const [processing, setProcessing] = useState(false);
 
+  // Pagination and search states
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    sortColumn: '',
+    sortDirection: 'asc' as 'asc' | 'desc',
+  });
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'color', 'tasks']);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [colorFilter, setColorFilter] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
+
+  // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddLabel = async () => {
     if (!selectedProject?.id || !formData.name) return;
     
@@ -102,136 +122,421 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'
   ];
 
+  // ── Enrich labels with task count ─────────────────────────────────────────
+  const enrichedLabels = useMemo(() =>
+    labels.map((label, index) => ({
+      ...label,
+      _taskCount: 0, // TODO: Integrate actual task count from backend
+    })),
+    [labels]
+  );
+
+  // ── GenericTable columns ──────────────────────────────────────────────────
+  const columns: TableColumn[] = [
+    {
+      key: 'name',
+      label: 'Label Name',
+      sortable: true,
+      render: (row: any) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '4px',
+            backgroundColor: row.color || '#4680FF',
+            flexShrink: 0,
+            border: '1px solid rgba(0,0,0,0.1)',
+          }}></div>
+          <div>
+            <div style={{ fontWeight: '500', color: '#1F2937' }}>{row.name}</div>
+            {row.description && (
+              <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{row.description}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'color',
+      label: 'Color',
+      sortable: true,
+      render: (row: any) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            backgroundColor: row.color || '#4680FF',
+            border: '2px solid #E5E9F2',
+            flexShrink: 0,
+          }}></div>
+          <span style={{ 
+            color: '#6B7280', 
+            fontFamily: 'monospace', 
+            fontSize: '0.8rem',
+            textTransform: 'uppercase',
+          }}>
+            {row.color || '#4680FF'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'tasks',
+      label: 'Tasks',
+      sortable: true,
+      render: (row: any) => (
+        <span style={{
+          padding: '0.25rem 0.75rem',
+          backgroundColor: '#F3F4F6',
+          color: '#4B5563',
+          borderRadius: '6px',
+          fontSize: '0.75rem',
+          fontWeight: '600',
+          display: 'inline-block',
+        }}>
+          {row._taskCount || 0} tasks
+        </span>
+      ),
+    },
+  ];
+
+  // ── GenericTable actions ──────────────────────────────────────────────────
+  const actions: TableAction[] = isAllow ? [
+    {
+      label: 'Edit Label',
+      icon: <Edit size={16} />,
+      variant: 'link',
+      className: 'text-secondary p-1',
+      onClick: (row: any) => {
+        openEditModal(row);
+      },
+    },
+    {
+      label: 'Delete Label',
+      icon: <Trash2 size={16} />,
+      variant: 'link',
+      className: 'text-danger p-1',
+      onClick: (row: any) => {
+        openDeleteModal(row);
+      },
+    },
+  ] : [];
+
+  // ── Filtered and Paginated Data ───────────────────────────────────────────
+  const filteredLabels = useMemo(() => {
+    let result = enrichedLabels;
+
+    // Search filter
+    if (searchValue.trim()) {
+      const search = searchValue.toLowerCase();
+      result = result.filter((label: any) => 
+        (label.name || '').toLowerCase().includes(search) ||
+        (label.color || '').toLowerCase().includes(search) ||
+        (label.description || '').toLowerCase().includes(search)
+      );
+    }
+
+    // Color filter
+    if (colorFilter) {
+      result = result.filter((label: any) => label.color === colorFilter);
+    }
+
+    return result;
+  }, [enrichedLabels, searchValue, colorFilter]);
+
+  const paginatedLabels = useMemo(() => {
+    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
+    const end = start + pagination.rowsPerPage;
+    return filteredLabels.slice(start, end);
+  }, [filteredLabels, pagination.currentPage, pagination.rowsPerPage]);
+
+  // ── Stats Cards ───────────────────────────────────────────────────────────
+  const statsCardsData: StatsCardData[] = useMemo(() => {
+    const totalLabels = labels.length;
+    const uniqueColors = new Set(labels.map((l: any) => l.color || '#4680FF')).size;
+    const totalTasks = labels.reduce((sum: number, l: any) => sum + (l._taskCount || 0), 0);
+
+    return [
+      {
+        title: 'Total Labels',
+        value: totalLabels,
+        icon: Tag,
+        iconColor: '#6366F1',
+        iconBgColor: '#EEF2FF',
+        subtitle: `${uniqueColors} unique colors`,
+      },
+      {
+        title: 'Active Labels',
+        value: labels.filter((l: any) => (l._taskCount || 0) > 0).length,
+        icon: Tag,
+        iconColor: '#10B981',
+        iconBgColor: '#D1FAE5',
+        metric: {
+          text: 'Used in tasks',
+          dotColor: '#10B981',
+        },
+      },
+      {
+        title: 'Color Variations',
+        value: uniqueColors,
+        icon: Tag,
+        iconColor: '#F59E0B',
+        iconBgColor: '#FEF3C7',
+        metric: {
+          text: 'Unique colors',
+          dotColor: '#F59E0B',
+        },
+      },
+    ];
+  }, [labels]);
+
+  // ── Filter Pills ──────────────────────────────────────────────────────────
+  const uniqueColors = useMemo(() => {
+    return Array.from(new Set(labels.map((l: any) => l.color || '#4680FF')));
+  }, [labels]);
+
+  const filterPills: FilterPill[] = useMemo(() => [
+    {
+      id: 'color',
+      label: 'Color',
+      icon: <Tag size={14} />,
+      active: !!colorFilter,
+      activeLabel: colorFilter || undefined,
+      onClear: () => setColorFilter(null),
+      showDropdown: true,
+      dropdownOptions: [
+        { label: 'All Colors', value: 'all', onClick: () => setColorFilter(null) },
+        ...uniqueColors.map((color: string) => ({
+          label: color,
+          value: color,
+          onClick: () => setColorFilter(color),
+        })),
+      ],
+    },
+  ], [colorFilter, uniqueColors]);
+
+  // Render Add Label Button (following MembersTab pattern)
+  const renderAddLabelButton = () => (
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "170px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      {isAllow && selectedItems.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            // Bulk delete functionality
+            const firstSelected = labels.find((l: any) => l.id === selectedItems[0]);
+            if (firstSelected) {
+              setSelectedLabel(firstSelected);
+              setShowDeleteModal(true);
+            }
+          }}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#dc3545",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#c82333";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#dc3545";
+          }}
+        >
+          <Trash2 size={16} />
+          Delete ({selectedItems.length})
+        </button>
+      )}
+      {isAllow && (
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#000000",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <Plus size={16} />
+          Add Label
+        </button>
+      )}
+    </div>
+  );
+
+  // ── Toolbar Configuration ─────────────────────────────────────────────────
+  const toolbarConfig: ToolbarConfig = useMemo(() => ({
+    // Tabs (required for rightActions to render)
+    showTabs: true,
+    tabs: [
+      {
+        id: 'all',
+        label: 'All Labels',
+        count: labels.length,
+        removable: false,
+      },
+    ],
+    activeTab: 'all',
+    
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: 'Search labels...',
+    onSearchChange: setSearchValue,
+    onSearch: () => setPagination(prev => ({ ...prev, currentPage: 1 })),
+    
+    showFilterPills: true,
+    filterPills,
+    
+    showEditColumns: true,
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    
+    showExportButton: true,
+    onExportClick: () => {
+      console.log('Export labels data');
+      // Implement export functionality
+    },
+    
+    rightActions: renderAddLabelButton(),
+  }), [searchValue, filterPills, isAllow, selectedItems.length, labels.length]);
+
+  // ── Row Interaction Handlers ──────────────────────────────────────────────
+  const handleFirstColumnClick = useCallback((row: any) => {
+    openEditModal(row);
+  }, []);
+
+  const handleRowDoubleClick = useCallback((row: any) => {
+    if (isAllow) {
+      openEditModal(row);
+    }
+  }, [isAllow]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, [searchValue, colorFilter]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      <div style={styles.card}>
-        <div style={styles.cardHeader}>
-          <h5 style={styles.cardTitle}>Project Labels</h5>
-          {isAllow && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <Plus size={16} />
-            Add Label
-          </Button>
+      {/* Labels Table with GenericTable */}
+      <div
+        className="labels-table-wrapper"
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <GenericTable
+          data={paginatedLabels}
+          columns={columns.filter((c) => selectedColumns.includes(c.key))}
+          actions={actions}
+          showActions={isAllow && actions.length > 0}
+          actionsLabel="Actions"
+          
+          // Selection
+          selectable={isAllow}
+          selectedRows={paginatedLabels.filter((item) =>
+            selectedItems.includes(item.id)
           )}
-        </div>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem' }}>
-            <Spinner animation="border" />
-          </div>
-        ) : labels.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>
-            <Tag size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-            <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: '500' }}>No labels found</p>
-            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Add labels to categorize your project tasks</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
-            {labels.map((label: any, index: number) => (
-              <div
-                key={label.id || index}
-                style={{
-                  backgroundColor: 'white',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '8px',
-                  padding: '1rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = '#4680FF';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = '#E5E9F2';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '4px',
-                    backgroundColor: label.color || '#4680FF',
-                    flexShrink: 0
-                  }}></div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '500', color: '#1F2937', fontSize: '0.9rem' }}>
-                      {label.name}
-                    </div>
-                    {label.description && (
-                      <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '0.25rem' }}>
-                        {label.description}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {isAllow && (
-                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                  <button
-                    onClick={() => openEditModal(label)}
-                    style={{
-                      padding: '0.375rem',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: '#6B7280'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6';
-                      e.currentTarget.style.color = '#4680FF';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#6B7280';
-                    }}
-                    title="Edit Label"
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    onClick={() => openDeleteModal(label)}
-                    style={{
-                      padding: '0.375rem',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: '#6B7280'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#FEE2E2';
-                      e.currentTarget.style.color = '#DC2626';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#6B7280';
-                    }}
-                    title="Delete Label"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                )}
+          onSelectionChange={(selected) => {
+            setSelectedItems(selected.map((item) => item.id));
+            setClearSelectedRows(false);
+          }}
+          
+          // Pagination
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.rowsPerPage,
+            totalRows: filteredLabels.length,
+            pageSizeOptions: [10, 15, 25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({
+              ...pagination,
+              currentPage: page,
+              rowsPerPage,
+            });
+          }}
+          
+          // Sorting
+          sortable={true}
+          defaultSortColumn={pagination.sortColumn}
+          defaultSortDirection={pagination.sortDirection}
+          onSort={(column, direction) => {
+            setPagination((prev) => ({
+              ...prev,
+              sortColumn: column,
+              sortDirection: direction,
+              currentPage: 1,
+            }));
+          }}
+          
+          // Row interactions
+          onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+          onRowDoubleClick={(row) => handleRowDoubleClick(row)}
+          
+          // Loading & styling
+          loading={loading}
+          emptyMessage="No labels found matching your criteria"
+          loadingMessage="Loading labels..."
+          hover={true}
+          uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 345px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          
+          // Stats cards for metrics
+          statsCards={statsCardsData}
+          
+          // When Board View is selected, show board content instead of table
+          customBody={
+            viewMode === "board" ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>
+                <Tag size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                <p>Board view for labels is not yet implemented</p>
               </div>
-            ))}
-          </div>
-        )}
+            ) : undefined
+          }
+        />
       </div>
 
-      {/* Add Label Modal */}
+      {/* ── Add Label Modal ── */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Add Label</Modal.Title>
@@ -290,7 +595,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
         </Modal.Footer>
       </Modal>
 
-      {/* Edit Label Modal */}
+      {/* ── Edit Label Modal ── */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Edit Label</Modal.Title>
@@ -349,7 +654,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
         </Modal.Footer>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* ── Delete Confirmation Modal ── */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Delete Label</Modal.Title>

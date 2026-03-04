@@ -719,6 +719,9 @@ button.preview-button:hover, button.preview-button:focus {
   margin-bottom: -1px;
   /* border-bottom: 1px solid #edf2f7; */
 }
+.members-table-wrapper .gt-toolbar-tabs-section {
+ margin-left: 15px;
+}
 
 .gt-tab-button {
   display: inline-flex;
