@@ -1,11 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
-import { UserPlus, Edit, Trash2, Users } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Users, Search, Filter, Download, Eye } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
 import { canManage } from '@utils/work-planner';
-import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -33,6 +34,22 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
+
+  // Pagination and search states
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    sortColumn: '',
+    sortDirection: 'asc' as 'asc' | 'desc',
+  });
+  const [searchValue, setSearchValue] = useState('');
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
 
   const isAllow = useMemo(() => canManage(members, selectedProject, session), [members, selectedProject, session]);
 
@@ -266,52 +283,348 @@ const MembersTab: React.FC<MembersTabProps> = ({
     }
   };
 
+  // ── Filtered and Paginated Data ───────────────────────────────────────────
+  const filteredMembers = useMemo(() => {
+    let result = enrichedMembers;
+
+    // Search filter
+    if (searchValue.trim()) {
+      const search = searchValue.toLowerCase();
+      result = result.filter((m: any) => 
+        m._displayName.toLowerCase().includes(search) ||
+        m._email.toLowerCase().includes(search) ||
+        String(m.extension_number).toLowerCase().includes(search) ||
+        (m.role || '').toLowerCase().includes(search)
+      );
+    }
+
+    // Role filter
+    if (roleFilter) {
+      result = result.filter((m: any) => (m.role || 'member').toLowerCase() === roleFilter.toLowerCase());
+    }
+
+    return result;
+  }, [enrichedMembers, searchValue, roleFilter]);
+
+  const paginatedMembers = useMemo(() => {
+    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
+    const end = start + pagination.rowsPerPage;
+    return filteredMembers.slice(start, end);
+  }, [filteredMembers, pagination.currentPage, pagination.rowsPerPage]);
+
+  // ── Stats Cards ───────────────────────────────────────────────────────────
+  const statsCardsData: StatsCardData[] = useMemo(() => {
+    const totalMembers = members.length;
+    const ownerCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'owner').length;
+    const adminCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'admin').length;
+    const managerCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'manager').length;
+    const memberCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'member' || !m.role).length;
+
+    return [
+      {
+        title: 'Total Members',
+        value: totalMembers,
+        icon: Users,
+        iconColor: '#6366F1',
+        iconBgColor: '#EEF2FF',
+        subtitle: `${ownerCount + adminCount + managerCount} with elevated roles`,
+      },
+      {
+        title: 'Owners',
+        value: ownerCount,
+        icon: Users,
+        iconColor: '#991B1B',
+        iconBgColor: '#FEE2E2',
+        metric: {
+          text: 'Full project control',
+          dotColor: '#991B1B',
+        },
+      },
+      {
+        title: 'Admins',
+        value: adminCount,
+        icon: Users,
+        iconColor: '#92400E',
+        iconBgColor: '#FEF3C7',
+        metric: {
+          text: 'Management access',
+          dotColor: '#92400E',
+        },
+      },
+      {
+        title: 'Managers',
+        value: managerCount,
+        icon: Users,
+        iconColor: '#1E40AF',
+        iconBgColor: '#DBEAFE',
+        metric: {
+          text: 'Team coordination',
+          dotColor: '#1E40AF',
+        },
+      },
+      {
+        title: 'Members',
+        value: memberCount,
+        icon: Users,
+        iconColor: '#4B5563',
+        iconBgColor: '#E5E7EB',
+        metric: {
+          text: 'Standard access',
+          dotColor: '#4B5563',
+        },
+      },
+      {
+        title: 'Users',
+        value: memberCount,
+        icon: Users,
+        iconColor: '#4B5563',
+        iconBgColor: '#E5E7EB',
+        metric: {
+          text: 'Standard access',
+          dotColor: '#4B5563',
+        },
+      },
+    ];
+  }, [members]);
+
+  // ── Filter Pills ──────────────────────────────────────────────────────────
+  const filterPills: FilterPill[] = useMemo(() => [
+    {
+      id: 'role',
+      label: 'Role',
+      icon: <Filter size={14} />,
+      active: !!roleFilter,
+      activeLabel: roleFilter ? roleFilter.charAt(0).toUpperCase() + roleFilter.slice(1) : undefined,
+      onClear: () => setRoleFilter(null),
+      showDropdown: true,
+      dropdownOptions: [
+        { label: 'All Roles', value: 'all', onClick: () => setRoleFilter(null) },
+        { label: 'Owner', value: 'owner', onClick: () => setRoleFilter('owner') },
+        { label: 'Admin', value: 'admin', onClick: () => setRoleFilter('admin') },
+        { label: 'Manager', value: 'manager', onClick: () => setRoleFilter('manager') },
+        { label: 'Member', value: 'member', onClick: () => setRoleFilter('member') },
+      ],
+    },
+  ], [roleFilter]);
+
+  // Render Add Member Button (following prospects.tsx pattern)
+  const renderAddMemberButton = () => (
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "170px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      {isAllow && selectedItems.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setShowDeleteModal(true);
+          }}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#dc3545",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#c82333";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#dc3545";
+          }}
+        >
+          <Trash2 size={16} />
+          Delete ({selectedItems.length})
+        </button>
+      )}
+      {isAllow && (
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#000000",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <UserPlus size={16} />
+          Add Member
+        </button>
+      )}
+    </div>
+  );
+
+  // ── Toolbar Configuration ─────────────────────────────────────────────────
+  const toolbarConfig: ToolbarConfig = useMemo(() => ({
+    // Tabs (required for rightActions to render)
+    showTabs: true,
+    tabs: [
+      {
+        id: 'all',
+        label: 'All Members',
+        count: members.length,
+        removable: false,
+      },
+    ],
+    activeTab: 'all',
+    
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: 'Search members...',
+    onSearchChange: setSearchValue,
+    onSearch: () => setPagination(prev => ({ ...prev, currentPage: 1 })),
+    
+    showFilterPills: true,
+    filterPills,
+    
+    showEditColumns: true,
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    
+    showExportButton: true,
+    onExportClick: () => {
+      console.log('Export members data');
+      // Implement export functionality
+    },
+    
+    rightActions: renderAddMemberButton(),
+  }), [searchValue, filterPills, isAllow, selectedItems.length, members.length]);
+
+  // ── Row Interaction Handlers ──────────────────────────────────────────────
+  const handleFirstColumnClick = useCallback((row: any) => {
+    setSelectedMember(row);
+    setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
+    setShowEditModal(true);
+  }, []);
+
+  const handleRowDoubleClick = useCallback((row: any) => {
+    if (isAllow) {
+      setSelectedMember(row);
+      setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
+      setShowEditModal(true);
+    }
+  }, [isAllow]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, [searchValue, roleFilter]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Header row above the table */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h5 style={styles.cardTitle}>Project Members</h5>
-        {isAllow && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <UserPlus size={16} />
-            Add Member
-          </Button>
-        )}
-      </div>
-
-      {/* Empty state when no members */}
-      {!loading && members.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>
-          <Users size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-          <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: '500' }}>No members found</p>
-          <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-            Add members to collaborate on this project
-          </p>
-        </div>
-      ) : (
+      {/* Members Table with GenericTable */}
+      <div
+        className="members-table-wrapper"
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <GenericTable
-          data={enrichedMembers}
-          columns={columns}
+          data={paginatedMembers}
+          columns={columns.filter((c) => selectedColumns.includes(c.key))}
           actions={actions}
           showActions={isAllow && actions.length > 0}
           actionsLabel="Actions"
-          uniqueKey="id"
-          loading={loading}
-          loadingMessage="Loading members..."
-          emptyMessage="No members found"
-          hover={true}
+          
+          // Selection
+          selectable={isAllow}
+          selectedRows={paginatedMembers.filter((item) =>
+            selectedItems.includes(item.id)
+          )}
+          onSelectionChange={(selected) => {
+            setSelectedItems(selected.map((item) => item.id));
+            setClearSelectedRows(false);
+          }}
+          
+          // Pagination
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.rowsPerPage,
+            totalRows: filteredMembers.length,
+            pageSizeOptions: [10, 15, 25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({
+              ...pagination,
+              currentPage: page,
+              rowsPerPage,
+            });
+          }}
+          
+          // Sorting
           sortable={true}
-          fixedHeight={false}
-          showToolbar={false}
-          showToolbarActions={false}
+          defaultSortColumn={pagination.sortColumn}
+          defaultSortDirection={pagination.sortDirection}
+          onSort={(column, direction) => {
+            setPagination((prev) => ({
+              ...prev,
+              sortColumn: column,
+              sortDirection: direction,
+              currentPage: 1,
+            }));
+          }}
+          
+          // Row interactions
+          onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+          onRowDoubleClick={(row) => handleRowDoubleClick(row)}
+          
+          // Loading & styling
+          loading={loading}
+          emptyMessage="No members found matching your criteria"
+          loadingMessage="Loading members..."
+          hover={true}
+          uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 345px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          
+          // Stats cards for metrics
+          statsCards={statsCardsData}
+          
+          // When Board View is selected, show board content instead of table
+          customBody={
+            viewMode === "board" ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>
+                <Users size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
+                <p>Board view for members is not yet implemented</p>
+              </div>
+            ) : undefined
+          }
         />
-      )}
+      </div>
 
       {/* ── Add Member Modal ── */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>

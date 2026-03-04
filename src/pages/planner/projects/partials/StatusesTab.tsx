@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
-import { Plus, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, AlertCircle, Filter, Tag } from 'lucide-react';
 import { createStatus, updateStatus, deleteStatus } from '@utils/tasks';
 import { canManage } from '@utils/work-planner';
 import { useSession } from 'next-auth/react';
-import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
+import { StatsCardData } from '@components/GenericStatsCards';
 
 interface StatusesTabProps {
   selectedProject: any;
@@ -35,6 +36,20 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<any>(null);
   const [formData, setFormData]             = useState({ name: '', color: '#4680FF' });
   const [processing, setProcessing]         = useState(false);
+
+  // Pagination and search states
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    sortColumn: '',
+    sortDirection: 'asc' as 'asc' | 'desc',
+  });
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'color']);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [colorFilter, setColorFilter] = useState<string | null>(null);
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddStatus = async () => {
@@ -93,6 +108,227 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     setSelectedStatus(status);
     setShowDeleteModal(true);
   };
+
+  // ── Filtered and Paginated Data ───────────────────────────────────────────
+  const filteredStatuses = useMemo(() => {
+    let result = statuses;
+
+    // Search filter
+    if (searchValue.trim()) {
+      const search = searchValue.toLowerCase();
+      result = result.filter((s: any) => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.color || '').toLowerCase().includes(search)
+      );
+    }
+
+    // Color filter
+    if (colorFilter) {
+      result = result.filter((s: any) => (s.color || '').toLowerCase() === colorFilter.toLowerCase());
+    }
+
+    return result;
+  }, [statuses, searchValue, colorFilter]);
+
+  const paginatedStatuses = useMemo(() => {
+    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
+    const end = start + pagination.rowsPerPage;
+    return filteredStatuses.slice(start, end);
+  }, [filteredStatuses, pagination.currentPage, pagination.rowsPerPage]);
+
+  // ── Stats Cards ───────────────────────────────────────────────────────────
+  const statsCardsData: StatsCardData[] = useMemo(() => {
+    const totalStatuses = statuses.length;
+    const activeStatuses = statuses.filter((s: any) => s.is_active !== false).length;
+    const uniqueColors = new Set(statuses.map((s: any) => s.color)).size;
+
+    return [
+      {
+        title: 'Total Statuses',
+        value: totalStatuses,
+        icon: Tag,
+        iconColor: '#6366F1',
+        iconBgColor: '#EEF2FF',
+        subtitle: `${uniqueColors} unique colors`,
+      },
+      {
+        title: 'Active',
+        value: activeStatuses,
+        icon: Tag,
+        iconColor: '#10B981',
+        iconBgColor: '#D1FAE5',
+        metric: {
+          text: 'Currently in use',
+          dotColor: '#10B981',
+        },
+      },
+      {
+        title: 'Color Variations',
+        value: uniqueColors,
+        icon: Tag,
+        iconColor: '#8B5CF6',
+        iconBgColor: '#EDE9FE',
+        metric: {
+          text: 'Distinct colors',
+          dotColor: '#8B5CF6',
+        },
+      },
+    ];
+  }, [statuses]);
+
+  // ── Filter Pills ──────────────────────────────────────────────────────────
+  const uniqueColors = useMemo(() => {
+    const colors = new Set(statuses.map((s: any) => s.color).filter(Boolean));
+    return Array.from(colors);
+  }, [statuses]);
+
+  const filterPills: FilterPill[] = useMemo(() => [
+    {
+      id: 'color',
+      label: 'Color',
+      icon: <Filter size={14} />,
+      active: !!colorFilter,
+      activeLabel: colorFilter ? colorFilter.toUpperCase() : undefined,
+      onClear: () => setColorFilter(null),
+      showDropdown: true,
+      dropdownOptions: [
+        { label: 'All Colors', value: 'all', onClick: () => setColorFilter(null) },
+        ...uniqueColors.map((color: string) => ({
+          label: color.toUpperCase(),
+          value: color,
+          onClick: () => setColorFilter(color),
+        })),
+      ],
+    },
+  ], [colorFilter, uniqueColors]);
+
+  // Render Add Status Button (following prospects.tsx pattern)
+  const renderAddStatusButton = () => (
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "170px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      {isAllow && selectedItems.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            // Bulk delete - open delete modal for first selected item
+            const firstSelected = statuses.find((s: any) => selectedItems.includes(s.id));
+            if (firstSelected) {
+              setSelectedStatus(firstSelected);
+              setShowDeleteModal(true);
+            }
+          }}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#dc3545",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#c82333";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#dc3545";
+          }}
+        >
+          <Trash2 size={16} />
+          Delete ({selectedItems.length})
+        </button>
+      )}
+      {isAllow && (
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#000000",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <Plus size={16} />
+          Add Status
+        </button>
+      )}
+    </div>
+  );
+
+  // ── Toolbar Configuration ─────────────────────────────────────────────────
+  const toolbarConfig: ToolbarConfig = useMemo(() => ({
+    // Tabs (required for rightActions to render)
+    showTabs: true,
+    tabs: [
+      {
+        id: 'all',
+        label: 'All Statuses',
+        count: statuses.length,
+        removable: false,
+      },
+    ],
+    activeTab: 'all',
+    
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: 'Search statuses...',
+    onSearchChange: setSearchValue,
+    onSearch: () => setPagination(prev => ({ ...prev, currentPage: 1 })),
+    
+    showFilterPills: true,
+    filterPills,
+    
+    showEditColumns: true,
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    
+    showExportButton: true,
+    onExportClick: () => {
+      console.log('Export statuses data');
+      // Implement export functionality
+    },
+    
+    rightActions: renderAddStatusButton(),
+  }), [searchValue, filterPills, isAllow, selectedItems.length, statuses.length]);
+
+  // ── Row Interaction Handlers ──────────────────────────────────────────────
+  const handleFirstColumnClick = useCallback((row: any) => {
+    openEditModal(row);
+  }, []);
+
+  const handleRowDoubleClick = useCallback((row: any) => {
+    if (isAllow) {
+      openEditModal(row);
+    }
+  }, [isAllow]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
+  }, [searchValue, colorFilter]);
 
   // ── GenericTable columns ──────────────────────────────────────────────────
   const columns: TableColumn[] = [
@@ -186,49 +422,95 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h5 style={styles.cardTitle}>Project Statuses</h5>
-        {isAllow && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <Plus size={16} />
-            Add Status
-          </Button>
-        )}
-      </div>
+      {/* Custom styles for StatusesTab to reduce column width */}
+      <style>{`
+        .statuses-table-wrapper .generic-table-th.sortable {
+          min-width: 150px !important;
+        }
+        .statuses-table-wrapper .generic-table-th:first-child + .generic-table-th {
+          min-width: 150px !important;
+          width: 150px !important;
+        }
+      `}</style>
 
-      {/* Empty state */}
-      {!loading && statuses.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>
-          <AlertCircle size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-          <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: '500' }}>No statuses found</p>
-          <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', opacity: 0.7 }}>
-            Add statuses to organize your project tasks
-          </p>
-        </div>
-      ) : (
+      {/* Statuses Table with GenericTable */}
+      <div
+        className="statuses-table-wrapper"
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <GenericTable
-          data={statuses}
-          columns={columns}
+          data={paginatedStatuses}
+          columns={columns.filter((c) => selectedColumns.includes(c.key))}
           actions={actions}
           showActions={isAllow && actions.length > 0}
           actionsLabel="Actions"
-          uniqueKey="id"
-          loading={loading}
-          loadingMessage="Loading statuses..."
-          emptyMessage="No statuses found"
-          hover={true}
+          
+          // Selection
+          selectable={isAllow}
+          selectedRows={paginatedStatuses.filter((item) =>
+            selectedItems.includes(item.id)
+          )}
+          onSelectionChange={(selected) => {
+            setSelectedItems(selected.map((item) => item.id));
+            setClearSelectedRows(false);
+          }}
+          
+          // Pagination
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.rowsPerPage,
+            totalRows: filteredStatuses.length,
+            pageSizeOptions: [10, 15, 25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({
+              ...pagination,
+              currentPage: page,
+              rowsPerPage,
+            });
+          }}
+          
+          // Sorting
           sortable={true}
-          fixedHeight={false}
-          showToolbar={false}
-          showToolbarActions={false}
+          defaultSortColumn={pagination.sortColumn}
+          defaultSortDirection={pagination.sortDirection}
+          onSort={(column, direction) => {
+            setPagination((prev) => ({
+              ...prev,
+              sortColumn: column,
+              sortDirection: direction,
+              currentPage: 1,
+            }));
+          }}
+          
+          // Row interactions
+          onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+          onRowDoubleClick={(row) => handleRowDoubleClick(row)}
+          
+          // Loading & styling
+          loading={loading}
+          emptyMessage="No statuses found matching your criteria"
+          loadingMessage="Loading statuses..."
+          hover={true}
+          uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 345px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          
+          // Stats cards for metrics
+          statsCards={statsCardsData}
         />
-      )}
+      </div>
 
       {/* ── Add Status Modal ── */}
       <Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
