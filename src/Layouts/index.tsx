@@ -113,6 +113,24 @@ const Layout = ({ children }: LayoutProps) => {
 	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
   const [showBreezeAssistant, setShowBreezeAssistant] = useState(false);
   const [breezeMaximized, setBreezeMaximized] = useState(false);
+
+  // Allow any page/component to open the global AI Assistant (Breeze) sidebar
+  // by dispatching: window.dispatchEvent(new CustomEvent("breeze-assistant:open"))
+  useEffect(() => {
+    const w = globalThis.window;
+    if (!w) return;
+    const handler = () => {
+      setShowBreezeAssistant(true);
+      setBreezeMaximized(false);
+    };
+    w.addEventListener("breeze-assistant:open", handler as EventListener);
+    return () => {
+      w.removeEventListener(
+        "breeze-assistant:open",
+        handler as EventListener,
+      );
+    };
+  }, []);
   
 	useEffect(() => {
 		let cancelled = false;

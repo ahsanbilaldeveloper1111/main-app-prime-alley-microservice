@@ -3225,6 +3225,12 @@ export const updateMeeting = async (
     meeting_time?: string;
     meeting_outcome?: string;
     extensions?: string[];
+    start_date_time?: string;
+    end_date_time?: string;
+    emails?: string[];
+    attendees?: string[];
+    reminders?: string[];
+    summary?: string;
     id?: number;
   },
 ): Promise<MeetingData> => {
