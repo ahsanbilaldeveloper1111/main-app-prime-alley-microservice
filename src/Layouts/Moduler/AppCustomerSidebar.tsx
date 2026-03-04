@@ -391,20 +391,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/planner/projects',
           permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
         },
-        { 
-          id: 'work-planner-recurring-reminders', 
-          title: 'Recurring Reminders', 
-          icon: <Bell size={16} />, 
-          url: '/planner/recurring-reminders', 
-          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
-        },
-        { 
-          id: 'planner-todo-list', 
-          title: 'To-Do', 
-          icon: <Clock size={16} />, 
-          url: '/planner/todo', 
-          permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
-        },
+        // { 
+        //   id: 'work-planner-recurring-reminders', 
+        //   title: 'Recurring Reminders', 
+        //   icon: <Bell size={16} />, 
+        //   url: '/planner/recurring-reminders', 
+        //   permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+        // },
+        // { 
+        //   id: 'planner-todo-list', 
+        //   title: 'To-Do', 
+        //   icon: <Clock size={16} />, 
+        //   url: '/planner/todo', 
+        //   permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
+        // },
         {
           id: 'planner-tasks',
           title: 'Tasks',

@@ -425,11 +425,11 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       {/* Custom styles for StatusesTab to reduce column width */}
       <style>{`
         .statuses-table-wrapper .generic-table-th.sortable {
-          min-width: 150px !important;
+          min-width: auto !important;
         }
         .statuses-table-wrapper .generic-table-th:first-child + .generic-table-th {
-          min-width: 150px !important;
-          width: 150px !important;
+          min-width: auto !important;
+          width: auto !important;
         }
       `}</style>
 

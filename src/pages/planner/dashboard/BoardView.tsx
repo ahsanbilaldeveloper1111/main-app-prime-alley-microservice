@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { 
-  Plus, MoreVertical, Calendar,
-  SlidersHorizontal
+  Plus, MoreVertical, Calendar, ChevronLeft, ChevronRight,
+  SlidersHorizontal, FileText, MapPin, Mail, ExternalLink
 } from 'lucide-react';
 import { formatDateForTable } from '@utils/Helper';
 import { updateTask, deleteTask, getTask, getTaskActivities } from '@utils/tasks';
@@ -10,6 +10,11 @@ import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
+
+const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
+const TEAL = "#006162";
+const HEADER_H = 34;
+const ARROW_W = 10;
 
 interface BoardViewProps {
   selectedProject: any;
@@ -320,122 +325,38 @@ const BoardView: React.FC<BoardViewProps> = ({
     { id: 'label', label: 'Label', type: 'dropdown', value: boardSelectedLabel, onChange: (v) => setBoardSelectedLabel(v ?? 'All Labels'), options: [{ value: 'All Labels', label: 'All Labels' }, ...(labels || []).map((l: any) => ({ value: l.name, label: l.name }))] },
   ], [boardSearchTerm, boardSelectedAssignee, boardSelectedPriority, boardSelectedLabel, labels, getAllBoardAssignees, getAllBoardPriorities]);
 
+  const [collapsedColumns, setCollapsedColumns] = useState<Record<number, boolean>>({});
+  const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
+
   const styles = {
-    card: {
-      backgroundColor: 'white',
-      border: 'none',
-      borderRadius: '12px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-      padding: '1.5rem',
-      marginBottom: '1.5rem'
-    },
-    filterRow: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-      gap: '1rem'
-    },
-    input: {
-      width: '100%',
-      padding: '0.75rem',
-      border: '1px solid #E5E9F2',
-      borderRadius: '6px',
-      fontSize: '0.9rem',
-      outline: 'none',
-      fontFamily: 'inherit'
-    },
-    select: {
-      width: '100%',
-      padding: '0.75rem',
-      border: '1px solid #E5E9F2',
-      borderRadius: '6px',
-      fontSize: '0.9rem',
-      outline: 'none',
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-      backgroundColor: 'white'
-    },
-    inputGroup: {
-      position: 'relative' as const,
-      display: 'flex',
-      alignItems: 'center'
-    },
-    inputIcon: {
-      position: 'absolute' as const,
-      left: '0.75rem',
-      pointerEvents: 'none' as const
-    },
-    inputWithIcon: {
-      paddingLeft: '2.5rem'
-    },
-    buttonOutline: {
-      padding: '0.625rem 1.25rem',
-      backgroundColor: 'white',
-      color: '#4680FF',
-      border: '1px solid #4680FF',
-      borderRadius: '6px',
-      fontWeight: '500',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      fontSize: '0.9rem',
-      transition: 'all 0.2s'
-    },
     board: {
       display: 'flex',
-      gap: '1rem',
+      gap: 0,
       overflowX: 'auto' as const,
-      paddingBottom: '1rem'
+      paddingBottom: '1rem',
+      background: '#ffffff',
+      height: '80vh',
+      width: '100%',
+      overflowY: 'hidden' as const
     },
     column: {
-      minWidth: '280px',
-      maxWidth: '300px',
-      backgroundColor: '#E5E7EB',
-      borderRadius: '12px',
-      padding: '1rem',
       display: 'flex',
       flexDirection: 'column' as const,
-      height: 'fit-content'
-    },
-    columnHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '1rem'
-    },
-    columnTitle: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '0.5rem',
-      fontSize: '0.95rem',
-      fontWeight: '600',
-      color: '#1F2937'
-    },
-    columnCount: {
-      fontSize: '0.85rem',
-      color: '#6B7280',
-      fontWeight: '500'
-    },
-    moreButton: {
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: '0.25rem',
-      borderRadius: '4px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#6B7280',
-      transition: 'background 0.2s'
+      flexShrink: 0,
+      minWidth: '280px',
+      maxHeight: '100%',
+      overflow: 'hidden',
+      transition: 'width .15s ease',
+      backgroundColor: '#ffffff'
     },
     addButton: {
       width: '100%',
-      padding: '0.75rem',
+      padding: '0.5rem',
       backgroundColor: 'white',
-      border: '2px dashed #D1D5DB',
+      border: '1px solid #ccc',
       borderRadius: '8px',
-      color: '#4B5563',
-      fontSize: '0.9rem',
+      color: TEAL,
+      fontSize: '0.85rem',
       fontWeight: '500',
       cursor: 'pointer',
       display: 'flex',
@@ -443,96 +364,315 @@ const BoardView: React.FC<BoardViewProps> = ({
       justifyContent: 'center',
       gap: '0.5rem',
       marginBottom: '0.75rem',
-      transition: 'all 0.2s'
+      transition: 'all 0.12s',
+      fontFamily: FONT
     },
     taskCard: {
-      backgroundColor: 'white',
-      borderRadius: '10px',
-      padding: '1.125rem',
-      marginBottom: '0.875rem',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+      backgroundColor: '#fff',
+      border: '1px solid #ccc',
+      borderRadius: '8px',
+      padding: '11px 13px 12px',
+      marginBottom: '11px',
       cursor: 'grab',
-      transition: 'all 0.2s ease',
-      border: '1px solid #f1f5f9',
+      boxShadow: '0 1px 2px rgba(0,0,0,.05)',
+      transition: 'box-shadow .12s',
+      fontFamily: FONT,
       userSelect: 'none' as const
     },
-    columnDropZone: {
-      minHeight: '100px',
-      transition: 'background-color 0.2s'
-    },
     taskTitle: {
-      fontSize: '0.925rem',
-      fontWeight: '600',
-      color: '#1e293b',
-      marginBottom: '0.875rem',
-      lineHeight: '1.5',
-      letterSpacing: '-0.01em'
+      fontSize: '14px',
+      fontWeight: 600,
+      color: TEAL,
+      cursor: 'pointer',
+      fontFamily: FONT,
+      lineHeight: '18px',
+      marginBottom: '2px'
     },
     taskMeta: {
       display: 'flex',
       alignItems: 'center',
-      gap: '0.5rem',
-      flexWrap: 'wrap' as const,
-      marginBottom: '0.875rem'
+      gap: '5px',
+      margin: '5px 0 6px',
+      flexWrap: 'wrap' as const
+    },
+    miniAvatar: {
+      width: '18px',
+      height: '18px',
+      borderRadius: '50%',
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '7px',
+      fontWeight: 700,
+      flexShrink: 0,
+      userSelect: 'none' as const,
+      fontFamily: FONT
     },
     label: {
-      padding: '0.3rem 0.75rem',
+      padding: '0.25rem 0.5rem',
       borderRadius: '6px',
-      fontSize: '0.725rem',
+      fontSize: '11.5px',
       fontWeight: '600',
-      color: 'white',
-      letterSpacing: '0.3px'
+      color: '#fff',
+      fontFamily: FONT
     },
     priority: {
-      padding: '0.3rem 0.75rem',
+      padding: '0.25rem 0.5rem',
       borderRadius: '6px',
-      fontSize: '0.725rem',
+      fontSize: '11.5px',
       fontWeight: '600',
-      letterSpacing: '0.3px'
+      fontFamily: FONT
     },
     taskFooter: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingTop: '0.625rem',
-      borderTop: '1px solid #f1f5f9'
+      paddingTop: '4px',
+      marginTop: '4px'
     },
     taskIcons: {
       display: 'flex',
-      gap: '0.875rem',
-      alignItems: 'center'
-    },
-    dueDate: {
-      fontSize: '0.75rem',
-      color: '#DC2626',
-      fontWeight: '600',
-      display: 'flex',
+      gap: 0,
       alignItems: 'center',
-      gap: '0.25rem'
+      justifyContent: 'flex-end'
     },
-    assignees: {
-      display: 'flex',
-      gap: '0.25rem',
-      marginLeft: '-0.25rem'
-    },
-    avatar: {
-      width: '28px',
-      height: '28px',
-      borderRadius: '50%',
-      border: '2px solid white',
-      fontSize: '0.7rem',
+    actBtn: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '3px 4px',
+      borderRadius: '3px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#e2e8f0',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-      marginLeft: '-0.25rem'
+      color: '#141414',
+      transition: 'color .1s'
+    },
+    dueDate: {
+      fontSize: '11.5px',
+      color: '#555',
+      lineHeight: '18px',
+      fontFamily: FONT,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.25rem'
     }
+  };
+
+  const ColumnHeader: React.FC<{
+    title: string;
+    count: number;
+    color: string;
+    isCollapsed: boolean;
+    isLast: boolean;
+    onToggle: () => void;
+  }> = ({ title, count, color, isCollapsed, isLast, onToggle }) => {
+    const [hov, setHov] = useState(false);
+
+    // Render simplified vertical header when collapsed
+    if (isCollapsed) {
+      return (
+        <div
+          style={{
+            position: 'relative',
+            height: '100%',
+            minHeight: 120
+          }}
+        >
+          <div
+            onClick={onToggle}
+            onMouseEnter={() => setHov(true)}
+            onMouseLeave={() => setHov(false)}
+            style={{
+              height: HEADER_H,
+              backgroundColor: color || '#ccc',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '3px',
+              transition: 'all 0.2s',
+              opacity: hov ? 0.9 : 1,
+              boxShadow: hov ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+              marginBottom: 8
+            }}
+            title={`${title} (${count}) - Click to expand`}
+          >
+            <ChevronRight size={14} style={{ color: '#fff', marginBottom: 2 }} />
+            {count > 0 && (
+              <span style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: '#fff',
+                fontFamily: FONT,
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                borderRadius: '8px',
+                padding: '1px 4px',
+                minWidth: 16,
+                textAlign: 'center'
+              }}>
+                {count}
+              </span>
+            )}
+          </div>
+          {/* Vertical status name */}
+          <div
+            onClick={onToggle}
+            style={{
+              writingMode: 'vertical-rl' as const,
+              textOrientation: 'mixed',
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#666',
+              fontFamily: FONT,
+              cursor: 'pointer',
+              textAlign: 'center',
+              margin: '8px auto',
+              whiteSpace: 'nowrap',
+              userSelect: 'none'
+            }}
+            title={`${title} - Click to expand`}
+          >
+            {title}
+          </div>
+        </div>
+      );
+    }
+
+    const clipPathValue = isLast
+      ? `polygon(0px 0px, 100% 0px, 100% 100%, 0px 100%, ${ARROW_W}px 50%)`
+      : `polygon(0px 0px, calc(100% - ${ARROW_W}px) 0px, 100% 50%, calc(100% - ${ARROW_W}px) 100%, 0px 100%, ${ARROW_W}px 50%)`;
+
+    return (
+      <div
+        style={{
+          position: 'relative',
+          height: HEADER_H,
+          flexShrink: 0,
+          backgroundColor: color || '#ccc',
+          borderTopLeftRadius: 0,
+          clipPath: clipPathValue,
+          zIndex: 1,
+          width: '102%'
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 1,
+            left: 1,
+            right: isLast ? 1 : 0,
+            bottom: 1,
+            backgroundColor: '#f7f2f7',
+            borderTopLeftRadius: 0,
+            display: 'flex',
+            alignItems: 'center',
+            paddingLeft: ARROW_W + 6,
+            paddingRight: isLast ? 7 : ARROW_W + 5,
+            clipPath: isLast
+              ? `polygon(1px 0px, 100% 0px, 100% 100%, 1px 100%, ${ARROW_W}px 50%)`
+              : `polygon(1px 0px, calc(100% - ${ARROW_W}px) 0px, calc(100% - 1px) 50%, calc(100% - ${ARROW_W}px) 100%, 1px 100%, ${ARROW_W}px 50%)`,
+            cursor: 'default',
+            userSelect: 'none'
+          }}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontStyle: 'normal',
+              fontWeight: 600,
+              textTransform: 'unset',
+              margin: 0,
+              padding: 0,
+              backgroundColor: 'unset',
+              fontFamily: FONT,
+              letterSpacing: 0,
+              lineHeight: '18px',
+              color: '#141414',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: 1
+            }}
+          >
+            {title}
+          </span>
+
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 400,
+              color: '#888',
+              fontFamily: FONT,
+              marginLeft: 5,
+              marginRight: 4,
+              flexShrink: 0,
+              width: 27,
+              height: 20,
+              borderRadius: 20,
+              background: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            {count}
+          </span>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px 3px',
+              borderRadius: 3,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: hov ? '#555' : '#141414',
+              flexShrink: 0,
+              transition: 'color .12s'
+            }}
+          >
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const ActBtn: React.FC<{
+    icon: React.ReactNode;
+    title: string;
+    onClick: (e: React.MouseEvent) => void;
+  }> = ({ icon, title, onClick }) => {
+    const [hov, setHov] = useState(false);
+    return (
+      <button
+        title={title}
+        onClick={onClick}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          ...styles.actBtn,
+          color: hov ? '#000' : '#141414'
+        }}
+      >
+        {icon}
+      </button>
+    );
   };
 
   if (!selectedProject) {
     return (
-      <div style={styles.card}>
+      <div style={{ backgroundColor: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'center', padding: '3rem 2rem', color: '#6B7280' }}>
           <p style={{ margin: 0, fontSize: '0.95rem', fontWeight: '500' }}>No project selected</p>
           <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', opacity: 0.7 }}>Please select a project to view the board</p>
@@ -543,7 +683,7 @@ const BoardView: React.FC<BoardViewProps> = ({
 
   if (loadingBoardTasks) {
     return (
-      <div style={styles.card}>
+      <div style={{ backgroundColor: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ textAlign: 'center', padding: '3rem 2rem' }}>
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Loading...</span>
@@ -635,7 +775,7 @@ const BoardView: React.FC<BoardViewProps> = ({
         gap: '0.75rem'
       }}>
         <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F2937' }}>
-          {selectedProject?.name ? `${selectedProject.name} – Board` : 'Board'}
+          {selectedProject?.name ? `${selectedProject.name} - Board` : 'Board'}
         </div>
         <button
           type="button"
@@ -683,152 +823,212 @@ const BoardView: React.FC<BoardViewProps> = ({
       />
 
       {/* Kanban Board */}
-      <div style={styles.board}>
-        {statuses.map((status: any) => {
+      <div className="kb-scroll" style={styles.board}>
+        {statuses.map((status: any, idx: number) => {
           const statusTasks = getTasksByStatus(status.id);
+          const isCollapsed = !!collapsedColumns[status.id];
+          const isLast = idx === statuses.length - 1;
+          
           return (
             <div 
               key={status.id} 
               style={{
                 ...styles.column,
-                borderTop: `3px solid ${status.color || '#6B7280'}`,
-                backgroundColor: dragOverStatus === status.id ? '#F0F9FF' : '#E5E7EB',
-                border: dragOverStatus === status.id ? '2px dashed #4680FF' : 'none'
+                width: isCollapsed ? '46px' : '280px',
+                minWidth: isCollapsed ? '46px' : '280px',
+                borderRight: isCollapsed ? '1px solid #e5e7eb' : 'none'
               }}
-              onDragOver={(e) => handleDragOver(e, status.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, status.id)}
             >
-              <div style={styles.columnHeader}>
-                <div style={styles.columnTitle}>
-                  {status.name}
-                  <span style={styles.columnCount}>{statusTasks.length}</span>
-                </div>
-                <button 
-                  style={styles.moreButton}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <MoreVertical size={16} />
-                </button>
+              {/* White top bar that contains the arrow header */}
+              <div style={{
+                backgroundColor: '#ffffff',
+                flexShrink: 0,
+                padding: isCollapsed ? '5px 5px 5px 5px' : '5px 5px 0 5px'
+              }}>
+                <ColumnHeader
+                  title={status.name}
+                  count={statusTasks.length}
+                  color={status.color || '#ccc'}
+                  isCollapsed={isCollapsed}
+                  isLast={isLast}
+                  onToggle={() => setCollapsedColumns(prev => ({ ...prev, [status.id]: !prev[status.id] }))}
+                />
               </div>
 
-              <button 
-                style={styles.addButton}
-                onClick={() => onCreateTask(status.id)}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
-                  e.currentTarget.style.borderColor = '#9CA3AF';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.borderColor = '#D1D5DB';
-                }}
-              >
-                <Plus size={16} />
-                Add Task
-              </button>
+              {/* Cards area with 5px margin on all sides */}
+              {!isCollapsed && (
+                <div
+                  className="kb-col-cards"
+                  onDragOver={(e) => { e.preventDefault(); handleDragOver(e, status.id); }}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => { handleDrop(e, status.id); }}
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    margin: '5px',
+                    padding: '9px 10px 10px',
+                    borderRadius: 3,
+                    background: dragOverStatus === status.id ? '#dde8f3' : 'whitesmoke',
+                    transition: 'background .12s',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#c8c8c8 transparent',
+                    borderTop: '1px solid #cccccc'
+                  }}
+                >
+                  <button 
+                    style={styles.addButton}
+                    onClick={() => onCreateTask(status.id)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5';
+                      e.currentTarget.style.color = '#000';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.color = TEAL;
+                    }}
+                  >
+                    <Plus size={16} />
+                    Add Task
+                  </button>
 
-              {statusTasks.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.875rem' }}>
-                  No tasks
-                </div>
-              ) : (
-                statusTasks.map((task: any) => {
-                  return (
-                    <div
-                      key={task.id}
-                      draggable
-                      style={styles.taskCard}
-                      onDragStart={(e) => handleDragStart(e, task)}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => handleTaskClick(task)}
-                      onMouseOver={(e) => {
-                        if (draggedTask?.id !== task.id) {
-                          e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06)';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                          e.currentTarget.style.cursor = 'grab';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (draggedTask?.id !== task.id) {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
-                          e.currentTarget.style.borderColor = '#f1f5f9';
-                          e.currentTarget.style.cursor = 'grab';
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        // Prevent text selection while dragging
-                        if (e.button === 0) {
-                          e.currentTarget.style.cursor = 'grabbing';
-                        }
-                      }}
-                      onMouseUp={(e) => {
-                        e.currentTarget.style.cursor = 'grab';
-                      }}
-                    >
-                      <div style={styles.taskTitle}>{task.title || 'Untitled Task'}</div>
-
-                      {(task.labels?.length > 0 || task.priority) && (
-                        <div style={styles.taskMeta}>
-                          {task.labels?.map((label: any, idx: number) => (
-                            <span 
-                              key={idx}
-                              style={{...styles.label, backgroundColor: label.color || '#06b6d4'}}
-                            >
-                              {label.name}
-                            </span>
-                          ))}
-                          {task.priority && (
-                            <span 
-                              style={{
-                                ...styles.priority,
-                                backgroundColor: getPriorityColor(task.priority).bg,
-                                color: getPriorityColor(task.priority).text
-                              }}
-                            >
-                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div style={styles.taskFooter}>
-                        <div style={styles.taskIcons}>
-                          {task.due_date && (
-                            <span style={styles.dueDate}>
-                              <Calendar size={14} />
-                              {formatDateForTable(task.due_date)}
-                            </span>
-                          )}
-                        </div>
-
-                        {task.assignees && task.assignees.length > 0 && (
-                          <div style={styles.assignees}>
-                            {task.assignees.slice(0, 3).map((assignee: any, idx: number) => {
-                              const name = getAssigneeDisplayName(assignee);
-                              const assigneeInitials = name !== '' 
-                                ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-                                : 'UN';
-                              return (
-                                  <div key={idx} style={styles.avatar} title={name}>
-                                    {assigneeInitials}
-                                </div>
-                              );
-                            })}
-                            {task.assignees.length > 3 && (
-                              <div style={{...styles.avatar, backgroundColor: '#E5E7EB', color: '#6B7280'}}>
-                                +{task.assignees.length - 3}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                  {statusTasks.length === 0 ? (
+                    <div style={{
+                      padding: '28px 8px',
+                      textAlign: 'center',
+                      color: '#ccc',
+                      fontSize: 12,
+                      fontFamily: FONT
+                    }}>
+                      No records
                     </div>
-                  );
-                })
+                  ) : (
+                    statusTasks.map((task: any) => {
+                      const cardHov = hoveredTaskId === task.id;
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          draggable
+                          style={{
+                            ...styles.taskCard,
+                            boxShadow: cardHov ? '0 2px 8px rgba(0,0,0,.10)' : '0 1px 2px rgba(0,0,0,.05)'
+                          }}
+                          onDragStart={(e) => handleDragStart(e, task)}
+                          onDragEnd={handleDragEnd}
+                          onMouseEnter={() => setHoveredTaskId(task.id)}
+                          onMouseLeave={() => setHoveredTaskId(null)}
+                        >
+                          {/* Task title as clickable link */}
+                          <div style={{ marginBottom: 2 }}>
+                            <span
+                              onClick={(e) => { e.stopPropagation(); handleTaskClick(task); }}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              style={styles.taskTitle}
+                            >
+                              {task.title || 'Untitled Task'}
+                            </span>
+                          </div>
+
+                          {/* Due date and assignee info */}
+                          {(task.due_date || (task.assignees && task.assignees.length > 0)) && (
+                            <div style={styles.taskMeta}>
+                              {task.assignees && task.assignees.length > 0 && (
+                                <>
+                                  {task.assignees.slice(0, 1).map((assignee: any, idx: number) => {
+                                    const name = getAssigneeDisplayName(assignee);
+                                    const assigneeInitials = name !== '' 
+                                      ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                                      : 'UN';
+                                    const assigneeColor = `hsl(${(name.charCodeAt(0) * 137) % 360}, 70%, 50%)`;
+                                    
+                                    return (
+                                      <div key={idx} style={{...styles.miniAvatar, background: assigneeColor}} title={name}>
+                                        {assigneeInitials}
+                                      </div>
+                                    );
+                                  })}
+                                  <span
+                                    title={task.assignees.map((a: any) => getAssigneeDisplayName(a)).join(', ')}
+                                    style={{
+                                      fontSize: '11.5px',
+                                      color: TEAL,
+                                      fontFamily: FONT,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                      maxWidth: 180,
+                                      lineHeight: '18px'
+                                    }}
+                                  >
+                                    {getAssigneeDisplayName(task.assignees[0])}
+                                    {task.assignees.length > 1 && ` +${task.assignees.length - 1}`}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Labels and priority */}
+                          {(task.labels?.length > 0 || task.priority || task.description) && (
+                            <div style={{ marginBottom: 5 }}>
+                              {task.labels?.slice(0, 2).map((label: any, idx: number) => (
+                                <div key={idx} style={{ fontSize: '11.5px', color: '#555', lineHeight: '18px', fontFamily: FONT }}>
+                                  Label: {label.name}
+                                </div>
+                              ))}
+                              {task.priority && (
+                                <div style={{ fontSize: '11.5px', color: '#555', lineHeight: '18px', fontFamily: FONT }}>
+                                  Priority: {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                </div>
+                              )}
+                              {task.due_date && (
+                                <div style={styles.dueDate}>
+                                  Due: {formatDateForTable(task.due_date)}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              ...styles.taskFooter,
+                              borderTop: 'none',
+                              paddingTop: 4,
+                              marginTop: 0
+                            }}
+                          >
+                            <div style={styles.taskIcons}>
+                              <ActBtn 
+                                icon={<FileText size={13} />} 
+                                title="View record" 
+                                onClick={(e) => { e.stopPropagation(); handleTaskClick(task); }} 
+                              />
+                              <ActBtn 
+                                icon={<MapPin size={13} />} 
+                                title="Pin" 
+                                onClick={(e) => { e.stopPropagation(); }} 
+                              />
+                              <ActBtn 
+                                icon={<Mail size={13} />} 
+                                title="Send email" 
+                                onClick={(e) => { e.stopPropagation(); }} 
+                              />
+                              <ActBtn 
+                                icon={<ExternalLink size={13} />} 
+                                title="Open record" 
+                                onClick={(e) => { e.stopPropagation(); handleTaskClick(task); }} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               )}
             </div>
           );
@@ -836,7 +1036,7 @@ const BoardView: React.FC<BoardViewProps> = ({
       </div>
 
       {/* Task Detail Sidebar */}
-      <TaskDetailOffcanvas
+      {/* <TaskDetailOffcanvas
         show={showTaskDetail}
         onHide={() => {
           setShowTaskDetail(false);
@@ -876,7 +1076,7 @@ const BoardView: React.FC<BoardViewProps> = ({
         hierarchyDataExtensions={hierarchyDataExtensions}
         getStatusVariant={(s) => getStatusVariant(s)}
         getPriorityVariant={(p) => getPriorityVariant(p || '')}
-      />
+      /> */}
 
       <DeleteConfirmationModal
         show={showDeleteModal}

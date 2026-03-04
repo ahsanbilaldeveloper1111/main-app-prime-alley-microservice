@@ -956,7 +956,7 @@ const WorkPlannerProjects = () => {
   </nav>
 </div>
 <div className="d-flex flex-wrap gap-2">
-<Button 
+{/* <Button 
                   variant="primary" 
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   onClick={handleCreateProject}
@@ -971,7 +971,54 @@ const WorkPlannerProjects = () => {
             >
               <SlidersHorizontal size={18} />
               Filters
-            </Button>
+            </Button> */}
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    borderRadius: "4px",
+    border: "1px solid rgb(20, 20, 20)",
+    padding: "8px 16px",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    lineHeight: "14px",
+    backgroundColor: "rgb(20, 20, 20)",
+    color: "#ffffff",
+  }}
+  onClick={handleCreateProject}
+>
+  <Plus size={18} />
+  <span>Create Project</span>
+</button>
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    borderRadius: "4px",
+    border: "1px solid rgb(20, 20, 20)",
+    padding: "8px 16px",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    lineHeight: "14px",
+    backgroundColor: "#ffffff",
+    color: "rgb(20, 20, 20)",
+  }}
+  onClick={() => setShowFilterSidebar(true)}
+>
+  <SlidersHorizontal size={18} />
+  <span>Filters</span>
+</button>
+
         </div>
 </div>
 
