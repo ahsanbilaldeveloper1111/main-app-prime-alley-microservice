@@ -37,6 +37,9 @@ import {
   Layers2,
   ChevronRight,
   ChevronLeft,
+  House,
+  Megaphone,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -120,13 +123,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     "crm",
     "communications",
     "planner",
-    "netops",
+    "pulse",
     "virtual-agents",
     "finance",
     "compliance",
     "workforce",
     "unified-reports",
     "audit-logs",
+    "settings",
   ]);
 
   const mainMenuItems: MainMenuItem[] = [
@@ -134,7 +138,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: "dashboard",
       key: "dashboard",
       permission: "",
-      icon: <LayoutDashboard size={16} />,
+      icon: <House size={16} />,
       color: MENU_COLORS.DASHBOARD,
       title: "Overview",
       label: "Overview",
@@ -158,8 +162,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
-      title: "Sales CRM",
-      label: "Sales CRM",
+      title: "Smart CRM",
+      label: "Smart CRM",
       url: "",
       subItems: [
         {
@@ -204,7 +208,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_DEALS,
           url: "/crm/approvals",
         },
-
+        {
+          id: "crm-separator-1",
+          title: "---",
+          icon: null,
+          url: "",
+        },
         {
           id: "crm-company",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
@@ -266,10 +275,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: "ai-ml-calls-analysis",
-          title: "Calls Analytics",
+          title: "Calls Analysis",
           icon: <FileChartPie size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: "/communications/call-analytics",
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
+          url: "/communications/call-analysis",
         },
         {
           id: "wallboards-live",
@@ -340,14 +349,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: "planner-todo-list",
           title: "To-Do",
           icon: <Clock size={16} />,
-          url: "/planner/todo",
-          permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER,
+          url: "/planner/tasks",
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
         },
         {
-          id: "planner-tasks",
-          title: "Tasks",
-          icon: <Clock size={16} />,
-          url: "/crm/crm-tasks",
+          id: "planner-calendar",
+          title: "Calendar",
+          icon: <Calendar size={16} />,
+          url: "/planner/calendar",
           permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
         },
 
@@ -435,70 +444,92 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     //netops services start
     {
-      id: "netops",
-      key: "netops",
+      id: "pulse",
+      key: "pulse",
       permission: PERMISSIONS.NETOPS_SERVICES,
       icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.NETOPS,
-      title: MENU_LABELS.NETOPS,
-      label: MENU_LABELS.NETOPS,
+      title: "Pulse",
+      label: "Pulse",
       url: "",
       subItems: [
         {
-          id: "netops-dashboard",
+          id: "pulse-dashboard",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: "/netops/dashboard",
+          url: "/pulse/dashboard",
         },
         {
-          id: "netops-hosts",
+          id: "pulse-hosts",
           title: "Hosts",
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/netops/hosts",
+          url: "/pulse/hosts",
         },
         {
-          id: "netops-hosts-groups",
+          id: "pulse-hosts-groups",
           title: "Hosts Groups",
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/netops/host-groups",
+          url: "/pulse/host-groups",
         },
         {
-          id: "netops-hosts-alerts",
+          id: "pulse-hosts-alerts",
           title: "Alerts",
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/netops/alerts",
+          url: "/pulse/alerts",
         },
         {
-          id: "netops-uptime-sla",
+          id: "pulse-templates",
+          title: "Templates",
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: "/pulse/templates",
+        },
+        {
+          id: "pulse-events",
+          title: "Events",
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: "/pulse/events",
+        },
+        {
+          id: "pulse-customers",
+          title: "Customers",
+          icon: <Megaphone size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: "/pulse/customers",
+        },
+
+        {
+          id: "pulse-uptime-sla",
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: "/netops/uptime-sla",
+          url: "/pulse/uptime-sla",
         },
         {
-          id: "netops-select-server",
+          id: "pulse-select-server",
           title: "Server Insights",
           icon: <Server size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/netops/server-insights",
+          url: "/pulse/server-insights",
         },
         {
-          id: "netops-gateways",
+          id: "pulse-gateways",
           title: "Gateways",
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/netops/gateways",
+          url: "/pulse/gateways",
         },
         {
-          id: "netops-gateway-ports",
+          id: "pulse-gateway-ports",
           title: "Gateway Ports",
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/netops/gateway-ports",
+          url: "/pulse/gateway-ports",
         },
       ].filter((item) => !item.permission || hasPermission(item.permission)),
     },
@@ -575,9 +606,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: "workforce-attendence",
-          title: "Attendence",
+          title: "Attendance",
           icon: <Clock size={16} />,
-          url: "/workforce/attendences",
+          url: "/workforce/attendance",
           permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT,
         },
         {
@@ -704,6 +735,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Audit Logs",
       url: "/audit-logs",
     },
+    //audit logs services end
+    //settings services start
+    {
+      id: "settings",
+      key: "settings",
+      permission: PERMISSIONS.TMS_SERVICES,
+      icon: <Settings size={16} />,
+      color: MENU_COLORS.REPORTS,
+      title: "Settings",
+      label: "Settings",
+      url: "/main-settings",
+    },
+    //settings services end
   ].filter(
     (item) =>
       ENABLED_MODULE_IDS.has(item.id) &&
@@ -895,7 +939,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       left: 0;
       height: 100vh;
       width: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
-      background: #260646;
+      background: #00385d;
       border: none;
       display: flex;
       flex-direction: column;
@@ -1060,7 +1104,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       top: 0;
       min-width: 200px;
       max-width: 220px;
-      background: #260646 !important;
+      background: #00385d !important;
       border-radius: 0 8px 8px 0;
       box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.12);
       z-index: 1010;
@@ -1070,6 +1114,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       border: 1px solid rgba(255, 255, 255, 0.15);
       border-left: none;
       animation: flyoutFade 0.15s ease;
+      padding: 6px 10px
     }
 
     @keyframes flyoutFade {
@@ -1080,7 +1125,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     .submenu-flyout-header {
       padding: 12px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(0, 0, 0, 0.15);
+      /*background: rgba(0, 0, 0, 0.15);*/
       font-size: 14px;
       font-weight: 600;
       color: #fff;
@@ -1152,6 +1197,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       font-weight: 600;
       color: rgba(255, 255, 255, 0.85);
       cursor: default;
+    }
+
+    .submenu-flyout-item.separator {
+      padding: 0;
+      margin: 8px 0px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .submenu-flyout-item.separator:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .menu-item-button {
@@ -1499,7 +1557,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
   const getModuleMouseLeaveHandler = (module: MainMenuItem) => {
     if (!module.subItems?.length) return undefined;
-    if (isSidebarExpanded && isFlyoutPinned) return handleExpandedItemMouseLeave;
+    if (isSidebarExpanded && isFlyoutPinned)
+      return handleExpandedItemMouseLeave;
     return handleCollapsedItemMouseLeave;
   };
 
@@ -1514,7 +1573,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     };
   };
 
-  const isModuleLink = (module: MainMenuItem) => Boolean(module.url && module.url !== "");
+  const isModuleLink = (module: MainMenuItem) =>
+    Boolean(module.url && module.url !== "");
 
   const closeFlyoutOnNavigate = () => {
     setHoveredModuleId(null);
@@ -1581,9 +1641,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {/* Header */}
         <div className="sidebar-header">
           {isSidebarExpanded && (
-            <div className="sidebar-logo">
-              {userCompanyName}
-            </div>
+            <div className="sidebar-logo">{userCompanyName}</div>
           )}
         </div>
 

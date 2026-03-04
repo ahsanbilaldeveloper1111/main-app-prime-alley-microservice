@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { Plus, Trash2 } from "lucide-react";
 import { Country, State, City } from "country-state-city";
 import { toast } from "react-toastify";
@@ -308,10 +308,12 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 form.department_id == null ? "Select department first" : userOptionsLoading ? "Loading users…" : "Select user"
               }
               isClearable
+              isSearchable
               isDisabled={form.department_id == null || userOptionsLoading}
               isLoading={userOptionsLoading}
               options={userOptions}
               value={userOptions.find((o) => o.value === (form.user_id ?? "")) ?? null}
+              resetSearchOnValueChange={show}
               onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
               styles={selectStyles}
             />

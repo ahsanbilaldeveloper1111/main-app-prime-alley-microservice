@@ -313,7 +313,7 @@ const TicketModules = () => {
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/modules" subTitle="Ticket Modules" />
 
             <PageHeader
-                title="Ticket Modules"
+                title=""
                 buttons={
                     <>
                         {/* {session?.user?.permissions?.includes('edit-ticket-module-tickets') && (

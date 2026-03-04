@@ -209,7 +209,7 @@ const ManageExtensions = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Manage Extensions" />
 
-      <PageHeader title="Manage Extensions" showSearch={false} />
+      {/* <PageHeader title="Manage Extensions" showSearch={false} /> */}
 
       <Card className="shadow-sm">
         <Card.Header className="bg-white">

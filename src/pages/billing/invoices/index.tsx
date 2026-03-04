@@ -43,9 +43,15 @@ import {
   CreateDirectPaymentData,
   PaymentIntentResponse,
   getCompanies,
-} from "@utils/accountingOld";
+} from "@utils/accounts";
 import { GetPaymentMethods, CompletePayment } from "@utils/accounting";
-import { formatNumber, GlobalDateFormat, ModuleSlug } from "@utils/Helper";
+import { getMinifiedCompanies } from "@utils/crm";
+import {
+  formatNumber,
+  GlobalDateFormat,
+  getCompanyByCrmId,
+  ModuleSlug,
+} from "@utils/Helper";
 
 import {
   Button,
@@ -1177,8 +1183,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+    date_to?: string;
   }>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
@@ -1188,8 +1194,8 @@ const InvoiceList = () => {
     status?: string;
     invoice_date_from?: string;
     invoice_date_to?: string;
-    due_date_from?: string;
-    due_date_to?: string;
+    date_from?: string;
+    date_to?: string;
   }>({});
   const [showDescriptionModal, setShowDescriptionModal] =
     useState<boolean>(false);
@@ -1197,6 +1203,13 @@ const InvoiceList = () => {
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<
+    { id: string | number; name?: string }[]
+  >([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
+    "",
+  );
+
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] =
@@ -1390,36 +1403,25 @@ const InvoiceList = () => {
           })),
       },
       {
-        id: "invoice_date_to",
-        label: "Invoice Date To",
-        type: "date",
-        value: pendingFilters.invoice_date_to ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({
-            ...prev,
-            invoice_date_to: value || undefined,
-          })),
-      },
-      {
         id: "due_date_from",
-        label: "Due Date From",
+        label: "Date From",
         type: "date",
-        value: pendingFilters.due_date_from ?? "",
+        value: pendingFilters.date_from ?? "",
         onChange: (value) =>
           setPendingFilters((prev) => ({
             ...prev,
-            due_date_from: value || undefined,
+            date_from: value || undefined,
           })),
       },
       {
         id: "due_date_to",
-        label: "Due Date To",
+        label: "Date To",
         type: "date",
-        value: pendingFilters.due_date_to ?? "",
+        value: pendingFilters.date_to ?? "",
         onChange: (value) =>
           setPendingFilters((prev) => ({
             ...prev,
-            due_date_to: value || undefined,
+            date_to: value || undefined,
           })),
       },
     ],
@@ -1428,8 +1430,8 @@ const InvoiceList = () => {
       pendingFilters.status,
       pendingFilters.invoice_date_from,
       pendingFilters.invoice_date_to,
-      pendingFilters.due_date_from,
-      pendingFilters.due_date_to,
+      pendingFilters.date_from,
+      pendingFilters.date_to,
     ],
   );
 
@@ -1530,15 +1532,23 @@ const InvoiceList = () => {
 
         // Load products for the first company if available
         if (companiesData.data && companiesData.data.length > 0) {
-          const firstCompany = companiesData.data[0];
-          await loadCompanyProducts(firstCompany.id);
+          return;
         }
       } catch (error) {
         console.error("Error fetching companies:", error);
       }
     };
+    const fetchCompanyOptions = async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        setCompanyOptions(result ?? []);
+      } catch (e) {
+        console.error("Error fetching company options:", e);
+      }
+    };
 
     fetchCompanies();
+    fetchCompanyOptions();
     loadStripePublishableKey();
 
     // Load exchange rates on initial mount with USD as default base
@@ -1611,6 +1621,7 @@ const InvoiceList = () => {
         per_page: pagination.rowsPerPage,
         search: memoizedFilters.search || "",
         ...memoizedFilters,
+        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
       });
       if (currentRequestId !== invoiceRequestIdRef.current) return;
       const data = response?.data || [];
@@ -1634,6 +1645,7 @@ const InvoiceList = () => {
     pagination.rowsPerPage,
     memoizedFilters,
     refreshKey,
+    selectedCompanyId,
   ]);
 
   React.useEffect(() => {
@@ -1648,6 +1660,7 @@ const InvoiceList = () => {
           per_page: perPage,
           search,
           ...memoizedFilters,
+          ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
         });
 
         // The getInvoices function returns PaginationWrapper<InvoiceData>
@@ -1666,7 +1679,7 @@ const InvoiceList = () => {
         throw error;
       }
     },
-    [memoizedFilters],
+    [memoizedFilters, selectedCompanyId],
   );
 
   const _handleFiltersChange = useCallback(
@@ -2291,7 +2304,22 @@ const InvoiceList = () => {
             </ol>
           </nav>
         </div>
-        <div className="d-flex flex-wrap gap-2">
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <Form.Select
+            size="sm"
+            style={{ width: "220px" }}
+            value={String(selectedCompanyId)}
+            onChange={(e) =>
+              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+            }
+          >
+            <option value="">All companies</option>
+            {companyOptions.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
           <Button
             variant={showFilterTabs ? "secondary" : "outline-secondary"}
             onClick={() => setShowFilterTabs(!showFilterTabs)}
@@ -2620,8 +2648,11 @@ const InvoiceList = () => {
                 <div className="row">
                   <div className="col-md-6">
                     <p>
-                      <strong>Company:</strong>{" "}
-                      {selectedInvoiceForPayment.company?.name}
+                      <strong>Company:</strong>
+                      {getCompanyByCrmId(
+                        selectedInvoiceForPayment?.company?.crm_company_id,
+                        companyOptions,
+                      ) ?? ""}
                     </p>
                     <p>
                       <strong>Invoice Date:</strong>{" "}
@@ -2877,24 +2908,43 @@ const InvoiceList = () => {
                 <Row>
                   <Col md={6}>
                     <h3 className="mb-2">
-                      {selectedInvoiceForView?.company?.reseller?.name || ""}
+                      {session?.user?.company_name || ""}
                     </h3>
-                    <h5 className="mb-3 fw-bold" style={{ color: "#14509e" }}>
-                      TAX INVOICE{" "}
-                      {selectedInvoiceForView?.company?.reseller?.profile
-                        ?.tax_id || ""}
-                    </h5>
+
+                    {selectedInvoiceForView?.company?.reseller?.profile
+                      ?.tax_id &&
+                      Number.parseInt(
+                        selectedInvoiceForView?.company?.reseller?.profile
+                          ?.tax_id ?? "0",
+                      ) > 0 && (
+                        <h5
+                          className="mb-3 fw-bold"
+                          style={{ color: "#14509e" }}
+                        >
+                          TAX INVOICE{" "}
+                          {selectedInvoiceForView?.company?.reseller?.profile
+                            ?.tax_id || ""}
+                        </h5>
+                      )}
+
                     <p className="mb-2">
                       {selectedInvoiceForView?.company?.reseller?.profile
                         ?.address || ""}
                     </p>
-                    <p className="mb-2">
-                      {selectedInvoiceForView?.company?.reseller?.profile
-                        ?.city || ""}
-                      ,{" "}
-                      {selectedInvoiceForView?.company?.reseller?.profile
-                        ?.country || ""}
-                    </p>
+                    {selectedInvoiceForView?.company?.reseller?.profile?.city &&
+                      Number.parseInt(
+                        selectedInvoiceForView?.company?.reseller?.profile
+                          ?.city ?? "0",
+                      ) > 0 && (
+                        <p className="mb-2">
+                          {selectedInvoiceForView?.company?.reseller?.profile
+                            ?.city || ""}
+                          ,{" "}
+                          {selectedInvoiceForView?.company?.reseller?.profile
+                            ?.country || ""}
+                        </p>
+                      )}
+
                     <p className="mb-2">
                       <b>Phone:</b>
                       {selectedInvoiceForView?.company?.reseller?.phone || ""}
@@ -2946,7 +2996,10 @@ const InvoiceList = () => {
                     </h5>
                     <div className="border p-3 rounded bg-light mb-3">
                       <p className="mb-2 fw-bold">
-                        {selectedInvoiceForView?.company?.name || ""}
+                        {getCompanyByCrmId(
+                          selectedInvoiceForView?.company?.crm_company_id,
+                          companyOptions,
+                        ) ?? ""}
                       </p>
                       <p className="mb-2">
                         {selectedInvoiceForView?.company?.profile?.address ||
@@ -3068,358 +3121,6 @@ const InvoiceList = () => {
                     </table>
                   </Col>
                 </Row>
-
-                <div>
-                  {/* Invoice Header */}
-                  {/* <div className="row mb-4">
-                  <div className="col-md-6">
-                    <h5 className="mb-3 alert alert-info">Invoice Information</h5>
-                    <table className="table table-borderless">
-                      <tbody>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
-                          <td>{selectedInvoiceForView.invoice_number || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
-                          <td>
-                            {selectedInvoiceForView.invoice_date
-                              ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
-                              : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Due Date:</td>
-                          <td>
-                            {selectedInvoiceForView.due_date
-                              ? moment(selectedInvoiceForView.due_date).format('DD MMM YYYY')
-                              : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Status:</td>
-                          <td>
-                            <Badge
-                              bg={
-                                selectedInvoiceForView.status === STATUS_PAID
-                                  ? 'success'
-                                  : selectedInvoiceForView.status === STATUS_OVERDUE
-                                  ? 'danger'
-                                  : selectedInvoiceForView.status === STATUS_PARTIALLY_PAID
-                                  ? 'warning'
-                                  : selectedInvoiceForView.status === STATUS_PENDING
-                                  ? 'info'
-                                  : 'secondary'
-                              }
-                            >
-                              {selectedInvoiceForView.status?.toUpperCase() || 'N/A'}
-                            </Badge>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Payment Mode:</td>
-                          <td style={{ textTransform: 'uppercase' }}>{selectedInvoiceForView.payment_mode || 'N/A'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="col-md-6">
-                    <h5 className="mb-3 alert alert-info">Company Information</h5>
-                    {selectedInvoiceForView.company ? (
-                      <table className="table table-borderless">
-                        <tbody>
-                          <tr>
-                            <td style={{ verticalAlign: 'top', width: '40%' }} className="fw-bold" >Company Name:</td>
-                            <td>{selectedInvoiceForView.company.name || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Country:</td>  
-                            <td>{selectedInvoiceForView.company.country || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Phone:</td>
-                            <td>{selectedInvoiceForView.company.phone || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Email:</td>
-                            <td className="text-lowercase">{selectedInvoiceForView.company.email || 'N/A'}</td>
-                          </tr>
-                          {selectedInvoiceForView.company.profile?.address && (
-                            <tr>
-                              <td style={{ verticalAlign: 'top' }} className="fw-bold">Address:</td>
-                              <td className="text-capitalize">{selectedInvoiceForView.company.profile.address}</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="text-muted">No company information available</p>
-                    )}
-                  </div>
-                </div> */}
-
-                  {/* Invoice Items */}
-                  <div className="mb-4">
-                    {/* <h5 className="mb-3">Invoice Items</h5> */}
-                    {selectedInvoiceForView.items &&
-                    selectedInvoiceForView.items.length > 0 ? (
-                      <div className="">
-                        <table className="table table-bordered table-sm">
-                          <thead
-                            className="table-dark"
-                            style={{
-                              backgroundColor: "#0f3b66",
-                              color: "white",
-                            }}
-                          >
-                            <tr>
-                              <th className="text-uppercase">Product Name</th>
-                              <th className="text-uppercase text-start">
-                                Product Description
-                              </th>
-                              <th className="text-uppercase text-end">QTY</th>
-                              <th className="text-uppercase text-end">
-                                Unit Price (
-                                {selectedInvoiceForView.currency_code || "AED"})
-                              </th>
-                              <th className="text-uppercase text-end">
-                                Tax (
-                                {selectedInvoiceForView.currency_code || "AED"})
-                              </th>
-                              <th className="text-uppercase text-end">
-                                Amount (
-                                {selectedInvoiceForView.currency_code || "AED"})
-                              </th>
-                              <th className="text-uppercase text-end">
-                                Total Price (
-                                {selectedInvoiceForView.currency_code || "AED"})
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedInvoiceForView.items.map(
-                              (item: any, index: number) => (
-                                <tr key={item.id || index}>
-                                  <td className="text-capitalize">
-                                    {item.product?.name}
-                                  </td>
-                                  <td
-                                    className="text-start"
-                                    style={{ whiteSpace: "wrap" }}
-                                  >
-                                    <p className="mb-0">{item.description}</p>
-                                  </td>
-                                  <td className="text-end">{item.quantity}</td>
-                                  <td className="text-end">
-                                    {formatNumber(
-                                      Number.parseFloat(item.unit_price || "0"),
-                                    )}
-                                  </td>
-                                  <td className="text-end">
-                                    {formatNumber(
-                                      Number.parseFloat(item.tax_amount || "0"),
-                                    )}
-                                  </td>
-
-                                  <td className="text-end">
-                                    {formatNumber(
-                                      Number.parseFloat(item.line_total || "0"),
-                                    )}
-                                  </td>
-
-                                  <td className="text-end">
-                                    <strong>
-                                      {formatNumber(
-                                        Number.parseFloat(
-                                          item.tax_amount || "0",
-                                        ) +
-                                          Number.parseFloat(
-                                            item.line_total || "0",
-                                          ),
-                                      )}
-                                    </strong>
-                                  </td>
-                                </tr>
-                              ),
-                            )}
-                          </tbody>
-                        </table>
-                        <Row>
-                          <Col md={6}>
-                            <h5
-                              className="mb-2 fw-bold"
-                              style={{ color: "#14509e" }}
-                            >
-                              Terms & Conditions
-                            </h5>
-                            <ol style={{ paddingLeft: "15px" }}>
-                              <li>
-                                <p className="mb-1 text-muted">
-                                  Payment can be made as bank transfer or direct
-                                  deposit
-                                </p>
-                              </li>
-                              <li>
-                                <p className="mb-1 text-muted">
-                                  Cheque can be issued in favor of{" "}
-                                  {selectedInvoiceForView?.company?.reseller
-                                    ?.name || "N/A"}
-                                  .
-                                </p>
-                              </li>
-                              <li>
-                                <p className="mb-1 text-muted">
-                                  Services may be disconnected after the due
-                                  date without further notice.
-                                </p>
-                              </li>
-                              <li>
-                                <p className="mb-1 text-muted">
-                                  Value Added Tax (VAT) 5% will be applicable to
-                                  this invoice.
-                                </p>
-                              </li>
-                            </ol>
-                          </Col>
-                          <Col md={6}>
-                            <table className="table table-borderless table-sm">
-                              <tr>
-                                {" "}
-                                <td className="p-0 fw-bold">Subtotal</td>{" "}
-                                <td className="text-end fw-bold">
-                                  {selectedInvoiceForView.currency_code ||
-                                    "AED"}{" "}
-                                  {formatNumber(
-                                    Number.parseFloat(
-                                      selectedInvoiceForView.subtotal || "0",
-                                    ),
-                                  )}
-                                </td>{" "}
-                              </tr>
-                              <tr>
-                                {" "}
-                                <td className="p-0 fw-bold">Vat Total</td>{" "}
-                                <td className="text-end fw-bold">
-                                  {selectedInvoiceForView.currency_code ||
-                                    "AED"}{" "}
-                                  {formatNumber(
-                                    Number.parseFloat(
-                                      selectedInvoiceForView.tax_amount || "0",
-                                    ),
-                                  )}
-                                </td>{" "}
-                              </tr>
-                              <tr>
-                                {" "}
-                                <td className="p-0 fw-bold">Total</td>{" "}
-                                <td className="text-end fw-bold">
-                                  {selectedInvoiceForView.currency_code ||
-                                    "AED"}{" "}
-                                  {formatNumber(
-                                    Number.parseFloat(
-                                      selectedInvoiceForView.total_amount ||
-                                        "0",
-                                    ),
-                                  )}
-                                </td>{" "}
-                              </tr>
-
-                              {Number(selectedInvoiceForView.paid_amount) >=
-                                0 && (
-                                <tr style={{ borderTop: "2px #000 solid" }}>
-                                  <td className="p-0 fw-bold text-uppercase">
-                                    Paid Amount
-                                  </td>
-                                  <td className="text-end fw-bold text-success">
-                                    {selectedInvoiceForView.currency_code ||
-                                      "AED"}{" "}
-                                    {formatNumber(
-                                      Number.parseFloat(
-                                        String(
-                                          selectedInvoiceForView.paid_amount ??
-                                            0,
-                                        ),
-                                      ),
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
-                              {Number(selectedInvoiceForView.amount_due) >=
-                                0 && (
-                                <tr>
-                                  <td className="p-0 fw-bold text-uppercase">
-                                    Due Amount
-                                  </td>
-                                  <td className="text-end fw-bold text-danger">
-                                    {selectedInvoiceForView.currency_code ||
-                                      "AED"}{" "}
-                                    {formatNumber(
-                                      Number.parseFloat(
-                                        String(
-                                          selectedInvoiceForView.amount_due ??
-                                            0,
-                                        ),
-                                      ),
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
-                            </table>
-                          </Col>
-                        </Row>
-                      </div>
-                    ) : (
-                      <Alert variant="info">
-                        No items found for this invoice
-                      </Alert>
-                    )}
-                  </div>
-
-                  {/* Notes */}
-                  <div className="mb-3 alert alert-info">
-                    <h6>Bank Accounts</h6>
-
-                    {selectedInvoiceForView?.company?.reseller?.bank_accounts &&
-                      selectedInvoiceForView?.company?.reseller?.bank_accounts
-                        .length > 0 && (
-                        <Row>
-                          {selectedInvoiceForView?.company?.reseller?.bank_accounts?.map(
-                            (bankAccount: any, index: number) => (
-                              <Col
-                                key={bankAccount?.id ?? `bank-${index}`}
-                                md={4}
-                              >
-                                <p className="mb-1">
-                                  <b>Bank Name:</b> {bankAccount.bank_name}
-                                </p>
-                                <p className="mb-1">
-                                  <b>Account Holder Name:</b>{" "}
-                                  {bankAccount.account_holder_name}
-                                </p>
-                                <p className="mb-1">
-                                  <b>Account Number:</b>{" "}
-                                  {bankAccount.account_number}
-                                </p>
-                                <p className="mb-1">
-                                  <b>Currency:</b> {bankAccount.currency}
-                                </p>
-                                <p className="mb-1">
-                                  <b>Routing Number:</b>{" "}
-                                  {bankAccount.routing_number}
-                                </p>
-                                <p className="mb-1">
-                                  <b>Swift Code:</b> {bankAccount.swift_code}
-                                </p>
-                                <p className="mb-1">
-                                  <b>IBAN:</b> {bankAccount.iban}
-                                </p>
-                              </Col>
-                            ),
-                          )}
-                        </Row>
-                      )}
-                  </div>
-                </div>
               </>
             ) : (
               <Alert variant="warning">No invoice data available</Alert>

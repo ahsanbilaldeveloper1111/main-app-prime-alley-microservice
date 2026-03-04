@@ -811,6 +811,7 @@ import React, {
               border: none !important;
               background: #fff !important;
             }
+              .generic-table-responsive.fixed-height-table {border-radius: 0px 0px 0px 0px !important; margin-top:0px !important;}
           `}} />
     
           <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Tasks" />
@@ -821,6 +822,9 @@ import React, {
             flexDirection: "column",
             height: "calc(100vh - 100px)",
             overflow: "hidden",
+            marginTop: "-15px",
+            marginLeft: "-15px",
+            padding: "15px",
           }}>
     
             {/* ══════════════════════════════════════════════════════
@@ -883,6 +887,8 @@ import React, {
            
               height: 44,
               flexShrink: 0,
+              margin: "0 18px",
+              borderLeft: "1px solid",
             }}>
     
               {/* All 4 tabs with equal width */}
@@ -899,11 +905,11 @@ import React, {
                     border: "none",
                     borderRight: "1px solid #8A8A8A",
                     borderTop: "1px solid #8A8A8A",
-                    backgroundColor: activeTab === tab.id ? "#f7f2f7" : "#fff",
+                    backgroundColor: activeTab === tab.id ? "#ffffff" : "#f7f2f7",
                     borderBottom: activeTab === tab.id ? "none" : "1px solid #8A8A8A",
                     color: "#141414",
-                    fontSize: 13,
-                    fontWeight: activeTab === tab.id ? 500 : 400,
+                    fontSize: 14,
+                    fontWeight: activeTab === tab.id ? 400 : 300,
                     fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
                     cursor: "pointer",
                     height: "100%",
@@ -977,13 +983,13 @@ import React, {
               justifyContent: "space-between",
               padding: "10px 16px",
               backgroundColor: "#fff",
-              borderBottom: "1px solid #e5e7eb",
+              
               gap: 8,
               flexShrink: 0,
             }}>
     
               {/* LEFT — filter pills (GenericTable style) */}
-              <div className="gt-filter-pills">
+              <div className="gt-filter-pills" style={{ padding: "0px", border: "none" }}>
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   {filterPills.map((pill) =>
                     pill.showDropdown ? (
@@ -1118,15 +1124,24 @@ import React, {
             {/* ══════════════════════════════════════════════════════
                 ROW 4 — Search + Edit columns
             ══════════════════════════════════════════════════════ */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "8px 16px",
-              backgroundColor: "#fff",
-              borderBottom: "1px solid #e5e7eb",
-              flexShrink: 0,
-            }}>
+            <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 16px",
+    paddingBottom: "18px", // overridden final value
+    backgroundColor: "#fff",
+    borderTop: "1px solid rgb(229, 231, 235)",
+    borderLeft: "1px solid #ccc",
+    borderRight: "1px solid #ccc",
+    borderRadius: "14px 14px 0 0",
+    flexShrink: 0,
+    marginLeft: "25px",
+    marginRight: "30px",
+    marginBottom: 0,
+  }}
+>
               {/* Search — height 41px, rounded, with an outline-secondary search button beside it */}
               <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
                 {/* Input wrapper */}
@@ -1203,7 +1218,7 @@ import React, {
             {/* ══════════════════════════════════════════════════════
                 ROW 5 — Table (fills remaining height)
             ══════════════════════════════════════════════════════ */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
+            <div style={{ flex: 1, overflow: "hidden", marginTop: "-11px" }}>
               <GenericTable
                 data={tasks}
                 columns={columns}

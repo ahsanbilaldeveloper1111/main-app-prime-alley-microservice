@@ -10,14 +10,15 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from "react";
-import { Button } from "react-bootstrap";
+import { Button, Form } from "react-bootstrap";
 
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import "@assets/scss/datatable-style.scss";
-import { GetProducts, GetProductCategories } from "@utils/accounting";
+import { GetProducts } from "@utils/accounting";
+import { getMinifiedCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
@@ -41,6 +42,26 @@ interface Product {
 
 const ProductDetails = () => {
   const { data: session } = useSession();
+
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
+  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | "">("");
+
+
+  useEffect(() => {
+    const fetchCompanyOptions = async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        setCompanyOptions(result ?? []);
+      } catch (e) {
+        console.error("Error fetching company options:", e);
+      }
+    };
+    fetchCompanyOptions();
+  }, []);
+    
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -80,6 +101,7 @@ const ProductDetails = () => {
         search: currentFilters.search || "",
         status: currentFilters.status || undefined,
         billing_cycle: currentFilters.billing_cycle || undefined,
+        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
       }) as any;
 
       if (currentRequestId !== requestIdRef.current) return;
@@ -100,7 +122,7 @@ const ProductDetails = () => {
         setLoading(false);
       }
     }
-  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey]);
+  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey, selectedCompanyId]);
 
   useEffect(() => {
     fetchProducts();
@@ -228,14 +250,7 @@ const ProductDetails = () => {
     setSelectedProductView(null);
   }, []);
 
-  const [productCategories, setProductCategories] = useState<any[]>([]);
-  useEffect(() => {
-    const load = async () => {
-      const response = await GetProductCategories();
-      setProductCategories(response || []);
-    };
-    load();
-  }, []);
+  
 
   const filterFields: FilterField[] = useMemo(
     () => [
@@ -321,7 +336,22 @@ const ProductDetails = () => {
           </nav>
         </div>
 
-        <div className="d-flex flex-wrap gap-2">
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <Form.Select
+            size="sm"
+            style={{ width: "220px" }}
+            value={String(selectedCompanyId)}
+            onChange={(e) =>
+              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+            }
+          >
+            <option value="">All companies</option>
+            {companyOptions.map((c: { id: string | number; name?: string }) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
           <Button
             variant="outline-secondary"
             onClick={handleOpenFiltersSidebar}
@@ -330,7 +360,6 @@ const ProductDetails = () => {
             Filters
           </Button>
         </div>
-
       </div>
       <GenericTable
         data={dataList}

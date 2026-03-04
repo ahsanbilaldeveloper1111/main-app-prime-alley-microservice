@@ -2084,20 +2084,22 @@ const CrmCampaigns = () => {
       {/* Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
         <div className="mb-3 mb-md-0">
-          <h2 className="mb-1 fw-bold">Campaigns Management</h2>
+          {/* <h2 className="mb-1 fw-bold">Campaigns Management</h2>
           <p className="text-muted mb-0">
             Create and manage marketing campaigns
-          </p>
+          </p> */}
         </div>
         <div className="d-flex flex-wrap gap-2">
           {session?.user?.permissions?.includes("list-crm-campaigns") && (
-            <Button
+            <>
+            {/* <Button
               variant={showCampaignsAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowCampaignsAnalytics(!showCampaignsAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
               {showCampaignsAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button>
+            </Button> */}
+            </>
           )}
           {session?.user?.permissions?.includes("add-crm-data-management") &&
             session?.user?.permissions?.includes(

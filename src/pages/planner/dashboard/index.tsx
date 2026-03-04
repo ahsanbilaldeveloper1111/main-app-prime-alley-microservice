@@ -2,7 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
-  useEffect
+  useEffect,
+  useRef
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -12,7 +13,7 @@ import {
   Plus, LayoutGrid, ChevronDown, Folder
 } from 'lucide-react';
 import { Button, Spinner } from 'react-bootstrap';
-import ProjectTabsContent from '../projects/partials/ProjectTabsContent';
+import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/partials/ProjectTabsContent';
 import { listProjects } from '@utils/tasks';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
@@ -22,6 +23,7 @@ const WorkPlannerProjectsDashboard = () => {
     const [projects, setProjects] = useState<any[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+    const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
     
     // Fetch extensions for CreateTaskModal
     const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
@@ -219,7 +221,7 @@ const WorkPlannerProjectsDashboard = () => {
             </div>
             
             <div style={styles.headerRight}>
-              <Button 
+              {/* <Button 
                 variant="primary" 
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 onClick={() => {
@@ -238,10 +240,88 @@ const WorkPlannerProjectsDashboard = () => {
                 variant="outline-primary"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 disabled={!selectedProject}
+                onClick={() => projectTabsContentRef.current?.switchToBoardView()}
               >
                 <LayoutGrid size={18} />
                 Board View
-              </Button>
+              </Button> */}
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    backgroundColor: "rgb(20, 20, 20)", // Black
+    borderColor: "rgba(20, 20, 20, 0)",
+    color: "rgb(255, 255, 255)", // White text
+    textDecoration: "none",
+    borderRadius: "4px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    verticalAlign: "middle",
+    paddingBlock: "8px",
+    paddingInline: "16px",
+    maxWidth: "100%",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    letterSpacing: "0px",
+    lineHeight: "14px",
+    WebkitFontSmoothing: "antialiased",
+    textUnderlineOffset: "24%",
+    alignItems: "center",
+    gap: "0.5rem"
+  }}
+  onClick={() => {
+    if (!selectedProject) {
+      alert("Please select a project first");
+      return;
+    }
+  }}
+  disabled={!selectedProject || hierarchyLoading}
+>
+  <Plus size={18} />
+  <span>Create Task</span>
+</button>
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    backgroundColor: "rgb(255, 255, 255)", // White
+    borderColor: "rgb(20, 20, 20)",
+    color: "rgb(20, 20, 20)", // Black text
+    textDecoration: "none",
+    borderRadius: "4px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    verticalAlign: "middle",
+    paddingBlock: "8px",
+    paddingInline: "16px",
+    maxWidth: "100%",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    letterSpacing: "0px",
+    lineHeight: "14px",
+    WebkitFontSmoothing: "antialiased",
+    textUnderlineOffset: "24%",
+    alignItems: "center",
+    gap: "0.5rem"
+  }}
+  disabled={!selectedProject}
+  onClick={() => projectTabsContentRef.current?.switchToBoardView()}
+>
+  <LayoutGrid size={18} />
+  <span>Board View</span>
+</button>
               
             
             </div>
@@ -250,6 +330,7 @@ const WorkPlannerProjectsDashboard = () => {
         </div>
 
         <ProjectTabsContent
+          ref={projectTabsContentRef}
           selectedProject={selectedProject}
           hierarchyDataExtensions={hierarchyDataExtensions}
           hierarchyLoading={hierarchyLoading}

@@ -26,18 +26,36 @@ import {
   Ticket,
   Link2,
   AlertCircle,
+  X,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getAllCrmDataById, type CrmDataItem } from "@utils/crm";
+import {
+  getAllCrmDataById,
+  getCampaigns,
+  getCrmDataTags,
+  updateCrmData,
+  deleteCrmData,
+  type CrmDataItem,
+} from "@utils/crm";
+import { ModuleSlug } from "@utils/Helper";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel, {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
+import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
+import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
+import CrmProfileSection from "@components/CrmProfileSection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
+import { Dropdown, Form } from "react-bootstrap";
+import CreatableSelect from "react-select/creatable";
+import Select from "react-select";
+import { GetHierarchyData } from "@utils/users";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -100,6 +118,57 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
+
+  // Prospect & it's related data states
+  const [availableTags, setAvailableTags] = useState<
+    Array<{
+      value: string;
+      label: string;
+      id: number;
+    }>
+  >([]);
+
+  const [availableCampaigns, setAvailableCampaigns] = useState<
+    Array<{
+      value: string;
+      label: string;
+      id: number;
+    }>
+  >([]);
+  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
+    {},
+  );
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [prospectForm, setProspectForm] = useState({
+    id: null as number | null,
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    campaign_id: null as number | null,
+    contact_owner: null as string | null,
+    lifecycle_stage: "Lead",
+    disposition: "",
+    legal_basis: [] as string[],
+    company_domain: "",
+    scheduled_call_at: "",
+    tags: [] as Array<{ value: string; label: string; id?: number }>,
+    note: "",
+    source: "",
+  });
+  // Edit Prospect Sidebar States
+  const [showEditContactSidebar, setShowEditContactSidebar] = useState(false);
+  const [editContactLoading, setEditContactLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [prospectToDelete, setProspectToDelete] = useState<{
+    id: number;
+    name?: string;
+  } | null>(null);
+  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [successModalTitle, setSuccessModalTitle] = useState("");
+  const [successModalDescription, setSuccessModalDescription] = useState("");
+
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
@@ -143,6 +212,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState("");
   const [isDialing, setIsDialing] = useState(false);
+
+  // Static tags data
+  const staticTags = [
+    { value: "hot-lead", label: "Hot Lead" },
+    { value: "cold-lead", label: "Cold Lead" },
+    { value: "follow-up", label: "Follow Up" },
+    { value: "interested", label: "Interested" },
+    { value: "not-interested", label: "Not Interested" },
+    { value: "callback", label: "Callback" },
+    { value: "qualified", label: "Qualified" },
+    { value: "unqualified", label: "Unqualified" },
+  ];
 
   const handleCall = useCallback(
     async (phoneNumber: string) => {
@@ -214,6 +295,69 @@ const ContactRecordPage: NextPageWithLayout = () => {
     }
   }, [hasPhone, numberToCall, handleCall]);
 
+  const handleProspectExport = useCallback(async () => {
+    if (!prospect?.data) return;
+    const id = prospect.data.id ?? prospectRecordId;
+    const name = `prospect_${id}.csv`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const row = prospect.data as any;
+      const headers = Object.keys(row).filter(
+        (k) => typeof row[k] !== "object",
+      );
+      const csvRows = [
+        headers.join(","),
+        headers
+          .map((h) => {
+            const val = row[h];
+            if (val == null) return "";
+            if (typeof val === "object") return "";
+            const s = String(val).replace(/"/g, '""');
+            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+          })
+          .join(","),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Exported prospect successfully!");
+    } catch (err) {
+      toast.error("Failed to export prospect");
+    } finally {
+      setExporting(false);
+    }
+  }, [prospect, prospectRecordId]);
+
+  const handleOpenDeleteProspect = useCallback(() => {
+    if (!prospectRecordId || !prospect) return;
+    setProspectToDelete({ id: prospectRecordId, name: prospect.data?.name });
+    setShowDeleteModal(true);
+  }, [prospectRecordId, prospect]);
+
+  const confirmDeleteProspect = useCallback(async () => {
+    if (!prospectToDelete) return;
+    try {
+      await deleteCrmData(prospectToDelete.id);
+      setShowDeleteModal(false);
+      setProspectToDelete(null);
+      setShowSuccessfulModal(true);
+      setSuccessModalTitle("Prospect Deleted");
+      setSuccessModalDescription("Prospect has been deleted successfully");
+      router.push("/crm/prospects");
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error("Delete prospect error:", error);
+      toast.error("Failed to delete prospect");
+    }
+  }, [prospectToDelete, router]);
+
   // Load prospect by ID from URL
   useEffect(() => {
     if (!router.isReady || prospectId == null || prospectId === "") {
@@ -262,6 +406,117 @@ const ContactRecordPage: NextPageWithLayout = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
+  // Load prospect into form when sidebar opens in edit mode
+  useEffect(() => {
+    if (showEditContactSidebar) {
+      const data = prospect?.data || {};
+
+      setProspectForm({
+        id: data.id,
+        firstName: data.name?.split(" ")[0] || "",
+        lastName: data.name?.split(" ").slice(1).join(" ") || "",
+        email: data.data?.email || "",
+        phoneNumber: data.phone || "",
+        campaign_id: Number(data.campaign_id) || null,
+        contact_owner: data.data?.contact_owner || null,
+        lifecycle_stage: data.lifecycle_stage || "Prospect",
+        disposition: data.data?.disposition || "",
+        legal_basis: Array.isArray(data.data?.legal_basis)
+          ? data.data.legal_basis
+          : [],
+        company_domain: data.company_domain || "",
+        scheduled_call_at: data.scheduled_call_at || "",
+        tags: Array.isArray(data.data?.tags)
+          ? data.data.tags.map((tag: string) => ({
+              value: tag,
+              label: tag,
+            }))
+          : [],
+        note: data.data?.note || "",
+        source: data.source || "",
+      });
+
+      console.log("prospectForm", prospectForm);
+    }
+  }, [showEditContactSidebar]);
+
+  // Load available campaigns
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
+          value: campaign.id.toString(),
+          label: campaign.name,
+          id: campaign.id,
+        }));
+        setAvailableCampaigns(campaignOptions);
+
+        // Also populate the campaignsById map
+        const campaignsMap: Record<number, string> = {};
+        campaignsResponse.data.forEach((campaign: any) => {
+          campaignsMap[campaign.id] = campaign.name;
+        });
+        setCampaignsById(campaignsMap);
+      } catch (error) {
+        console.error("Failed to load campaigns:", error);
+        // Fallback to empty array
+        setAvailableCampaigns([]);
+      }
+    };
+
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(
+          ModuleSlug.CRM_DATA_MANAGEMENT,
+        );
+        if (hierarchyData?.extensions) {
+          setExtensions(hierarchyData.extensions);
+        }
+      } catch (error) {
+        console.error("Failed to fetch extensions:", error);
+      }
+    };
+
+    const loadTags = async () => {
+      try {
+        const tags = await getCrmDataTags();
+        const tagOptions = tags.map((tag: any) => ({
+          value: tag.name,
+          label: tag.name,
+          id: tag.id,
+        }));
+        setAvailableTags(tagOptions);
+      } catch (error) {
+        console.error("Failed to load tags:", error);
+        // Fallback to static tags
+        setAvailableTags(
+          staticTags.map((tag) => ({
+            value: tag.value,
+            label: tag.label,
+            id: parseInt(tag.value.replace("tag-", "")) || 0,
+          })),
+        );
+      }
+    };
+
+    fetchExtensions();
+    loadCampaigns();
+    loadTags();
+  }, [showEditContactSidebar]);
+
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {
       const newSet = new Set(prev);
@@ -306,442 +561,27 @@ const ContactRecordPage: NextPageWithLayout = () => {
         prospect?.data?.name ??
         "--",
     },
+    // {
+    //   label: "Lifecycle Stage",
+    //   value:
+    //     prospect?.data?.lifecycle_stage ??
+    //     prospect?.data?.data?.lifecycle_stage ??
+    //     "--",
+    // },
     {
-      label: "Lead Status",
-      value: firstTicket?.status ?? prospect?.data?.disposition ?? "--",
+      label: "Contact owner",
+      value: (() => {
+        const ownerId = prospect?.data?.user_extension;
+        if (ownerId == null) return "--";
+        const match = extensions.find(
+          (ext: any) =>
+            String(ext.id) === String(ownerId) ||
+            String(ext.extension) === String(ownerId),
+        );
+        return match?.display_name ?? match?.name ?? String(ownerId);
+      })(),
     },
-    {
-      label: "Lifecycle Stage",
-      value: prospect?.data?.lifecycle_stage ?? "--",
-    },
-    { label: "Buying Role", value: prospect?.data?.buying_role ?? "--" },
-    { label: "Associate with", value: prospect?.data?.contact_owner ?? "--" },
   ];
-
-  const renderIntelligenceTab = () => {
-    return (
-      <div>
-        {/* Info Banner */}
-        <div
-          style={{
-            padding: "16px 20px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #eaf0f6",
-            borderRadius: "5px",
-            marginBottom: "20px",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#666",
-              margin: 0,
-            }}
-          >
-            HubSpot does not have enrichment data for this record, yet.
-          </p>
-        </div>
-
-        {/* Contact Information Card */}
-        <div
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #eaf0f6",
-            borderRadius: "5px",
-            padding: "20px",
-            marginBottom: "20px",
-          }}
-        >
-          {/* Single row: all fields + social icons */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "20px",
-              flexWrap: "nowrap",
-            }}
-          >
-            {/* Lifecycle stage */}
-            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Lifecycle stage
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "700",
-                }}
-              >
-                Lead
-              </div>
-            </div>
-
-            {/* Related company */}
-            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Related company
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            {/* Employment role */}
-            <div style={{ flex: "1 1 auto", minWidth: "100px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Employment role
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            {/* City */}
-            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                City
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {firstTicket?.company_city ?? "--"}
-              </div>
-            </div>
-
-            {/* State */}
-            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                State
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {firstTicket?.company_province ?? "--"}
-              </div>
-            </div>
-
-            {/* Region */}
-            <div style={{ flex: "1 1 auto", minWidth: "60px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Region
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            {/* Social Icons — same row, pushed to the right */}
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                alignItems: "center",
-                flexShrink: 0,
-                marginLeft: "auto",
-                paddingTop: "2px",
-              }}
-            >
-              {/* Facebook */}
-              <button
-                style={{
-                  padding: "7px",
-                  backgroundColor: "#f0f0f0",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#e0e0e0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f0f0f0";
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                </svg>
-              </button>
-              {/* LinkedIn */}
-              <button
-                style={{
-                  padding: "7px",
-                  backgroundColor: "#f0f0f0",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#e0e0e0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f0f0f0";
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                </svg>
-              </button>
-              {/* X / Twitter */}
-              <button
-                style={{
-                  padding: "7px",
-                  backgroundColor: "#f0f0f0",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#e0e0e0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f0f0f0";
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Two Column Layout */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "20px",
-          }}
-        >
-          {/* Left Column - Company Info */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #eaf0f6",
-              borderRadius: "5px",
-              padding: "20px",
-            }}
-          >
-            <div
-              style={{
-                paddingBottom: "16px",
-                borderBottom: "1px solid #eaf0f6",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Industry
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            <div
-              style={{
-                paddingBottom: "16px",
-                borderBottom: "1px solid #eaf0f6",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Company description
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Company keywords
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Contact Outreach */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              border: "1px solid #eaf0f6",
-              borderRadius: "5px",
-              padding: "20px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                color: "#141414",
-                margin: "0 0 16px 0",
-              }}
-            >
-              Contact Outreach
-            </h3>
-
-            <div style={{ marginBottom: "20px" }}>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                Email
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                {prospect?.data?.data?.email ?? "--"}
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
-                marginBottom: "20px",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#666",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Job sub role
-                </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "#141414",
-                    fontWeight: "400",
-                  }}
-                >
-                  --
-                </div>
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#666",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Job seniority
-                </div>
-                <div
-                  style={{
-                    fontSize: "14px",
-                    color: "#141414",
-                    fontWeight: "400",
-                  }}
-                >
-                  --
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}
-              >
-                LinkedIn
-              </div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  fontWeight: "400",
-                }}
-              >
-                --
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -985,6 +825,941 @@ const ContactRecordPage: NextPageWithLayout = () => {
   // LEFT SIDEBAR (Contact Info)
   // ============================================================================
 
+  const handleUpdateContactSubmit = async (data: any) => {
+    const name = [data.firstName, data.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (data.id == null) {
+      toast.error("Prospect not found");
+      return;
+    }
+    if (!name || !data.email?.trim() || !data.phoneNumber?.trim()) {
+      toast.error("Name, email and phone are required");
+      return;
+    }
+    if (data.campaign_id == null) {
+      toast.error("Campaign is required");
+      return;
+    }
+    setEditContactLoading(true);
+    console.log("data", data);
+    try {
+      await updateCrmData(data.id, {
+        name,
+        phone: data.phoneNumber.trim(),
+        campaign_id: Number(data.campaign_id) ?? null,
+        company_domain: data.company_domain?.trim() || undefined,
+        source: data.source?.trim() || undefined,
+        scheduled_call_at: data.scheduled_call_at || undefined,
+        data: {
+          email: data.email.trim(),
+          disposition: data.disposition || undefined,
+          tags: data.tags?.length
+            ? data.tags.map(
+                (t: { value: string; label: string }) => t.value || t.label,
+              )
+            : undefined,
+          note: data.note || undefined,
+          contact_owner: data.contact_owner ?? undefined,
+          lifecycle_stage: data.lifecycle_stage || undefined,
+          legal_basis: data.legal_basis?.length ? data.legal_basis : undefined,
+        },
+      });
+      setShowEditContactSidebar(false);
+      const updated = await getAllCrmDataById(data.id);
+      setProspect(updated);
+    } catch {
+      // Error already shown by updateCrmData
+    } finally {
+      setEditContactLoading(false);
+    }
+  };
+
+  const renderEditContactSidebar = () => {
+    if (!showEditContactSidebar) return null;
+
+    const isFormValid =
+      prospectForm?.email?.trim() &&
+      prospectForm?.phoneNumber?.trim() &&
+      prospectForm?.firstName?.trim() &&
+      prospectForm?.lastName?.trim() &&
+      prospectForm?.campaign_id != null;
+
+    return (
+      <>
+        {/* Overlay */}
+        <div
+          className="contact-sidebar-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+          }}
+          onClick={() => setShowEditContactSidebar(false)}
+        />
+
+        {/* Sidebar */}
+        <div
+          className="contact-sidebar-container"
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            width: "600px",
+            height: "100vh",
+            backgroundColor: "#ffffff",
+            boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+            zIndex: 999999,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* Header */}
+          <div
+            className="contact-sidebar-header"
+            style={{
+              padding: "20px 24px",
+              borderBottom: "1px solid #eaf0f6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <h2
+              className="contact-sidebar-title"
+              style={{
+                fontSize: "20px",
+                fontWeight: "600",
+                color: "#141414",
+                margin: 0,
+              }}
+            >
+              Edit Prospect
+            </h2>
+            <button
+              className="contact-sidebar-close-btn"
+              onClick={() => {
+                setShowEditContactSidebar(false);
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#718096",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              console.log("updating here 1");
+              e.preventDefault();
+              console.log("updating here");
+              if (!isFormValid || editContactLoading) return;
+              console.log("updating");
+              handleUpdateContactSubmit(prospectForm);
+            }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <div
+              className="contact-sidebar-content"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "40px",
+              }}
+            >
+              <>
+                {/* Required: Name, Email, Phone */}
+                <div className="contact-form-section">
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label contact-form-label-required"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      First name <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      data-test-id="firstname-input"
+                      value={prospectForm?.firstName}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          firstName: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label contact-form-label-required"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Last name <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      data-test-id="lastname-input"
+                      value={prospectForm?.lastName}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          lastName: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label contact-form-label-required"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Email <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      data-test-id="email-input"
+                      value={prospectForm?.email}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          email: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label contact-form-label-required"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Phone <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      data-test-id="phone-input"
+                      value={prospectForm?.phoneNumber}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          phoneNumber: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
+                <div
+                  className="contact-form-section"
+                  style={{ marginTop: "24px" }}
+                >
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label contact-form-label-required"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Campaign <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    {(() => {
+                      const campaignSelectOptions = availableCampaigns.map(
+                        (c) => ({
+                          value: String(c.id),
+                          label: c.label,
+                        }),
+                      );
+                      return (
+                        <Select
+                          value={
+                            prospectForm.campaign_id != null
+                              ? (campaignSelectOptions.find(
+                                  (o) =>
+                                    o.value ===
+                                    String(prospectForm.campaign_id),
+                                ) ?? null)
+                              : null
+                          }
+                          onChange={(opt: any) =>
+                            setProspectForm({
+                              ...prospectForm,
+                              campaign_id: opt?.value
+                                ? Number(opt.value)
+                                : null,
+                            })
+                          }
+                          options={campaignSelectOptions}
+                          placeholder="Select campaign"
+                          isClearable
+                          isSearchable
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              minHeight: 40,
+                              border: "1px solid #8a8a8a",
+                              borderRadius: "4px",
+                              fontSize: "14px",
+                            }),
+                          }}
+                        />
+                      );
+                    })()}
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Owner
+                    </label>
+                    <Select
+                      value={(() => {
+                        const opts = extensions.map((ext: any) => ({
+                          value: String(ext.extension ?? ext.id ?? ""),
+                          label:
+                            ext.display_name ||
+                            ext.name ||
+                            ext.extension ||
+                            String(ext.id || ""),
+                        }));
+                        return prospectForm.contact_owner != null
+                          ? opts.find(
+                              (o) => o.value === prospectForm.contact_owner,
+                            ) || null
+                          : null;
+                      })()}
+                      onChange={(opt: any) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          contact_owner: opt?.value ?? null,
+                        })
+                      }
+                      options={extensions.map((ext: any) => ({
+                        value: String(ext.extension ?? ext.id ?? ""),
+                        label:
+                          ext.display_name ||
+                          ext.name ||
+                          ext.extension ||
+                          String(ext.id || ""),
+                      }))}
+                      placeholder="Select owner"
+                      isClearable
+                      isSearchable
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: 40,
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Source
+                    </label>
+                    <input
+                      type="text"
+                      value={prospectForm?.source}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          source: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                      placeholder="Enter source"
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Lifecycle stage
+                    </label>
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          backgroundColor: "#fff",
+                        }}
+                      >
+                        {prospectForm?.lifecycle_stage || "Select..."}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ width: "100%" }}>
+                        {["Lead", "Prospect", "Customer", "Evangelist"].map(
+                          (stage) => (
+                            <Dropdown.Item
+                              key={stage}
+                              onClick={() =>
+                                setProspectForm({
+                                  ...prospectForm,
+                                  lifecycle_stage: stage,
+                                })
+                              }
+                            >
+                              {stage}
+                            </Dropdown.Item>
+                          ),
+                        )}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Disposition
+                    </label>
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          backgroundColor: "#fff",
+                          color: prospectForm?.disposition
+                            ? "#141414"
+                            : "#a0aec0",
+                        }}
+                      >
+                        {prospectForm?.disposition || "Select..."}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ width: "100%" }}>
+                        {[
+                          "interested",
+                          "not_interested",
+                          "callback_requested",
+                          "no_answer",
+                          "busy",
+                          "do_not_call",
+                          "wrong_number",
+                          "follow_up",
+                        ].map((d) => (
+                          <Dropdown.Item
+                            key={d}
+                            onClick={() =>
+                              setProspectForm({
+                                ...prospectForm,
+                                disposition: d,
+                              })
+                            }
+                          >
+                            {d.replace(/_/g, " ")}
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Legal basis for processing contact&apos;s data
+                    </label>
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          backgroundColor: "#fff",
+                          color: prospectForm?.legal_basis?.length
+                            ? "#141414"
+                            : "#a0aec0",
+                        }}
+                      >
+                        {prospectForm?.legal_basis?.length
+                          ? prospectForm?.legal_basis.join(", ")
+                          : "Select..."}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ width: "100%", padding: "8px" }}>
+                        {[
+                          "Legitimate interest",
+                          "Consent",
+                          "Contract",
+                          "Legal obligation",
+                          "Vital interests",
+                          "Public task",
+                        ].map((option) => (
+                          <Dropdown.Item
+                            key={option}
+                            as="div"
+                            style={{ padding: "4px 8px" }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const isSelected =
+                                prospectForm?.legal_basis?.includes(option);
+                              setProspectForm({
+                                ...prospectForm,
+                                legal_basis: isSelected
+                                  ? prospectForm.legal_basis.filter(
+                                      (b) => b !== option,
+                                    )
+                                  : [...prospectForm.legal_basis, option],
+                              });
+                            }}
+                          >
+                            <Form.Check
+                              type="checkbox"
+                              label={option}
+                              checked={prospectForm?.legal_basis?.includes(
+                                option,
+                              )}
+                              onChange={() => {}}
+                            />
+                          </Dropdown.Item>
+                        ))}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                </div>
+
+                {/* Optional: Datetime and text fields */}
+                <div
+                  className="contact-form-section"
+                  style={{
+                    marginTop: "24px",
+                    paddingTop: "24px",
+                    borderTop: "1px solid #eaf0f6",
+                  }}
+                >
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Company domain
+                    </label>
+                    <input
+                      type="text"
+                      value={prospectForm?.company_domain}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          company_domain: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. example.com"
+                      data-no-capitalize
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Scheduled call at
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={prospectForm?.scheduled_call_at}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          scheduled_call_at: e.target.value,
+                        })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Tags
+                    </label>
+                    <CreatableSelect
+                      isMulti
+                      value={prospectForm?.tags}
+                      onChange={(selected) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          tags: selected ? [...selected] : [],
+                        })
+                      }
+                      options={availableTags.map((t: any) => ({
+                        value: t.value,
+                        label: t.label,
+                        id: t.id,
+                      }))}
+                      placeholder="Select or create tags"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: 40,
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div
+                    className="contact-form-field"
+                    style={{ marginBottom: "20px" }}
+                  >
+                    <label
+                      className="contact-form-label"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Note
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={prospectForm?.note}
+                      onChange={(e) =>
+                        setProspectForm({
+                          ...prospectForm,
+                          note: e.target.value,
+                        })
+                      }
+                      placeholder="Notes about this contact"
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                        resize: "vertical",
+                        fontFamily: "inherit",
+                      }}
+                      onFocus={(e) =>
+                        (e.currentTarget.style.borderColor = "#0091ae")
+                      }
+                      onBlur={(e) =>
+                        (e.currentTarget.style.borderColor = "#8a8a8a")
+                      }
+                    />
+                  </div>
+                </div>
+              </>
+            </div>
+            {/* Footer Buttons */}
+            <div
+              className="contact-sidebar-footer"
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #eaf0f6",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-start",
+              }}
+            >
+              <button
+                type="submit"
+                className="contact-form-btn-create"
+                disabled={!isFormValid || editContactLoading}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor:
+                    isFormValid && !editContactLoading ? "#0091ae" : "#cbd5e0",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor:
+                    isFormValid && !editContactLoading
+                      ? "pointer"
+                      : "not-allowed",
+                }}
+                onMouseEnter={(e) => {
+                  if (isFormValid && !editContactLoading)
+                    e.currentTarget.style.backgroundColor = "#007a94";
+                }}
+                onMouseLeave={(e) => {
+                  if (isFormValid && !editContactLoading)
+                    e.currentTarget.style.backgroundColor = "#0091ae";
+                }}
+              >
+                {editContactLoading ? "Updating..." : "Update"}
+              </button>
+              <button
+                type="button"
+                className="contact-form-btn-cancel"
+                onClick={() => {
+                  setShowEditContactSidebar(false);
+                  setEditContactLoading(false);
+                }}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "transparent",
+                  color: "#141414",
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f7fafc")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </>
+    );
+  };
+
   const renderLeftSidebar = () => (
     <div
       className="sidebar-scrollbar"
@@ -1087,7 +1862,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Clone", "Export"].map((action) => (
                   <button
                     key={action}
-                    onClick={() => setShowActionsDropdown(false)}
+                    onClick={() => {
+                      if (action === "Edit") {
+                        setShowEditContactSidebar(true);
+                      } else if (action === "Delete") {
+                        handleOpenDeleteProspect();
+                      } else if (action === "Export") {
+                        void handleProspectExport();
+                      }
+                      setShowActionsDropdown(false);
+                    }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -1568,6 +2352,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
   // MAIN CONTENT (Center with Tabs)
   // ============================================================================
 
+  console.log("prospect", prospect);
+
   const renderMainContent = () => (
     <div
       style={{
@@ -1703,7 +2489,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   </div>
                 </div>
               </div>
-              
+
               {!collapsedSections.has("breeze") && (
                 <div style={{ padding: "20px" }}>
                   {(prospect as any)?.data?.crm_summary?.summary != null && (
@@ -1721,14 +2507,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
                         {prospect?.data?.updated_at && (
                           <span>
                             Updated{" "}
-                            {new Date(prospect.data.updated_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
+                            {new Date(
+                              prospect.data.updated_at,
+                            ).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
                           </span>
                         )}
                         <button
@@ -1763,118 +2548,127 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       </div>
                     </>
                   )}
-                  {((prospect as any)?.crm_summary?.summary ?? (prospect as any)?.data?.crm_summary?.summary) == null && (
+                  {((prospect as any)?.crm_summary?.summary ??
+                    (prospect as any)?.data?.crm_summary?.summary) == null && (
                     <div style={{ fontSize: "14px", color: "#718096" }}>
                       No summary available.
                     </div>
                   )}
 
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #fee",
-                    }}
-                  >
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Good summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Bad summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
+                  {((prospect as any)?.crm_summary?.summary ??
+                    (prospect as any)?.data?.crm_summary?.summary) != null && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #fee",
+                        }}
+                      >
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Good summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <ThumbsUp size={16} />
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Bad summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <ThumbsDown size={16} />
+                        </button>
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Copy"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                            e.currentTarget.style.color = "#141414";
+                          }}
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
 
-                  <button
-                    style={{
-                      marginTop: "16px",
-                      padding: "6px 16px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fff5f7";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
+                      <button
+                        style={{
+                          marginTop: "16px",
+                          padding: "6px 16px",
+                          backgroundColor: "transparent",
+                          border: "1px solid #d20688",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: "500",
+                          color: "#d20688",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#fff5f7";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Sparkles size={16} />
+                        Ask a question
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -1888,72 +2682,50 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 marginBottom: "20px",
               }}
             >
-              <div
-                style={{
-                  padding: "16px 20px",
-                  borderBottom: "1px solid #eaf0f6",
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: "600",
-                    color: "#141414",
-                    margin: 0,
-                  }}
-                >
-                  Contact profile
-                </h3>
-              </div>
-
-              <div style={{ padding: "20px" }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: "20px",
-                  }}
-                >
-                  {[
-                    {
-                      label: "Company name",
-                      value: firstTicket?.company_name ?? "--",
-                    },
-                    { label: "Street address", value: "--" },
-                    { label: "City", value: firstTicket?.company_city ?? "--" },
-                    { label: "Postal code", value: "--" },
-                    {
-                      label: "State",
-                      value: firstTicket?.company_province ?? "--",
-                    },
-                    {
-                      label: "Email",
-                      value: prospect?.data?.data?.email ?? "--",
-                      link: true,
-                    },
-                  ].map((field, index) => (
-                    <div key={index}>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "#666666",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        {field.label}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: field.link ? "#006162" : "#141414",
-                        }}
-                      >
-                        {field.value}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <CrmProfileSection
+                title="Contact profile"
+                fields={[
+                  {
+                    label: "Company name",
+                    value:
+                      (prospect as any)?.data?.company?.enrichment_data
+                        ?.structured_data?.official_company_name ??
+                      prospect?.data?.company_name ??
+                      "--",
+                  },
+                  {
+                    label: "Street address",
+                    value:
+                      (prospect as any)?.data?.company?.enrichment_data
+                        ?.structured_data?.headquarters?.address ??
+                      (prospect as any)?.data?.company?.address ??
+                      "--",
+                  },
+                  {
+                    label: "City",
+                    value:
+                      (prospect as any)?.data?.company?.enrichment_data
+                        ?.structured_data?.headquarters?.city ?? "--",
+                  },
+                  {
+                    label: "Postal code",
+                    value: (prospect as any)?.data?.data?.postal_code ?? "--",
+                  },
+                  {
+                    label: "State/Region",
+                    value:
+                      (prospect as any)?.data?.company?.enrichment_data
+                        ?.structured_data?.headquarters?.state ?? "--",
+                  },
+                  {
+                    label: "Email",
+                    value:
+                      (prospect as any)?.data?.company?.enrichment_data
+                        ?.structured_data?.emails?.[0]?.email ?? "--",
+                    link: true,
+                  },
+                ]}
+              />
             </div>
             {/* Enrollments */}
             {/* <div
@@ -2050,7 +2822,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
           />
         )}
 
-        {activeTab === "intelligence" && renderIntelligenceTab()}
+        {activeTab === "intelligence" && (
+          <CrmIntelligenceTab
+            company={(prospect as any)?.data?.company ?? null}
+            relatedCompany={prospect?.data?.company_name ?? "—"}
+          />
+        )}
       </div>
     </div>
   );
@@ -2124,6 +2901,35 @@ const ContactRecordPage: NextPageWithLayout = () => {
               paddingBottom: "0",
             }}
           >
+            {(() => {
+              const company = (prospect as any)?.data?.company ?? null;
+              const struct = company?.enrichment_data?.structured_data ?? null;
+              const companyName =
+                struct?.official_company_name ??
+                company?.name ??
+                prospect?.data?.company_name ??
+                null;
+              const primaryPhone =
+                struct?.phones?.[0]?.number ??
+                company?.phone ??
+                prospect?.data?.company_contact ??
+                null;
+              const phones =
+                struct?.phones?.map((p: any) => ({
+                  number: p?.number ?? "",
+                  type: p?.type ?? null,
+                })) ?? undefined;
+              return (
+                <CrmAssociatedCompaniesCard
+                  sectionId="companies"
+                  collapsedSections={collapsedSections}
+                  toggleSection={toggleSection}
+                  companyName={companyName}
+                  primaryPhone={primaryPhone}
+                  phones={phones}
+                />
+              );
+            })()}
             {/* Deals - from prospect.data.tickets[].deals */}
             {(() => {
               const allDeals =
@@ -2600,7 +3406,24 @@ const ContactRecordPage: NextPageWithLayout = () => {
         extensionNumber={ctiUserAddress ?? ""}
         userAddress={ctiUserAddress}
       />
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setProspectToDelete(null);
+        }}
+        onConfirm={confirmDeleteProspect}
+        itemName={prospectToDelete?.name}
+        itemType="prospect"
+      />
+      <SuccessfulModal
+        show={showSuccessfulModal}
+        onHide={() => setShowSuccessfulModal(false)}
+        title={successModalTitle}
+        description={successModalDescription}
+      />
       {activityModals.modals}
+      {renderEditContactSidebar()}
     </>
   );
 };

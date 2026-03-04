@@ -722,7 +722,7 @@ const Teams = () => {
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
                       
-                      <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS}</h2>
+                      {/* <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS}</h2> */}
                     </Col>
 
 

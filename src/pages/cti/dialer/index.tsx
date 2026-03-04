@@ -962,7 +962,7 @@ const CtiDialer = () => {
         transferInitiatorDeviceName: callingDevice.callingDeviceName,
         transferAddress: call.calledAddress || call.number,
         targetAddress: targetExtension,
-        mode: 'BLIND'
+        mode: 'CONSULT'
       })
 
       if (result.success) {

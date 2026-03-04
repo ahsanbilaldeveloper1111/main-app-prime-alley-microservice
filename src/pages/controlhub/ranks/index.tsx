@@ -606,8 +606,8 @@ const Ranks = () => {
                 <div className="page-header-title style-2">
                 <Row className="d-flex justify-content-between align-items-center">
                     <Col md={4}>
-                      
-                      <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.RANKS}</h2>
+                     
+                      {/* <h2 className="mb-0">{HEADER_CONSTANTS.SUBMENU_LABELS.RANKS}</h2> */}
                     </Col>
 
 

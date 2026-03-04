@@ -93,6 +93,7 @@ interface CreateTaskData {
   status_id?: number;
   priority?: string;
   due_date?: string;
+  due_time?: string;
   start_date?: string;
   estimated_hours?: string;
   progress?: number;
@@ -552,7 +553,7 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     const {
       page = 1,
       limit = 20,
-      type = "regular",
+      type="",
       project_id,
       search = "",
       status_id,

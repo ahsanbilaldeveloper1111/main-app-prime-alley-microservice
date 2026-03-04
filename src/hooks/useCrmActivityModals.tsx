@@ -143,7 +143,7 @@ export function useCrmActivityModals({
           meeting_type: "Video",
           meeting_date,
           meeting_time,
-          record_type: recordType,
+          record_type: recordType as "prospect" | "lead" | "deal" | "order",
           record_id: recordId,
           extensions,
           tenant_id: tenantId,

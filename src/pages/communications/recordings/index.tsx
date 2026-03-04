@@ -973,7 +973,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                 />
               )}
             </div>
-            {session?.user?.is_admin === '1' && (
+            {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
               <i
                 data-tooltip-id="my-tooltip"
                 data-tooltip-content="Call Analysis"

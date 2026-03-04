@@ -30,7 +30,8 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
     }
 
     return (
-        <Row className="mb-3">
+        <>
+        {/* <Row className="mb-3">
             <Col md={12}>
                 <div className="page-header-title style-2">
                     <Row className="d-flex justify-content-between align-items-center">
@@ -39,16 +40,6 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                         </Col>
                         <Col md={9} className="d-flex justify-content-end">
                             <div className="action-buttons">
-                                {/* <div className="search-container">
-                                    <i className="fas fa-search search-icon"></i>
-                                    <input 
-                                        type="text" 
-                                        className="search-bar" 
-                                        placeholder="Search users..." 
-                                        onChange={(e) => handleFiltersChange({...currentFilters, search: e.target.value})}
-                                    />
-                                </div> */}
-                                {/* <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                                
                                 {session?.user?.permissions?.includes('add-users') && (
                                     <Button variant="primary" 
@@ -75,7 +66,36 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                     </Row>
                 </div>
             </Col>
+        </Row> */}
+
+<Row className="mb-3">
+            <Col md={12}>
+            <div className="action-buttons justify-content-end gap-2 align-items-end d-flex">
+                               
+                               {session?.user?.permissions?.includes('add-users') && (
+                                   <Button variant="primary" 
+                                   onClick={() => router.push('/controlhub/users/create')}>
+                                       <FiPlus size={16} className="me-2" /> Add User
+                                   </Button>
+                               )}
+                              
+                               {session?.user?.permissions?.includes('sync-ldap') && (
+                                   <Button variant="info" onClick={() => syncLdapUsers()}>
+                                       
+                                       <FaSync size={16} className="me-2" /> Sync Users 
+                                   </Button>
+                               )}
+
+{session?.user?.is_admin == "1" && (
+                                   <Button variant="danger" onClick={() => syncBillingCompanies()}>
+                                       <FaSync size={16} className="me-2" /> Sync Billing Companies
+                                   </Button>
+                               )}
+
+                           </div>
+            </Col>
         </Row>
+        </>
     );
 };
 

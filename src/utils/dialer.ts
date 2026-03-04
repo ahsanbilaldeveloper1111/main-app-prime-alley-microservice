@@ -91,6 +91,13 @@ interface EndCallParams {
   callingDeviceName: string
 }
 
+/** Hold call params: leg identities + optional controller (agent putting call on hold) */
+export interface HoldCallParams extends EndCallParams {
+  controllerAddress?: string
+  controllerDeviceName?: string
+  controllerDeviceType?: string
+}
+
 interface AttendCallParams {
   callId: string
   callingAddress: string
@@ -221,7 +228,7 @@ export const attendCall = async (params: AttendCallParams): Promise<DialResponse
   }
 }
 
-export const holdCall = async (params: EndCallParams): Promise<DialResponse> => {
+export const holdCall = async (params: HoldCallParams): Promise<DialResponse> => {
   try {
     const response = await axiosInstance.post(CTI_ENDPOINTS.HOLD_CALL, params);
 

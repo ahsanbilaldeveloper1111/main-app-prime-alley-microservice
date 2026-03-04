@@ -61,21 +61,37 @@ interface TrendByCountry {
 
 const DATETIME_LOCAL_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-const xaxisLabelsStyle = { show: true as const, style: { fontSize: "11px", colors: "#666" } };
+const xaxisLabelsStyle = {
+  show: true as const,
+  style: { fontSize: "11px", colors: "#666" },
+};
 
 const DEFAULT_COUNTRY_CHART_OPTIONS: ApexOptions = {
   chart: { type: "bar", toolbar: { show: false } },
-  plotOptions: { bar: { borderRadius: 4, borderRadiusApplication: "end", horizontal: true } },
+  plotOptions: {
+    bar: { borderRadius: 4, borderRadiusApplication: "end", horizontal: true },
+  },
   legend: { show: true, position: "bottom" },
   dataLabels: { enabled: false },
   tooltip: {},
   xaxis: { categories: [], labels: xaxisLabelsStyle },
-  yaxis: { title: { text: "", style: { fontSize: "12px", fontWeight: "bold", color: "#263238" } } },
+  yaxis: {
+    title: {
+      text: "",
+      style: { fontSize: "12px", fontWeight: "bold", color: "#263238" },
+    },
+  },
 };
 
 const DEFAULT_DEPARTMENT_CHART_OPTIONS: ApexOptions = {
   ...DEFAULT_COUNTRY_CHART_OPTIONS,
-  yaxis: { title: { text: "Call Count", style: { fontSize: "12px", fontWeight: "bold", color: "#263238" } }, labels: xaxisLabelsStyle },
+  yaxis: {
+    title: {
+      text: "Call Count",
+      style: { fontSize: "12px", fontWeight: "bold", color: "#263238" },
+    },
+    labels: xaxisLabelsStyle,
+  },
   fill: { opacity: 1 },
 };
 
@@ -93,7 +109,9 @@ const DEFAULT_EXTENSION_CHART_OPTIONS: ApexOptions = {
 function mapChartDataFromApi(items: { label?: string; value?: unknown }[]) {
   return {
     labels: items.map((item) => item.label || "Unknown"),
-    values: items.map((item) => (item.value ? Number.parseInt(String(item.value), 10) : 0)),
+    values: items.map((item) =>
+      item.value ? Number.parseInt(String(item.value), 10) : 0,
+    ),
   };
 }
 
@@ -109,23 +127,45 @@ interface ChartCardProps {
   readonly show: boolean;
 }
 
-function ChartCard({ title, emptyTitle, dataLength, options, series, onExpand, show }: ChartCardProps) {
+function ChartCard({
+  title,
+  emptyTitle,
+  dataLength,
+  options,
+  series,
+  onExpand,
+  show,
+}: ChartCardProps) {
   if (!show) return null;
   return (
     <Col md={4}>
       <div className="card">
         <div className="card-body">
           {dataLength === 0 ? (
-            <EmptyState title={emptyTitle} description="Chart data will appear here when available." className="table-empty-state" />
+            <EmptyState
+              title={emptyTitle}
+              description="Chart data will appear here when available."
+              className="table-empty-state"
+            />
           ) : (
             <>
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="mb-0 app-title-heading">{title}</h5>
-                <button type="button" className="btn btn-sm btn-light" onClick={onExpand} aria-label={`Expand ${title}`}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-light"
+                  onClick={onExpand}
+                  aria-label={`Expand ${title}`}
+                >
                   <i className="material-icons-two-tone">open_in_full</i>
                 </button>
               </div>
-              <ReactApexChart options={options} series={series} type="bar" height={200} />
+              <ReactApexChart
+                options={options}
+                series={series}
+                type="bar"
+                height={200}
+              />
             </>
           )}
         </div>
@@ -144,14 +184,23 @@ interface ChartModalProps {
 
 function ChartModal({ show, onHide, title, options, series }: ChartModalProps) {
   return (
-    <Modal show={show} onHide={onHide} size="xl" centered className="chart-modal">
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="xl"
+      centered
+      className="chart-modal"
+    >
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <div className="chart-container" style={{ minHeight: "500px" }}>
           <ReactApexChart
-            options={{ ...options, chart: { ...options.chart, height: 500, toolbar: { show: true } } }}
+            options={{
+              ...options,
+              chart: { ...options.chart, height: 500, toolbar: { show: true } },
+            }}
             series={series}
             type="bar"
             height={500}
@@ -172,14 +221,27 @@ interface StatsTableCardProps {
   readonly children: React.ReactNode;
 }
 
-function StatsTableCard({ show, title, emptyTitle, emptyDescription, isEmpty, viewAllHref, children }: StatsTableCardProps) {
+function StatsTableCard({
+  show,
+  title,
+  emptyTitle,
+  emptyDescription,
+  isEmpty,
+  viewAllHref,
+  children,
+}: StatsTableCardProps) {
   if (!show) return null;
   return (
     <Col md={6}>
       <div className="card">
         <div className="card-body">
           {isEmpty ? (
-            <EmptyState title={emptyTitle} description={emptyDescription} isTableRow colSpan={6} />
+            <EmptyState
+              title={emptyTitle}
+              description={emptyDescription}
+              isTableRow
+              colSpan={6}
+            />
           ) : (
             <>
               <h5 className="mb-0 app-title-heading">{title}</h5>
@@ -344,7 +406,13 @@ const CallDashboard = () => {
         const { labels, values } = mapChartDataFromApi(chartExtension);
         setExtensionChart({
           series: [{ name: "Call Count", data: values }],
-          options: { ...DEFAULT_EXTENSION_CHART_OPTIONS, xaxis: { ...DEFAULT_EXTENSION_CHART_OPTIONS.xaxis, categories: labels } },
+          options: {
+            ...DEFAULT_EXTENSION_CHART_OPTIONS,
+            xaxis: {
+              ...DEFAULT_EXTENSION_CHART_OPTIONS.xaxis,
+              categories: labels,
+            },
+          },
         });
       }
 
@@ -355,7 +423,13 @@ const CallDashboard = () => {
         const { labels, values } = mapChartDataFromApi(chartDepartment);
         setDepartmentChart({
           series: [{ name: "Call Count", data: values }],
-          options: { ...DEFAULT_DEPARTMENT_CHART_OPTIONS, xaxis: { ...DEFAULT_DEPARTMENT_CHART_OPTIONS.xaxis, categories: labels } },
+          options: {
+            ...DEFAULT_DEPARTMENT_CHART_OPTIONS,
+            xaxis: {
+              ...DEFAULT_DEPARTMENT_CHART_OPTIONS.xaxis,
+              categories: labels,
+            },
+          },
         });
       }
 
@@ -366,21 +440,36 @@ const CallDashboard = () => {
         const { labels, values } = mapChartDataFromApi(chartCountry);
         setCountryChart({
           series: [{ name: "Call Count", data: values }],
-          options: { ...DEFAULT_COUNTRY_CHART_OPTIONS, xaxis: { ...DEFAULT_COUNTRY_CHART_OPTIONS.xaxis, categories: labels } },
+          options: {
+            ...DEFAULT_COUNTRY_CHART_OPTIONS,
+            xaxis: {
+              ...DEFAULT_COUNTRY_CHART_OPTIONS.xaxis,
+              categories: labels,
+            },
+          },
         });
       }
     }
   };
 
-  const [countryChart, setCountryChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+  const [countryChart, setCountryChart] = useState<{
+    series: ChartSeries;
+    options: ApexOptions;
+  }>({
     series: [{ name: "", data: [] }],
     options: DEFAULT_COUNTRY_CHART_OPTIONS,
   });
-  const [departmentChart, setDepartmentChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+  const [departmentChart, setDepartmentChart] = useState<{
+    series: ChartSeries;
+    options: ApexOptions;
+  }>({
     series: [],
     options: DEFAULT_DEPARTMENT_CHART_OPTIONS,
   });
-  const [extensionChart, setExtensionChart] = useState<{ series: ChartSeries; options: ApexOptions }>({
+  const [extensionChart, setExtensionChart] = useState<{
+    series: ChartSeries;
+    options: ApexOptions;
+  }>({
     series: [],
     options: DEFAULT_EXTENSION_CHART_OPTIONS,
   });
@@ -652,7 +741,9 @@ const CallDashboard = () => {
             </thead>
             <tbody>
               {extensionData.map((item) => (
-                <tr key={`extension-${item.Extension}-${item.Calls}-${item.TotalDuration}`}>
+                <tr
+                  key={`extension-${item.Extension}-${item.Calls}-${item.TotalDuration}`}
+                >
                   <td>{item.Extension}</td>
                   <td>{item.Calls}</td>
                   <td>{item.Answered}</td>
@@ -684,7 +775,9 @@ const CallDashboard = () => {
             </thead>
             <tbody>
               {trendByCountryData.map((item) => (
-                <tr key={`country-${item.Country}-${item.Calls}-${item.TotalDuration}`}>
+                <tr
+                  key={`country-${item.Country}-${item.Calls}-${item.TotalDuration}`}
+                >
                   <td>{item.Country}</td>
                   <td>{item.Calls}</td>
                   <td>{item.Answered}</td>

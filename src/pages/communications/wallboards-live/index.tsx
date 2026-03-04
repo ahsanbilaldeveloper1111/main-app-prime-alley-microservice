@@ -1083,7 +1083,7 @@ const LiveCallDashboard = () => {
   }
 
   return (
-    <>
+    <div className="live-calls-wrapper">
       {isReconnecting && (
         <div
           className="alert alert-warning mb-0 rounded-0 d-flex align-items-center justify-content-center gap-2"
@@ -1228,7 +1228,7 @@ const LiveCallDashboard = () => {
         getUserDataExtensions={getUserDataExtensions}
       />
 
-    </>
+    </div>
   )
 }
 

@@ -869,6 +869,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         onFocus={focusStyle}
                         onBlur={blurStyle}
                         placeholder="e.g. example.com"
+                        data-no-capitalize
                       />
                     </div>
                     <div style={fieldWrap}>

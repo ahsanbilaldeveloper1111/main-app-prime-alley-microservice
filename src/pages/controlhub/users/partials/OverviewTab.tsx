@@ -54,7 +54,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
     return (
         <>
-            <PageSummaryGrid cards={summaryCards} />
+            {/* <PageSummaryGrid cards={summaryCards} /> */}
             
            
             <BarFilters
@@ -62,7 +62,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                 showFilters={session?.user?.permissions?.includes('filters-users') || false}
                 leftContent={
                     <>
-                    <h5 className="mb-0">Users Directory</h5>
+                    {/* <h5 className="mb-0">Users Directory</h5> */}
                     </>
                 }
                 onSearchChange={(value) => {

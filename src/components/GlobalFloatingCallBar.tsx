@@ -114,6 +114,9 @@ const GlobalFloatingCallBar: React.FC = () => {
   const [dialedNumber, setDialedNumber] = useState("");
   const [isDialing, setIsDialing] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
+  const [isHoldingCall, setIsHoldingCall] = useState(false);
+  const [isResumingCall, setIsResumingCall] = useState(false);
+  const [isTransferringCall, setIsTransferringCall] = useState(false);
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
     useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
@@ -1158,6 +1161,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
+    setIsHoldingCall(true);
     try {
       const result = await holdCall({
         callId: activeCall.callId,
@@ -1178,6 +1182,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       }
     } catch (error) {
       //toast.error("Failed to hold call");
+    } finally {
+      setIsHoldingCall(false);
     }
   };
 
@@ -1193,6 +1199,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
+    setIsResumingCall(true);
     try {
       const result = await resumeCall({
         callId: activeCall.callId,
@@ -1213,6 +1220,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       }
     } catch (error) {
       //toast.error("Failed to resume call");
+    } finally {
+      setIsResumingCall(false);
     }
   };
 
@@ -1245,12 +1254,13 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
+    setIsTransferringCall(true);
     try {
       const result = await transferCall({
         callId: activeCall.callId,
         transferAddress: activeCall.calledAddress || activeCall.number,
         targetAddress: transferTarget,
-        mode: "BLIND",
+        mode: "CONSULT",
         transferInitiatorAddress: controllerDevice.controllerAddress,
         transferInitiatorDeviceType: controllerDevice.controllerDeviceType,
         transferInitiatorDeviceName: controllerDevice.controllerDeviceName,
@@ -1266,6 +1276,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       }
     } catch (error) {
       //toast.error("Failed to transfer call");
+    } finally {
+      setIsTransferringCall(false);
     }
   };
 
@@ -1417,6 +1429,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       <style>{floatingBarStyles}</style>
       {/* Floating Call Bar - Hide when incoming call modal is open */}
       {shouldShowFloatingBar && activeCall && !showIncomingCallModalFromContext && (
+        <>
         <div
           ref={barRef}
           className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
@@ -1696,6 +1709,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                   type="button"
                   role="button"
                   tabIndex={0}
+                  disabled={isHoldingCall}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleHoldCall();
@@ -1707,23 +1721,27 @@ const GlobalFloatingCallBar: React.FC = () => {
                     backgroundColor: "#f1f5f9",
                     border: "none",
                     color: "#475569",
-                    cursor: "pointer",
+                    cursor: isHoldingCall ? "not-allowed" : "pointer",
                     transition: "background-color 0.2s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#e2e8f0";
+                    if (!isHoldingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = "#f1f5f9";
                   }}
                   title="Hold Call"
                 >
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1.25rem", color: "#475569" }}
-                  >
-                    pause
-                  </i>
+                  {isHoldingCall ? (
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: "1.25rem", height: "1.25rem", borderWidth: "2px", color: "#475569" }} />
+                  ) : (
+                    <i
+                      className="material-icons-two-tone"
+                      style={{ fontSize: "1.25rem", color: "#475569" }}
+                    >
+                      pause
+                    </i>
+                  )}
                 </button>
                 {hasPermission("transfer-call-cti") && (
                 <button
@@ -1768,6 +1786,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 type="button"
                 role="button"
                 tabIndex={0}
+                disabled={isResumingCall}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleResumeCall();
@@ -1779,23 +1798,27 @@ const GlobalFloatingCallBar: React.FC = () => {
                   backgroundColor: "#f1f5f9",
                   border: "none",
                   color: "#475569",
-                  cursor: "pointer",
+                  cursor: isResumingCall ? "not-allowed" : "pointer",
                   transition: "background-color 0.2s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#e2e8f0";
+                  if (!isResumingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "#f1f5f9";
                 }}
                 title="Resume Call"
               >
-                <i
-                  className="material-icons-two-tone"
-                  style={{ fontSize: "1.25rem", color: "#475569" }}
-                >
-                  play_arrow
-                </i>
+                {isResumingCall ? (
+                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: "1.25rem", height: "1.25rem", borderWidth: "2px", color: "#475569" }} />
+                ) : (
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: "1.25rem", color: "#475569" }}
+                  >
+                    play_arrow
+                  </i>
+                )}
               </button>
             )}
 
@@ -1971,6 +1994,132 @@ const GlobalFloatingCallBar: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Transfer Call Modal - shown with call bar */}
+        <Modal
+          show={showTransferModal}
+          onHide={() => {
+            setShowTransferModal(false);
+            setTransferTarget("");
+            setExtensionSearch("");
+          }}
+          centered
+          size="sm"
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              <i className="material-icons-two-tone me-2">call_made</i>
+              Transfer Call
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold">
+                Select Target Extension
+              </Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Search extensions..."
+                value={extensionSearch}
+                onChange={(e) => setExtensionSearch(e.target.value)}
+                className="mb-2"
+              />
+              <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                {getAvailableExtensionsForTransfer()
+                  .filter(
+                    (ext) =>
+                      extensionSearch === "" ||
+                      ext.toLowerCase().includes(extensionSearch.toLowerCase())
+                  )
+                  .filter((ext) =>
+                    Object.values(dnsMap?.[ext]?.devices || {}).some(
+                      (d: any) => d.terminalState === "REGISTERED"
+                    )
+                  )
+                  .sort((extA, extB) => {
+                    const isOnline = (e: string) =>
+                      Object.values(dnsMap?.[e]?.devices || {}).some(
+                        (d: any) => d.terminalState === "REGISTERED"
+                      );
+                    const aOnline = isOnline(extA);
+                    const bOnline = isOnline(extB);
+                    if (aOnline && !bOnline) return -1;
+                    if (!aOnline && bOnline) return 1;
+                    return 0;
+                  })
+                  .map((ext) => {
+                    const extensionData = dnsMap?.[ext];
+                    const deviceList = extensionData
+                      ? Object.values(extensionData.devices || {})
+                      : [];
+                    const isOnline = deviceList.some(
+                      (d: any) => d.terminalState === "REGISTERED"
+                    );
+                    const userDataExtensions = getUserDataExtensions?.() || {};
+                    const dnString = String(ext);
+                    const dnNumber = Number(ext);
+                    const userData = userDataExtensions[ext] || userDataExtensions[dnString] || userDataExtensions[dnNumber];
+                    const name = userData?.name || userData?.user_name;
+                    const displayName = name ? `${name} (${ext})` : ext;
+
+                    return (
+                      <Button
+                        key={ext}
+                        variant={
+                          transferTarget === ext ? "primary" : "outline-primary"
+                        }
+                        size="sm"
+                        className="w-100 mb-2"
+                        onClick={() => setTransferTarget(ext)}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span className="fw-bold">{displayName}</span>
+                          <small
+                            className={isOnline ? "text-success" : "text-muted"}
+                          >
+                            {isOnline ? "ONLINE" : "OFFLINE"}
+                          </small>
+                        </div>
+                      </Button>
+                    );
+                  })}
+              </div>
+              {getAvailableExtensionsForTransfer().length === 0 && (
+                <div className="alert alert-warning py-2">
+                  <i className="material-icons-two-tone me-2">warning</i>
+                  <small>No available extensions for transfer</small>
+                </div>
+              )}
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowTransferModal(false);
+                setTransferTarget("");
+                setExtensionSearch("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleTransferCall}
+              disabled={!transferTarget || isTransferringCall}
+            >
+              {isTransferringCall ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem", borderWidth: "2px" }} />
+                  Transferring...
+                </>
+              ) : (
+                "Transfer"
+              )}
+            </Button>
+          </Modal.Footer>
+        </Modal>
+        </>
       )}
       {/* Quick Dialer Modal - Always render if user has permission */}
       {/* {shouldShowDialerModal && (
@@ -2215,102 +2364,6 @@ const GlobalFloatingCallBar: React.FC = () => {
         onSelectDevice={handleDeviceSelect}
         extensionNumber={userAddress || ""}
       />
-
-      {/* Transfer Call Modal */}
-      <Modal
-        show={showTransferModal}
-        onHide={() => {
-          setShowTransferModal(false);
-          setTransferTarget("");
-          setExtensionSearch("");
-        }}
-        centered
-        size="sm"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <i className="material-icons-two-tone me-2">call_made</i>
-            Transfer Call
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label className="fw-semibold">
-              Select Target Extension
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Search extensions..."
-              value={extensionSearch}
-              onChange={(e) => setExtensionSearch(e.target.value)}
-              className="mb-2"
-            />
-            <div style={{ maxHeight: "200px", overflowY: "auto" }}>
-              {getAvailableExtensionsForTransfer()
-                .filter(
-                  (ext) =>
-                    extensionSearch === "" ||
-                    ext.toLowerCase().includes(extensionSearch.toLowerCase())
-                )
-                .map((ext) => {
-                  const extensionData = dnsMap?.[ext];
-                  const deviceList = extensionData
-                    ? Object.values(extensionData.devices || {})
-                    : [];
-                  const isOnline = deviceList.some(
-                    (d: any) => d.terminalState === "REGISTERED"
-                  );
-
-                  return (
-                    <Button
-                      key={ext}
-                      variant={
-                        transferTarget === ext ? "primary" : "outline-primary"
-                      }
-                      size="sm"
-                      className="w-100 mb-2"
-                      onClick={() => setTransferTarget(ext)}
-                    >
-                      <div className="d-flex justify-content-between align-items-center">
-                        <span className="fw-bold">{ext}</span>
-                        <small
-                          className={isOnline ? "text-success" : "text-muted"}
-                        >
-                          {isOnline ? "ONLINE" : "OFFLINE"}
-                        </small>
-                      </div>
-                    </Button>
-                  );
-                })}
-            </div>
-            {getAvailableExtensionsForTransfer().length === 0 && (
-              <div className="alert alert-warning py-2">
-                <i className="material-icons-two-tone me-2">warning</i>
-                <small>No available extensions for transfer</small>
-              </div>
-            )}
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowTransferModal(false);
-              setTransferTarget("");
-              setExtensionSearch("");
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleTransferCall}
-            disabled={!transferTarget}
-          >
-            Transfer
-          </Button>
-        </Modal.Footer>
-      </Modal>
 
       {/* Incoming Call Modal - Moved to Layouts/index.tsx */}
       {/* {showIncomingCallModal && incomingCall && (

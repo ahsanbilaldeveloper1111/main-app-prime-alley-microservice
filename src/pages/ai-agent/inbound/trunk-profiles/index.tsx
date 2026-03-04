@@ -93,13 +93,13 @@ const AIMLTrunkProfile = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Trunk Profiles" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Trunk Profiles"
         showSearch={false}
         buttons={
           <>  </>
         }>
-        </PageHeader>
+        </PageHeader> */}
     
 
 <div>

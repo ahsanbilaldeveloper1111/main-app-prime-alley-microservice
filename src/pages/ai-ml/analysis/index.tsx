@@ -675,18 +675,15 @@ const CallAnalysis = () => {
       if (decodedDateTime) {
         setDateTime(decodedDateTime);
       }
-      
-      // Parse file path for additional parameters
-     
-        
-        // Set extracted parameters
+
+      // Only trigger analysis when we have encoded data in the URL with valid decoded params
+      const hasValidDecodedData = data && decodedId && (decodedDateOnly || decodedLocalPartyNumber || decodedOwnerUsername);
+      if (hasValidDecodedData) {
         setLocalPartyNumber(decodedLocalPartyNumber);
         setOwnerUsername(decodedOwnerUsername);
         setDate(decodedDateOnly);
-        
-        // Trigger analysis
-        handleGetCallAnalysisWithData(decodedDateOnly, decodedLocalPartyNumber, decodedOwnerUsername, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone);
-      
+        handleGetCallAnalysisWithData(decodedDateOnly, decodedLocalPartyNumber, decodedOwnerUsername, decodedId, decodedImagicle, decodedDateTime, decodedDuration, decodedDirection, decodedPhone);
+      }
     } catch (error) {
       console.error('Error parsing URL data:', error);
     }
@@ -1832,9 +1829,8 @@ const CallAnalysis = () => {
       {/* Always show the form */}
       {renderAnalysisForm()}
       
-      {/* Show steps progress */}
-      
-      {!error  && (
+      {/* Show steps progress only after analysis has been started (decoded data or form submit) */}
+      {!error && (loading || steps.length > 0) && (
         <Row className="mb-3">
           <Col md={12}>
             <Card>
@@ -1842,7 +1838,7 @@ const CallAnalysis = () => {
                 <h6 className="card-title mb-0">Analysis Progress</h6>
               </Card.Header>
               <Card.Body className="py-2">
-                {steps.length === 0 && !error ? (
+                {steps.length === 0 ? (
                   <div className="text-center p-2">
                     <Spinner animation="border" size="sm" className="me-2" />
                     <span>Initializing analysis...</span>
@@ -2249,7 +2245,8 @@ const CallAnalysis = () => {
         </Row>
       )}
       
-      {!error && validAnalysis && (
+      {/* Show Summary / Transcript / Translate tabs only after analysis has completed (decoded data available) */}
+      {!error && validAnalysis && analysisComplete && (
         <div className="analysis-container">
         {/* {loading ? (
           <Row>

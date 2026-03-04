@@ -1491,7 +1491,7 @@ const CreateLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>
-                                  Assigned To{" "}
+                                  Owner{" "}
                                   <span className="text-danger">*</span>
                                 </Form.Label>
                                 {formData.type === "opportunity" ? (

@@ -268,8 +268,8 @@ const PaymentMethods = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Payment Methods" />
 
       <PageHeader
-        title="Payment Methods"
-        description="Manage your payment methods"
+        title=""
+        description=""
         showSearch={false}
         buttons={
           <>

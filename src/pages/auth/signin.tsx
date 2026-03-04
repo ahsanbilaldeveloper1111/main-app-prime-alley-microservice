@@ -1,6 +1,6 @@
 import NonLayout from "@layout/NonLayout";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { toast } from "react-toastify";
@@ -294,7 +294,20 @@ const Signin = () => {
       }, 5000);
     } else if (status === "authenticated" && session) {
       setSessionLoading(false);
-      // User is already logged in, redirect them
+      // If NextAuth says authenticated but we have no access token in sessionStorage,
+      // we're likely in a "session expired" loop: user was sent here after tokens were cleared
+      // but NextAuth cookie wasn't cleared yet. Don't redirect to dashboard or we'll loop.
+      const hasAppTokens =
+        typeof window !== "undefined" &&
+        window.sessionStorage?.getItem("accessToken");
+      if (!hasAppTokens) {
+        // Best-effort: clear server-side NextAuth session payload store, then sign out
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+        // Stale NextAuth session without app tokens – clear it and show sign-in form
+        signOut({ redirect: false });
+        return;
+      }
+      // User is already logged in with valid app session, redirect them
       const redirectUrl = callbackUrl
         ? decodeURIComponent(callbackUrl as string)
         : "/dashboard";

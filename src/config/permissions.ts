@@ -28,7 +28,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
-    {path:'/billing',permissions: ['']},
+    {path:'/billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
     {path:'/dialpad-use',permissions: ['']},
     {path:'/crm-new-dashboard',permissions: ['']},
     {path:'/help-center-new',permissions: ['']},
@@ -38,7 +38,8 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
     {path:'/crm-tasks',permissions: ['']},
-   
+    {path:'/main-dashboard',permissions: ['']},
+    {path:'/main-settings',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },
@@ -55,7 +56,7 @@ export const routePermissions: RoutePermission[] = [
     
     { path: '/company', permissions: ['set-company-image-users'] },
     { path: '/audit-logs', permissions: [''] },
-
+   
 
 
 
@@ -132,6 +133,8 @@ export const routePermissions: RoutePermission[] = [
             {path:'/approvals/approval-detailpage',permissions: ['']},
             {path:'/inbox',permissions: ['']},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
+            {path:'/main-dashboard',permissions: ['']},
+            
         ]
     },
     //crm services end
@@ -155,7 +158,7 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.VIEW_CALL_RECORDINGS]
             },
             {
-                path: '/call-analytics',
+                path: '/call-analysis',
                 permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
                 children: [
                     {
@@ -199,8 +202,14 @@ export const routePermissions: RoutePermission[] = [
             { path: '/orders-delivery',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
+            
+            { path: '/tasks-old', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            { path: '/tasks-old/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+
             { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            {path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
+            { path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            { path: '/calendar', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            
             {
                 path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
                 children: [
@@ -273,53 +282,29 @@ export const routePermissions: RoutePermission[] = [
 
     //netops services start
     {
-        path: '/netops',
+        path: '/pulse',
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD] },
+            { path: '/customers', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            {  path: '/devices',permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]},
+            {path: '/services', permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]},
+            { path: '/alerts',permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]},
+            {path: '/uptime-sla',permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]},
+            {path: '/server-insights',permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            {path: '/application-monitoring',permissions: [PERMISSIONS.NETOPS_SERVICES]},
             {
-                path: '/dashboard',
-                permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD]
+                path: '/hosts', permissions: [PERMISSIONS.NETOPS_SERVICES],
+                children: [
+                    { path: '/:hostid', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+                ]
             },
-            {
-                path: '/devices',
-                permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]
-            },
-            {
-                path: '/services',
-                permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]
-            },
-            {
-                path: '/alerts',
-                permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]
-            },
-            {
-                path: '/uptime-sla',
-                permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
-            },
-            {
-                path: '/server-insights',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/application-monitoring',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/hosts',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/host-groups',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/gateways',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
-            {
-                path: '/gateway-ports',
-                permissions: [PERMISSIONS.NETOPS_SERVICES]
-            },
+            { path: '/host-groups', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            { path: '/templates', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            { path: '/events', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/triggers', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/gateways', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/gateway-ports', permissions: [PERMISSIONS.NETOPS_SERVICES]},
         ]
     },
     //netops services end
@@ -339,11 +324,11 @@ export const routePermissions: RoutePermission[] = [
             { path: '/sub-categories', permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT] },
 
             
-            {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/attendance',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
             {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]
     },
-    //workforce services end
+    //workforce services ends
 
 
     //reports services start

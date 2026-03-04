@@ -327,7 +327,7 @@ const ModuleSubCategories = () => {
       />
 
       <PageHeader
-        title="Sub Categories"
+        title=""
         buttons={
           <>
          <Button 
