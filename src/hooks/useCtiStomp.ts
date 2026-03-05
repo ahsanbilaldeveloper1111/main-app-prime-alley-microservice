@@ -5,6 +5,7 @@ import { getCrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { useAuth } from "./useAuth";
 import { useRouter } from "next/router";
 import { getGlobalExcludedPaths } from "@utils/Helper";
+import tokenService from "@utils/tokenService";
 
 interface CtiDevice {
   dn: string;
@@ -1088,6 +1089,17 @@ export default function useCtiStomp(
     try {
       if(typeof window !== 'undefined' && globalExcludedPaths.some(path => window.location.pathname?.includes(path)) && !isAuthenticated) {
         throw new Error("User not authenticated");
+      }
+      // Wait for token to be in sessionStorage so axios interceptor can send Authorization header.
+      // After login, TokenServiceProvider/useAuth may not have synced yet when this runs.
+      const tokenWaitMs = 4000;
+      const tokenCheckInterval = 100;
+      const start = Date.now();
+      while (!tokenService.getAccessToken() && Date.now() - start < tokenWaitMs) {
+        await new Promise((r) => setTimeout(r, tokenCheckInterval));
+      }
+      if (!tokenService.getAccessToken()) {
+        console.warn(`[${instanceIdRef.current}] No access token in sessionStorage after ${tokenWaitMs}ms, /cti/connect may return 401`);
       }
       const response = await axiosInstance.get("/cti/connect", {
         headers: {
@@ -2396,6 +2408,11 @@ export default function useCtiStomp(
       return;
     }
 
+    // Only call connect when user is authenticated; avoid 401 from /cti/connect
+    if (!isAuthenticated || !authInitialized) {
+      return;
+    }
+
     const manager = crossTabManagerRef.current;
     const currentInstanceId = instanceIdRef.current;
 
@@ -2767,8 +2784,8 @@ export default function useCtiStomp(
           setError("Failed to get token");
         });
     }
-    // Only depend on isMasterTab and isGlobalInstance - getBearerToken is stable (memoized with empty deps)
-  }, [isMasterTab, isGlobalInstance]);
+    // Re-run when auth state changes so we connect only when authenticated
+  }, [isMasterTab, isGlobalInstance, isAuthenticated, authInitialized]);
 
   // Cross-tab integration: Listen to events from master tab
   useEffect(() => {

@@ -1297,121 +1297,9 @@ font-weight:600;
                 </button>
               )}
 
-              {/* Notifications - always show icon in topbar */}
-              {/* <Dropdown 
-                show={showNotificationDropdown} 
-                onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}
-                align="end"
-              >
-                <Dropdown.Toggle 
-                  as="button"
-                  className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
-                  data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                  style={{ border: 'none', background: 'transparent' }}
-                >
-                  <Bell size={14} />
-                </Dropdown.Toggle>
-
-                  <Dropdown.Menu style={{ width: '350px', maxWidth: '90vw', marginTop: '8px' }}>
-                    <div className="p-3 border-bottom">
-                      <h6 className="m-0" style={{ fontSize: '14px', fontWeight: 600 }}>Notifications</h6>
-                    </div>
-
-                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                      {(() => {
-                        const grouped = groupNotificationsByDate();
-                        const allNotifications = [
-                          ...grouped.today,
-                          ...grouped.yesterday,
-                          ...grouped.older
-                        ].slice(0, 10);
-
-                        if (allNotifications.length === 0) {
-                          return (
-                            <div className="p-4 text-center text-muted">
-                              <p className="mb-0" style={{ fontSize: '13px' }}>No notifications</p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div>
-                            {allNotifications.map((notification) => (
-                              <div 
-                                key={notification.id}
-                                className={`p-3 border-bottom ${notification.read ? '' : 'bg-light'}`}
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => {
-                                  if (notification.read === false && !notification.id.startsWith('dummy-')) {
-                                    markAsRead(notification.id);
-                                  }
-                                  if (notification.url) {
-                                    router.push(notification.url);
-                                  }
-                                }}
-                              >
-                                <div className="d-flex gap-3">
-                                  <div style={{ width: '36px', height: '36px', flexShrink: 0 }}>
-                                    {notification.icon ? (
-                                      <img 
-                                        src={notification.icon} 
-                                        alt="" 
-                                        style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                                      />
-                                    ) : (
-                                      <div style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        borderRadius: '50%', 
-                                        background: '#e3f2fd',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                      }}>
-                                        <Bell size={14} color="#006162" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div className="d-flex justify-content-between mb-1">
-                                      <h6 className="mb-0" style={{ fontSize: '13px', fontWeight: 600 }}>
-                                        {notification.title}
-                                      </h6>
-                                      <span className="text-muted" style={{ fontSize: '11px', whiteSpace: 'nowrap', marginLeft: '8px' }}>
-                                        {formatTimeAgo(notification.timestamp)}
-                                      </span>
-                                    </div>
-                                    <p className="mb-0 text-muted" style={{ fontSize: '12px' }}>
-                                      {notification.description || notification.body}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="p-3 border-top d-flex justify-content-between">
-                      <button 
-                        className="btn btn-link btn-sm p-0"
-                        onClick={markAllAsRead}
-                        style={{ fontSize: '13px' }}
-                      >
-                        Mark all as read
-                      </button>
-                        <button 
-                        className="btn btn-link btn-sm p-0"
-                        onClick={() => router.push('/notifications')}
-                        style={{ fontSize: '13px' }}
-                      >
-                        View all
-                      </button>
-                    </div>
-                  </Dropdown.Menu>
-                </Dropdown> */}
+              
 {/* Notifications - opens sidebar */}
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
 <button
                 className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
                 data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
@@ -1419,20 +1307,26 @@ font-weight:600;
                 title="Notifications"
               >
                 <Bell size={14} />
-              </button>
+                  </button>
+              )}
  {/* Help Icon */}
+
+ {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
                 <button className="crm-prime-topbar-icon" title="Help"
                 onClick={() => router.push('/help-center')}
                 >
                 <HelpCircle size={18} />
-              </button>
+                  </button>
+              )}
 
-              {/* Settings Icon */}
+                {/* Settings Icon */}
+              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
                 <button className="crm-prime-topbar-icon" title="Settings"
                 onClick={() => router.push('/main-settings')}
                 >
                 <Settings size={18} />
-              </button>
+                  </button>
+              )}
               {/* Divider */}
               <div style={{ 
                 width: '1px', 
@@ -1442,7 +1336,8 @@ font-weight:600;
               }} />
 
               {/* Assistant Icon */}
-              {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
+                {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
+                {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
               <button 
                 className="crm-prime-topbar-icon" 
                 title="AI Assistant" 
@@ -1451,7 +1346,8 @@ font-weight:600;
               >
                 <Sparkles size={18} />
                 <span style={{ fontSize: '13px', fontWeight: 500 }}>AI Assistant</span>
-              </button>
+                  </button>
+              )}
 
               {/* Divider */}
               <div style={{ 
@@ -1522,13 +1418,14 @@ font-weight:600;
                               {loggedInName?.charAt(0)?.toUpperCase() || 'H'}
                             </div>
                           )}
-                        </div>
+                          </div>
+                          
                         <div className="user-dropdown-header-text">
                           <div className="user-dropdown-name">
-                            {loggedInName || 'User'}
+                            {loggedInName || ''}
                           </div>
                           <div className="user-dropdown-email">
-                            {session?.user?.email || 'user@example.com'}
+                            {session?.user?.email}
                           </div>
                           <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences
