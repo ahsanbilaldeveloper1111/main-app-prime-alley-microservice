@@ -3096,7 +3096,7 @@ const CrmProspectsManagement = () => {
       },
       {
         key: "user_extension",
-        label: "Assigned To",
+        label: "Owner",
         sortable: true,
         type: "badge",
         accessor: (row) => {
@@ -3442,7 +3442,7 @@ const CrmProspectsManagement = () => {
       },
       {
         key: "user_extension",
-        name: "Assigned To",
+        name: "Owner",
         selector: (row: any) => row.user_extension,
         sortable: true,
         cell: (props: any) => (

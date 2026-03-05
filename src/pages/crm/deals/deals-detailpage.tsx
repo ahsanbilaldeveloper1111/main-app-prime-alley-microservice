@@ -275,7 +275,7 @@ const DealRecordPage: NextPageWithLayout = () => {
       value: deal?.company_name ?? "--",
     },
     {
-      label: "Deal Owner",
+      label: "Owner",
       value: (() => {
         const rawOwner = deal?.assigned_to ?? null;
         if (!rawOwner) return "--";

@@ -173,6 +173,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
+    business_type_id: null as number | null,
   });
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement>) =>
@@ -187,6 +188,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       setTemplateFieldsData({});
       setBusinessTypeId(null);
       setBusinessTypeOther("");
+      setShowOtherBusinessType(false);
       setShowAllIndustries(false);
     }
   }, [show]);
@@ -221,12 +223,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     }
   }, [show, leadId]);
 
+  
   const fetchLeadData = async () => {
     try {
       setLoadingLead(true);
       const leadData: any = await getLead(leadId);
       setSourceLead(leadData);
-
+      
       // Parse contact_persons
       let contactPersonsArray: any[] = [];
       if (leadData.contact_persons) {
@@ -285,7 +288,23 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
         tax_percentage: "0",
         standard_discount_percentage: "0",
         special_discount_percentage: "0",
+        business_type_id: leadData.business_type_id || null,
       });
+
+      // Set business type controls based on lead data
+      if (leadData.business_type_id) {
+        setBusinessTypeId(Number(leadData.business_type_id));
+        setBusinessTypeOther("");
+        setShowOtherBusinessType(false);
+      } else if (leadData.business_type_other) {
+        setBusinessTypeId(null);
+        setBusinessTypeOther(leadData.business_type_other);
+        setShowOtherBusinessType(true);
+      } else {
+        setBusinessTypeId(null);
+        setBusinessTypeOther("");
+        setShowOtherBusinessType(false);
+      }
 
       // Fetch deal template
       try {
@@ -419,7 +438,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       { field: 'name' as const, name: 'Deal Name' },
       { field: 'stage_id' as const, name: 'Stage' },
       { field: 'expected_close_date' as const, name: 'Expected Close Date' },
-      { field: 'assigned_to' as const, name: 'Assigned to' },
+      { field: 'assigned_to' as const, name: 'Owner' },
       { field: 'currency' as const, name: 'Currency' },
     ];
     return checkRequiredFields(formData, requiredFields);
@@ -736,7 +755,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                       />
                     </div>
                     <div style={fieldWrap}>
-                      {fieldLabel("Assigned to", true)}
+                      {fieldLabel("Owner", true)}
                       <Form.Select
                         value={formData.assigned_to ?? ""}
                         onChange={(e) =>
@@ -876,28 +895,28 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div style={fieldWrap}>
                       {fieldLabel("Select Business Type", true)}
                       <Form.Select
-                        value={
-                          showOtherBusinessType
-                            ? "other"
-                            : businessTypeId
-                              ? String(businessTypeId)
-                              : ""
-                        }
+                      value={
+                        showOtherBusinessType
+                          ? "other"
+                          : businessTypeId
+                          ? String(businessTypeId)
+                          : ""
+                      }
                         onChange={(e) => {
                           const value = e.target.value;
-                          if (value === "other") {
-                            setShowOtherBusinessType(true);
-                            setBusinessTypeId(null);
-                            setBusinessTypeOther("");
-                          } else if (value) {
-                            setShowOtherBusinessType(false);
-                            setBusinessTypeId(Number(value));
-                            setBusinessTypeOther("");
-                          } else {
-                            setShowOtherBusinessType(false);
-                            setBusinessTypeId(null);
-                            setBusinessTypeOther("");
-                          }
+                        if (value === "other") {
+                          setBusinessTypeId(null);
+                          setBusinessTypeOther("");
+                          setShowOtherBusinessType(true);
+                        } else if (value) {
+                          setBusinessTypeId(Number(value));
+                          setBusinessTypeOther("");
+                          setShowOtherBusinessType(false);
+                        } else {
+                          setBusinessTypeId(null);
+                          setBusinessTypeOther("");
+                          setShowOtherBusinessType(false);
+                        }
                         }}
                         style={inputStyle}
                       >
@@ -1312,13 +1331,11 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                           }
                           style={{ ...inputStyle, width: "70px" }}
                         />
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
+                        <Form.Select
                           value={
-                            (Number(item.standard_discount_percentage) || 0) +
-                            (Number(item.special_discount_percentage) || 0) || ""
+                            item.standard_discount_percentage ??
+                            item.special_discount_percentage ??
+                            ""
                           }
                           onChange={(e) =>
                             setEstimationItems((prev) =>
@@ -1329,12 +1346,17 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                                       standard_discount_percentage: e.target.value,
                                       special_discount_percentage: "0",
                                     }
-                                  : li
+                                  : li,
                               )
                             )
                           }
                           style={{ ...inputStyle, width: "70px" }}
-                        />
+                        >
+                          <option value="">Select</option>
+                          <option value="5">5</option>
+                          <option value="10">10</option>
+                          <option value="15">15</option>
+                        </Form.Select>
                         <button
                           type="button"
                           onClick={() => removeLineItem(index)}
@@ -1412,18 +1434,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         onFocus={focusStyle}
                         onBlur={blurStyle}
                       />
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.01}
-                        value={lineItemDiscount || ""}
-                        placeholder="0"
-                        onChange={(e) => setLineItemDiscount(Number(e.target.value) || 0)}
+                      <Form.Select
+                        value={lineItemDiscount ? String(lineItemDiscount) : ""}
+                        onChange={(e) =>
+                          setLineItemDiscount(
+                            e.target.value ? Number(e.target.value) : 0,
+                          )
+                        }
                         style={{ ...inputStyle, width: "70px" }}
-                        onFocus={focusStyle}
-                        onBlur={blurStyle}
-                      />
+                      >
+                        <option value="">Select</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                      </Form.Select>
                       <button
                         type="button"
                         onClick={addLineItem}
