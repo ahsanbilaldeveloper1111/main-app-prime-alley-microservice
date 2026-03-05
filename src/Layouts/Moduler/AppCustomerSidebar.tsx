@@ -746,6 +746,26 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/billing/payment-history', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
+        {
+          id: 'finance-separator-1',
+          title: '---',
+          icon: null,
+          url: ''
+        },
+        { 
+          id: 'finance-quotes', 
+          title: 'Quotes', 
+          icon: <Scroll size={16} />, 
+          url: '/billing/quotes', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+        { 
+          id: 'finance-products', 
+          title: 'Products', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/products', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
     //finance services end

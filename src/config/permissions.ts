@@ -40,6 +40,9 @@ export const routePermissions: RoutePermission[] = [
     {path:'/crm-tasks',permissions: ['']},
     {path:'/main-dashboard',permissions: ['']},
     {path:'/main-settings',permissions: ['']},
+    {path:'/crm/quotes',permissions: ['']},
+    {path:'/billing/quotes',permissions: ['']},
+    {path:'/billing/products',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },
