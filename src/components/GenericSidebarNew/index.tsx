@@ -65,6 +65,7 @@ import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
+import MeetingModal from "@components/MeetingModal";
 import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
 
@@ -249,7 +250,6 @@ export interface GenericSidebarProps {
   // Meeting modal callbacks
   onMeetingSchedule?: (meetingData: {
     title: string;
-    hostType: "user" | "rotation";
     hostEmail: string;
     startDate: string;
     startTime: string;
@@ -257,8 +257,7 @@ export interface GenericSidebarProps {
     attendees: string[];
     location: string;
     reminders: string[];
-    description: string;
-    internalNote: string;
+    summary: string;
   }) => void;
   /** Lead (ticket) ID for CRM meeting association */
   leadId?: number;
@@ -3237,10 +3236,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
 };
 
 // ============================================================================
-// MEETING/SCHEDULE MODAL COMPONENT - Add this after TaskModal in your file
+// LEGACY MEETING/SCHEDULE MODAL (kept for reference, no longer used)
 // ============================================================================
 
-interface MeetingModalProps {
+interface LegacyMeetingModalProps {
   isOpen: boolean;
   onClose: () => void;
   hostEmail?: string;
@@ -3248,19 +3247,7 @@ interface MeetingModalProps {
   /** Single email, comma-separated string, or array of emails */
   attendeeEmail?: string | string[];
   attendeeName?: string;
-  onSchedule: (meetingData: {
-    title: string;
-    hostType: "user" | "rotation";
-    hostEmail: string;
-    startDate: string;
-    startTime: string;
-    endTime: string;
-    attendees: string[];
-    location: string;
-    reminders: string[];
-    description: string;
-    internalNote: string;
-  }) => void | Promise<void>;
+  onSchedule: (meetingData: any) => void | Promise<void>;
 }
 
 const normalizeAttendeeEmails = (v?: string | string[]): string[] => {
@@ -3272,7 +3259,7 @@ const normalizeAttendeeEmails = (v?: string | string[]): string[] => {
     .filter(Boolean);
 };
 
-const MeetingModal: React.FC<MeetingModalProps> = ({
+const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
   isOpen,
   onClose,
   hostEmail = "user@example.com",
@@ -5402,7 +5389,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const handleMeetingSchedule = async (
     meetingData: {
       title: string;
-      hostType: "user" | "rotation";
       hostEmail: string;
       startDate: string;
       startTime: string;
@@ -5410,8 +5396,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       attendees: string[];
       location: string;
       reminders: string[];
-      description: string;
-      internalNote: string;
+      summary: string;
     },
     record?: {
       id: number;
@@ -5463,13 +5448,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         ...(meetingData.reminders?.length > 0 && {
           reminders: meetingData.reminders,
         }),
-        ...([meetingData.description, meetingData.internalNote].filter(Boolean)
-          .length > 0 && {
-          summary: [meetingData.description, meetingData.internalNote]
-            .filter(Boolean)
-            .join("\n\n")
-            .slice(0, 255),
-        }),
+        ...(meetingData.summary?.trim()
+          ? { summary: meetingData.summary.trim().slice(0, 255) }
+          : {}),
       });
       onMeetingSchedule?.(meetingData);
     } catch (err: unknown) {
@@ -7308,14 +7289,22 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         userAddress={ctiUserAddress}
       />
 
-      {/* Meeting Modal - Rendered as floating window */}
+      {/* Meeting Modal - Rendered as floating window (shared component, same as prospects) */}
       <MeetingModal
         isOpen={showMeetingModal}
         onClose={handleMeetingClose}
-        hostEmail={senderEmail}
-        hostName={senderName}
-        attendeeEmail={emailList}
+        hostEmail={session?.user?.email ?? ""}
+        hostName={session?.user?.name ?? ""}
+        attendeeEmail={
+          Array.isArray(emailList)
+            ? emailList[0]
+            : typeof emailList === "string"
+              ? emailList
+              : ""
+        }
         attendeeName={title}
+        recordType={record?.type as any}
+        recordId={record?.id}
         onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
       />
 

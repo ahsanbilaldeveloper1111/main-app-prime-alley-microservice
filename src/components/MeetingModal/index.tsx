@@ -133,8 +133,15 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
 
   const getWeekDayDate = (index: number) => {
     const dt = new Date(weekStartDate);
-    dt.setDate(weekStartDate.getDate() + index + 1);
+    dt.setDate(weekStartDate.getDate() + index);
     return dt;
+  };
+
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const [meetingsForCalendar, setMeetingsForCalendar] = useState<
@@ -142,7 +149,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   >([]);
 
   useEffect(() => {
-    if (!isOpen) return;
+        if (!isOpen) return;
     if (!recordType || !recordId || Number.isNaN(Number(recordId))) {
       setMeetingsForCalendar([]);
       return;
@@ -365,7 +372,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
       await onSchedule({
         title,
         hostEmail: selectedHost,
-        startDate: startDate.toISOString(),
+        startDate: formatDateForInput(startDate),
         startTime,
         endTime,
         attendees: cleanAttendees,
@@ -609,7 +616,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     <input
                       ref={startDateInputRef}
                       type="date"
-                      value={startDate.toISOString().slice(0, 10)}
+                      value={formatDateForInput(startDate)}
                       onChange={(e) => {
                         const v = e.target.value;
                         if (!v) return;
@@ -1362,6 +1369,9 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       onClick={() => {
                         const d = getWeekDayDate(dayIndex);
                         handleDateSelect(d);
+                        const startHourStr = hour.toString().padStart(2, '0');
+                        setStartTime(`${startHourStr}:00`);
+                        setEndTime(`${startHourStr}:30`);
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#f0f4f8';

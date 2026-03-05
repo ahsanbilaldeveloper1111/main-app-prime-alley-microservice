@@ -7388,7 +7388,6 @@ const CrmProspectsManagement = () => {
             recordId={
               selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
             }
-            quickActions={sidebarQuickActions}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
             crmSummary={
