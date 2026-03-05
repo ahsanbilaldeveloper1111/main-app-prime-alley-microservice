@@ -16,13 +16,14 @@ import {
   BusinessTypeData,
   getDealTemplate,
   DealTemplateData,
+  DealTemplateField,
   getIndustries,
   IndustryData,
   getCrmProducts,
   CrmProduct,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Badge, Modal } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Alert, Badge, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
@@ -30,6 +31,7 @@ import { useSession } from "next-auth/react";
 import "react-phone-number-input/style.css";
 import { Country, State, City } from "country-state-city";
 import {
+  FiSave,
   FiArrowLeft,
   FiDatabase,
   FiTarget,
@@ -39,7 +41,9 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  AlertCircle,
   X,
+  Edit,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -48,6 +52,11 @@ import { useRouter } from "next/router";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import FormModal from "../../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
+import DatatableActionButton from "@components/DatatableActionButton";
 import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
 
 const CreateLead = () => {

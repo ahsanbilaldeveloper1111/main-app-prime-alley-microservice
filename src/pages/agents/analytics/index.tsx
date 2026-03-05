@@ -5,6 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 import {
   getFaqsInboundPaginated,
   type OutboundCallItem,
@@ -21,6 +22,7 @@ import {
   X,
   Filter,
   ArrowUpDown,
+  ThumbsUp,
   ThumbsDown,
   FileText,
   Timer,
@@ -39,7 +41,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 
 interface Session {

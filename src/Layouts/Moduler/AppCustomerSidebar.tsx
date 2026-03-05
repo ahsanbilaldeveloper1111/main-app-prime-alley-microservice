@@ -1,55 +1,80 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  LayoutDashboard,
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  LayoutDashboard, 
   Users,
+  ChevronDown,
   FileText,
   Eye,
   ShoppingBag,
   Briefcase,
+  Target,
+  Megaphone,
+  Database,
   BarChart3,
   Phone,
+  Languages,
+  AudioLines,
+  CassetteTape,
   PhoneCall,
+  List,
   CreditCard,
+  Settings,
   History,
+  ChartNoAxesCombined,
   FileChartPie,
   Ban,
+  RadioTower,
   Workflow,
+  NotebookText,
   DollarSign,
+  MonitorSpeaker,
   Monitor,
   Server,
+  Search,
+  Menu,
   X,
   UserSearch,
   Handshake,
+  Scroll,
+  Layers,
   ReceiptText,
   Activity,
   Contact,
   Voicemail,
+  Inbox,
   Wifi,
+  ClipboardCheck,
+  ClipboardList,
   MonitorCheck,
   User,
+  VoicemailIcon,
+  Bot,
   Calendar,
   Bell,
   Clock,
   MessageCircle,
+  Shield,
   Folder,
   UserPlus,
   CheckCheck,
   Layers2,
+  Map,
   ChevronRight,
   ChevronLeft,
-  House,
-  Megaphone,
-  Settings,
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/router";
+  House
+} from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/router';
+import logodark from '@assets/images/Prime-Alley-Logo.png';
 
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
+import { getCurrentUserCompanyImage } from "@utils/company";
 import { useSession } from "next-auth/react";
 
 // Destructure constants for easier use
-const { MENU_LABELS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
+const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
 
 interface SubMenuItem {
   id: string;
@@ -85,688 +110,720 @@ interface SidebarProps {
   setSidebarExpanded?: (expanded: boolean) => void;
 }
 
-const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
-  sidebarOpen,
+const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({ 
+  sidebarOpen, 
   setSidebarOpen,
   isSidebarExpanded: controlledExpanded,
   setSidebarExpanded: setControlledExpanded,
 }) => {
   const { data: session, status } = useSession();
   const [internalExpanded, setInternalExpanded] = useState(false);
-  const isSidebarExpanded = controlledExpanded ?? internalExpanded;
+  const isSidebarExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
   const setIsSidebarExpanded = setControlledExpanded ?? setInternalExpanded;
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
-  const [hoveredItemRect, setHoveredItemRect] = useState<{
-    top: number;
-    height: number;
-  } | null>(null);
+  const [hoveredItemRect, setHoveredItemRect] = useState<{ top: number; height: number } | null>(null);
   const [isFlyoutPinned, setIsFlyoutPinned] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
-  const prevPathnameRef = useRef<string>("");
+  const prevPathnameRef = useRef<string>('');
+  const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<string | null>(null);
+  const companyImageUrlRef = useRef<string | null>(null);
 
-  const [userCompanyName, setUserCompanyName] = useState("");
+  const [userCompanyName, setUserCompanyName] = useState('');
   useEffect(() => {
-    if (status !== "loading" && session && globalThis.window !== undefined) {
-      setUserCompanyName(session.user.company_name || "");
-    }
-  }, [status, session]);
+		if (status !=="loading" && session) {
+		  if (typeof window !== "undefined") {
+		    setUserCompanyName(session.user.company_name || '');
+		  }
+		}
+	}, [ status, session]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUserCompanyImage()
+      .then((blob) => {
+        if (cancelled) return;
+        if (blob && blob.size > 0) {
+          const url = URL.createObjectURL(blob);
+          companyImageUrlRef.current = url;
+          setCurrentUserCompanyImageUrl(url);
+        } else {
+          setCurrentUserCompanyImageUrl(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentUserCompanyImageUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      const url = companyImageUrlRef.current;
+      if (url) {
+        URL.revokeObjectURL(url);
+        companyImageUrlRef.current = null;
+      }
+    };
+  }, []);
 
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
 
   // Only these modules are enabled; others are hidden (can re-enable by adding id to this list)
-  const ENABLED_MODULE_IDS = new Set([
-    "dashboard",
-    "crm",
-    "communications",
-    "planner",
-    "pulse",
-    "virtual-agents",
-    "finance",
-    "compliance",
-    "workforce",
-    "unified-reports",
-    "audit-logs",
-    "settings",
-  ]);
+  const ENABLED_MODULE_IDS = [
+    'dashboard',     
+    'crm',          
+    'communications',
+    'planner',
+    'pulse',
+    'virtual-agents',
+    'finance',
+    'compliance',
+    'workforce',
+    'unified-reports',
+    'audit-logs',
+    'settings',
+  ];
 
   const mainMenuItems: MainMenuItem[] = [
     {
-      id: "dashboard",
-      key: "dashboard",
-      permission: "",
+      id: 'dashboard',
+      key: 'dashboard',
+      permission: '',
       icon: <House size={16} />,
       color: MENU_COLORS.DASHBOARD,
       title: "Overview",
       label: "Overview",
-      url: "/dashboard",
+      url: '/dashboard',
     },
     {
-      id: "dashboard-unified-workspace",
-      key: "dashboard-unified-workspace",
+      id: 'dashboard-unified-workspace',
+      key: 'dashboard-unified-workspace',
       icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.DASHBOARD,
       permission: PERMISSIONS.VIEW_UNIFIED_WORKSPACE,
       title: "Unified Workspace",
       label: "Unified Workspace",
-      url: "/unified-workspace",
+      url: '/unified-workspace',
     },
 
     //crm services start
     {
-      id: "crm",
-      key: "crm",
+      id: 'crm',
+      key: 'crm',
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
       title: "Smart CRM",
       label: "Smart CRM",
-      url: "",
+      url: '',
       subItems: [
         {
-          id: "crm-dashboard",
+          id: 'crm-dashboard',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CRM_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DASHBOARD,
-          url: "/crm/dashboard",
+          url: '/crm/dashboard'
         },
         {
-          id: "crm-prospects-management",
+          id: 'crm-prospects-management',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: "/crm/prospects",
+          url: '/crm/prospects',
         },
         {
-          id: "crm-leads",
+          id: 'crm-leads',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.LEADS,
           icon: <Contact size={16} />,
           permission: PERMISSIONS.VIEW_CRM_LEADS,
-          url: "/crm/leads",
+          url: '/crm/leads'
         },
         {
-          id: "crm-deals",
+          id: 'crm-deals',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS,
           icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: "/crm/deals",
+          url: '/crm/deals'
         },
         {
-          id: "crm-orders",
+          id: 'crm-orders',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: "/crm/orders",
+          url: '/crm/orders'
         },
         {
-          id: "crm-deals-approval",
+          id: 'crm-deals-approval',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
           icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: "/crm/approvals",
+          url: '/crm/approvals', 
         },
         {
-          id: "crm-separator-1",
-          title: "---",
+          id: 'crm-separator-1',
+          title: '---',
           icon: null,
-          url: "",
+          url: ''
         },
         {
-          id: "crm-company",
+          id: 'crm-company',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: "/crm/companies",
+          url: '/crm/companies'
         },
         {
-          id: "crm-inbox",
+          id: 'crm-inbox',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX_CRM,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: "/crm/inbox",
+          url: '/crm/inbox'
         },
         {
-          id: "crm-activities",
-          title:
-            (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>)
-              .CRM_ACTIVITY ?? "Activities",
+          id: 'crm-activities',
+          title: (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>).CRM_ACTIVITY ?? 'Activities',
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: "/crm/activities",
+          url: '/crm/activities'
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //crm services end
-
+    
     //communications services start
     {
-      id: "communications",
-      key: "communications",
-      permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+      id: 'communications',
+      key: 'communications',
+      permission: PERMISSIONS.CALL_HISTORY_SERVICES,
       icon: <Phone size={16} />,
       color: MENU_COLORS.CALL_HISTORY,
-      title: "Communications",
-      label: "Communications",
-      url: "",
+      title: 'Communications',
+      label: 'Communications',
+      url: '',
       subItems: [
         {
-          id: "call-history-dashboard",
-          title: "Dashboard",
+          id: 'call-history-dashboard',
+          title: 'Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
-          url: "/communications/dashboard",
+          url: '/communications/dashboard'
         },
         {
-          id: "call-history-logs",
+          id: 'call-history-logs',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_LOGS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_LOGS,
-          url: "/communications/call-logs",
+          url: '/communications/call-logs'
         },
         {
-          id: "call-history-recordings",
+          id: 'call-history-recordings',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_RECORDINGS,
           icon: <Voicemail size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
-          url: "/communications/recordings",
+          url: '/communications/recordings'
         },
         {
-          id: "ai-ml-calls-analysis",
-          title: "Calls Analysis",
+          id: 'ai-ml-calls-analysis',
+          title: 'Calls Analysis',
           icon: <FileChartPie size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: "/communications/call-analysis",
+          url: '/communications/call-analysis'
         },
         {
-          id: "wallboards-live",
+          id: 'wallboards-live',
           title: "Wallboards (Live)",
           icon: <MonitorCheck size={16} />,
           permission: PERMISSIONS.VIEW_CTI,
-          url: "/communications/wallboards-live",
+          url: '/communications/wallboards-live'
         },
         {
-          id: "text-messages-communications",
+          id: 'text-messages-communications',
           title: "Text Messages",
           icon: <MessageCircle size={16} />,
           permission: PERMISSIONS.VIEW_GSM_INBOX,
-          url: "/communications/text-messages",
+          url: '/communications/text-messages'
         },
 
         {
-          id: "live-calls-campaign-manager",
-          title: "Campaigns Manager",
+          id: 'live-calls-campaign-manager',
+          title: 'Campaigns Manager',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT,
-          url: "/communications/campaign-manager",
+          url: '/communications/campaign-manager'
         },
         {
-          id: "live-calls-campaign-console",
-          title: "Campaign Console",
+          id: 'live-calls-campaign-console',
+          title: 'Campaign Console',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
-          url: "/communications/campaign-console",
+          url: '/communications/campaign-console'
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+
+
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //communications services end
 
     //planner services start
     {
-      id: "planner",
-      key: "planner",
+      id: 'planner',
+      key: 'planner',
       permission: PERMISSIONS.WORK_PLANNER_SERVICES,
       icon: <Calendar size={16} />,
       color: MENU_COLORS.BILLING,
       title: "Planner",
       label: "Planner",
-      url: "",
+      url: '',
       subItems: [
-        {
-          id: "planner-dashboard",
-          title: "Dashboard",
-          icon: <Folder size={16} />,
-          url: "/planner/dashboard",
-          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER,
-        },
-        {
-          id: "planner-projects",
-          title: "Projects",
-          icon: <Folder size={16} />,
-          url: "/planner/projects",
-          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER,
-        },
-        {
-          id: "work-planner-recurring-reminders",
-          title: "Recurring Reminders",
-          icon: <Bell size={16} />,
-          url: "/planner/recurring-reminders",
-          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER,
-        },
-        {
-          id: "planner-todo-list",
-          title: "Tasks",
-          icon: <Clock size={16} />,
-          url: "/planner/tasks",
-          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
-        },
-        {
-          id: "planner-calendar",
-          title: "Calendar",
-          icon: <Calendar size={16} />,
-          url: "/planner/calendar",
-          permission: PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER,
-        },
 
         {
-          id: "work-planner-orders",
-          title: "Orders Delivery",
-          icon: <ReceiptText size={16} />,
-          url: "/planner/orders-delivery",
-          permission: PERMISSIONS.VIEW_ORDERS_DELIVERY_WORK_PLANNER,
+          id: 'planner-dashboard',
+          title: 'Dashboard',
+          icon: <Folder size={16} />,
+          url: '/planner/dashboard',
+          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER 
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+        {
+          id: 'planner-projects',
+          title: 'Projects',
+          icon: <Folder size={16} />,
+          url: '/planner/projects',
+          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
+        },
+        // { 
+        //   id: 'work-planner-recurring-reminders', 
+        //   title: 'Recurring Reminders', 
+        //   icon: <Bell size={16} />, 
+        //   url: '/planner/recurring-reminders', 
+        //   permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+        // },
+        // { 
+        //   id: 'planner-todo-list', 
+        //   title: 'To-Do', 
+        //   icon: <Clock size={16} />, 
+        //   url: '/planner/todo', 
+        //   permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
+        // },
+        {
+          id: 'planner-tasks',
+          title: 'Tasks',
+          icon: <Clock size={16} />,
+          url: '/planner/tasks',
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+        },
+        {
+          id: 'planner-calendar',
+          title: 'Calendar',
+          icon: <Calendar size={16} />,
+          url: '/planner/calendar',
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+        },
+
+      
+        { 
+          id: 'work-planner-orders', 
+          title: 'Orders Delivery', 
+          icon: <ReceiptText size={16} />, 
+          url: '/planner/orders-delivery', 
+          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+        },
+       
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //planner services end
 
     //virtual agent start
     {
-      id: "virtual-agents",
-      key: "virtual-agents",
-      permission: PERMISSIONS.VIRTUAL_AGENTS_SERVICES,
+      id: 'virtual-agents',
+      key: 'virtual-agents',
+      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
       icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: "Virtual Agents",
       label: "Virtual Agents",
-      url: "",
+      url: '',
       subItems: [
         {
-          id: "virtual-agents-outbound-agent",
-          title: "Outbound Agent",
+          id: 'virtual-agents-outbound-agent',
+          title: 'Outbound Agent',
           icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
-          url: "/agents/outbound-agent",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/outbound-agent'
         },
         {
-          id: "virtual-agents-inbound-agent",
-          title: "Inbound Agent",
+          id: 'virtual-agents-inbound-agent',
+          title: 'Inbound Agent',
           icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
-          url: "/agents/inbound-agent",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/inbound-agent'
         },
         {
-          id: "virtual-agents-agent-campaigns",
-          title: "Agent Campaigns",
+          id: 'virtual-agents-agent-campaigns',
+          title: 'Agent Campaigns',
           icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
-          url: "/agents/agent-campaigns",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/agent-campaigns'
         },
         {
-          id: "virtual-agents-create-campaigns",
-          title: "Create Campaign",
+          id: 'virtual-agents-create-campaigns',
+          title: 'Create Campaign',
           icon: <User size={16} />,
-          permission: PERMISSIONS.CREATE_CAMPAIGN_AIML,
-          url: "/agents/create-campaign",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/create-campaign'
         },
         {
-          id: "ai-agent-outbound-campaigns-pitch-deck",
-          title: "Pitch Deck",
+          id: 'ai-agent-outbound-campaigns-pitch-deck',
+          title: 'Pitch Deck',
           icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_PITCH_DECK_AIML,
-          url: "/agents/pitch-deck",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/pitch-deck'
         },
         {
-          id: "virtual-agents-live-monitoring",
-          title: "Live Monitoring",
+          id: 'virtual-agents-live-monitoring',
+          title: 'Live Monitoring',
           icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.VIEW_LIVE_MONITORING_AIML,
-          url: "/agents/live-monitoring",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/live-monitoring'
         },
         {
-          id: "virtual-agents-analytics",
-          title: "Analytics",
+          id: 'virtual-agents-analytics',
+          title: 'Analytics',
           icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
-          url: "/agents/analytics",
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/analytics'
         },
         {
-          id: "virtual-agents-usage-reports",
-          title: "Usage Reports",
+          id: 'virtual-agents-usage-reports',
+          title: 'Usage Reports',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_USAGE_REPORTS_AIML,
-          url: "/agents/usage-reports",
-        },
-      ],
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/agents/usage-reports'
+        }
+      ]
     },
     //virtual agent end
 
+
     //netops services start
     {
-      id: "pulse",
-      key: "pulse",
+      id: 'pulse',
+      key: 'pulse',
       permission: PERMISSIONS.NETOPS_SERVICES,
       icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.NETOPS,
       title: "Pulse",
       label: "Pulse",
-      url: "",
+      url: '',
       subItems: [
         {
-          id: "pulse-dashboard",
+          id: 'pulse-dashboard',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: "/pulse/dashboard",
+          url: '/pulse/dashboard'
         },
         {
-          id: "pulse-hosts",
-          title: "Hosts",
+          id: 'pulse-hosts',
+          title: 'Hosts',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/hosts",
+          url: '/pulse/hosts'
         },
         {
-          id: "pulse-hosts-groups",
-          title: "Hosts Groups",
+          id: 'pulse-hosts-groups',
+          title: 'Hosts Groups',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/host-groups",
+          url: '/pulse/host-groups'
         },
         {
-          id: "pulse-hosts-alerts",
-          title: "Alerts",
+          id: 'pulse-hosts-alerts',
+          title: 'Alerts',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/alerts",
+          url: '/pulse/alerts'
         },
         {
-          id: "pulse-templates",
-          title: "Templates",
+          id: 'pulse-templates',
+          title: 'Templates',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/templates",
+          url: '/pulse/templates'
         },
         {
-          id: "pulse-events",
-          title: "Events",
+          id: 'pulse-events',
+          title: 'Events',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/events",
+          url: '/pulse/events'
         },
         {
-          id: "pulse-customers",
-          title: "Customers",
+          id: 'pulse-customers',
+          title: 'Customers',
           icon: <Megaphone size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: "/pulse/customers",
+          url: '/pulse/customers'
         },
 
+
         {
-          id: "pulse-uptime-sla",
+          id: 'pulse-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: "/pulse/uptime-sla",
+          url: '/pulse/uptime-sla'
         },
         {
-          id: "pulse-select-server",
-          title: "Server Insights",
+          id: 'pulse-select-server',
+          title: 'Server Insights',
           icon: <Server size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/pulse/server-insights",
+          url: '/pulse/server-insights'
         },
         {
-          id: "pulse-gateways",
-          title: "Gateways",
+          id: 'pulse-gateways',
+          title: 'Gateways',
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/pulse/gateways",
+          url: '/pulse/gateways'
         },
         {
-          id: "pulse-gateway-ports",
-          title: "Gateway Ports",
+          id: 'pulse-gateway-ports',
+          title: 'Gateway Ports',
           icon: <Wifi size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: "/pulse/gateway-ports",
+          url: '/pulse/gateway-ports'
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+       
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //netops services end
 
     //compliance services start
     {
-      id: "compliance",
-      key: "compliance",
+      id: 'compliance',
+      key: 'compliance',
       permission: PERMISSIONS.DNCR_SERVICES,
       icon: <Ban size={16} />,
       color: MENU_COLORS.DNCR,
       title: MENU_LABELS.COMPLIANCES,
       label: MENU_LABELS.COMPLIANCES,
-      url: "",
+      url: '',
       subItems: [
         {
-          id: "compliance-api-number-check",
+          id: 'compliance-api-number-check',
           title: "API Number Check",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: "/compliance/api-number-check",
+          url: '/compliance/api-number-check'
         },
         {
-          id: "compliance-cdr-records",
+          id: 'compliance-cdr-records',
           title: "CDR Records",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_CDR_DNCR,
-          url: "/compliance/cdr-records",
+          url: '/compliance/cdr-records'
         },
         {
-          id: "dncr-local-dnd-call-block",
+          id: 'dncr-local-dnd-call-block',
           title: "Add Records",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
-          url: "/compliance/add-records",
-        },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+          url: '/compliance/add-records'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //compliance services end
 
     //workforce services start
     {
-      id: "workforce",
-      key: "workforce",
+      id: 'workforce',
+      key: 'workforce',
       permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
       icon: <Users size={16} />,
       color: MENU_COLORS.BILLING,
       title: "Workforce",
       label: "Workforce",
-      url: "",
+      url: '',
       subItems: [
-        {
-          id: "workforce-dashboard",
-          title: "Dashboard",
-          icon: <LayoutDashboard size={16} />,
-          url: "/workforce/dashboard",
-          permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT,
+        { 
+          id: 'workforce-dashboard', 
+          title: 'Dashboard', 
+          icon: <LayoutDashboard size={16} />, 
+          url: '/workforce/dashboard', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-org-chart', 
+          title: 'Org Chart', 
+          icon: <Layers2 size={16} />, 
+          url: '/workforce/org-chart', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
         },
         {
-          id: "workforce-org-chart",
-          title: "Org Chart",
-          icon: <Layers2 size={16} />,
-          url: "/workforce/org-chart",
-          permission:
-            PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT,
-        },
-        {
-          id: "workforce-employees",
-          title: "Employees",
+          id: 'workforce-employees',
+          title: 'Employees',
           icon: <Users size={16} />,
-          url: "/workforce/employees",
-          permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT,
+          url: '/workforce/employees',
+          permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
         },
         {
-          id: "workforce-attendence",
-          title: "Attendance",
+          id: 'workforce-attendence',
+          title: 'Attendance',
           icon: <Clock size={16} />,
-          url: "/workforce/attendance",
-          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT,
+          url: '/workforce/attendance',
+          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
         },
-        {
-          id: "workforce-journey",
-          title: "Journey",
-          icon: <UserPlus size={16} />,
-          url: "/workforce/journey",
-          permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT,
+        { 
+          id: 'workforce-journey', 
+          title: 'Journey', 
+          icon: <UserPlus size={16} />, 
+          url: '/workforce/journey', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
         },
-        {
-          id: "workforce-approval-requests",
-          title: "Approval Requests",
-          icon: <CheckCheck size={16} />,
-          url: "/workforce/approval-requests",
-          permission:
-            PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT,
+        { 
+          id: 'workforce-approval-requests', 
+          title: 'Approval Requests', 
+          icon: <CheckCheck size={16} />, 
+          url: '/workforce/approval-requests', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
-    },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    }, 
     //workforce services end
 
     //finance services start
     {
-      id: "finance",
-      key: "finance",
+      id: 'finance',
+      key: 'finance',
       permission: PERMISSIONS.ACCOUNTS_SERVICES,
       icon: <CreditCard size={16} />,
       color: MENU_COLORS.BILLING,
-      title: "Billing",
-      label: "Billing",
-      url: "",
+      title: 'Billing',
+      label: 'Billing',
+      url: '',
       subItems: [
-        {
-          id: "finance-dashboard",
-          title: "Dashboard",
-          icon: <LayoutDashboard size={16} />,
-          url: "/billing/dashboard",
-          permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING,
+        { 
+          id: 'finance-dashboard', 
+          title: 'Dashboard', 
+          icon: <LayoutDashboard size={16} />, 
+          url: '/billing/dashboard', 
+          permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
         },
-        {
-          id: "finance-account-overview",
-          title: "Account Overview",
-          icon: <Eye size={16} />,
-          url: "/billing/account-overview",
-          permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
+        { 
+          id: 'finance-account-overview', 
+          title: 'Account Overview', 
+          icon: <Eye size={16} />, 
+          url: '/billing/account-overview', 
+          permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
-        {
-          id: "finance-subscriptions",
-          title: "Subscriptions",
-          icon: <ShoppingBag size={16} />,
-          url: "/billing/subscriptions",
-          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING,
+        { 
+          id: 'finance-subscriptions', 
+          title: 'Subscriptions', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/subscriptions', 
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
         },
-        {
-          id: "finance-order-invoicing",
-          title: "Order Invoicing",
-          icon: <ShoppingBag size={16} />,
-          url: "/billing/order-invoicing",
-          permission: PERMISSIONS.VIEW_INVOICES_BILLING,
+        { 
+          id: 'finance-order-invoicing', 
+          title: 'Order Invoicing', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/order-invoicing', 
+          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
-        {
-          id: "finance-invoices",
-          title: "Invoices",
-          icon: <DollarSign size={16} />,
-          url: "/billing/invoices",
-          permission: PERMISSIONS.VIEW_INVOICES_BILLING,
+        { 
+          id: 'finance-invoices', 
+          title: 'Invoices', 
+          icon: <DollarSign size={16} />, 
+          url: '/billing/invoices', 
+          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
-        {
-          id: "finance-payment-history",
-          title: "Payment History",
-          icon: <FileText size={16} />,
-          url: "/billing/payment-history",
-          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
+        { 
+          id: 'finance-payment-history', 
+          title: 'Payment History', 
+          icon: <FileText size={16} />, 
+          url: '/billing/payment-history', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
-    },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    }, 
     //finance services end
 
     //reports and audit services start
     {
-      id: "unified-reports",
-      key: "unified-reports",
+      id: 'unified-reports',
+      key: 'unified-reports',
       permission: PERMISSIONS.REPORTS_SERVICES,
       icon: <BarChart3 size={16} />,
       color: MENU_COLORS.REPORTS,
       title: "Unified Reports",
       label: "Unified Reports",
-      url: "",
+      url: '',
       subItems: [
         {
-          id: "crm-reports",
-          title: "CRM Insights",
+          id: 'crm-reports',
+          title: 'CRM Insights',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_REPORTS,
-          url: "/reports/crm-insights",
+          url: '/reports/crm-insights'
         },
         {
-          id: "call-reports",
-          title: "Call Analytics",
+          id: 'call-reports',
+          title: 'Call Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
           // url: '/call-reports'
-          url: "/reports/call-analytics",
+          url:'/reports/call-analytics'
         },
         {
-          id: "ai-chat-usage-reports",
-          title: "Chat Usage",
+          id: 'ai-chat-usage-reports',
+          title: 'Chat Usage',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: "/reports/chat-usage",
-        },
-      ].filter((item) => !item.permission || hasPermission(item.permission)),
+          url: '/reports/chat-usage'
+        }
+      ].filter(item => !item.permission || hasPermission(item.permission))
     },
     //reports and audit services end
 
     //audit logs services start
-    {
-      id: "audit-logs",
-      key: "audit-logs",
-      permission: PERMISSIONS.TMS_SERVICES,
-      icon: <History size={16} />,
-      color: MENU_COLORS.REPORTS,
-      title: "Audit Logs",
-      label: "Audit Logs",
-      url: "/audit-logs",
+      {
+        id: 'audit-logs',
+        key: 'audit-logs',
+        permission: PERMISSIONS.TMS_SERVICES,
+        icon: <History size={16} />,
+        color: MENU_COLORS.REPORTS,
+        title: 'Audit Logs',
+        label: 'Audit Logs',
+        url: '/audit-logs',
     },
     //audit logs services end
     //settings services start
     {
-      id: "settings",
-      key: "settings",
+      id: 'settings',
+      key: 'settings',
       permission: PERMISSIONS.TMS_SERVICES,
       icon: <Settings size={16} />,
       color: MENU_COLORS.REPORTS,
-      title: "Settings",
-      label: "Settings",
-      url: "/main-settings",
+      title: 'Settings',
+      label: 'Settings',
+      url: '/main-settings',
     },
     //settings services end
-  ].filter(
-    (item) =>
-      ENABLED_MODULE_IDS.has(item.id) &&
-      (!item.permission || hasPermission(item.permission)),
-  );
+
+  ].filter(item => ENABLED_MODULE_IDS.includes(item.id) && (!item.permission || hasPermission(item.permission)));
 
   const toggleSubModule = (subModuleId: string) => {
-    setExpandedSubModules((prev) =>
-      prev.includes(subModuleId)
-        ? prev.filter((id) => id !== subModuleId)
-        : [...prev, subModuleId],
+    setExpandedSubModules(prev => 
+      prev.includes(subModuleId) 
+        ? prev.filter(id => id !== subModuleId)
+        : [...prev, subModuleId]
     );
   };
 
-  const handleModuleClick = (
-    module: MainMenuItem,
-    ev?: React.MouseEvent<HTMLElement>,
-  ) => {
-    if (module.url && module.url !== "") {
+  const handleModuleClick = (module: MainMenuItem, ev?: React.MouseEvent<HTMLElement>) => {
+    if (module.url && module.url !== '') {
       setActiveModule(null);
       return;
     }
@@ -789,10 +846,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const handleCollapsedItemMouseEnter = (
-    module: MainMenuItem,
-    ev: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleCollapsedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -812,10 +866,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }, 150);
   };
 
-  const handleExpandedItemMouseEnter = (
-    module: MainMenuItem,
-    ev: React.MouseEvent<HTMLElement>,
-  ) => {
+  const handleExpandedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -871,17 +922,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     if (prevPathnameRef.current === router.pathname) {
       return;
     }
-
+    
     prevPathnameRef.current = router.pathname;
-
+    
     const isSubItemActive = (subItem: SubMenuItem): boolean => {
       if (subItem.url && router.pathname === subItem.url) {
         return true;
       }
       if (subItem.subItems && subItem.subItems.length > 0) {
-        return subItem.subItems.some((nestedItem) =>
-          isSubItemActive(nestedItem),
-        );
+        return subItem.subItems.some(nestedItem => isSubItemActive(nestedItem));
       }
       return false;
     };
@@ -893,20 +942,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       if (!module.subItems || module.subItems.length === 0) {
         return false;
       }
-      return module.subItems.some((subItem) => isSubItemActive(subItem));
+      return module.subItems.some(subItem => isSubItemActive(subItem));
     };
 
     const subModulesToExpand: string[] = [];
     let foundActiveModule: string | null = null;
 
-    mainMenuItems.forEach((module) => {
+    mainMenuItems.forEach(module => {
       if (hasActiveChild(module)) {
         if (module.subItems && module.subItems.length > 0) {
           foundActiveModule = module.id;
         }
-
+        
         if (module.subItems) {
-          module.subItems.forEach((subItem) => {
+          module.subItems.forEach(subItem => {
             if (isSubItemActive(subItem)) {
               subModulesToExpand.push(subItem.id);
             }
@@ -916,12 +965,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     });
 
     setActiveModule(foundActiveModule);
-    setExpandedSubModules((prev) => {
+    setExpandedSubModules(prev => {
       if (subModulesToExpand.length > 0) {
         const newExpanded = Array.from(new Set(subModulesToExpand));
-        const hasChange =
-          newExpanded.length !== prev.length ||
-          !newExpanded.every((id) => prev.includes(id));
+        const hasChange = newExpanded.length !== prev.length || 
+                         !newExpanded.every(id => prev.includes(id));
         return hasChange ? newExpanded : prev;
       }
       return [];
@@ -970,10 +1018,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       bottom: 0;
       background: rgba(0, 0, 0, 0.5);
       z-index: 999;
-      cursor: default;
-      font: inherit;
-      border: none;
-      padding: 0;
     }
 
     @media (max-width: 1199px) {
@@ -987,7 +1031,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       padding: 15px 16px 6px 25px;
       display: flex;
       align-items: center;
-      justify-content: ${isSidebarExpanded ? "flex-start" : "center"};
+      justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
       /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
     }
 
@@ -995,7 +1039,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: white;
       font-size: 18px;
       font-weight: 700;
-      opacity: ${isSidebarExpanded ? "1" : "0"};
+      opacity: ${isSidebarExpanded ? '1' : '0'};
       transition: opacity 0.3s;
       white-space: nowrap;
       overflow: hidden;
@@ -1025,7 +1069,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       border-top: 0px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
-      justify-content: ${isSidebarExpanded ? "flex-end" : "center"};
+      justify-content: ${isSidebarExpanded ? 'flex-end' : 'center'};
     }
 
     .sidebar-menu {
@@ -1216,8 +1260,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       width: 100%;
       display: flex;
       align-items: center;
-      justify-content: ${isSidebarExpanded ? "flex-start" : "center"};
-      padding: ${isSidebarExpanded ? "12px 16px" : "12px"};
+      justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
+      padding: ${isSidebarExpanded ? '12px 16px' : '12px'};
       background: transparent;
       border: none;
       border-radius: 8px;
@@ -1254,7 +1298,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       font-size: 13px;
       font-weight: 300;
       color: white;
-      opacity: ${isSidebarExpanded ? "1" : "0"};
+      opacity: ${isSidebarExpanded ? '1' : '0'};
       transition: opacity 0.3s;
       white-space: nowrap;
       overflow: hidden;
@@ -1262,7 +1306,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .menu-item-chevron {
       color: white;
-      display: ${isSidebarExpanded ? "flex" : "none"};
+      display: ${isSidebarExpanded ? 'flex' : 'none'};
       align-items: center;
       margin-left: auto;
       opacity: 0;
@@ -1283,7 +1327,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       background: white;
       border-right: 1px solid #e5e7eb;
       box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
-      transform: translateX(${activeModule ? "0" : "-100%"});
+      transform: translateX(${activeModule ? '0' : '-100%'});
       transition: all 0.3s ease-in-out;
       z-index: 999;
       display: flex;
@@ -1512,137 +1556,68 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
   `;
 
-  const dashboardItems = mainMenuItems.filter((item) =>
-    hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE)
-      ? item.id === "dashboard" || item.id === "dashboard-unified-workspace"
-      : item.id === "dashboard",
+  const dashboardItems = mainMenuItems.filter(item => 
+    hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE) 
+      ? item.id === 'dashboard' || item.id === 'dashboard-unified-workspace'
+      : item.id === 'dashboard'
   );
 
-  const servicesItems = mainMenuItems.filter(
-    (item) =>
-      item.id !== "dashboard" &&
-      item.id !== "dashboard-unified-workspace" &&
-      item.id !== "settings" &&
-      item.id !== "resources" &&
-      item.id !== "unified-reports" &&
-      item.id !== "audit-logs",
+  const servicesItems = mainMenuItems.filter(item => 
+    item.id !== 'dashboard' && 
+    item.id !== 'dashboard-unified-workspace' && 
+    item.id !== 'settings' && 
+    item.id !== 'resources' &&
+    item.id !== 'unified-reports' &&
+    item.id !== 'audit-logs'
   );
 
-  const systemItems = mainMenuItems.filter(
-    (item) =>
-      item.id === "settings" ||
-      item.id === "resources" ||
-      item.id === "unified-reports" ||
-      item.id === "audit-logs",
+  const systemItems = mainMenuItems.filter(item => 
+    item.id === 'settings' || item.id === 'resources' || item.id === 'unified-reports' || item.id === 'audit-logs'
   );
 
-  const activeModuleData = mainMenuItems.find((m) => m.id === activeModule);
-
-  const closeBackdrop = () => {
-    setSidebarOpen(false);
-    setActiveModule(null);
-    if (isFlyoutPinned) {
-      setHoveredModuleId(null);
-      setHoveredItemRect(null);
-      setIsFlyoutPinned(false);
-    }
-  };
-
-  const handleBackdropKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      closeBackdrop();
-    }
-  };
-
-  const getModuleMouseLeaveHandler = (module: MainMenuItem) => {
-    if (!module.subItems?.length) return undefined;
-    if (isSidebarExpanded && isFlyoutPinned)
-      return handleExpandedItemMouseLeave;
-    return handleCollapsedItemMouseLeave;
-  };
-
-  const getModuleMouseEnterHandler = (module: MainMenuItem) => {
-    if (!module.subItems?.length) return undefined;
-    return (ev: React.MouseEvent<HTMLElement>) => {
-      if (isSidebarExpanded && isFlyoutPinned) {
-        handleExpandedItemMouseEnter(module, ev);
-      } else if (!isSidebarExpanded) {
-        handleCollapsedItemMouseEnter(module, ev);
-      }
-    };
-  };
-
-  const isModuleLink = (module: MainMenuItem) =>
-    Boolean(module.url && module.url !== "");
-
-  const closeFlyoutOnNavigate = () => {
-    setHoveredModuleId(null);
-    setHoveredItemRect(null);
-    setIsFlyoutPinned(false);
-    if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) {
-      setSidebarOpen(false);
-    }
-  };
-
-  const renderFlyoutSubItem = (subItem: SubMenuItem): React.ReactNode => {
-    const hasNested = subItem.subItems && subItem.subItems.length > 0;
-    if (hasNested) {
-      return (
-        <div key={subItem.id}>
-          <div className="submenu-flyout-item submenu-flyout-item-label">
-            <span className="flyout-item-icon">{subItem.icon}</span>
-            {subItem.title}
-          </div>
-          {subItem.subItems!.map((nestedItem: SubMenuItem) => (
-            <Link
-              key={nestedItem.id}
-              href={(BASE_URL || "") + (nestedItem.url || "/")}
-              className={`submenu-flyout-item ${router.pathname === nestedItem.url ? "active" : ""}`}
-              onClick={closeFlyoutOnNavigate}
-            >
-              <span className="flyout-item-icon">{nestedItem.icon}</span>
-              {nestedItem.title}
-            </Link>
-          ))}
-        </div>
-      );
-    }
-    return (
-      <Link
-        key={subItem.id}
-        href={(BASE_URL || "") + (subItem.url || "/")}
-        className={`submenu-flyout-item ${router.pathname === subItem.url ? "active" : ""}`}
-        onClick={closeFlyoutOnNavigate}
-      >
-        <span className="flyout-item-icon">{subItem.icon}</span>
-        {subItem.title}
-      </Link>
-    );
-  };
+  const activeModuleData = mainMenuItems.find(m => m.id === activeModule);
 
   return (
     <>
       <style>{customStyles}</style>
 
       {/* Backdrop for mobile and submenu */}
-      <button
-        type="button"
-        aria-label="Close sidebar"
-        className={`sidebar-backdrop ${sidebarOpen || activeModule || isFlyoutPinned ? "show" : ""}`}
-        onClick={closeBackdrop}
-        onKeyDown={handleBackdropKeyDown}
+      <div
+        className={`sidebar-backdrop ${(sidebarOpen || activeModule || isFlyoutPinned) ? 'show' : ''}`}
+        onClick={() => {
+          setSidebarOpen(false);
+          setActiveModule(null);
+          if (isFlyoutPinned) {
+            setHoveredModuleId(null);
+            setHoveredItemRect(null);
+            setIsFlyoutPinned(false);
+          }
+        }}
       />
 
       {/* Main Sidebar */}
-      <div
-        className={`sidebar-container ${sidebarOpen ? "" : "mobile-hidden"} ${isSidebarExpanded ? "" : "collapsed"}`}
-      >
+      <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''} ${!isSidebarExpanded ? 'collapsed' : ''}`}>
         {/* Header */}
-        <div className="sidebar-header">
-          {isSidebarExpanded && (
-            <div className="sidebar-logo">{userCompanyName}</div>
-          )}
+        <div className="sidebar-header" style={{ display: 'none' }}>
+          {isSidebarExpanded && <div className="sidebar-logo menu-item-text">
+            {userCompanyName}
+
+            {/* {currentUserCompanyImageUrl ? (
+              <img
+                src={currentUserCompanyImageUrl}
+                alt="Company logo"
+                style={{
+                  maxWidth: 160,
+                  objectFit: "contain",
+                  
+                }}
+              />
+            ) : (
+              <img src={logodark.src} alt="logo" className="img-fluid" />
+            )} */}
+
+
+          </div>}
         </div>
 
         {/* Menu Items */}
@@ -1653,47 +1628,46 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={getModuleMouseEnterHandler(module)}
-                onMouseLeave={getModuleMouseLeaveHandler(module)}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
-                {isSidebarExpanded ? null : (
-                  <span className="menu-item-tooltip">{module.title}</span>
-                )}
-                {isModuleLink(module) ? (
-                  <Link href={(BASE_URL || "") + (module.url || "/")}>
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
-                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
-                        if (
-                          globalThis.window !== undefined &&
-                          globalThis.window.innerWidth < 1200
-                        ) {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                           setSidebarOpen(false);
                         }
                       }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
-                      {isSidebarExpanded && (
-                        <span className="menu-item-text">{module.title}</span>
-                      )}
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
                     </button>
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
-                    {isSidebarExpanded && (
-                      <span className="menu-item-text">{module.title}</span>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
                     )}
-                    {isSidebarExpanded &&
-                      module.subItems &&
-                      module.subItems.length > 0 && (
-                        <div className="menu-item-chevron">
-                          <ChevronRight size={18} />
-                        </div>
-                      )}
                   </button>
                 )}
               </li>
@@ -1706,47 +1680,46 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={getModuleMouseEnterHandler(module)}
-                onMouseLeave={getModuleMouseLeaveHandler(module)}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
-                {isSidebarExpanded ? null : (
-                  <span className="menu-item-tooltip">{module.title}</span>
-                )}
-                {isModuleLink(module) ? (
-                  <Link href={(BASE_URL || "") + (module.url || "/")}>
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
-                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
-                        if (
-                          globalThis.window !== undefined &&
-                          globalThis.window.innerWidth < 1200
-                        ) {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                           setSidebarOpen(false);
                         }
                       }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
-                      {isSidebarExpanded && (
-                        <span className="menu-item-text">{module.title}</span>
-                      )}
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
                     </button>
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
-                    {isSidebarExpanded && (
-                      <span className="menu-item-text">{module.title}</span>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
                     )}
-                    {isSidebarExpanded &&
-                      module.subItems &&
-                      module.subItems.length > 0 && (
-                        <div className="menu-item-chevron">
-                          <ChevronRight size={18} />
-                        </div>
-                      )}
                   </button>
                 )}
               </li>
@@ -1759,47 +1732,46 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               <li
                 key={module.id}
                 className="menu-item"
-                onMouseEnter={getModuleMouseEnterHandler(module)}
-                onMouseLeave={getModuleMouseLeaveHandler(module)}
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
               >
-                {isSidebarExpanded ? null : (
-                  <span className="menu-item-tooltip">{module.title}</span>
-                )}
-                {isModuleLink(module) ? (
-                  <Link href={(BASE_URL || "") + (module.url || "/")}>
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
-                      className={`menu-item-button ${router.pathname === module.url ? "active" : ""}`}
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
                       onClick={() => {
-                        if (
-                          globalThis.window !== undefined &&
-                          globalThis.window.innerWidth < 1200
-                        ) {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                           setSidebarOpen(false);
                         }
                       }}
                     >
                       <div className="menu-item-icon">{module.icon}</div>
-                      {isSidebarExpanded && (
-                        <span className="menu-item-text">{module.title}</span>
-                      )}
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
                     </button>
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? "active" : ""} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? "active" : ""}`}
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
                     onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
-                    {isSidebarExpanded && (
-                      <span className="menu-item-text">{module.title}</span>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
                     )}
-                    {isSidebarExpanded &&
-                      module.subItems &&
-                      module.subItems.length > 0 && (
-                        <div className="menu-item-chevron">
-                          <ChevronRight size={18} />
-                        </div>
-                      )}
                   </button>
                 )}
               </li>
@@ -1809,59 +1781,89 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
         {/* Footer with expand/collapse */}
         <div className="sidebar-footer">
-          <button
+          <button 
             className="expand-toggle-btn"
             onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
           >
-            {isSidebarExpanded ? (
-              <ChevronLeft size={20} />
-            ) : (
-              <ChevronRight size={20} />
-            )}
+            {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
       </div>
 
       {/* Collapsed sidebar: hover flyout for sub-items (above main content) */}
       {/* Submenu flyout: when collapsed on hover, when expanded on click (same style, above content) */}
-      {(() => {
-        if (!hoveredModuleId || !hoveredItemRect) return null;
-        const flyoutModule = mainMenuItems.find(
-          (m) => m.id === hoveredModuleId,
-        );
+      {hoveredModuleId && hoveredItemRect && (() => {
+        const flyoutModule = mainMenuItems.find(m => m.id === hoveredModuleId);
         if (!flyoutModule?.subItems?.length) return null;
         return (
           <div
             className="submenu-flyout"
-            role="menu"
-            aria-label={flyoutModule.title}
-            tabIndex={0}
             style={{
               top: hoveredItemRect.top,
-              left:
-                (isSidebarExpanded
-                  ? SIDEBAR_WIDTH_EXPANDED
-                  : SIDEBAR_WIDTH_COLLAPSED) + 3,
+              left: (isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED) + 3,
             }}
             onMouseEnter={handleFlyoutMouseEnter}
             onMouseLeave={handleFlyoutMouseLeave}
           >
             <div className="submenu-flyout-header">{flyoutModule.title}</div>
             <div className="submenu-flyout-content">
-              {flyoutModule.subItems.map((subItem: SubMenuItem) =>
-                renderFlyoutSubItem(subItem),
-              )}
+              {flyoutModule.subItems.map((subItem: SubMenuItem) => {
+                // Handle separator
+                if (subItem.title === '---') {
+                  return <div key={subItem.id} className="submenu-flyout-item separator" />;
+                }
+                
+                return subItem.subItems && subItem.subItems.length > 0 ? (
+                  <div key={subItem.id}>
+                    <div className="submenu-flyout-item submenu-flyout-item-label">
+                      <span className="flyout-item-icon">{subItem.icon}</span>
+                      {subItem.title}
+                    </div>
+                    {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                      <Link
+                        key={nestedItem.id}
+                        href={(BASE_URL || '') + (nestedItem.url || '/')}
+                        className={`submenu-flyout-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
+                        onClick={() => {
+                          setHoveredModuleId(null);
+                          setHoveredItemRect(null);
+                          setIsFlyoutPinned(false);
+                          if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
+                        }}
+                      >
+                        <span className="flyout-item-icon">{nestedItem.icon}</span>
+                        {nestedItem.title}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <Link
+                    key={subItem.id}
+                    href={(BASE_URL || '') + (subItem.url || '/')}
+                    className={`submenu-flyout-item ${router.pathname === subItem.url ? 'active' : ''}`}
+                    onClick={() => {
+                      setHoveredModuleId(null);
+                      setHoveredItemRect(null);
+                      setIsFlyoutPinned(false);
+                      if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
+                    }}
+                  >
+                    <span className="flyout-item-icon">{subItem.icon}</span>
+                    {subItem.title}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         );
       })()}
 
       {/* Submenu Panel */}
-      {activeModuleData?.subItems && (
+      {activeModuleData && activeModuleData.subItems && (
         <div className="submenu-panel">
           <div className="submenu-header">
             <div className="submenu-title">{activeModuleData.title}</div>
-            <button
+            <button 
               className="submenu-close-btn"
               onClick={() => setActiveModule(null)}
             >
@@ -1875,16 +1877,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   {subItem.subItems && subItem.subItems.length > 0 ? (
                     <>
                       <button
-                        className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? "active" : ""}`}
+                        className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? 'active' : ''}`}
                         onClick={() => toggleSubModule(subItem.id)}
                       >
                         <div className="submenu-item-icon">{subItem.icon}</div>
-                        <span className="submenu-item-text">
-                          {subItem.title}
-                        </span>
-                        <div
-                          className={`submenu-item-chevron ${expandedSubModules.includes(subItem.id) ? "expanded" : ""}`}
-                        >
+                        <span className="submenu-item-text">{subItem.title}</span>
+                        <div className={`submenu-item-chevron ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
                           <ChevronRight size={16} />
                         </div>
                       </button>
@@ -1892,29 +1890,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                         <ul className="nested-submenu">
                           {subItem.subItems.map((nestedItem: SubMenuItem) => (
                             <li key={nestedItem.id}>
-                              <Link
-                                href={
-                                  (BASE_URL || "") + (nestedItem.url || "/")
-                                }
-                              >
+                              <Link href={(BASE_URL || '') + (nestedItem.url || '/')}>
                                 <button
-                                  className={`nested-sub-item ${router.pathname === nestedItem.url ? "active" : ""}`}
+                                  className={`nested-sub-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
                                   onClick={() => {
-                                    if (
-                                      globalThis.window !== undefined &&
-                                      globalThis.window.innerWidth < 1200
-                                    ) {
+                                    if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                                       setSidebarOpen(false);
                                       setActiveModule(null);
                                     }
                                   }}
                                 >
-                                  <div className="nested-sub-item-icon">
-                                    {nestedItem.icon}
-                                  </div>
-                                  <span className="nested-sub-item-text">
-                                    {nestedItem.title}
-                                  </span>
+                                  <div className="nested-sub-item-icon">{nestedItem.icon}</div>
+                                  <span className="nested-sub-item-text">{nestedItem.title}</span>
                                 </button>
                               </Link>
                             </li>
@@ -1923,23 +1910,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                       )}
                     </>
                   ) : (
-                    <Link href={(BASE_URL || "") + (subItem.url || "/")}>
+                    <Link href={(BASE_URL || '') + (subItem.url || '/')}>
                       <button
-                        className={`submenu-item-button ${router.pathname === subItem.url ? "active" : ""}`}
+                        className={`submenu-item-button ${router.pathname === subItem.url ? 'active' : ''}`}
                         onClick={() => {
-                          if (
-                            globalThis.window !== undefined &&
-                            globalThis.window.innerWidth < 1200
-                          ) {
+                          if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                             setSidebarOpen(false);
                             setActiveModule(null);
                           }
                         }}
                       >
                         <div className="submenu-item-icon">{subItem.icon}</div>
-                        <span className="submenu-item-text">
-                          {subItem.title}
-                        </span>
+                        <span className="submenu-item-text">{subItem.title}</span>
                       </button>
                     </Link>
                   )}

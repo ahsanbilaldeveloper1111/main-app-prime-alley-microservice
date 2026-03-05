@@ -28,9 +28,12 @@ import {
 } from "lucide-react";
 import {
   getCrmNotes,
+  createCrmNote,
   updateCrmNote,
   deleteCrmNote,
   getCrmMeetingsForRecord,
+  getMeeting,
+  createMeeting,
   updateMeeting,
   deleteMeeting,
   getCampaigns,
@@ -38,6 +41,7 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  createTaskNote,
   type CrmNoteItem,
   type CrmMeetingListItem,
   type AuditTrailEntry,
@@ -49,6 +53,7 @@ import {
   getWhatsAppChatMessages,
   sendWhatsApp,
   getEmails,
+  sendEmail,
   type SmsListItem,
   type SmsListMeta,
 } from "@utils/communication";
@@ -59,6 +64,7 @@ import axiosInstance from "@utils/axios";
 import CallLog from "@components/CallLogNew";
 import AudioPlayer, { AudioPlayerRef } from "@components/AudioPlayer";
 import NotesModal from "@components/NotesModal";
+import RichNoteEditor from "@components/RichNoteEditor";
 import EmailModal from "@components/EmailModal";
 import TaskModal from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
@@ -245,6 +251,8 @@ export interface CrmActivitiesPanelProps {
   recordLoading?: boolean;
   recordName?: string;
   canSendWhatsApp?: boolean;
+  /** Optional: if provided, clicking a WhatsApp chat navigates externally (e.g. to Inbox). */
+  onWhatsAppChatClick?: (chat: { id: number; phone_number: string }) => void;
   /** Optional: used to show assignee name instead of ID in Activity audit trail */
   extensions?: AuditTrailExtension[] | null;
   /** Optional: used to show campaign name instead of ID in Activity audit trail */
@@ -276,6 +284,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     recordLoading = false,
     recordName = "Record",
     canSendWhatsApp = false,
+    onWhatsAppChatClick,
     extensions: extensionsProp,
     campaigns,
     onOpenNote,
@@ -287,12 +296,22 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   ref,
 ) => {
   const { data: session } = useSession();
+  const userEmail =
+    (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
+  const userName =
+    (session?.user as { name?: string } | undefined)?.name ?? "Your Name";
   const extension =
     (session?.user as { extension?: string; phone?: string } | undefined)
       ?.extension ??
     (session?.user as { extension?: string; phone?: string } | undefined)
       ?.phone ??
     "";
+  const tenantId =
+    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
+      ?.tenant_id ??
+    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
+      ?.tenant ??
+    "default";
   const useExternalModals = Boolean(
     onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting,
   );
@@ -314,12 +333,18 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     useState<CrmMeetingListItem | null>(null);
   const [meetingDeleteLoading, setMeetingDeleteLoading] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
-  const [editingMeetingForm, setEditingMeetingForm] = useState({
-    name: "",
-    meeting_date: "",
-    meeting_time: "",
-    meeting_type: "Video",
-  });
+  const [editMeetingModalOpen, setEditMeetingModalOpen] = useState(false);
+  const [editMeetingDefaults, setEditMeetingDefaults] = useState<{
+    title?: string;
+    date?: string;
+    startTime?: string;
+    endTime?: string;
+    attendees?: string[];
+    location?: string;
+    reminders?: string[];
+    summary?: string;
+    meetingType?: string;
+  } | null>(null);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -726,17 +751,192 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   }, [whatsappMessagesLoading, whatsappMessages]);
 
   const handleNoteCreate = useCallback(
-    (note: string) => {
-      fetchNotes();
-      setShowNotesModal(false);
+    async (note: string) => {
+      const text = (note ?? "").trim();
+      if (!text) return;
+      if (recordId == null || Number.isNaN(Number(recordId))) return;
+      try {
+        await createCrmNote({
+          record_type: recordType,
+          record_id: Number(recordId),
+          text,
+        });
+        setShowNotesModal(false);
+        await fetchNotes();
+      } catch {
+        // createCrmNote shows toast on error
+      }
     },
-    [fetchNotes],
+    [recordType, recordId, fetchNotes],
   );
 
-  const handleMeetingSchedule = useCallback(async () => {
-    await fetchMeetings();
-    setShowMeetingModal(false);
-  }, [fetchMeetings]);
+  const handleMeetingSchedule = useCallback(
+    async (meetingData: {
+      title: string;
+      hostEmail: string;
+      startDate: string;
+      startTime: string;
+      endTime: string;
+      attendees: string[];
+      location: string;
+      reminders: string[];
+      summary: string;
+    }) => {
+      if (recordId == null || Number.isNaN(Number(recordId))) return;
+      const meeting_date = meetingData.startDate.slice(0, 10);
+      const meeting_time =
+        meetingData.startTime.length === 5
+          ? meetingData.startTime
+          : meetingData.startTime.slice(0, 5);
+      const end_time =
+        meetingData.endTime.length === 5
+          ? meetingData.endTime
+          : meetingData.endTime.slice(0, 5);
+      const extensions = [extension.slice(0, 15) || "0"];
+      const start_date_time = `${meeting_date}T${meeting_time}:00`;
+      const end_date_time = `${meeting_date}T${end_time}:00`;
+      try {
+        await createMeeting({
+          name: meetingData.title.trim(),
+          meeting_type: "Video",
+          meeting_date,
+          meeting_time,
+          record_type: recordType as "prospect" | "lead" | "deal" | "order",
+          record_id: Number(recordId),
+          extensions,
+          tenant_id: tenantId,
+          extension_user: extension,
+          start_date_time,
+          end_date_time,
+          ...(meetingData.attendees?.length > 0 && {
+            emails: meetingData.attendees,
+            attendees: meetingData.attendees,
+          }),
+          ...(meetingData.reminders?.length > 0 && {
+            reminders: meetingData.reminders,
+          }),
+          ...(meetingData.summary?.trim()
+            ? { summary: meetingData.summary.trim().slice(0, 255) }
+            : {}),
+        });
+        setShowMeetingModal(false);
+        await fetchMeetings();
+      } catch {
+        // createMeeting shows toast on error
+      }
+    },
+    [recordType, recordId, extension, tenantId, fetchMeetings],
+  );
+  const recordEmail = record?.data?.data?.email;
+  const openEditMeeting = useCallback(
+    async (meeting: CrmMeetingListItem) => {
+      try {
+        setEditingMeetingId(meeting.id);
+        const full = await getMeeting(meeting.id);
+        const date =
+          (full as any)?.meeting_date?.slice?.(0, 10) ??
+          String((full as any)?.meeting_date ?? meeting.meeting_date ?? "").slice(
+            0,
+            10,
+          );
+        const startTime =
+          String((full as any)?.meeting_time ?? meeting.meeting_time ?? "")
+            .trim()
+            .slice(0, 5) || "09:00";
+        const endTime =
+          String((full as any)?.end_time ?? (full as any)?.endTime ?? "").slice(
+            0,
+            5,
+          ) ||
+          (() => {
+            const [h, m] = startTime.split(":").map((x) => Number(x));
+            const d = new Date();
+            d.setHours(h || 0, m || 0, 0, 0);
+            d.setMinutes(d.getMinutes() + 30);
+            const hh = String(d.getHours()).padStart(2, "0");
+            const mm = String(d.getMinutes()).padStart(2, "0");
+            return `${hh}:${mm}`;
+          })();
+        const attendeesRaw =
+          (full as any)?.attendees ??
+          (full as any)?.emails ??
+          (recordEmail ? [recordEmail] : []);
+        const attendees = Array.isArray(attendeesRaw)
+          ? attendeesRaw.map((e: any) => String(e).trim()).filter(Boolean)
+          : [];
+        const remindersRaw = (full as any)?.reminders ?? [];
+        const reminders = Array.isArray(remindersRaw)
+          ? remindersRaw.map((r: any) => String(r)).filter(Boolean)
+          : [];
+
+        setEditMeetingDefaults({
+          title: (full as any)?.name ?? meeting.name ?? "",
+          date,
+          startTime,
+          endTime,
+          attendees,
+          location: (full as any)?.location ?? "",
+          reminders,
+          summary: (full as any)?.summary ?? "",
+          meetingType: (full as any)?.meeting_type ?? meeting.meeting_type ?? "Video",
+        });
+        setEditMeetingModalOpen(true);
+      } catch {
+        // getMeeting shows toast on error
+        setEditingMeetingId(null);
+      }
+    },
+    [recordEmail],
+  );
+
+  const handleMeetingUpdate = useCallback(
+    async (meetingData: {
+      title: string;
+      hostEmail: string;
+      startDate: string;
+      startTime: string;
+      endTime: string;
+      attendees: string[];
+      location: string;
+      reminders: string[];
+      summary: string;
+    }) => {
+      if (editingMeetingId == null) return;
+      const meeting_date = meetingData.startDate.slice(0, 10);
+      const meeting_time =
+        meetingData.startTime.length === 5
+          ? meetingData.startTime
+          : meetingData.startTime.slice(0, 5);
+      const end_time =
+        meetingData.endTime.length === 5
+          ? meetingData.endTime
+          : meetingData.endTime.slice(0, 5);
+      const start_date_time = `${meeting_date}T${meeting_time}:00`;
+      const end_date_time = `${meeting_date}T${end_time}:00`;
+      try {
+        await updateMeeting(editingMeetingId, {
+          name: meetingData.title.trim(),
+          meeting_date: meeting_date ? `${meeting_date}T00:00:00.000Z` : undefined,
+          meeting_time,
+          meeting_type: editMeetingDefaults?.meetingType ?? "Video",
+          start_date_time,
+          end_date_time,
+          ...(meetingData.attendees?.length
+            ? { emails: meetingData.attendees, attendees: meetingData.attendees }
+            : {}),
+          ...(meetingData.reminders?.length ? { reminders: meetingData.reminders } : {}),
+          ...(meetingData.summary?.trim() ? { summary: meetingData.summary.trim().slice(0, 255) } : {}),
+        });
+        setEditMeetingModalOpen(false);
+        setEditMeetingDefaults(null);
+        setEditingMeetingId(null);
+        await fetchMeetings();
+      } catch {
+        // updateMeeting shows toast on error
+      }
+    },
+    [editingMeetingId, editMeetingDefaults, fetchMeetings],
+  );
 
   const parseTaskDueDate = useCallback(
     (activityDate: string, activityTime: string): string => {
@@ -888,7 +1088,17 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   );
 
   const activitiesData: ActivityItem[] = useMemo(() => {
-    const trail = (record?.audit_trail ?? []) as AuditTrailEntry[];
+    const rawTrail =
+      (record as any)?.audit_trail ??
+      (record as any)?.audit_trails ??
+      // Some APIs wrap the record payload under `data` and keep `audit_trail` alongside it.
+      (record as any)?.data?.audit_trail ??
+      (record as any)?.data?.audit_trails ??
+      // Some responses nest again under `data.data`.
+      (record as any)?.data?.data?.audit_trail ??
+      (record as any)?.data?.data?.audit_trails ??
+      [];
+    const trail = (Array.isArray(rawTrail) ? rawTrail : []) as AuditTrailEntry[];
     const fmt = formatValForAudit;
     const resolveFieldVal = (field: string, raw: unknown): string => {
       if (AUDIT_FIELDS_EXTENSION.has(field))
@@ -983,7 +1193,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
         auditChanges: auditChanges.length > 0 ? auditChanges : undefined,
       };
     });
-  }, [record?.audit_trail, extensionsForAudit, campaignsForAudit]);
+  }, [record, extensionsForAudit, campaignsForAudit]);
 
   const renderActivityItem = useCallback(
     (activity: ActivityItem) => {
@@ -1106,7 +1316,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     [expandedActivities, toggleActivity],
   );
 
-  const recordEmail = record?.data?.data?.email;
+  
   const within24h = whatsappChatWindowInfo?.is_within_24h_window !== false;
   let minutesRemaining =
     whatsappChatWindowInfo?.window_minutes_remaining ?? null;
@@ -1719,22 +1929,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {isEditing ? (
                           <>
-                            <textarea
+                            <RichNoteEditor
                               value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                              style={{
-                                width: "100%",
-                                minHeight: "80px",
-                                padding: "10px 12px",
-                                border: "1px solid #cbd5e0",
-                                borderRadius: "5px",
-                                fontSize: "14px",
-                                color: "#141414",
-                                lineHeight: "1.6",
-                                resize: "vertical",
-                                fontFamily: "inherit",
-                              }}
-                              autoFocus
+                              onChange={setEditingText}
+                              placeholder="Edit note..."
+                              minHeight={80}
                             />
                             <div
                               style={{
@@ -1794,6 +1993,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               </button>
                             </div>
                           </>
+                        ) : note.text &&
+                          note.text.includes("<") &&
+                          note.text.includes(">") ? (
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: "#141414",
+                              margin: "4px 0",
+                              lineHeight: "1.6",
+                            }}
+                            className="crm-note-content"
+                            dangerouslySetInnerHTML={{ __html: note.text }}
+                          />
                         ) : (
                           <p
                             style={{
@@ -2173,11 +2385,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                       urgency: editingTaskForm.urgency,
                                       notes:
                                         editingTaskForm.notes.trim() !== ""
-                                          ? [
-                                              {
-                                                note: editingTaskForm.notes.trim(),
-                                              },
-                                            ]
+                                          ? [{ note: editingTaskForm.notes.trim() }]
                                           : undefined,
                                     });
                                     setEditingTaskId(null);
@@ -2409,7 +2617,6 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   minute: "2-digit",
                 });
                 const meetingDate = meeting.meeting_date?.slice(0, 10) ?? "";
-                const isEditingMeeting = editingMeetingId === meeting.id;
                 const iconBtnStyle: React.CSSProperties = {
                   background: "transparent",
                   border: "none",
@@ -2439,240 +2646,79 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        {isEditingMeeting ? (
-                          <>
-                            <input
-                              type="text"
-                              value={editingMeetingForm.name}
-                              onChange={(e) =>
-                                setEditingMeetingForm((p) => ({
-                                  ...p,
-                                  name: e.target.value,
-                                }))
-                              }
-                              placeholder="Meeting name"
-                              style={{
-                                width: "100%",
-                                padding: "8px 12px",
-                                border: "1px solid #cbd5e0",
-                                borderRadius: "5px",
-                                fontSize: "14px",
-                                marginBottom: "8px",
-                              }}
-                            />
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "12px",
-                                flexWrap: "wrap",
-                                marginBottom: "8px",
-                              }}
-                            >
-                              <input
-                                type="date"
-                                value={editingMeetingForm.meeting_date}
-                                onChange={(e) =>
-                                  setEditingMeetingForm((p) => ({
-                                    ...p,
-                                    meeting_date: e.target.value,
-                                  }))
-                                }
-                                style={{
-                                  padding: "8px 12px",
-                                  border: "1px solid #cbd5e0",
-                                  borderRadius: "5px",
-                                  fontSize: "14px",
-                                }}
-                              />
-                              <input
-                                type="time"
-                                value={editingMeetingForm.meeting_time}
-                                onChange={(e) =>
-                                  setEditingMeetingForm((p) => ({
-                                    ...p,
-                                    meeting_time: e.target.value,
-                                  }))
-                                }
-                                style={{
-                                  padding: "8px 12px",
-                                  border: "1px solid #cbd5e0",
-                                  borderRadius: "5px",
-                                  fontSize: "14px",
-                                }}
-                              />
-                              <select
-                                value={editingMeetingForm.meeting_type}
-                                onChange={(e) =>
-                                  setEditingMeetingForm((p) => ({
-                                    ...p,
-                                    meeting_type: e.target.value,
-                                  }))
-                                }
-                                style={{
-                                  padding: "8px 12px",
-                                  border: "1px solid #cbd5e0",
-                                  borderRadius: "5px",
-                                  fontSize: "14px",
-                                }}
-                              >
-                                <option value="Video">Video</option>
-                                <option value="Phone">Phone</option>
-                                <option value="In Person">In Person</option>
-                              </select>
-                            </div>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (editingMeetingId == null) return;
-                                  try {
-                                    await updateMeeting(editingMeetingId, {
-                                      name: editingMeetingForm.name,
-                                      meeting_date:
-                                        editingMeetingForm.meeting_date
-                                          ? `${editingMeetingForm.meeting_date}T00:00:00.000Z`
-                                          : undefined,
-                                      meeting_time:
-                                        editingMeetingForm.meeting_time,
-                                      meeting_type:
-                                        editingMeetingForm.meeting_type,
-                                    });
-                                    setEditingMeetingId(null);
-                                    fetchMeetings();
-                                  } catch {}
-                                }}
-                                style={{
-                                  padding: "6px 14px",
-                                  backgroundColor: "#141414",
-                                  border: "none",
-                                  borderRadius: "4px",
-                                  fontSize: "14px",
-                                  fontWeight: "500",
-                                  color: "#fff",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingMeetingId(null)}
-                                style={{
-                                  padding: "6px 14px",
-                                  backgroundColor: "#fff",
-                                  border: "1px solid #8a8a8a",
-                                  borderRadius: "4px",
-                                  fontSize: "14px",
-                                  fontWeight: "500",
-                                  color: "#141414",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                fontWeight: "600",
-                                color: "#141414",
-                                margin: "0 0 4px 0",
-                                lineHeight: "1.4",
-                              }}
-                            >
-                              {meeting.name}
+                        <>
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: "600",
+                              color: "#141414",
+                              margin: "0 0 4px 0",
+                              lineHeight: "1.4",
+                            }}
+                          >
+                            {meeting.name}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: "#141414",
+                              margin: "4px 0",
+                              lineHeight: "1.6",
+                            }}
+                          >
+                            {meeting.meeting_type} ·{" "}
+                            {meetingDate
+                              ? new Date(meeting.meeting_date).toLocaleDateString(
+                                  "en-US",
+                                )
+                              : "—"}{" "}
+                            {meeting.meeting_time ?? ""}
+                            {meeting.status ? ` · ${meeting.status}` : ""}
+                          </p>
+                          {meeting.meet_link && (
+                            <p style={{ fontSize: '13px', color: '#2563eb', margin: '6px 0 0 0', lineHeight: '1.5' }}>
+                              <a href={meeting.meet_link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                                Join meeting
+                              </a>
                             </p>
-                            <p
-                              style={{
-                                fontSize: "14px",
-                                color: "#141414",
-                                margin: "4px 0",
-                                lineHeight: "1.6",
-                              }}
-                            >
-                              {meeting.meeting_type} ·{" "}
-                              {meetingDate
-                                ? new Date(
-                                    meeting.meeting_date,
-                                  ).toLocaleDateString("en-US")
-                                : "—"}{" "}
-                              {meeting.meeting_time ?? ""}
-                              {meeting.status ? ` · ${meeting.status}` : ""}
-                            </p>
-                            {meeting.meet_link && (
-                              <p
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#2563eb",
-                                  margin: "6px 0 0 0",
-                                  lineHeight: "1.5",
-                                }}
-                              >
-                                <a
-                                  href={meeting.meet_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    color: "inherit",
-                                    textDecoration: "underline",
-                                  }}
-                                >
-                                  Join meeting
-                                </a>
-                              </p>
-                            )}
-                          </>
-                        )}
+                          )}
+                        </>
                       </div>
-                      {!isEditingMeeting && (
-                        <div
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            flexShrink: 0,
+                            fontSize: "13px",
+                            color: "#718096",
+                            whiteSpace: "nowrap",
+                            marginRight: "4px",
                           }}
                         >
-                          <span
-                            style={{
-                              fontSize: "13px",
-                              color: "#718096",
-                              whiteSpace: "nowrap",
-                              marginRight: "4px",
-                            }}
-                          >
-                            {meetingUpdatedAt}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingMeetingId(meeting.id);
-                              setEditingMeetingForm({
-                                name: meeting.name,
-                                meeting_date:
-                                  meeting.meeting_date?.slice(0, 10) ?? "",
-                                meeting_time: meeting.meeting_time ?? "",
-                                meeting_type: meeting.meeting_type ?? "Video",
-                              });
-                            }}
-                            style={iconBtnStyle}
-                            title="Edit meeting"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setMeetingToDelete(meeting)}
-                            style={{ ...iconBtnStyle, color: "#e53e3e" }}
-                            title="Delete meeting"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
+                          {meetingUpdatedAt}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openEditMeeting(meeting)}
+                          style={iconBtnStyle}
+                          title="Edit meeting"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetingToDelete(meeting)}
+                          style={{ ...iconBtnStyle, color: "#e53e3e" }}
+                          title="Delete meeting"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -3061,6 +3107,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     role="button"
                     tabIndex={0}
                     onClick={() => {
+                      if (onWhatsAppChatClick) {
+                        onWhatsAppChatClick({
+                          id: chat.id,
+                          phone_number: chat.phone_number,
+                        });
+                        return;
+                      }
                       setSelectedWhatsAppChatId(chat.id);
                       setSelectedWhatsAppChat(chat);
                       setShowWhatsAppModal(true);
@@ -3068,6 +3121,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
+                        if (onWhatsAppChatClick) {
+                          onWhatsAppChatClick({
+                            id: chat.id,
+                            phone_number: chat.phone_number,
+                          });
+                          return;
+                        }
                         setSelectedWhatsAppChatId(chat.id);
                         setSelectedWhatsAppChat(chat);
                         setShowWhatsAppModal(true);
@@ -3168,11 +3228,25 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             onClose={() => setShowEmailModal(false)}
             recipientEmail={recordEmail}
             recipientName={recordName}
-            senderEmail="user@example.com"
-            senderName="Your Name"
-            onSend={async () => {
-              await fetchEmails();
-              setShowEmailModal(false);
+            senderEmail={userEmail}
+            senderName={userName}
+            onSend={async (emailData) => {
+              if (!emailData.to?.length) return;
+              try {
+                await sendEmail({
+                  to: emailData.to,
+                  cc: emailData.cc?.length ? emailData.cc : undefined,
+                  bcc: emailData.bcc?.length ? emailData.bcc : undefined,
+                  subject: emailData.subject ?? "",
+                  content: emailData.body ?? "",
+                  ...(recordId != null && { record_id: Number(recordId) }),
+                  ...(recordType && { record_type: recordType }),
+                });
+                await fetchEmails();
+                setShowEmailModal(false);
+              } catch {
+                // sendEmail shows toast on error
+              }
             }}
           />
           <TaskModal
@@ -3184,13 +3258,42 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           <MeetingModal
             isOpen={showMeetingModal}
             onClose={() => setShowMeetingModal(false)}
-            hostEmail="user@example.com"
-            hostName="Your Name"
+            hostEmail={userEmail}
+            hostName={userName}
             attendeeEmail={recordEmail}
             attendeeName={recordName}
+            recordType={recordType}
+            recordId={recordId}
             onSchedule={handleMeetingSchedule}
           />
         </>
+      )}
+
+      {editMeetingModalOpen && (
+        <MeetingModal
+          isOpen={true}
+          onClose={() => {
+            setEditMeetingModalOpen(false);
+            setEditMeetingDefaults(null);
+            setEditingMeetingId(null);
+          }}
+          hostEmail={userEmail}
+          hostName={userName}
+          attendeeEmail={recordEmail}
+          attendeeName={recordName}
+          recordType={recordType}
+          recordId={recordId}
+          defaultTitle={editMeetingDefaults?.title}
+          defaultDate={editMeetingDefaults?.date}
+          defaultStartTime={editMeetingDefaults?.startTime}
+          defaultEndTime={editMeetingDefaults?.endTime}
+          defaultAttendees={editMeetingDefaults?.attendees}
+          defaultLocation={editMeetingDefaults?.location}
+          defaultReminders={editMeetingDefaults?.reminders}
+          defaultSummary={editMeetingDefaults?.summary}
+          submitLabel="Save changes"
+          onSchedule={handleMeetingUpdate}
+        />
       )}
 
       {taskToDelete != null && (

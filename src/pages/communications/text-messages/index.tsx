@@ -3,6 +3,7 @@ import Layout from '@layout/index';
 import '@assets/scss/datatable-style.scss';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Row, Col } from 'react-bootstrap';
+import GenericListPage from '@components/GenericListPage';
 import { Column } from '@components/CustomDataTable';
 import { ListGsmInbox,MarkAsRead } from '@utils/GsmManagement';
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';

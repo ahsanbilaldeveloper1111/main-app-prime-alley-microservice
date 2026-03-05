@@ -12,19 +12,23 @@ import { listProjects, createProject, updateProject, deleteProject, getProject, 
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import { StatsCardData } from '@components/GenericStatsCards';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { Spinner, Modal } from 'react-bootstrap';
-import { StylesConfig } from 'react-select';
+import Select, { SingleValue, StylesConfig } from 'react-select';
 import { 
   Container, 
   Row, 
   Col, 
+  Card, 
   Button, 
   Form, 
-  Badge,
+  Table, 
+  Badge, 
+  Dropdown,
   Nav,
+  InputGroup,
   Offcanvas,
   ProgressBar
 } from 'react-bootstrap';
@@ -32,12 +36,17 @@ import {
   FolderOpen,
   Folder,
   Plus, 
+  ChevronDown, 
+  Search, 
   X,
   MoreVertical,
   Calendar,
   AlertCircle,
   CalendarDays,
   Users,
+  Grid3x3,
+  Bell,
+  ChevronUp,
   Settings,
   SlidersHorizontal,
   Palette,
@@ -46,9 +55,13 @@ import {
   Monitor,
   Headphones,
   Rocket,
+  MessageCircle,
+  Clock,
   CheckCircle2,
+  UserPlus,
   Edit3,
   Trash2,
+  Link,
   ExternalLink,
   Archive
 } from 'lucide-react';
@@ -943,7 +956,7 @@ const WorkPlannerProjects = () => {
   </nav>
 </div>
 <div className="d-flex flex-wrap gap-2">
-<Button 
+{/* <Button 
                   variant="primary" 
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   onClick={handleCreateProject}
@@ -958,7 +971,54 @@ const WorkPlannerProjects = () => {
             >
               <SlidersHorizontal size={18} />
               Filters
-            </Button>
+            </Button> */}
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    borderRadius: "4px",
+    border: "1px solid rgb(20, 20, 20)",
+    padding: "8px 16px",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    lineHeight: "14px",
+    backgroundColor: "rgb(20, 20, 20)",
+    color: "#ffffff",
+  }}
+  onClick={handleCreateProject}
+>
+  <Plus size={18} />
+  <span>Create Project</span>
+</button>
+
+<button
+  style={{
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    borderRadius: "4px",
+    border: "1px solid rgb(20, 20, 20)",
+    padding: "8px 16px",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    lineHeight: "14px",
+    backgroundColor: "#ffffff",
+    color: "rgb(20, 20, 20)",
+  }}
+  onClick={() => setShowFilterSidebar(true)}
+>
+  <SlidersHorizontal size={18} />
+  <span>Filters</span>
+</button>
+
         </div>
 </div>
 

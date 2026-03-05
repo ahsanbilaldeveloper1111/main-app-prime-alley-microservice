@@ -10,7 +10,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { 
-  Plus, LayoutGrid, ChevronDown, Folder
+  Plus, LayoutGrid, ChevronDown,
+  MoreVertical, Folder
 } from 'lucide-react';
 import { Button, Spinner } from 'react-bootstrap';
 import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/partials/ProjectTabsContent';
@@ -66,7 +67,7 @@ const WorkPlannerProjectsDashboard = () => {
     const styles = {
       container: { backgroundColor: '#F4F7FA', minHeight: '100vh', paddingBottom: '2rem' },
       header: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2', padding: '1rem 0' },
-      headerInner: { maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem' },
+      headerInner: {  margin: '0 auto', padding: '0 1.5rem' },
       headerContent: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: '1rem' },
       headerLeft: { display: 'flex', alignItems: 'center', gap: '1rem' },
       logoBox: { width: '40px', height: '40px', backgroundColor: '#4680FF', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 },
@@ -80,9 +81,9 @@ const WorkPlannerProjectsDashboard = () => {
       buttonOutline: { padding: '0.625rem 1.25rem', backgroundColor: 'white', color: '#4680FF', border: '1px solid #4680FF', borderRadius: '6px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', transition: 'all 0.2s' },
       buttonLight: { padding: '0.625rem', backgroundColor: '#F4F7FA', color: '#6B7280', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.2s' },
       tabsContainer: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2' },
-      tabsInner: { maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', gap: '2rem' },
+      tabsInner: {  margin: '0 auto', padding: '0 1.5rem', display: 'flex', gap: '2rem' },
       tab: { background: 'none', border: 'none', padding: '1rem 0', fontSize: '0.95rem', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s', position: 'relative' as const },
-      contentContainer: { maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem', marginTop: '1.5rem' },
+      contentContainer: {  margin: '0 auto', padding: '0 1.5rem', marginTop: '1.5rem' },
       grid: { display: 'grid', gap: '1rem', marginBottom: '1.5rem' },
       gridFive: { gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' },
       gridTwo: { gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' },
@@ -168,57 +169,133 @@ const WorkPlannerProjectsDashboard = () => {
         <div style={styles.header}>
           <div style={styles.headerInner}>
             <div style={styles.headerContent}>
-              <div style={styles.headerLeft}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <Folder size={32} className="text-primary" style={{ marginRight: '0.5rem' }} />
-                <h2 className="mb-0 fw-bold">Projects</h2>
-              </div>
-              
-              <div style={styles.dropdown}>
-                <button 
-                  style={styles.dropdownButton}
-                  onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E5E9F2'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F4F7FA'}
-                  disabled={loadingProjects}
-                >
-                  {loadingProjects ? (
-                    <Spinner size="sm" animation="border" />
-                  ) : (
-                    <>
-                      {selectedProject?.name || 'Select Project'}
-                      <ChevronDown size={16} />
-                    </>
-                  )}
-                </button>
-                {showProjectDropdown && !loadingProjects && (
-                  <div style={styles.dropdownMenu}>
-                    {projects.map((project, index) => (
-                      <div 
-                        key={project.id}
-                        style={{
-                          ...styles.dropdownItem,
-                          borderBottom: index === projects.length - 1 ? 'none' : '1px solid #F3F4F6'
-                        }}
-                        onClick={() => { 
-                          handleProjectSelect(project); 
-                          setShowProjectDropdown(false); 
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                      >
-                        {project.name}
-                      </div>
-                    ))}
-                    {projects.length === 0 && (
-                      <div style={styles.dropdownItem}>
-                        No projects available
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <div style={styles.headerLeft}>
+
+{/* Projects title with icon */}
+<div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+  <Folder
+    size={22}
+    style={{ color: '#141414', flexShrink: 0 }}
+  />
+  <h2
+    style={{
+      margin: 0,
+      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+      fontSize: '20px',
+      fontWeight: 600,
+      color: '#141414',
+      letterSpacing: '0px',
+      lineHeight: '24px',
+    }}
+  >
+    Projects
+  </h2>
+</div>
+
+{/* Project selector dropdown */}
+<div style={styles.dropdown}>
+  <button
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 14px',
+      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+      fontSize: '14px',
+      fontWeight: 300,
+      color: '#141414',
+      background: '#fff',
+      border: '1px solid #d0d0d0',
+      borderRadius: '4px',
+      cursor: loadingProjects ? 'not-allowed' : 'pointer',
+      transition: 'border-color 0.15s',
+      whiteSpace: 'nowrap',
+      letterSpacing: '0px',
+      lineHeight: '20px',
+    }}
+    onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+    onMouseEnter={e => {
+      if (!loadingProjects) e.currentTarget.style.borderColor = '#141414';
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = '#d0d0d0';
+    }}
+    disabled={loadingProjects}
+  >
+    {loadingProjects ? (
+      <Spinner size="sm" animation="border" />
+    ) : (
+      <>
+        <span>{selectedProject?.name || 'Select Project'}</span>
+        <ChevronDown size={14} style={{ color: '#555', flexShrink: 0 }} />
+      </>
+    )}
+  </button>
+
+  {/* Dropdown menu */}
+  {showProjectDropdown && !loadingProjects && (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 6px)',
+        left: 0,
+        background: '#fff',
+        border: '1px solid #e0e0e0',
+        borderRadius: '4px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+        minWidth: '200px',
+        zIndex: 1000,
+        overflow: 'hidden',
+      }}
+    >
+      {projects.length === 0 ? (
+        <div
+          style={{
+            padding: '10px 14px',
+            fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+            fontSize: '14px',
+            fontWeight: 300,
+            color: '#888',
+          }}
+        >
+          No projects available
+        </div>
+      ) : (
+        projects.map((project, index) => (
+          <div
+            key={project.id}
+            onClick={() => {
+              handleProjectSelect(project);
+              setShowProjectDropdown(false);
+            }}
+            style={{
+              padding: '10px 14px',
+              fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+              fontSize: '14px',
+              fontWeight: selectedProject?.id === project.id ? 500 : 300,
+              color: selectedProject?.id === project.id ? '#141414' : '#4B5563',
+              borderBottom: index === projects.length - 1 ? 'none' : '1px solid #F3F4F6',
+              cursor: 'pointer',
+              transition: 'background 0.12s',
+              background: selectedProject?.id === project.id ? '#f5f5f5' : '#fff',
+            }}
+            onMouseEnter={e => {
+              if (selectedProject?.id !== project.id)
+                e.currentTarget.style.background = '#f9f9f9';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background =
+                selectedProject?.id === project.id ? '#f5f5f5' : '#fff';
+            }}
+          >
+            {project.name}
+          </div>
+        ))
+      )}
+    </div>
+  )}
+</div>
+</div>
             
             <div style={styles.headerRight}>
               {/* <Button 

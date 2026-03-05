@@ -1,9 +1,4 @@
 import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
-import "react-phone-number-input/style.css";
-
 import React, {
   ReactElement,
   useState,
@@ -12,6 +7,9 @@ import React, {
   useMemo,
   useRef,
 } from "react";
+import parsePhoneNumber from "libphonenumber-js";
+import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -26,6 +24,7 @@ import {
   Badge,
   InputGroup,
   Dropdown,
+  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -36,6 +35,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
+import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import {
   FiUpload,
   FiDatabase,
@@ -47,9 +47,11 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
+  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
+  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
@@ -74,7 +76,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Trash2,
   MoreVertical,
+  MoreHorizontal,
   Phone as PhoneIcon,
   Phone,
   Mail,
@@ -82,23 +86,34 @@ import {
   History,
   FileText,
   Target,
+  Layers,
   MessageCircle,
-  Trash2,
+  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
+  PaginationConfig,
+  ToolbarConfig,
+  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar from "@components/GenericSidebarNew";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar, {
+  SidebarSection,
+  QuickAction,
+  SidebarField,
+} from "@components/GenericSidebarNew";
+import GenericFilterSidebar, {
+  FilterField,
+} from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   getCrmDataById,
+  getAllCrmDataById,
   createCrmData,
   updateCrmData,
   uploadCrmDataCsv,
@@ -133,6 +148,7 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
+import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -140,6 +156,11 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
+import CrmActivitiesPanel, {
+  type CrmActivitiesPanelRef,
+} from "@components/CrmActivitiesPanel";
+import RichNoteEditor from "@components/RichNoteEditor";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -546,9 +567,7 @@ const CrmProspectsManagement = () => {
     null,
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteModalMode, setDeleteModalMode] = useState<
-    "single" | "bulk" | null
-  >(null);
+  const [deleteModalMode, setDeleteModalMode] = useState<"single" | "bulk" | null>(null);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
@@ -634,6 +653,7 @@ const CrmProspectsManagement = () => {
   const [showProspectSidebar, setShowProspectSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedProspect, setSelectedProspect] = useState<any>(null);
+  const sidebarProspectFetchTokenRef = useRef(0);
   const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Add Contacts button states
@@ -707,11 +727,18 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     if (!router.isReady || router.query.createContact !== "1") return;
     setShowCreateContactSidebar(true);
-    const { createContact: _, ...rest } = router.query;
+    const rawEditId = router.query.editContactId;
+    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
+    const editIdNum = editIdStr != null ? Number(editIdStr) : NaN;
+    if (Number.isFinite(editIdNum) && editIdNum > 0) {
+      setEditingContactId(editIdNum);
+    }
+
+    const { createContact: _, editContactId: __, ...rest } = router.query;
     router.replace({ pathname: router.pathname, query: rest }, undefined, {
       shallow: true,
     });
-  }, [router.isReady, router.query.createContact]);
+  }, [router.isReady, router.query.createContact, router.query.editContactId]);
 
   // Close Add Contacts dropdown when clicking outside
   useEffect(() => {
@@ -742,109 +769,88 @@ const CrmProspectsManagement = () => {
     setContactFormLoadError(null);
     setContactFormLoading(true);
     getCrmDataById(editingContactId)
-      .then(
-        (
-          item: CrmDataItem & {
-            data?: Record<string, any>;
-            source_file?: string;
-            tags?: { id?: number; name?: string }[];
-          },
-        ) => {
-          if (cancelled) return;
-          const d = item.data || {};
-          const nameParts = (item.name || "").trim().split(/\s+/);
-          const firstName = nameParts[0] || "";
-          const lastName = nameParts.slice(1).join(" ") || "";
-          const toDatetimeLocal = (v: string | null | undefined) => {
-            if (!v) return "";
-            const m = moment(v);
-            return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-          };
-          const rawTags =
-            (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-          const tagsArray = Array.isArray(rawTags)
-            ? rawTags.map((t: any) =>
-                typeof t === "string"
-                  ? { value: t, label: t }
-                  : {
-                      value: t.name ?? t.value ?? String(t.id ?? ""),
-                      label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
-                    },
-              )
-            : [];
-          // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
-          let phoneCountryCode = "";
-          let phoneNumber = item.phone ?? "";
-          if (typeof item.phone === "string" && item.phone.trim()) {
-            try {
-              const normalized = item.phone.replace(/\s/g, "");
-              const parsed = parsePhoneNumberInput(normalized);
-              if (parsed) {
-                phoneCountryCode = `+${parsed.countryCallingCode}`;
-                phoneNumber = parsed.nationalNumber;
-              }
-            } catch {
-              // keep phoneNumber as-is, phoneCountryCode ""
+      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
+        if (cancelled) return;
+        const d = item.data || {};
+        const nameParts = (item.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+        const toDatetimeLocal = (v: string | null | undefined) => {
+          if (!v) return "";
+          const m = moment(v);
+          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
+        };
+        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
+        const tagsArray = Array.isArray(rawTags)
+          ? rawTags.map((t: any) =>
+              typeof t === "string"
+                ? { value: t, label: t }
+                : {
+                  value: t.name ?? t.value ?? String(t.id ?? ""),
+                  label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
+                  id: Number(t.id ?? t.tag_id ?? t.pivot?.tag_id ?? 0),
+                },
+            )
+          : [];
+        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
+        let phoneCountryCode = "";
+        let phoneNumber = item.phone ?? "";
+        if (typeof item.phone === "string" && item.phone.trim()) {
+          try {
+            const normalized = item.phone.replace(/\s/g, "");
+            const parsed = parsePhoneNumberInput(normalized);
+            if (parsed) {
+              phoneCountryCode = `+${parsed.countryCallingCode}`;
+              phoneNumber = parsed.nationalNumber;
             }
+          } catch {
+            // keep phoneNumber as-is, phoneCountryCode ""
           }
-          // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
-          const reservedDataKeys = new Set([
-            "email",
-            "assigned_to",
-            "uploaded_by",
-            "disposition",
-            "tags",
-            "note",
-            "contact_owner",
-            "lifecycle_stage",
-            "legal_basis",
-          ]);
-          const customFieldsArray = Object.entries(d)
-            .filter(([k]) => !reservedDataKeys.has(k))
-            .map(([field_name, field_value]) => ({
-              id: `${Date.now()}-${Math.random()}-${field_name}`,
-              field_name,
-              field_value: Array.isArray(field_value)
-                ? (field_value as string[]).join(", ")
-                : String(field_value ?? "").trim(),
-            }))
-            .filter((f) => f.field_name || f.field_value);
-          setContactForm({
-            firstName,
-            lastName,
-            email: d.email ?? (item as any).email ?? "",
-            phone_country_code: phoneCountryCode,
-            phoneNumber,
-            campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-            contact_owner:
-              (item as any).user_extension ??
-              d.contact_owner ??
-              (item as any).contact_owner ??
-              null,
-            lifecycle_stage: d.lifecycle_stage ?? "",
-            disposition: d.disposition ?? (item as any).disposition ?? "",
-            legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-            company_domain:
-              (item as any).company_domain ?? d.company_domain ?? "",
-            scheduled_call_at: toDatetimeLocal(
-              item.scheduled_call_at ?? d.scheduled_call_at,
-            ),
-            tags: tagsArray as Array<{
-              value: string;
-              label: string;
-              id: number;
-            }>,
-            note: item.note ?? d.note ?? "",
-            source:
-              (item as any).source_file ??
-              d.source ??
-              (item as any).source ??
-              "",
-            custom_fields: customFieldsArray,
-          });
-          if (!cancelled) setContactFormLoading(false);
-        },
-      )
+        }
+        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
+        const reservedDataKeys = new Set([
+          "email",
+          "assigned_to",
+          "uploaded_by",
+          "disposition",
+          "tags",
+          "note",
+          "contact_owner",
+          "lifecycle_stage",
+          "legal_basis",
+        ]);
+        const customFieldsArray = Object.entries(d)
+          .filter(([k]) => !reservedDataKeys.has(k))
+          .map(([field_name, field_value]) => ({
+            id: `${Date.now()}-${Math.random()}-${field_name}`,
+            field_name,
+            field_value: Array.isArray(field_value)
+              ? (field_value as string[]).join(", ")
+              : String(field_value ?? "").trim(),
+          }))
+          .filter((f) => f.field_name || f.field_value);
+        setContactForm({
+          firstName,
+          lastName,
+          email: d.email ?? (item as any).email ?? "",
+          phone_country_code: phoneCountryCode,
+          phoneNumber,
+          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
+          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
+          lifecycle_stage: d.lifecycle_stage ?? "",
+          disposition: d.disposition ?? (item as any).disposition ?? "",
+          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
+          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
+          scheduled_call_at: toDatetimeLocal(
+            item.scheduled_call_at ?? d.scheduled_call_at,
+          ),
+          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
+          note: item.note ?? d.note ?? "",
+          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
+          custom_fields: customFieldsArray,
+        });
+        if (!cancelled) setContactFormLoading(false);
+      })
       .catch(() => {
         if (!cancelled) {
           setContactFormLoadError("Failed to load prospect");
@@ -896,9 +902,9 @@ const CrmProspectsManagement = () => {
     tags: null as string[] | null,
   });
   /** View mode: table or board; dropdown shows only the other option to switch */
-  const [prospectsViewMode, setProspectsViewMode] = useState<"table" | "board">(
-    "table",
-  );
+  const [prospectsViewMode, setProspectsViewMode] = useState<
+    "table" | "board"
+  >("table");
 
   // Column customization and pagination states
   const defaultSelectedColumns = [
@@ -1142,6 +1148,111 @@ const CrmProspectsManagement = () => {
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
+  const sidebarActivitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
+  const sidebarRecordId = Number(
+    selectedProspect?.id ?? selectedProspect?.data?.id ?? 0,
+  );
+  const sidebarRecordName = selectedProspect?.name ?? "Prospect";
+  const sidebarRecordPhone = selectedProspect?.phone ?? "";
+  const sidebarRecordEmail =
+    selectedProspect?.data?.email ??
+    selectedProspect?.data?.data?.email ??
+    selectedProspect?.email ??
+    "";
+
+  const sidebarActivityModals = useCrmActivityModals({
+    recordType: "prospect",
+    recordId: sidebarRecordId,
+    recordName: sidebarRecordName,
+    recordEmail: sidebarRecordEmail,
+    recordPhone: sidebarRecordPhone,
+    onTaskCreated: () => sidebarActivitiesPanelRef.current?.refetchTasks?.(),
+    onNoteCreated: () => sidebarActivitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () =>
+      sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
+  });
+
+  const sidebarQuickActions = useMemo(() => {
+    const hasPhone = !!String(sidebarRecordPhone || "").trim();
+    const hasEmail = !!String(sidebarRecordEmail || "").trim();
+    return [
+      {
+        id: "qa-call",
+        label: "Call",
+        icon: Phone,
+        onClick: () => {
+          const phone = String(sidebarRecordPhone || "").trim();
+          if (!phone) {
+            toast.error("No phone number available for this entry");
+            return;
+          }
+          if (!isInitialized) {
+            toast.error("CTI not initialized. Please wait...");
+            return;
+          }
+          dialNumber(phone)
+            .then((result) => {
+              if (result.success) {
+                toast.success(`Calling ${sidebarRecordName || phone}...`);
+              } else {
+                toast.error(result.error || "Failed to make call");
+              }
+            })
+            .catch((error) => {
+              console.error("Call error:", error);
+              toast.error("Failed to make call");
+            });
+        },
+        disabled: !hasPhone,
+      },
+      {
+        id: "qa-whatsapp",
+        label: "WhatsApp",
+        icon: MessageCircle,
+        onClick: () => sidebarActivityModals.openWhatsApp(),
+        disabled: !hasPhone,
+      },
+      {
+        id: "qa-sms",
+        label: "SMS",
+        icon: MessageSquare,
+        onClick: () => sidebarActivityModals.openSms(),
+        disabled: !hasPhone,
+      },
+      {
+        id: "qa-meeting",
+        label: "Meeting",
+        icon: Calendar,
+        onClick: () => sidebarActivityModals.openMeeting(),
+      },
+      {
+        id: "qa-email",
+        label: "Email",
+        icon: Mail,
+        onClick: () => sidebarActivityModals.openEmail(),
+        disabled: !hasEmail,
+      },
+      {
+        id: "more",
+        label: "More",
+        icon: MoreHorizontal,
+        onClick: () => {
+          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
+        },
+        disabled: false,
+      },
+    ];
+  }, [
+    sidebarRecordPhone,
+    sidebarRecordEmail,
+    sidebarActivityModals,
+    dialNumber,
+    isInitialized,
+    sidebarRecordName,
+    sidebarRecordId,
+  ]);
+
   const buildCrmDataParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
       const params: any = {
@@ -1304,35 +1415,16 @@ const CrmProspectsManagement = () => {
         }
       }
       const preferredTopLevelOrder = [
-        "id",
-        "name",
-        "phone",
-        "user_extension",
-        "campaign_id",
-        "source_file",
-        "directory",
-        "is_viewed",
-        "scheduled_call_at",
-        "uploaded_by",
-        "created_by",
-        "note",
-        "company_name",
-        "company_domain",
-        "company_id",
-        "created_at",
-        "updated_at",
-        "tags",
-        "crm_summary",
+        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
+        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
+        "note", "company_name", "company_domain", "company_id", "created_at",
+        "updated_at", "tags", "crm_summary",
       ];
       const orderedTopLevel = [
         ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys)
-          .filter((k) => !preferredTopLevelOrder.includes(k))
-          .sort((a, b) => a.localeCompare(b)),
+        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
       ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
-        a.localeCompare(b),
-      );
+      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
       const nestedDataKeysSet = new Set(orderedNestedData);
       const headers = [
         ...orderedTopLevel,
@@ -1350,21 +1442,13 @@ const CrmProspectsManagement = () => {
           return row?.company_name != null ? String(row.company_name) : "";
         }
         if (header === "crm_summary") {
-          const summary =
-            row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null
-            ? typeof summary === "string"
-              ? summary
-              : String(summary)
-            : "";
+          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
         }
-        const raw = nestedDataKeysSet.has(header)
-          ? (row?.data?.[header] ?? row?.[header])
-          : row?.[header];
+        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
         if (raw == null) return "";
         if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean")
-          return String(raw);
+        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
         try {
           return JSON.stringify(raw);
         } catch {
@@ -1378,9 +1462,7 @@ const CrmProspectsManagement = () => {
       };
       const csvContent = [
         headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) =>
-          headers.map((h) => escapeCsv(getCellValue(row, h))).join(","),
-        ),
+        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
       ].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
@@ -1457,12 +1539,12 @@ const CrmProspectsManagement = () => {
       try {
         const tags = await getCrmDataTags();
         const tagOptions = tags
-          .filter((tag: any) => tag.id != null)
-          .map((tag: any) => ({
-            value: tag.name,
-            label: tag.name,
-            id: tag.id,
-          }));
+        .filter((tag: any) => tag.id != null)
+        .map((tag: any) => ({
+          value: tag.name,
+          label: tag.name,
+          id: tag.id,
+        }));
         setAvailableTags(tagOptions);
       } catch (error) {
         console.error("Failed to load tags:", error);
@@ -1511,6 +1593,314 @@ const CrmProspectsManagement = () => {
     setCurrentFilters(filters);
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  const applyTableFiltersPatch = useCallback(
+    (patch: Record<string, any>) => {
+      const next: Record<string, any> = { ...currentFilters, ...patch };
+
+      Object.keys(next).forEach((k) => {
+        const v = next[k];
+        if (
+          v === undefined ||
+          v === null ||
+          v === "" ||
+          (Array.isArray(v) && v.length === 0)
+        ) {
+          delete next[k];
+        }
+      });
+
+      handleFiltersChange(next);
+      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    },
+    [currentFilters, handleFiltersChange, setPagination],
+  );
+
+  const hasAdvancedFiltersApplied = useMemo(() => {
+    const campaign = currentFilters.campaign_id;
+    const hasCampaign =
+      Array.isArray(campaign) ? campaign.length > 0 : !!campaign;
+
+    const tags = currentFilters.tags;
+    const hasTags = Array.isArray(tags) ? tags.length > 0 : !!tags;
+
+    const hasSource = !!currentFilters.source_file;
+    const hasNextCall =
+      !!currentFilters.scheduled_call_from || !!currentFilters.scheduled_call_to;
+
+    return hasCampaign || hasTags || hasSource || hasNextCall;
+  }, [currentFilters]);
+
+  const showAdvancedFilterPills =
+    showAdvancedFilters || hasAdvancedFiltersApplied;
+
+  const advancedFilterPills = useMemo<FilterPill[]>(() => {
+    const campaignIds = Array.isArray(currentFilters.campaign_id)
+      ? currentFilters.campaign_id
+      : currentFilters.campaign_id
+        ? [currentFilters.campaign_id]
+        : [];
+
+    const selectedCampaignOptions = availableCampaigns.filter((c) =>
+      campaignIds.includes(c.value),
+    );
+
+    const tagValues = Array.isArray(currentFilters.tags)
+      ? currentFilters.tags
+      : currentFilters.tags
+        ? [currentFilters.tags]
+        : [];
+    const selectedTagOptions = availableTags.filter((t) =>
+      tagValues.includes(t.value),
+    );
+
+    const sourceValue = currentFilters.source_file ?? null;
+    const nextFrom = currentFilters.scheduled_call_from ?? "";
+    const nextTo = currentFilters.scheduled_call_to ?? "";
+
+    const nextCallLabel = (() => {
+      if (!nextFrom && !nextTo) return undefined;
+      if (nextFrom && nextTo && nextFrom === nextTo) {
+        return moment(nextFrom).isValid()
+          ? moment(nextFrom).format("MMM D, YYYY")
+          : String(nextFrom);
+      }
+      const fromLabel = nextFrom
+        ? moment(nextFrom).isValid()
+          ? moment(nextFrom).format("MMM D")
+          : String(nextFrom)
+        : "…";
+      const toLabel = nextTo
+        ? moment(nextTo).isValid()
+          ? moment(nextTo).format("MMM D")
+          : String(nextTo)
+        : "…";
+      return `${fromLabel} – ${toLabel}`;
+    })();
+
+    return [
+      {
+        id: "campaigns",
+        label: "Campaigns",
+        showDropdown: true,
+        active: campaignIds.length > 0,
+        activeLabel:
+          campaignIds.length > 1
+            ? `${campaignIds.length} selected`
+            : selectedCampaignOptions[0]?.label,
+        onClear: () => {
+          setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
+          applyTableFiltersPatch({ campaign_id: undefined });
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 280 }}>
+            <Select
+              isMulti
+              options={availableCampaigns}
+              value={selectedCampaignOptions}
+              onChange={(selected) => {
+                const values = selected
+                  ? (selected as any[]).map((s: any) => s.value)
+                  : null;
+                setProspectsFilters((prev) => ({ ...prev, campaigns: values }));
+                applyTableFiltersPatch({ campaign_id: values });
+              }}
+              placeholder="Select campaigns..."
+              styles={customSelectStyles}
+              isClearable
+            />
+            <div className="d-flex justify-content-end mt-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => {
+                  setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
+                  applyTableFiltersPatch({ campaign_id: undefined });
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "source_file",
+        label: "Source",
+        showDropdown: true,
+        active: !!sourceValue,
+        activeLabel: sourceValue ? String(sourceValue) : undefined,
+        onClear: () => {
+          setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
+          applyTableFiltersPatch({ source_file: undefined });
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 280 }}>
+            <CreatableSelect
+              options={uniqueSources}
+              value={
+                sourceValue
+                  ? { value: sourceValue, label: String(sourceValue) }
+                  : null
+              }
+              onChange={(selected) => {
+                const v = selected ? (selected as any).value : null;
+                setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
+                applyTableFiltersPatch({ source_file: v });
+              }}
+              placeholder="Select or type a source..."
+              styles={customSelectStyles}
+              isClearable
+            />
+            <div className="d-flex justify-content-end mt-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => {
+                  setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
+                  applyTableFiltersPatch({ source_file: undefined });
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "tags",
+        label: "Tags",
+        showDropdown: true,
+        active: tagValues.length > 0,
+        activeLabel:
+          tagValues.length > 1
+            ? `${tagValues.length} selected`
+            : selectedTagOptions[0]?.label,
+        onClear: () => {
+          setProspectsFilters((prev) => ({ ...prev, tags: null }));
+          applyTableFiltersPatch({ tags: undefined });
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 280 }}>
+            <Select
+              isMulti
+              options={availableTags.map((t) => ({
+                value: t.value,
+                label: t.label,
+              }))}
+              value={selectedTagOptions.map((t) => ({
+                value: t.value,
+                label: t.label,
+              }))}
+              onChange={(selected) => {
+                const values = selected
+                  ? (selected as any[]).map((s: any) => s.value)
+                  : null;
+                setProspectsFilters((prev) => ({ ...prev, tags: values }));
+                applyTableFiltersPatch({ tags: values });
+              }}
+              placeholder="Select tags..."
+              styles={customSelectStyles}
+              isClearable
+            />
+            <div className="d-flex justify-content-end mt-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => {
+                  setProspectsFilters((prev) => ({ ...prev, tags: null }));
+                  applyTableFiltersPatch({ tags: undefined });
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "next_call",
+        label: "Next Call Date",
+        showDropdown: true,
+        active: !!nextFrom || !!nextTo,
+        activeLabel: nextCallLabel,
+        onClear: () => {
+          setProspectsFilters((prev) => ({
+            ...prev,
+            nextCallDateFrom: null,
+            nextCallDateTo: null,
+          }));
+          applyTableFiltersPatch({
+            scheduled_call_from: undefined,
+            scheduled_call_to: undefined,
+          });
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 280 }}>
+            <div className="d-flex gap-2">
+              <div className="flex-grow-1">
+                <Form.Label className="small fw-bold mb-1">From</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={currentFilters.scheduled_call_from || ""}
+                  onChange={(e) => {
+                    const v = e.target.value || null;
+                    setProspectsFilters((prev) => ({
+                      ...prev,
+                      nextCallDateFrom: v,
+                    }));
+                    applyTableFiltersPatch({ scheduled_call_from: v });
+                  }}
+                />
+              </div>
+              <div className="flex-grow-1">
+                <Form.Label className="small fw-bold mb-1">To</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={currentFilters.scheduled_call_to || ""}
+                  onChange={(e) => {
+                    const v = e.target.value || null;
+                    setProspectsFilters((prev) => ({
+                      ...prev,
+                      nextCallDateTo: v,
+                    }));
+                    applyTableFiltersPatch({ scheduled_call_to: v });
+                  }}
+                />
+              </div>
+            </div>
+            <div className="d-flex justify-content-end gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => {
+                  setProspectsFilters((prev) => ({
+                    ...prev,
+                    nextCallDateFrom: null,
+                    nextCallDateTo: null,
+                  }));
+                  applyTableFiltersPatch({
+                    scheduled_call_from: undefined,
+                    scheduled_call_to: undefined,
+                  });
+                }}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        ),
+      },
+    ];
+  }, [
+    applyTableFiltersPatch,
+    availableCampaigns,
+    availableTags,
+    currentFilters,
+    customSelectStyles,
+    setProspectsFilters,
+    uniqueSources,
+  ]);
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
@@ -1741,7 +2131,9 @@ const CrmProspectsManagement = () => {
         setTotalAllProspects(response.pagination.total || 0);
       }
 
-      setMetrics(response.metrics || {});
+      setMetrics(
+        response.metrics || {},
+      );
     } catch (error: any) {
       // Only handle error if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -1940,12 +2332,46 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  // Handle view data item - open GenericSidebar only (no modal)
-  const handleViewData = useCallback((item: CrmDataItem) => {
+  const openProspectSidebar = useCallback((item: CrmDataItem | any) => {
     setSelectedDataItem(item);
     setSelectedProspect(item);
     setShowProspectSidebar(true);
+
+    const id = Number(item?.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const token = ++sidebarProspectFetchTokenRef.current;
+    getAllCrmDataById(id)
+      .then((full: any) => {
+        if (sidebarProspectFetchTokenRef.current !== token) return;
+        const record = full?.data ?? null;
+        if (!record) return;
+
+        // Attach audit trail (top-level on the full response) onto the record so
+        // CrmActivitiesPanel can pick it up consistently.
+        const hydrated = {
+          ...record,
+          audit_trail: full?.audit_trail ?? full?.audit_trails ?? undefined,
+          leads: full?.leads ?? undefined,
+          deals: full?.deals ?? undefined,
+        };
+
+        setSelectedProspect((prev: any) => {
+          const prevId = Number(prev?.id);
+          if (!Number.isFinite(prevId) || prevId !== id) return prev;
+          return { ...prev, ...hydrated };
+        });
+      })
+      .catch(() => {
+        // getAllCrmDataById already toasts on error; keep sidebar usable with base row data
+      });
   }, []);
+
+  // Backwards-compatible alias used throughout the file
+  const handleViewData = useCallback(
+    (item: CrmDataItem) => openProspectSidebar(item),
+    [openProspectSidebar],
+  );
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -2496,12 +2922,12 @@ const CrmProspectsManagement = () => {
 
   // Handle prospect row click
   const handleProspectClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
-  }, []);
+    openProspectSidebar(prospect);
+  }, [openProspectSidebar]);
 
   // Handle close prospect sidebar
   const handleCloseProspectSidebar = useCallback(() => {
+    sidebarProspectFetchTokenRef.current += 1;
     setShowProspectSidebar(false);
     setSelectedProspect(null);
   }, []);
@@ -2513,7 +2939,8 @@ const CrmProspectsManagement = () => {
       if (!prospect?.id) return;
       const name = prospect.name ?? "";
       const phone = prospect.phone ?? "";
-      const campaignId = prospect.campaign_id ?? prospect.campaign?.id ?? null;
+      const campaignId =
+        prospect.campaign_id ?? prospect.campaign?.id ?? null;
       const existingData = (prospect.data as Record<string, unknown>) ?? {};
       try {
         await updateCrmData(prospect.id, {
@@ -2553,9 +2980,8 @@ const CrmProspectsManagement = () => {
 
   // Handle preview button click - shows sidebar
   const handlePreviewClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
-  }, []);
+    openProspectSidebar(prospect);
+  }, [openProspectSidebar]);
 
   // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
@@ -3393,91 +3819,91 @@ const CrmProspectsManagement = () => {
           <ChevronDown size={16} />
         </button>
 
-        {showAddContactsDropdown && (
-          <div
+      {showAddContactsDropdown && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: "4px",
+            backgroundColor: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: "5px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+            minWidth: "160px",
+            zIndex: 1000,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            onClick={() => {
+              setShowAddContactsDropdown(false);
+              setEditingContactId(null);
+              setContactForm({
+                firstName: "",
+                lastName: "",
+                email: "",
+                phone_country_code: "",
+                phoneNumber: "",
+                campaign_id: null,
+                contact_owner: null,
+                lifecycle_stage: "Lead",
+                disposition: "",
+                legal_basis: [],
+                company_domain: "",
+                scheduled_call_at: "",
+                tags: [],
+                note: "",
+                source: "",
+                custom_fields: [],
+              });
+              setShowCreateContactSidebar(true);
+            }}
             style={{
-              position: "absolute",
-              top: "100%",
-              right: 0,
-              marginTop: "4px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e2e8f0",
-              borderRadius: "5px",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-              minWidth: "160px",
-              zIndex: 1000,
-              overflow: "hidden",
+              width: "100%",
+              padding: "12px 16px",
+              backgroundColor: "transparent",
+              border: "none",
+              textAlign: "left",
+              fontSize: "14px",
+              color: "#141414",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#f7fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
-            <button
-              onClick={() => {
-                setShowAddContactsDropdown(false);
-                setEditingContactId(null);
-                setContactForm({
-                  firstName: "",
-                  lastName: "",
-                  email: "",
-                  phone_country_code: "",
-                  phoneNumber: "",
-                  campaign_id: null,
-                  contact_owner: null,
-                  lifecycle_stage: "Lead",
-                  disposition: "",
-                  legal_basis: [],
-                  company_domain: "",
-                  scheduled_call_at: "",
-                  tags: [],
-                  note: "",
-                  source: "",
-                  custom_fields: [],
-                });
-                setShowCreateContactSidebar(true);
-              }}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                backgroundColor: "transparent",
-                border: "none",
-                textAlign: "left",
-                fontSize: "14px",
-                color: "#141414",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              Create new
-            </button>
-            <button
-              onClick={() => {
-                setShowAddContactsDropdown(false);
-                setShowUploadModal(true);
-              }}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                backgroundColor: "transparent",
-                border: "none",
-                textAlign: "left",
-                fontSize: "14px",
-                color: "#d97706",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              Import
-            </button>
-          </div>
-        )}
+            Create new
+          </button>
+          <button
+            onClick={() => {
+              setShowAddContactsDropdown(false);
+              setShowUploadModal(true);
+            }}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              backgroundColor: "transparent",
+              border: "none",
+              textAlign: "left",
+              fontSize: "14px",
+              color: "#d97706",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#f7fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            Import
+          </button>
+        </div>
+      )}
       </div>
     </div>
   );
@@ -3505,7 +3931,7 @@ const CrmProspectsManagement = () => {
       const phoneForPayload =
         contactForm.phone_country_code && contactForm.phoneNumber?.trim()
           ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-          : (contactForm.phoneNumber?.trim() ?? "");
+          : contactForm.phoneNumber?.trim() ?? "";
       const customFieldsForPayload = (contactForm.custom_fields ?? [])
         .map((f) => ({
           field_name: String(f.field_name ?? "").trim(),
@@ -3538,8 +3964,8 @@ const CrmProspectsManagement = () => {
           company_domain: contactForm.company_domain?.trim() || undefined,
           source: contactForm.source?.trim() || undefined,
           tag_ids: contactForm.tags?.length
-            ? contactForm.tags.map((t) => t.id)
-            : [],
+          ? contactForm.tags.map((t) => t.id)
+          : [],
           data: dataPayload,
         });
         fetchCrmData();
@@ -3594,7 +4020,7 @@ const CrmProspectsManagement = () => {
     const phoneForPayload =
       contactForm.phone_country_code && contactForm.phoneNumber?.trim()
         ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-        : (contactForm.phoneNumber?.trim() ?? "");
+        : contactForm.phoneNumber?.trim() ?? "";
     const customFieldsForPayload = (contactForm.custom_fields ?? [])
       .map((f) => ({
         field_name: String(f.field_name ?? "").trim(),
@@ -3641,1166 +4067,49 @@ const CrmProspectsManagement = () => {
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {
     if (!showCreateContactSidebar) return null;
-
+  
     const isFormValid =
       contactForm.email?.trim() &&
       contactForm.phoneNumber?.trim() &&
       (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
       contactForm.campaign_id != null;
-
+  
     return (
-      <>
-        {/* Overlay */}
-        <div
-          className="contact-sidebar-overlay"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 1000,
-          }}
-          onClick={() => setShowCreateContactSidebar(false)}
-        />
-
-        {/* Sidebar */}
-        <div
-          className="contact-sidebar-container"
-          style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            width: "600px",
-            height: "100vh",
-            backgroundColor: "#ffffff",
-            boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-            zIndex: 999999,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Header */}
-          <div
-            className="contact-sidebar-header"
-            style={{
-              padding: "20px 24px",
-              borderBottom: "1px solid #eaf0f6",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <h2
-              className="contact-sidebar-title"
-              style={{
-                fontSize: "20px",
-                fontWeight: "600",
-                color: "#141414",
-                margin: 0,
-              }}
-            >
-              {editingContactId ? "Edit Prospect" : "Create Prospect"}
-            </h2>
-            <button
-              className="contact-sidebar-close-btn"
-              onClick={() => {
-                setShowCreateContactSidebar(false);
-                setEditingContactId(null);
-                setContactFormLoadError(null);
-                setContactFormLoading(false);
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "#718096",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (
-                !isFormValid ||
-                createContactLoading ||
-                (editingContactId != null && contactFormLoading)
-              )
-                return;
-              if (editingContactId) handleUpdateContactSubmit();
-              else handleCreateContactSubmit(false);
-            }}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              flex: 1,
-              minHeight: 0,
-            }}
-          >
-            {contactFormLoadError && (
-              <div
-                style={{
-                  padding: "12px 24px",
-                  background: "#fef2f2",
-                  color: "#b91c1c",
-                  fontSize: "14px",
-                }}
-              >
-                {contactFormLoadError}
-              </div>
-            )}
-            {/* Form Content */}
-            <div
-              className="contact-sidebar-content"
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "40px",
-              }}
-            >
-              {editingContactId && contactFormLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 280,
-                    gap: "16px",
-                  }}
-                >
-                  <Spinner
-                    animation="border"
-                    role="status"
-                    style={{
-                      width: "2.5rem",
-                      height: "2.5rem",
-                      color: "#0091ae",
-                    }}
-                  />
-                  <span style={{ fontSize: "14px", color: "#64748b" }}>
-                    Loading prospect...
-                  </span>
-                </div>
-              ) : (
-                <>
-                  {/* Required: Name, Email, Phone */}
-                  <div className="contact-form-section">
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label contact-form-label-required"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        First name <span style={{ color: "#f2545b" }}>*</span>
-                      </label>
-                      <input
-                        type="text"
-                        data-test-id="firstname-input"
-                        value={contactForm.firstName}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            firstName: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label contact-form-label-required"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Last name <span style={{ color: "#f2545b" }}>*</span>
-                      </label>
-                      <input
-                        type="text"
-                        data-test-id="lastname-input"
-                        value={contactForm.lastName}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            lastName: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label contact-form-label-required"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Email <span style={{ color: "#f2545b" }}>*</span>
-                      </label>
-                      <input
-                        type="email"
-                        data-test-id="email-input"
-                        value={contactForm.email}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            email: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label contact-form-label-required"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Phone <span style={{ color: "#f2545b" }}>*</span>
-                      </label>
-                      <div className="phone-input-wrapper contact-form-phone-input-wrapper">
-                        <PhoneInput
-                          international
-                          defaultCountry="US"
-                          value={
-                            contactForm.phone_country_code &&
-                            contactForm.phoneNumber
-                              ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
-                              : contactForm.phoneNumber || undefined
-                          }
-                          onChange={(value) => {
-                            if (value) {
-                              try {
-                                const phoneNumber =
-                                  parsePhoneNumberInput(value);
-                                if (phoneNumber) {
-                                  setContactForm({
-                                    ...contactForm,
-                                    phone_country_code: `+${phoneNumber.countryCallingCode}`,
-                                    phoneNumber: phoneNumber.nationalNumber,
-                                  });
-                                } else {
-                                  setContactForm({
-                                    ...contactForm,
-                                    phone_country_code: "",
-                                    phoneNumber: value,
-                                  });
-                                }
-                              } catch {
-                                setContactForm({
-                                  ...contactForm,
-                                  phone_country_code: "",
-                                  phoneNumber: value,
-                                });
-                              }
-                            } else {
-                              setContactForm({
-                                ...contactForm,
-                                phone_country_code: "",
-                                phoneNumber: "",
-                              });
-                            }
-                          }}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
-                  <div
-                    className="contact-form-section"
-                    style={{ marginTop: "24px" }}
-                  >
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label contact-form-label-required"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Campaign <span style={{ color: "#f2545b" }}>*</span>
-                      </label>
-                      {(() => {
-                        const campaignSelectOptions = availableCampaigns.map(
-                          (c) => ({
-                            value: String(c.id),
-                            label: c.label,
-                          }),
-                        );
-                        return (
-                          <Select
-                            value={
-                              contactForm.campaign_id != null
-                                ? (campaignSelectOptions.find(
-                                    (o) =>
-                                      o.value ===
-                                      String(contactForm.campaign_id),
-                                  ) ?? null)
-                                : null
-                            }
-                            onChange={(opt: any) =>
-                              setContactForm({
-                                ...contactForm,
-                                campaign_id: opt?.value
-                                  ? Number(opt.value)
-                                  : null,
-                              })
-                            }
-                            options={campaignSelectOptions}
-                            placeholder="Select campaign"
-                            isClearable
-                            isSearchable
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                minHeight: 40,
-                                border: "1px solid #8a8a8a",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                              }),
-                            }}
-                          />
-                        );
-                      })()}
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Associate with
-                      </label>
-                      <Select
-                        value={(() => {
-                          const opts = extensions.map((ext: any) => ({
-                            value: String(ext.extension ?? ext.id ?? ""),
-                            label:
-                              ext.display_name ||
-                              ext.name ||
-                              ext.extension ||
-                              String(ext.id || ""),
-                          }));
-                          return contactForm.contact_owner != null
-                            ? opts.find(
-                                (o) => o.value === contactForm.contact_owner,
-                              ) || null
-                            : null;
-                        })()}
-                        onChange={(opt: any) =>
-                          setContactForm({
-                            ...contactForm,
-                            contact_owner: opt?.value ?? null,
-                          })
-                        }
-                        options={extensions.map((ext: any) => ({
-                          value: String(ext.extension ?? ext.id ?? ""),
-                          label:
-                            ext.display_name ||
-                            ext.name ||
-                            ext.extension ||
-                            String(ext.id || ""),
-                        }))}
-                        placeholder="Select associate with"
-                        isClearable
-                        isSearchable
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            minHeight: 40,
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                          }),
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Source
-                      </label>
-                      <input
-                        type="text"
-                        value={contactForm.source}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            source: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                        placeholder="Enter source"
-                      />
-                    </div>
-                    {/* <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Lifecycle stage
-                      </label>
-                      <Dropdown>
-                        <Dropdown.Toggle
-                          variant="outline-secondary"
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            backgroundColor: "#fff",
-                          }}
-                        >
-                          {contactForm.lifecycle_stage || "Select..."}
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu style={{ width: "100%" }}>
-                          {["Lead", "Prospect", "Customer", "Evangelist"].map(
-                            (stage) => (
-                              <Dropdown.Item
-                                key={stage}
-                                onClick={() =>
-                                  setContactForm({
-                                    ...contactForm,
-                                    lifecycle_stage: stage,
-                                  })
-                                }
-                              >
-                                {stage}
-                              </Dropdown.Item>
-                            ),
-                          )}
-                        </Dropdown.Menu>
-                      </Dropdown>
-                    </div> */}
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Disposition
-                      </label>
-                      <Dropdown>
-                        <Dropdown.Toggle
-                          variant="outline-secondary"
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            backgroundColor: "#fff",
-                            color: contactForm.disposition
-                              ? "#141414"
-                              : "#a0aec0",
-                          }}
-                        >
-                          {contactForm.disposition || "Select..."}
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu style={{ width: "100%" }}>
-                          {[
-                            "interested",
-                            "not_interested",
-                            "callback_requested",
-                            "no_answer",
-                            "busy",
-                            "do_not_call",
-                            "wrong_number",
-                            "follow_up",
-                          ].map((d) => (
-                            <Dropdown.Item
-                              key={d}
-                              onClick={() =>
-                                setContactForm({
-                                  ...contactForm,
-                                  disposition: d,
-                                })
-                              }
-                            >
-                              {d.replace(/_/g, " ")}
-                            </Dropdown.Item>
-                          ))}
-                        </Dropdown.Menu>
-                      </Dropdown>
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Legal basis for processing contact&apos;s data
-                      </label>
-                      <Dropdown>
-                        <Dropdown.Toggle
-                          variant="outline-secondary"
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            backgroundColor: "#fff",
-                            color: contactForm.legal_basis?.length
-                              ? "#141414"
-                              : "#a0aec0",
-                          }}
-                        >
-                          {contactForm.legal_basis?.length
-                            ? contactForm.legal_basis.join(", ")
-                            : "Select..."}
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu
-                          style={{ width: "100%", padding: "8px" }}
-                        >
-                          {[
-                            "Legitimate interest",
-                            "Consent",
-                            "Contract",
-                            "Legal obligation",
-                            "Vital interests",
-                            "Public task",
-                          ].map((option) => (
-                            <Dropdown.Item
-                              key={option}
-                              as="div"
-                              style={{ padding: "4px 8px" }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const isSelected =
-                                  contactForm.legal_basis.includes(option);
-                                setContactForm({
-                                  ...contactForm,
-                                  legal_basis: isSelected
-                                    ? contactForm.legal_basis.filter(
-                                        (b) => b !== option,
-                                      )
-                                    : [...contactForm.legal_basis, option],
-                                });
-                              }}
-                            >
-                              <Form.Check
-                                type="checkbox"
-                                label={option}
-                                checked={contactForm.legal_basis.includes(
-                                  option,
-                                )}
-                                onChange={() => {}}
-                              />
-                            </Dropdown.Item>
-                          ))}
-                        </Dropdown.Menu>
-                      </Dropdown>
-                    </div>
-                  </div>
-
-                  {/* Optional: Datetime and text fields */}
-                  <div
-                    className="contact-form-section"
-                    style={{
-                      marginTop: "24px",
-                      paddingTop: "24px",
-                      borderTop: "1px solid #eaf0f6",
-                    }}
-                  >
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Company domain
-                      </label>
-                      <input
-                        type="text"
-                        value={contactForm.company_domain}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            company_domain: e.target.value,
-                          })
-                        }
-                        placeholder="e.g. example.com"
-                        data-no-capitalize
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Scheduled call at
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={contactForm.scheduled_call_at}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            scheduled_call_at: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Tags
-                      </label>
-                      <CreatableSelect
-                        isMulti
-                        value={contactForm.tags}
-                        onChange={(selected) =>
-                          setContactForm({
-                            ...contactForm,
-                            tags: selected ? [...selected] : [],
-                          })
-                        }
-                        options={availableTags.map((t: any) => ({
-                          value: t.value,
-                          label: t.label,
-                          id: t.id,
-                        }))}
-                        placeholder="Select or create tags"
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            minHeight: 40,
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                          }),
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Note
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={contactForm.note}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            note: e.target.value,
-                          })
-                        }
-                        placeholder="Notes about this contact"
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                          resize: "vertical",
-                          fontFamily: "inherit",
-                        }}
-                        onFocus={(e) =>
-                          (e.currentTarget.style.borderColor = "#0091ae")
-                        }
-                        onBlur={(e) =>
-                          (e.currentTarget.style.borderColor = "#8a8a8a")
-                        }
-                      />
-                    </div>
-
-                    {/* Custom fields (user-defined) */}
-                    <div
-                      className="contact-form-field"
-                      style={{
-                        marginBottom: contactForm.custom_fields?.length
-                          ? "12px"
-                          : "0px",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            custom_fields: [
-                              ...(prev.custom_fields ?? []),
-                              {
-                                id: `${Date.now()}-${Math.random()}`,
-                                field_name: "",
-                                field_value: "",
-                              },
-                            ],
-                          }))
-                        }
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          padding: "8px 10px",
-                          backgroundColor: "transparent",
-                          border: "1px dashed #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          color: "#141414",
-                          cursor: "pointer",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#f7fafc";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <Plus size={16} />
-                        Add custom field
-                      </button>
-                    </div>
-
-                    {!!contactForm.custom_fields?.length && (
-                      <div style={{ marginTop: "12px" }}>
-                        {contactForm.custom_fields.map((f, idx) => (
-                          <div
-                            key={f.id}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr auto",
-                              gap: "10px",
-                              alignItems: "center",
-                              marginBottom: "10px",
-                            }}
-                          >
-                            <input
-                              type="text"
-                              value={f.field_name}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).map(
-                                    (cf, i) =>
-                                      i === idx ? { ...cf, field_name: v } : cf,
-                                  ),
-                                }));
-                              }}
-                              placeholder="Title"
-                              style={{
-                                width: "100%",
-                                padding: "10px 12px",
-                                border: "1px solid #8a8a8a",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                outline: "none",
-                              }}
-                              onFocus={(e) =>
-                                (e.currentTarget.style.borderColor = "#0091ae")
-                              }
-                              onBlur={(e) =>
-                                (e.currentTarget.style.borderColor = "#8a8a8a")
-                              }
-                            />
-                            <input
-                              type="text"
-                              value={f.field_value}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).map(
-                                    (cf, i) =>
-                                      i === idx
-                                        ? { ...cf, field_value: v }
-                                        : cf,
-                                  ),
-                                }));
-                              }}
-                              placeholder="Value"
-                              style={{
-                                width: "100%",
-                                padding: "10px 12px",
-                                border: "1px solid #8a8a8a",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                outline: "none",
-                              }}
-                              onFocus={(e) =>
-                                (e.currentTarget.style.borderColor = "#0091ae")
-                              }
-                              onBlur={(e) =>
-                                (e.currentTarget.style.borderColor = "#8a8a8a")
-                              }
-                            />
-                            <button
-                              type="button"
-                              aria-label={`Remove custom field ${idx + 1}`}
-                              onClick={() =>
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (
-                                    prev.custom_fields ?? []
-                                  ).filter((cf) => cf.id !== f.id),
-                                }))
-                              }
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 36,
-                                height: 36,
-                                borderRadius: "6px",
-                                border: "1px solid #8a8a8a",
-                                backgroundColor: "transparent",
-                                cursor: "pointer",
-                                color: "#718096",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "#fef2f2";
-                                e.currentTarget.style.borderColor = "#ef4444";
-                                e.currentTarget.style.color = "#ef4444";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                  "transparent";
-                                e.currentTarget.style.borderColor = "#8a8a8a";
-                                e.currentTarget.style.color = "#718096";
-                              }}
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Footer Buttons */}
-            <div
-              className="contact-sidebar-footer"
-              style={{
-                padding: "16px 24px",
-                borderTop: "1px solid #eaf0f6",
-                display: "flex",
-                gap: "12px",
-                justifyContent: "flex-start",
-              }}
-            >
-              <button
-                type="submit"
-                className="contact-form-btn-create"
-                disabled={
-                  !isFormValid ||
-                  createContactLoading ||
-                  (!!editingContactId && contactFormLoading)
-                }
-                style={{
-                  padding: "10px 20px",
-                  backgroundColor:
-                    isFormValid && !createContactLoading
-                      ? "#0091ae"
-                      : "#cbd5e0",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor:
-                    isFormValid && !createContactLoading
-                      ? "pointer"
-                      : "not-allowed",
-                }}
-                onMouseEnter={(e) => {
-                  if (isFormValid && !createContactLoading)
-                    e.currentTarget.style.backgroundColor = "#007a94";
-                }}
-                onMouseLeave={(e) => {
-                  if (isFormValid && !createContactLoading)
-                    e.currentTarget.style.backgroundColor = "#0091ae";
-                }}
-              >
-                {createContactLoading
-                  ? editingContactId
-                    ? "Updating..."
-                    : "Creating..."
-                  : editingContactId
-                    ? "Update"
-                    : "Create"}
-              </button>
-              {!editingContactId && (
-                <button
-                  type="button"
-                  className="contact-form-btn-create-another"
-                  disabled={!isFormValid || createContactLoading}
-                  onClick={() => handleCreateContactSubmit(true)}
-                  style={{
-                    padding: "10px 20px",
-                    backgroundColor: "transparent",
-                    color:
-                      isFormValid && !createContactLoading
-                        ? "#141414"
-                        : "#a0aec0",
-                    border: "1px solid #8a8a8a",
-                    borderRadius: "4px",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    cursor:
-                      isFormValid && !createContactLoading
-                        ? "pointer"
-                        : "not-allowed",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isFormValid && !createContactLoading)
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isFormValid && !createContactLoading)
-                      e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  Create and add another
-                </button>
-              )}
-              <button
-                type="button"
-                className="contact-form-btn-cancel"
-                disabled={createContactLoading}
-                onClick={() => {
-                  setShowCreateContactSidebar(false);
-                  setEditingContactId(null);
-                  setContactFormLoadError(null);
-                  setContactFormLoading(false);
-                }}
-                style={{
-                  padding: "10px 20px",
-                  backgroundColor: "transparent",
-                  color: "#141414",
-                  border: "1px solid #8a8a8a",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "#f7fafc")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      </>
+      <ProspectEditSidebar
+        isOpen={showCreateContactSidebar}
+        title={editingContactId ? "Edit Prospect" : "Create Prospect"}
+        isEditing={!!editingContactId}
+        isFormValid={!!isFormValid}
+        createContactLoading={createContactLoading}
+        contactForm={contactForm}
+        setContactForm={setContactForm}
+        contactFormLoading={contactFormLoading}
+        contactFormLoadError={contactFormLoadError}
+        availableCampaigns={availableCampaigns}
+        extensions={extensions}
+        availableTags={availableTags}
+        parsePhoneNumberInput={parsePhoneNumberInput}
+        onClose={() => {
+          setShowCreateContactSidebar(false);
+          setEditingContactId(null);
+          setContactFormLoadError(null);
+          setContactFormLoading(false);
+        }}
+        onSubmitPrimary={() => {
+          if (editingContactId) {
+            handleUpdateContactSubmit();
+          } else {
+            handleCreateContactSubmit(false);
+          }
+        }}
+        onCreateAndAddAnother={
+          editingContactId
+            ? undefined
+            : () => {
+                handleCreateContactSubmit(true);
+              }
+        }
+      />
     );
   };
 
@@ -5237,311 +4546,6 @@ const CrmProspectsManagement = () => {
                 />
               )}
 
-            {/* Advanced Filters */}
-            {showAdvancedFilters &&
-              session?.user?.permissions?.includes(
-                "list-crm-data-management",
-              ) && (
-                <Card className="border-0 shadow-sm mb-4">
-                  <Card.Body>
-                    <Row className="g-3 align-items-end">
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Search
-                        </Form.Label>
-                        <Form.Control
-                          type="text"
-                          placeholder="Search by name or phone..."
-                          value={prospectsSearch}
-                          onChange={(e) => setProspectsSearch(e.target.value)}
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Owner
-                        </Form.Label>
-                        <Select
-                          options={extensions.map((ext: any) => ({
-                            value: ext.id || ext.extension,
-                            label:
-                              ext.display_name ||
-                              ext.name ||
-                              ext.id ||
-                              ext.extension,
-                          }))}
-                          value={
-                            prospectsFilters.assignedTo
-                              ? (() => {
-                                  const assignedToId =
-                                    prospectsFilters.assignedTo;
-                                  const ext = extensions.find(
-                                    (e: any) =>
-                                      (e.id || e.extension) === assignedToId,
-                                  );
-                                  return ext
-                                    ? {
-                                        value: assignedToId,
-                                        label:
-                                          ext.display_name ||
-                                          ext.name ||
-                                          assignedToId,
-                                      }
-                                    : {
-                                        value: assignedToId,
-                                        label: assignedToId,
-                                      };
-                                })()
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const assignedToValue = selected
-                              ? selected.value
-                              : null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              assignedTo: assignedToValue,
-                            }));
-                            // Reset to all when assigned filter changes
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select user..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Campaigns
-                        </Form.Label>
-                        <Select
-                          isMulti
-                          options={availableCampaigns.map((c) => ({
-                            value: c.value,
-                            label: c.label,
-                          }))}
-                          value={
-                            prospectsFilters.campaigns
-                              ? prospectsFilters.campaigns.map(
-                                  (campaignId: string) => {
-                                    const campaign = availableCampaigns.find(
-                                      (c: any) => c.value === campaignId,
-                                    );
-                                    return campaign
-                                      ? {
-                                          value: campaignId,
-                                          label: campaign.label,
-                                        }
-                                      : {
-                                          value: campaignId,
-                                          label: campaignId,
-                                        };
-                                  },
-                                )
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const campaignValues = selected
-                              ? selected.map((s: any) => s.value)
-                              : null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              campaigns: campaignValues,
-                            }));
-                            // Reset to all when campaign filter changes
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select campaigns..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Next Call Date (From)
-                        </Form.Label>
-                        <Form.Control
-                          type="date"
-                          value={prospectsFilters.nextCallDateFrom || ""}
-                          onChange={(e) => {
-                            const dateValue = e.target.value || null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              nextCallDateFrom: dateValue,
-                            }));
-                          }}
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Next Call Date (To)
-                        </Form.Label>
-                        <Form.Control
-                          type="date"
-                          value={prospectsFilters.nextCallDateTo || ""}
-                          onChange={(e) => {
-                            const dateValue = e.target.value || null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              nextCallDateTo: dateValue,
-                            }));
-                          }}
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Source Name
-                        </Form.Label>
-                        <CreatableSelect
-                          options={uniqueSources}
-                          value={
-                            prospectsFilters.sourceFile
-                              ? {
-                                  value: prospectsFilters.sourceFile,
-                                  label: prospectsFilters.sourceFile,
-                                }
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const sourceValue = selected
-                              ? selected.value
-                              : null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              sourceFile: sourceValue,
-                            }));
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select or create source..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Tags
-                        </Form.Label>
-                        <Select
-                          isMulti
-                          options={availableTags.map((tag) => ({
-                            value: tag.value,
-                            label: tag.label,
-                          }))}
-                          value={
-                            prospectsFilters.tags
-                              ? prospectsFilters.tags.map(
-                                  (tagValue: string) => {
-                                    const tag = availableTags.find(
-                                      (t: any) => t.value === tagValue,
-                                    );
-                                    return tag
-                                      ? { value: tagValue, label: tag.label }
-                                      : { value: tagValue, label: tagValue };
-                                  },
-                                )
-                              : null
-                          }
-                          onChange={(selected) => {
-                            const tagValues = selected
-                              ? selected.map((s: any) => s.value)
-                              : null;
-                            setProspectsFilters((prev) => ({
-                              ...prev,
-                              tags: tagValues,
-                            }));
-                            setActiveFilter("all");
-                          }}
-                          placeholder="Select tags..."
-                          styles={customSelectStyles}
-                          isClearable
-                        />
-                      </Col>
-                      <Col md={4}>
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="outline-secondary"
-                            className="d-flex align-items-center justify-content-center"
-                            onClick={() => {
-                              // Map prospectsFilters to the format expected by handleFiltersChange
-                              const filtersToApply: Record<string, any> = {};
-
-                              if (prospectsSearch) {
-                                filtersToApply.search = prospectsSearch;
-                              }
-                              if (prospectsFilters.assignedTo) {
-                                filtersToApply.user_extension = [
-                                  prospectsFilters.assignedTo,
-                                ];
-                              }
-                              if (
-                                prospectsFilters.campaigns &&
-                                prospectsFilters.campaigns.length > 0
-                              ) {
-                                filtersToApply.campaign_id =
-                                  prospectsFilters.campaigns;
-                              }
-                              if (prospectsFilters.sourceFile) {
-                                filtersToApply.source_file =
-                                  prospectsFilters.sourceFile;
-                              }
-                              if (
-                                prospectsFilters.tags &&
-                                prospectsFilters.tags.length > 0
-                              ) {
-                                filtersToApply.tags = prospectsFilters.tags;
-                              }
-
-                              // Next Call Date (From)/(To) -> scheduled_call_from / scheduled_call_to
-                              if (prospectsFilters.nextCallDateFrom) {
-                                filtersToApply.scheduled_call_from =
-                                  prospectsFilters.nextCallDateFrom;
-                              }
-                              if (prospectsFilters.nextCallDateTo) {
-                                filtersToApply.scheduled_call_to =
-                                  prospectsFilters.nextCallDateTo;
-                              }
-
-                              handleFiltersChange(filtersToApply);
-                              setPagination((prev) => ({
-                                ...prev,
-                                currentPage: 1,
-                              }));
-                              setRefreshKey((prev) => prev + 1);
-                            }}
-                          >
-                            Submit Filters
-                          </Button>
-                          <Button
-                            variant="outline-secondary"
-                            className="d-flex align-items-center justify-content-center"
-                            onClick={() => {
-                              setProspectsSearch("");
-                              setProspectsFilters({
-                                assignedTo: null,
-                                campaigns: null,
-                                nextCallDateFrom: null,
-                                nextCallDateTo: null,
-                                sourceFile: null,
-                                tags: null,
-                              });
-                              handleFiltersChange({});
-                              setCurrentFilters({});
-                              setActiveFilter("all");
-                              setPagination((prev) => ({
-                                ...prev,
-                                currentPage: 1,
-                              }));
-                              setRefreshKey((prev) => prev + 1);
-                            }}
-                          >
-                            Reset Filters
-                          </Button>
-                        </div>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
             {/* Bulk Actions */}
             {/* {selectedItems.length > 0 &&
           session?.user?.permissions?.includes(
@@ -5651,42 +4655,53 @@ const CrmProspectsManagement = () => {
                 maxHeight="calc(100vh - 345px)"
                 // Toolbar
                 showToolbar={true}
-                toolbar={prospectsToolbarConfig}
+                toolbar={{
+                  ...prospectsToolbarConfig,
+                  // Remove the "+ More" pill on this page
+                  showMoreFiltersButton: false,
+                  // Hide Advanced filters button while the filters sidebar is open
+                  showAdvancedFilters: !showFiltersSidebar,
+                  // Keep pills visible by default so advanced pills can appear inline
+                  showFilterPills: true,
+                  onAdvancedFiltersClick: () =>
+                    setShowAdvancedFilters((prev) => !prev),
+                  filterPills: [
+                    ...(prospectsToolbarConfig.filterPills ?? []),
+                    ...(showAdvancedFilterPills ? advancedFilterPills : []),
+                  ],
+                }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
                 // When Board View is selected, show board content instead of table
                 customBody={
-                  prospectsViewMode === "board" ? (
-                    <KanbanBoard
-                      columns={prospectsToKanbanColumns(
-                        dataList,
-                        getInitials,
-                        getRandomColor,
-                      )}
-                      onCardClick={(card) => handleViewData(card.raw)}
-                      onCardMove={(cardId, fromCol, toCol) => {
-                        // Optionally call updateCrmData here to persist the lifecycle_stage change
-                        const prospect = dataList.find((p) => p.id === cardId);
-                        if (prospect) {
-                          updateCrmData(Number(cardId), {
-                            name: prospect.name || "",
-                            phone: prospect.phone || "",
-                            campaign_id: prospect.campaign_id,
-                            data: { ...prospect.data, lifecycle_stage: toCol },
-                            scheduled_call_at:
-                              prospect.scheduled_call_at || undefined,
-                            company_domain:
-                              prospect.data?.company_domain || undefined,
-                            company_name:
-                              prospect.data?.company_name || undefined,
-                            source: prospect.data?.source || undefined,
-                          });
-                        }
-                      }}
-                      searchValue={prospectsSearch}
-                    />
-                  ) : undefined
-                }
+  prospectsViewMode === "board" ? (
+    <KanbanBoard
+      columns={prospectsToKanbanColumns(
+        dataList,
+        getInitials,
+        getRandomColor
+      )}
+      onCardClick={(card) => handleViewData(card.raw)}
+      onCardMove={(cardId, fromCol, toCol) => {
+        // Optionally call updateCrmData here to persist the lifecycle_stage change
+        const prospect = dataList.find(p => p.id === cardId);
+        if (prospect) {
+          updateCrmData(Number(cardId), {
+            name: prospect.name || "",
+            phone: prospect.phone || "",
+            campaign_id: prospect.campaign_id,
+            data: { ...prospect.data, lifecycle_stage: toCol },
+            scheduled_call_at: prospect.scheduled_call_at || undefined,
+            company_domain: prospect.data?.company_domain || undefined,
+            company_name: prospect.data?.company_name || undefined,
+            source: prospect.data?.source || undefined,
+          });
+        }
+      }}
+      searchValue={prospectsSearch}
+    />
+  ) : undefined
+}
               />
             </div>
           </div>
@@ -8373,47 +7388,59 @@ const CrmProspectsManagement = () => {
             recordId={
               selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
             }
+            quickActions={sidebarQuickActions}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
             crmSummary={
-              selectedProspect?.data?.crm_summary ??
               selectedProspect?.crm_summary ??
+              selectedProspect?.data?.crm_summary ??
+              (selectedProspect as any)?.data?.data?.crm_summary ??
               undefined
             }
             recordLink={{
               label: "View record",
               onClick: () => {
-                const prospectId = selectedProspect?.id;
-                if (prospectId != null) {
-                  setShowProspectSidebar(false);
-                  router.push(
-                    `/crm/prospects/prospects-detailpage?id=${prospectId}`,
-                  );
-                }
+                const prospectId = Number(
+                  selectedProspect?.id ??
+                    selectedProspect?.data?.id ??
+                    (selectedProspect as any)?.data?.data?.id ??
+                    NaN,
+                );
+                if (!Number.isFinite(prospectId) || prospectId <= 0) return;
+                handleCloseProspectSidebar();
+                router.push(
+                  `/crm/prospects/prospects-detailpage?id=${prospectId}`,
+                );
               },
             }}
             actionsDropdown={{
               label: "Actions",
               items: [
                 {
+                  label: "Edit Prospect",
+                  onClick: () => {
+                    const id = selectedProspect?.id;
+                    if (!id) return;
+                    setShowProspectSidebar(false);
+                    setEditingContactId(id);
+                    setShowCreateContactSidebar(true);
+                  },
+                },
+                {
                   label: "Convert to Lead",
                   onClick: () => {
+                    setShowProspectSidebar(false);
                     setConvertingProspectId(selectedProspect?.id);
                     setShowConvertToLeadModal(true);
                   },
                 },
-                {
-                  label: "Update owner",
-                  subItems: extensions.map((ext: any) => ({
-                    label:
-                      ext.display_name ||
-                      ext.name ||
-                      ext.extension ||
-                      String(ext.id ?? ""),
-                    value: String(ext.extension ?? ext.id ?? ""),
-                  })),
-                  onSubItemSelect: handleProspectOwnerSelect,
-                },
+                // {
+                //   label: "View History",
+                //   onClick: () => {
+                //     setShowProspectSidebar(false);
+                //     setShowHistoryModal(true);
+                //   },
+                // },
                 {
                   label: "Delete",
                   onClick: () => handleDeleteData(selectedProspect),
@@ -8430,7 +7457,13 @@ const CrmProspectsManagement = () => {
                 actions: [
                   {
                     label: "Edit all properties",
-                    onClick: () => console.log("Edit all"),
+                    onClick: () => {
+                      const id = selectedProspect?.id;
+                      if (!id) return;
+                      setShowProspectSidebar(false);
+                      setEditingContactId(id);
+                      setShowCreateContactSidebar(true);
+                    },
                   },
                 ],
                 fields: [
@@ -8506,14 +7539,9 @@ const CrmProspectsManagement = () => {
                   action: {
                     label: "Log activity",
                     onClick: () => {
-                      const id =
-                        selectedProspect?.id ??
-                        selectedProspect?.data?.id ??
-                        "";
+                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
                       if (id) {
-                        router.push(
-                          `/crm/prospects/prospects-detailpage?id=${id}`,
-                        );
+                        router.push(`/crm/prospects/prospects-detailpage?id=${id}`);
                         handleCloseProspectSidebar();
                       }
                     },
@@ -8552,10 +7580,11 @@ const CrmProspectsManagement = () => {
                     onClick: () => console.log("Add note"),
                   },
                 },
-              },
+              }
             ]}
           />
         )}
+        {sidebarActivityModals.modals}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
@@ -8750,8 +7779,7 @@ const CrmProspectsManagement = () => {
                 prospectsFilters.nextCallDateFrom;
             }
             if (prospectsFilters.nextCallDateTo) {
-              filtersToApply.scheduled_call_to =
-                prospectsFilters.nextCallDateTo;
+              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
             }
 
             handleFiltersChange(filtersToApply);
@@ -8832,187 +7860,187 @@ const CrmProspectsManagement = () => {
       >
         <hr />
         <h6 className="mb-3">Export filters</h6>
-        <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Associate with</Form.Label>
-              <Form.Select
-                value={
-                  exportFilters.user_extension
-                    ? String(exportFilters.user_extension)
-                    : ""
-                }
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.user_extension = v;
-                    else delete next.user_extension;
-                    return next;
-                  });
-                }}
-              >
-                <option value="">All owners</option>
-                {extensions.map((ext) => (
-                  <option
-                    key={String(ext.id || ext.extension)}
-                    value={String(ext.id || ext.extension)}
-                  >
-                    {ext.display_name ||
-                      ext.name ||
-                      ext.id ||
-                      ext.extension ||
-                      ""}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Lead status</Form.Label>
-              <Form.Select
-                value={exportFilters.disposition || ""}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.disposition = v;
-                    else delete next.disposition;
-                    return next;
-                  });
-                }}
-              >
-                <option value="">All status</option>
-                <option value="hot_lead">Hot Lead</option>
-                <option value="warm_lead">Warm Lead</option>
-                <option value="cold_lead">Cold Lead</option>
-                <option value="interested">Interested</option>
-                <option value="callback_requested">Callback Requested</option>
-                <option value="no_answer">No Answer</option>
-                <option value="not_interested">Not Interested</option>
-                <option value="follow_up">Follow Up</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-        <Row>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Create date</Form.Label>
-              <Form.Select
-                value={(() => {
-                  const from = exportFilters.created_at_from;
-                  const to = exportFilters.created_at_to;
-                  if (!from || !to) return "all";
-                  const days = moment(to).diff(moment(from), "days");
-                  if (days === 0) return "today";
-                  if (days >= 6 && days <= 8) return "week";
-                  if (days >= 28 && days <= 31) return "month";
-                  return "all";
-                })()}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v === "all") {
-                      delete next.created_at_from;
-                      delete next.created_at_to;
-                    } else {
-                      const today = moment().format("YYYY-MM-DD");
-                      if (v === "today") {
-                        next.created_at_from = today;
-                        next.created_at_to = today;
-                      } else if (v === "week") {
-                        next.created_at_from = moment()
-                          .subtract(7, "days")
-                          .format("YYYY-MM-DD");
-                        next.created_at_to = today;
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Associate with</Form.Label>
+                <Form.Select
+                  value={
+                    exportFilters.user_extension
+                      ? String(exportFilters.user_extension)
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.user_extension = v;
+                      else delete next.user_extension;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All owners</option>
+                  {extensions.map((ext) => (
+                    <option
+                      key={String(ext.id || ext.extension)}
+                      value={String(ext.id || ext.extension)}
+                    >
+                      {ext.display_name ||
+                        ext.name ||
+                        ext.id ||
+                        ext.extension ||
+                        ""}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Lead status</Form.Label>
+                <Form.Select
+                  value={exportFilters.disposition || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v) next.disposition = v;
+                      else delete next.disposition;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="">All status</option>
+                  <option value="hot_lead">Hot Lead</option>
+                  <option value="warm_lead">Warm Lead</option>
+                  <option value="cold_lead">Cold Lead</option>
+                  <option value="interested">Interested</option>
+                  <option value="callback_requested">Callback Requested</option>
+                  <option value="no_answer">No Answer</option>
+                  <option value="not_interested">Not Interested</option>
+                  <option value="follow_up">Follow Up</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Create date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.created_at_from;
+                    const to = exportFilters.created_at_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.created_at_from;
+                        delete next.created_at_to;
                       } else {
-                        next.created_at_from = moment()
-                          .subtract(30, "days")
-                          .format("YYYY-MM-DD");
-                        next.created_at_to = today;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.created_at_from = today;
+                          next.created_at_to = today;
+                        } else if (v === "week") {
+                          next.created_at_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.created_at_to = today;
+                        } else {
+                          next.created_at_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.created_at_to = today;
+                        }
                       }
-                    }
-                    return next;
-                  });
-                }}
-              >
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 days</option>
-                <option value="month">Last 30 days</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Last activity date</Form.Label>
-              <Form.Select
-                value={(() => {
-                  const from = exportFilters.last_called_at_from;
-                  const to = exportFilters.last_called_at_to;
-                  if (!from || !to) return "all";
-                  const days = moment(to).diff(moment(from), "days");
-                  if (days === 0) return "today";
-                  if (days >= 6 && days <= 8) return "week";
-                  if (days >= 28 && days <= 31) return "month";
-                  return "all";
-                })()}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v === "all") {
-                      delete next.last_called_at_from;
-                      delete next.last_called_at_to;
-                    } else {
-                      const today = moment().format("YYYY-MM-DD");
-                      if (v === "today") {
-                        next.last_called_at_from = today;
-                        next.last_called_at_to = today;
-                      } else if (v === "week") {
-                        next.last_called_at_from = moment()
-                          .subtract(7, "days")
-                          .format("YYYY-MM-DD");
-                        next.last_called_at_to = today;
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-3">
+                <Form.Label>Last activity date</Form.Label>
+                <Form.Select
+                  value={(() => {
+                    const from = exportFilters.last_called_at_from;
+                    const to = exportFilters.last_called_at_to;
+                    if (!from || !to) return "all";
+                    const days = moment(to).diff(moment(from), "days");
+                    if (days === 0) return "today";
+                    if (days >= 6 && days <= 8) return "week";
+                    if (days >= 28 && days <= 31) return "month";
+                    return "all";
+                  })()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExportFilters((prev) => {
+                      const next = { ...prev };
+                      if (v === "all") {
+                        delete next.last_called_at_from;
+                        delete next.last_called_at_to;
                       } else {
-                        next.last_called_at_from = moment()
-                          .subtract(30, "days")
-                          .format("YYYY-MM-DD");
-                        next.last_called_at_to = today;
+                        const today = moment().format("YYYY-MM-DD");
+                        if (v === "today") {
+                          next.last_called_at_from = today;
+                          next.last_called_at_to = today;
+                        } else if (v === "week") {
+                          next.last_called_at_from = moment()
+                            .subtract(7, "days")
+                            .format("YYYY-MM-DD");
+                          next.last_called_at_to = today;
+                        } else {
+                          next.last_called_at_from = moment()
+                            .subtract(30, "days")
+                            .format("YYYY-MM-DD");
+                          next.last_called_at_to = today;
+                        }
                       }
-                    }
-                    return next;
-                  });
-                }}
-              >
-                <option value="all">All time</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 days</option>
-                <option value="month">Last 30 days</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-        <Form.Group className="mb-0">
-          <Form.Label>Search (optional)</Form.Label>
-          <Form.Control
-            type="text"
-            placeholder="Filter by name, phone, etc."
-            value={exportFilters.search || ""}
-            onChange={(e) => {
-              const v = e.target.value.trim();
-              setExportFilters((prev) => {
-                const next = { ...prev };
-                if (v) next.search = v;
-                else delete next.search;
-                return next;
-              });
-            }}
-          />
-        </Form.Group>
+                      return next;
+                    });
+                  }}
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <Form.Group className="mb-0">
+            <Form.Label>Search (optional)</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Filter by name, phone, etc."
+              value={exportFilters.search || ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                setExportFilters((prev) => {
+                  const next = { ...prev };
+                  if (v) next.search = v;
+                  else delete next.search;
+                  return next;
+                });
+              }}
+            />
+          </Form.Group>
       </CrmExportModal>
       {/* Add Tab Modal */}
       <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>

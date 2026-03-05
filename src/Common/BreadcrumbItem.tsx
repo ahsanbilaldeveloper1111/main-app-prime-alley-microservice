@@ -1,5 +1,7 @@
 import Head from "next/head";
+import Link from "next/link";
 import React from "react";
+import { Row, Col } from "react-bootstrap";
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 import PageLoader from '@components/PageLoader';
 

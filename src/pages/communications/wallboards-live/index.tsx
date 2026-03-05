@@ -10,6 +10,7 @@ import { useCti } from '@hooks/useCti'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import SummaryCards from './partials/SummaryCards'
 import FilterBar from './partials/FilterBar'
+import MonitoringModal from './partials/MonitoringModal'
 import PageHeader from './partials/PageHeader'
 import SectionsRenderer from './partials/SectionsRenderer'
 import { 

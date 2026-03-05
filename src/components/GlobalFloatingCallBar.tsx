@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Modal, Form } from "react-bootstrap";
 import { useCti } from "../contexts/CtiContext";
 import { usePermissions } from "../utils/permissionUtils";
+import { toast } from "react-toastify";
 import DeviceSelectionModal from "./DeviceSelectionModal";
 import { useRouter } from "next/router";
 import { useDialerModal } from "../contexts/DialerModalContext";

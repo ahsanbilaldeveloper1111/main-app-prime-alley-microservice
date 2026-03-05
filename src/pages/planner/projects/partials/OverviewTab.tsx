@@ -1,6 +1,6 @@
 import React from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
-import { FileText, Users } from 'lucide-react';
+import { Search, MoreVertical, FileText, Users, X } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip 

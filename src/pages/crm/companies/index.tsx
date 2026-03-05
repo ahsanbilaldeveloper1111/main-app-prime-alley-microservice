@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 import {
   Button,
   Card,
@@ -23,6 +24,7 @@ import {
   Badge,
   InputGroup,
   Dropdown,
+  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -43,32 +45,49 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
+  FiMessageCircle,
+  FiPlay,
   FiClock,
   FiX,
+  FiAlertCircle,
   FiCalendar,
   FiTarget,
+  FiMoreVertical,
 } from "react-icons/fi";
 import {
   Users,
   Calendar,
+  XCircle,
+  Clock as ClockIcon,
+  ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
+  UserPlus,
   ArrowUp,
   ArrowDown,
   Download,
+  CheckSquare,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
   Eye,
+  Trash2,
   MoreVertical,
   Phone as PhoneIcon,
   Phone,
   Mail,
+  User,
+  History,
+  FileText,
   Target,
   Layers,
+  Link as LinkIcon,
+  Linkedin,
+  ExternalLink,
   ClipboardList,
+  MoreHorizontal,
 } from "lucide-react";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import ConvertToLeadModal from "@components/ConvertToLeadModal";
@@ -76,6 +95,9 @@ import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
+  PaginationConfig,
+  ToolbarConfig,
+  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
@@ -83,10 +105,17 @@ import GenericSidebar, {
   QuickAction,
   SidebarField,
 } from "@components/GenericSidebarNew";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import { StatsCardData } from "@components/GenericStatsCards";
+import GenericFilterSidebar, {
+  FilterField,
+} from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
+  getCrmData,
+  getCrmDataById,
+  createCrmData,
+  updateCrmData,
   uploadCrmDataCsv,
+  deleteCrmData,
   assignCrmDataAdvanced,
   getCrmDataCounts,
   bulkDeleteCrmData,
@@ -116,13 +145,19 @@ import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import {
   ModuleSlug,
+  formatDuration,
+  formatDateTimeToLocal,
+  GlobalDateFormat,
+  GlobalTimeFormat,
   GlobalDateTimeFormat,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
+import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
+import CircularProgressCircle from "@components/CircularProgressCircle";
 
 import renderCreateCompany, {
   type CompanyFormPayload,
@@ -7393,17 +7428,78 @@ const CrmCompanyManagement = () => {
                         },
                       ],
               },
-            ];
-            if (structuredSectionFields.length > 0) {
-              sections.push({
-                id: "enrichment-structured",
-                title: "Enrichment (structured data)",
-                icon: Layers,
+              {
+                id: "recent-activities",
+                title: "Recent activities",
+                icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                fields: structuredSectionFields,
-              });
-            }
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this order.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => console.log("Log activity"),
+                  },
+                },
+              },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
+                icon: PhoneIcon,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () => {
+                      const phone =
+                        selectedCompany?.phone ||
+                        selectedCompany?.rawData?.phone
+                      if (phone) {
+                        handleCallClick(selectedCompany);
+                      }
+                    },
+                  },
+                },
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
+                  },
+                },
+              },
+            ];
+            // if (structuredSectionFields.length > 0) {
+            //   sections.push({
+            //     id: "enrichment-structured",
+            //     title: "Enrichment (structured data)",
+            //     icon: Layers,
+            //     collapsible: true,
+            //     defaultExpanded: true,
+            //     fields: structuredSectionFields,
+            //   });
+            // }
 
             return (
               <GenericSidebar
@@ -8011,4 +8107,3 @@ CrmCompanyManagement.getLayout = (page: ReactElement) => {
 };
 
 export default CrmCompanyManagement;
-

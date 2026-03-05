@@ -1,11 +1,11 @@
 import "@assets/scss/datatable-style.scss";
 import '@assets/scss/common.scss';
-import React, { ReactElement, useState, useCallback } from "react";
+import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Column } from "@components/CustomDataTable";
-import { Row, Col } from "react-bootstrap";
+import { Button, Modal, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
@@ -15,17 +15,24 @@ import {
   getMonitoringDashboard,
   resolveAlert,
   Alert,
+  MonitoringDashboardResponse,
 } from "@utils/netops";
 import {
   convertUTCToUserTimezone,
+  GlobalDateFormat,
+  GlobalTimeFormat,
 } from "@utils/Helper";
 
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiCheck } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiEye, FiPlus, FiCheck } from "react-icons/fi";
 
 
 

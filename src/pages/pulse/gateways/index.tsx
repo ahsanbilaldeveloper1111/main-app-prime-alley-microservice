@@ -1,18 +1,25 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback } from "react";
+import React, { ReactElement, useEffect, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { ListGsmManagement, updateGsm, deleteGsm } from "@utils/GsmManagement";
 
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row } from "react-bootstrap";
+import { Button, Card, Modal, Row } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
+import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
+import GsmListFilter from "@components/filters/GsmListFilter";
 
 import "@assets/scss/common.scss";
 
+import { motion } from "framer-motion";
+import imgStatus1 from "@assets/images/widget/img-status-1.svg";
+import imgStatus2 from "@assets/images/widget/img-status-2.svg";
+import imgStatus3 from "@assets/images/widget/img-status-3.svg";
+import imgStatus4 from "@assets/images/widget/img-status-4.svg";
 
 import AddGsmModal from "@pages/gsm/partial/AddGsmModal";
 
@@ -20,11 +27,14 @@ import GsmDetailModel from "@pages/gsm/partial/GsmDetailModel";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
+import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye } from "react-icons/fi";
+import { FiEdit, FiTrash2, FiEye, FiPlus } from "react-icons/fi";
+import { getDashboardData, ViewGsm } from "@utils/GsmAssign";
 
 const GsmList = () => {
   const { data: session, status } = useSession();

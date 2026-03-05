@@ -18,6 +18,7 @@ import {
   uploadCrmDataCsv,
   getCrmDataTags,
   getCrmDataCounts,
+  assignCrmDataAdvanced,
   downloadExampleCsv,
   getIndustries,
   getDealTemplates,
@@ -43,6 +44,9 @@ import {
   FiEye,
   FiPlus,
   FiCalendar,
+  FiFilter,
+  FiDatabase,
+  FiUsers,
 } from "react-icons/fi";
 import {
   X,
@@ -67,10 +71,12 @@ import {
   Eye,
   Trash2,
   Calendar,
+  User,
   Download,
   AlertCircle as AlertCircleIcon,
   Hash,
   Briefcase,
+  RefreshCw,
   UserPlus,
   Building2,
 } from "lucide-react";
@@ -81,14 +87,27 @@ import { GetHierarchyData } from "@utils/users";
 import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
-
-
+import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { Column } from "@components/CustomDataTable";
+import PageSummaryGrid from "@components/PageSummaryGrid";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import moment from "moment";
 

@@ -2,7 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Button, Row, Accordion, Card } from "react-bootstrap";
+import { Button, Modal, Row, Accordion, Card } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import { FiChevronDown, FiChevronUp, FiSearch } from "react-icons/fi";

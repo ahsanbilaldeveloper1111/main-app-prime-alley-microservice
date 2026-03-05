@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   Key,
+  Mail,
   Calendar,
+  Heart,
+  Download,
+  Globe,
   Flag,
+  Moon,
   User,
+  Star,
+  Bell,
   Settings,
+  PlusCircle,
   LogOut,
+  ChevronDown,
   Ticket,
   Shield,
   History

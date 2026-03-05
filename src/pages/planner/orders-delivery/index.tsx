@@ -13,10 +13,26 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards from "@components/GenericStatsCards";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import OrderEditModal from "@components/OrderEditModal";
 import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
   FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
 } from "react-icons/fi";
 import {
   getOrders,
@@ -40,9 +56,11 @@ import {
   Row,
   Col,
   Badge,
+  Dropdown,
   Form,
   Card,
   Table,
+  InputGroup,
   Modal,
   Spinner
 } from "react-bootstrap";
@@ -51,6 +69,9 @@ import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper"
 import {
   Target,
   CheckCircle,
+  TrendingUp,
+  BarChart3,
+  Plus,
   Eye,
   Edit,
   Trash2,
@@ -59,6 +80,11 @@ import {
   X,
   Users,
   PlusCircle,
+  Zap,
+  Star,
+  Clock,
+  Search,
+  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -72,10 +98,13 @@ import {
   Activity,
   FileText,
   ShoppingCart,
+  AlertTriangle,
+  RefreshCw,
   History,
   Mail,
   Phone,
   Building2,
+  Package,
   Link2,
   User,
   Paperclip,
@@ -83,6 +112,7 @@ import {
   Download as DownloadIcon,
   RotateCcw,
   AlertCircle,
+  Handshake,
   Info,
 } from "lucide-react";
 import {
@@ -97,6 +127,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -1858,56 +1889,32 @@ const CrmOrders = () => {
             {
               title: 'All Orders',
               value: summaryTiles?.total_orders || totalOrders || 0,
-              icon: ShoppingBag,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total orders'
+              
             },
             {
               title: 'New',
               value: summaryTiles?.new_orders || analyticsData.stageCounts['New'] || 0,
-              icon: PlusCircle,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh orders',
-                dotColor: '#2563EB'
-              }
+              
             },
             {
               title: 'Qualified',
               value: summaryTiles?.qualified_orders || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
+             
             },
             {
               title: 'Proposal',
               value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'Under review',
-                dotColor: '#7C3AED'
-              }
+             
             },
             {
               title: 'Negotiation',
               value: analyticsData.stageCounts['Negotiation'] || 0,
-              icon: Users,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'In discussion'
+              
             },
             {
               title: 'Lost',
               value: summaryTiles?.lost_orders || filterCounts.lost || 0,
-              icon: AlertCircle,
-              iconColor: '#EF4444',
-              iconBgColor: '#FEE2E2',
-              subtitle: 'Requires review'
+             
             }
             // {
             //   title: 'Deleted',

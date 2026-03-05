@@ -1,6 +1,7 @@
 import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
+import UsersFilters from '@components/filters/UsersFilters';
 import { SyncBillingCompanies } from '@utils/users';
 import { toast } from 'react-toastify';
 import router from 'next/router';

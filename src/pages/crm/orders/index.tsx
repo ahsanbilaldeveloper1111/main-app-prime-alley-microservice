@@ -20,9 +20,27 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import { StatsCardData } from "@components/GenericStatsCards";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
-
+import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
+} from "react-icons/fi";
 import {
   getOrders,
   getOrder,
@@ -45,9 +63,11 @@ import {
   Row,
   Col,
   Badge,
+  Dropdown,
   Form,
   Card,
   Table,
+  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -61,12 +81,22 @@ import {
 import {
   Target,
   CheckCircle,
+  TrendingUp,
+  BarChart3,
+  Plus,
   Eye,
   Edit,
   Trash2,
   ShoppingBag,
   MoreVertical,
   X,
+  Users,
+  PlusCircle,
+  Zap,
+  Star,
+  Clock,
+  Search,
+  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -80,16 +110,23 @@ import {
   Activity,
   FileText,
   ShoppingCart,
+  AlertTriangle,
+  RefreshCw,
   History,
   Mail,
+  Phone,
   Building2,
+  Package,
+  Link2,
   User,
   Paperclip,
   Upload,
   Download as DownloadIcon,
   RotateCcw,
+  AlertCircle,
+  Handshake,
   Info,
-  Users,
+  Phone as PhoneIcon,
 } from "lucide-react";
 import {
   PieChart,
@@ -103,6 +140,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -113,7 +151,53 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 
+// Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
+const PhoneContainer = ({ phone }: { phone: string }) => {
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+  return (
+    <Badge bg="info" className="bg-opacity-10 text-dark">
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+};
 
 // Phone Display Component (without Badge for view dialogs)
 const PhoneDisplay = ({ phone }: { phone: string }) => {
@@ -396,10 +480,9 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
-  const [ordersMetrics, setOrdersMetrics] = useState<Record<
-    string,
-    number
-  > | null>(null);
+  const [ordersMetrics, setOrdersMetrics] = useState<Record<string, number> | null>(
+    null,
+  );
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -424,9 +507,7 @@ const CrmOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [ordersViewMode, setOrdersViewMode] = useState<"table" | "board">(
-    "table",
-  );
+  const [ordersViewMode, setOrdersViewMode] = useState<"table" | "board">("table");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -530,46 +611,31 @@ const CrmOrders = () => {
 
   // Build API params from filters for export (per Orders API spec)
   const buildOrdersExportParams = useCallback(
-    (
-      filters: Record<string, any>,
-      pagination?: { page: number; per_page: number },
-    ) => {
+    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
-      if (filters.include_lost !== undefined)
-        params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined)
-        params.include_archived = filters.include_archived;
+      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
       if (filters.user_extensions?.length) {
         params.user_extensions = filters.user_extensions;
       } else if (filters.assigned_to) {
         params.user_extensions = [filters.assigned_to];
       }
       if (filters.industry) params.industry = filters.industry;
-      if (filters.order_value_min != null && filters.order_value_min !== "")
-        params.order_value_min = Number(filters.order_value_min);
-      if (filters.order_value_max != null && filters.order_value_max !== "")
-        params.order_value_max = Number(filters.order_value_max);
-      if (filters.order_stage_id)
-        params.order_stage_id = filters.order_stage_id;
+      if (filters.order_value_min != null && filters.order_value_min !== "") params.order_value_min = Number(filters.order_value_min);
+      if (filters.order_value_max != null && filters.order_value_max !== "") params.order_value_max = Number(filters.order_value_max);
+      if (filters.order_stage_id) params.order_stage_id = filters.order_stage_id;
       if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.order_approval_status)
-        params.order_approval_status = filters.order_approval_status;
-      if (filters.fulfillment_status)
-        params.fulfillment_status = filters.fulfillment_status;
-      if (filters.payment_status)
-        params.payment_status = filters.payment_status;
+      if (filters.order_approval_status) params.order_approval_status = filters.order_approval_status;
+      if (filters.fulfillment_status) params.fulfillment_status = filters.fulfillment_status;
+      if (filters.payment_status) params.payment_status = filters.payment_status;
       if (filters.status) params.status = filters.status;
-      if (filters.ticket_id != null && filters.ticket_id !== "")
-        params.ticket_id = filters.ticket_id;
-      if (filters.deal_id != null && filters.deal_id !== "")
-        params.deal_id = filters.deal_id;
+      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
+      if (filters.deal_id != null && filters.deal_id !== "") params.deal_id = filters.deal_id;
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.created_at_from)
-        params.created_at_from = filters.created_at_from;
+      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
       if (filters.created_at_to) params.created_at_to = filters.created_at_to;
-      if (filters.created_at_month)
-        params.created_at_month = filters.created_at_month;
+      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
       if (filters.search) params.search = filters.search;
       if (filters.sort_by) params.sort_by = filters.sort_by;
       if (filters.sort_order) params.sort_order = filters.sort_order;
@@ -604,8 +670,7 @@ const CrmOrders = () => {
   );
 
   const handleOrdersExport = useCallback(async () => {
-    const name =
-      exportFileName.trim() || `orders_${moment().format("YYYY-MM-DD")}`;
+    const name = exportFileName.trim() || `orders_${moment().format("YYYY-MM-DD")}`;
     const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
@@ -671,52 +736,31 @@ const CrmOrders = () => {
         // order_value_min/max, order_stage_id, stage_id, order_approval_status, fulfillment_status,
         // payment_status, status, ticket_id, deal_id, date_from/to, created_at_from/to/month, search, sort_by, sort_order
         if (currentFilters.search) params.search = currentFilters.search;
-        if (currentFilters.include_lost !== undefined)
-          params.include_lost = currentFilters.include_lost;
-        if (currentFilters.include_archived !== undefined)
-          params.include_archived = currentFilters.include_archived;
+        if (currentFilters.include_lost !== undefined) params.include_lost = currentFilters.include_lost;
+        if (currentFilters.include_archived !== undefined) params.include_archived = currentFilters.include_archived;
         if (currentFilters.user_extensions?.length) {
           params.user_extensions = currentFilters.user_extensions;
         } else if (currentFilters.assigned_to) {
           params.user_extensions = [currentFilters.assigned_to];
         }
         if (currentFilters.industry) params.industry = currentFilters.industry;
-        if (
-          currentFilters.order_value_min != null &&
-          currentFilters.order_value_min !== ""
-        )
-          params.order_value_min = Number(currentFilters.order_value_min);
-        if (
-          currentFilters.order_value_max != null &&
-          currentFilters.order_value_max !== ""
-        )
-          params.order_value_max = Number(currentFilters.order_value_max);
-        if (currentFilters.order_stage_id)
-          params.order_stage_id = currentFilters.order_stage_id;
+        if (currentFilters.order_value_min != null && currentFilters.order_value_min !== "") params.order_value_min = Number(currentFilters.order_value_min);
+        if (currentFilters.order_value_max != null && currentFilters.order_value_max !== "") params.order_value_max = Number(currentFilters.order_value_max);
+        if (currentFilters.order_stage_id) params.order_stage_id = currentFilters.order_stage_id;
         if (currentFilters.stage_id) params.stage_id = currentFilters.stage_id;
-        if (currentFilters.order_approval_status)
-          params.order_approval_status = currentFilters.order_approval_status;
-        if (currentFilters.fulfillment_status)
-          params.fulfillment_status = currentFilters.fulfillment_status;
-        if (currentFilters.payment_status)
-          params.payment_status = currentFilters.payment_status;
+        if (currentFilters.order_approval_status) params.order_approval_status = currentFilters.order_approval_status;
+        if (currentFilters.fulfillment_status) params.fulfillment_status = currentFilters.fulfillment_status;
+        if (currentFilters.payment_status) params.payment_status = currentFilters.payment_status;
         if (currentFilters.status) params.status = currentFilters.status;
-        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "")
-          params.ticket_id = currentFilters.ticket_id;
-        if (currentFilters.deal_id != null && currentFilters.deal_id !== "")
-          params.deal_id = currentFilters.deal_id;
-        if (currentFilters.date_from)
-          params.date_from = currentFilters.date_from;
+        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") params.ticket_id = currentFilters.ticket_id;
+        if (currentFilters.deal_id != null && currentFilters.deal_id !== "") params.deal_id = currentFilters.deal_id;
+        if (currentFilters.date_from) params.date_from = currentFilters.date_from;
         if (currentFilters.date_to) params.date_to = currentFilters.date_to;
-        if (currentFilters.created_at_from)
-          params.created_at_from = currentFilters.created_at_from;
-        if (currentFilters.created_at_to)
-          params.created_at_to = currentFilters.created_at_to;
-        if (currentFilters.created_at_month)
-          params.created_at_month = currentFilters.created_at_month;
+        if (currentFilters.created_at_from) params.created_at_from = currentFilters.created_at_from;
+        if (currentFilters.created_at_to) params.created_at_to = currentFilters.created_at_to;
+        if (currentFilters.created_at_month) params.created_at_month = currentFilters.created_at_month;
         if (currentFilters.sort_by) params.sort_by = currentFilters.sort_by;
-        if (currentFilters.sort_order)
-          params.sort_order = currentFilters.sort_order;
+        if (currentFilters.sort_order) params.sort_order = currentFilters.sort_order;
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -737,6 +781,21 @@ const CrmOrders = () => {
       }
     },
     [currentFilters],
+  );
+
+  // initiate call
+  const handleCallClick = useCallback(
+    async (order: any) => {
+      const phone = order?.phone || order?.rawData?.phone || relatedLead?.phone;
+      if (!phone) {
+        toast.error("No phone number available for this order");
+        return;
+      }
+      // Handle call logic here - similar to leads page
+      // This might integrate with CTI or open a phone dialer
+      console.log("Calling:", phone);
+    },
+    [relatedLead],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -1792,68 +1851,71 @@ const CrmOrders = () => {
   }, [filterCounts]);
 
   // Define stats cards for GenericTable
-  const ordersStatsCards: StatsCardData[] = useMemo(() => {
-    const m = ordersMetrics || {};
-    return [
-      {
-        title: "All Orders",
-        value: m.total_orders ?? 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        metric: {
-          text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#6366F1",
+  const ordersStatsCards: StatsCardData[] = useMemo(
+    () => {
+      const m = ordersMetrics || {};
+      return [
+        {
+          title: "All Orders",
+          value: m.total_orders ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          metric: {
+            text: `${m.total_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#6366F1",
+          },
         },
-      },
-      {
-        title: "High-Value Orders",
-        value: m.high_value_orders ?? 0,
-        icon: Calendar,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        additionalText: "Client-defined threshold",
-      },
-      {
-        title: "Active Orders",
-        value: m.active_orders ?? 0,
-        icon: Target,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        additionalText: "In progress",
-      },
-      {
-        title: "Orders under Review",
-        value: m.orders_under_review ?? 0,
-        icon: Users,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-        additionalText: "Orders paused for review",
-      },
-      {
-        title: "Completed Orders",
-        value: m.completed_orders ?? 0,
-        icon: Calendar,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-        metric: {
-          text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#10B981",
+        {
+          title: "High-Value Orders",
+          value: m.high_value_orders ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          additionalText: "Client-defined threshold",
         },
-      },
-      {
-        title: "Canceled Orders",
-        value: m.canceled_orders ?? 0,
-        icon: Target,
-        iconColor: "#8B5CF6",
-        iconBgColor: "#EDE9FE",
-        metric: {
-          text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
-          dotColor: "#8B5CF6",
+        {
+          title: "Active Orders",
+          value: m.active_orders ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          additionalText: "In progress",
         },
-      },
-    ];
-  }, [ordersMetrics]);
+        {
+          title: "Orders under Review",
+          value: m.orders_under_review ?? 0,
+          icon: Users,
+          iconColor: "#6366F1",
+          iconBgColor: "#EEF2FF",
+          additionalText: "Orders paused for review",
+        },
+        {
+          title: "Completed Orders",
+          value: m.completed_orders ?? 0,
+          icon: Calendar,
+          iconColor: "#10B981",
+          iconBgColor: "#D1FAE5",
+          metric: {
+            text: `${m.completed_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#10B981",
+          },
+        },
+        {
+          title: "Canceled Orders",
+          value: m.canceled_orders ?? 0,
+          icon: Target,
+          iconColor: "#8B5CF6",
+          iconBgColor: "#EDE9FE",
+          metric: {
+            text: `${m.canceled_orders_last_7_days ?? 0} in last 7 days`,
+            dotColor: "#8B5CF6",
+          },
+        },
+      ];
+    },
+    [ordersMetrics],
+  );
 
   // Custom select styles
   const customSelectStyles = {
@@ -2211,12 +2273,7 @@ const CrmOrders = () => {
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
-      {
-        id: "all",
-        label: "All orders",
-        count: filterCounts.all,
-        removable: false,
-      },
+      { id: "all", label: "All orders", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
@@ -2988,11 +3045,7 @@ const CrmOrders = () => {
             recordId={
               selectedOrder?.id ?? selectedOrder?.rawData?.id ?? undefined
             }
-            crmSummary={
-              selectedOrder?.rawData?.crm_summary ??
-              selectedOrder?.crm_summary ??
-              undefined
-            }
+            crmSummary={selectedOrder?.rawData?.crm_summary ?? selectedOrder?.crm_summary ?? undefined}
             record={{
               id: selectedOrder?.id || selectedOrder?.rawData?.id,
               type: RECORD_TYPES.ORDER,
@@ -3235,6 +3288,52 @@ const CrmOrders = () => {
                   },
                 },
               },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
+                icon: PhoneIcon,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () => {
+                      const phone =
+                        selectedOrder?.phone ||
+                        selectedOrder?.rawData?.phone ||
+                        relatedLead?.phone;
+                      if (phone) {
+                        handleCallClick(selectedOrder);
+                      }
+                    },
+                  },
+                },
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
+                  },
+                },
+              },
             ]}
           />
         )}
@@ -3281,7 +3380,10 @@ const CrmOrders = () => {
         onApply={(keys) => {
           setSelectedOrdersColumns(keys);
           if (typeof window !== "undefined") {
-            localStorage.setItem("ordersSelectedColumns", JSON.stringify(keys));
+            localStorage.setItem(
+              "ordersSelectedColumns",
+              JSON.stringify(keys),
+            );
           }
         }}
       />
@@ -3311,11 +3413,7 @@ const CrmOrders = () => {
                   ...extensions.map((ext: any) => ({
                     value: String(ext.id ?? ext.extension),
                     label:
-                      ext.display_name ||
-                      ext.name ||
-                      ext.id ||
-                      ext.extension ||
-                      "",
+                      ext.display_name || ext.name || ext.id || ext.extension || "",
                   })),
                 ]}
                 value={
@@ -3327,14 +3425,14 @@ const CrmOrders = () => {
                         );
                         return {
                           value: id,
-                          label: ext ? ext.display_name || ext.name || id : id,
+                          label: ext
+                            ? ext.display_name || ext.name || id
+                            : id,
                         };
                       })()
                     : null
                 }
-                onChange={(
-                  selected: { value: string; label: string } | null,
-                ) => {
+                onChange={(selected: { value: string; label: string } | null) => {
                   const v = selected?.value;
                   setExportFilters((prev) => {
                     const next = { ...prev };

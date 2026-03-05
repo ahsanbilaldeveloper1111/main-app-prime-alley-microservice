@@ -7,7 +7,8 @@ import React, {
   } from "react";
   import Layout from "@layout/index";
   import BreadcrumbItem from "@common/BreadcrumbItem";
-  import { Button, Dropdown, Form } from "react-bootstrap";
+  import { Button, Dropdown, Form, Card } from "react-bootstrap";
+  import Select from "react-select";
   import { toast } from "react-toastify";
   import { useRouter } from "next/router";
   import moment from "moment";
@@ -18,12 +19,18 @@ import React, {
     ChevronDown, 
     ExternalLink, 
     Save, 
-    Filter
+    Filter,
+    Eye,
+    Edit as EditIcon,
+    Trash2,
+    MoreVertical
   } from "lucide-react";
   import GenericTable, { 
     TableColumn, 
     TableAction,
     FilterPill,
+    PaginationConfig,
+    ToolbarConfig,
   } from "@components/GenericTable";
   import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
   import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";

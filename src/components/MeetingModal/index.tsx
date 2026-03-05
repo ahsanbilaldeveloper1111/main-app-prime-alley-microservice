@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronDown, X, Maximize2, Calendar, Clock, Plus } from 'lucide-react';
+import { getCrmMeetingsForRecord } from '@utils/crm';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -8,9 +9,25 @@ interface MeetingModalProps {
   hostName?: string;
   attendeeEmail?: string;
   attendeeName?: string;
+  /** Optional: when provided, calendar will show existing meetings */
+  recordType?: 'prospect' | 'lead' | 'deal' | 'order' | 'company';
+  recordId?: number;
+  /** Optional defaults (used for Edit flows) */
+  defaultTitle?: string;
+  /** YYYY-MM-DD */
+  defaultDate?: string;
+  /** HH:mm */
+  defaultStartTime?: string;
+  /** HH:mm */
+  defaultEndTime?: string;
+  defaultAttendees?: string[];
+  defaultLocation?: string;
+  /** API format e.g. "YYYY-MM-DD HH:mm:ss" */
+  defaultReminders?: string[];
+  defaultSummary?: string;
+  submitLabel?: string;
   onSchedule: (meetingData: {
     title: string;
-    hostType: 'user' | 'rotation';
     hostEmail: string;
     startDate: string;
     startTime: string;
@@ -18,8 +35,7 @@ interface MeetingModalProps {
     attendees: string[];
     location: string;
     reminders: string[];
-    description: string;
-    internalNote: string;
+    summary: string;
   }) => void | Promise<void>;
 }
 
@@ -30,38 +46,205 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   hostName = 'Your Name',
   attendeeEmail,
   attendeeName,
+  recordType,
+  recordId,
+  defaultTitle,
+  defaultDate,
+  defaultStartTime,
+  defaultEndTime,
+  defaultAttendees,
+  defaultLocation,
+  defaultReminders,
+  defaultSummary,
+  submitLabel = 'Schedule meeting',
   onSchedule 
 }) => {
   // State management
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [title, setTitle] = useState('');
-  const [hostType, setHostType] = useState<'user' | 'rotation'>('user');
   const [selectedHost, setSelectedHost] = useState(hostEmail);
   const [startDate, setStartDate] = useState(new Date());
   const [startTime, setStartTime] = useState('01:00');
   const [endTime, setEndTime] = useState('01:30');
-  const [attendees, setAttendees] = useState<string[]>(attendeeEmail ? [attendeeEmail] : []);
-  const [attendeeCount, setAttendeeCount] = useState(attendeeEmail ? 1 : 2);
+  const [attendees, setAttendees] = useState<string[]>(() => {
+    const base = [hostEmail, attendeeEmail].filter(Boolean) as string[];
+    return Array.from(new Set(base.map((e) => String(e).trim()).filter(Boolean)));
+  });
+  const [currentAttendeeInput, setCurrentAttendeeInput] = useState('');
   const [location, setLocation] = useState('');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-  const [reminders, setReminders] = useState<string[]>([]);
-  const [description, setDescription] = useState('');
-  const [internalNote, setInternalNote] = useState('');
+  const [reminderInputs, setReminderInputs] = useState<string[]>([]);
+  const [summary, setSummary] = useState('');
   const [hideWeekends, setHideWeekends] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showHostDropdown, setShowHostDropdown] = useState(false);
-  const [showAttendeesDropdown, setShowAttendeesDropdown] = useState(false);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
+  const userTimezoneLabel = useMemo(() => {
+    try {
+      if (typeof Intl === 'undefined') return 'Local timezone';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const now = new Date();
+      const offsetMinutes = -now.getTimezoneOffset();
+      const sign = offsetMinutes >= 0 ? '+' : '-';
+      const abs = Math.abs(offsetMinutes);
+      const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+      const mins = String(abs % 60).padStart(2, '0');
+      return `UTC ${sign}${hours}:${mins} ${tz}`;
+    } catch {
+      return 'Local timezone';
+    }
+  }, []);
   
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const startDateInputRef = useRef<HTMLInputElement>(null);
   const locationDropdownRef = useRef<HTMLDivElement>(null);
+  const prevHostRef = useRef<string>(hostEmail);
+
+  const attendeeCount = attendees.length;
+
+  const normalizeEmailList = (list: string[]) =>
+    Array.from(
+      new Set(
+        list
+          .map((e) => String(e).trim())
+          .filter(Boolean)
+          .filter((e) => e.includes('@')),
+      ),
+    );
+
+  const toReminderApiFormat = (dtLocal: string): string | null => {
+    // dtLocal is "YYYY-MM-DDTHH:mm"
+    const v = (dtLocal || '').trim();
+    if (!v) return null;
+    const [d, t] = v.split('T');
+    if (!d || !t) return null;
+    const hhmm = t.length >= 5 ? t.slice(0, 5) : t;
+    return `${d} ${hhmm}:00`;
+  };
+
+  const weekStartDate = useMemo(() => {
+    const d = new Date(currentMonth);
+    const startOfWeek = new Date(d);
+    startOfWeek.setDate(d.getDate() - d.getDay() + (hideWeekends ? 1 : 0));
+    startOfWeek.setHours(0, 0, 0, 0);
+    return startOfWeek;
+  }, [currentMonth, hideWeekends]);
+
+  const getWeekDayDate = (index: number) => {
+    const dt = new Date(weekStartDate);
+    dt.setDate(weekStartDate.getDate() + index + 1);
+    return dt;
+  };
+
+  const [meetingsForCalendar, setMeetingsForCalendar] = useState<
+    Array<{ id?: number; name?: string; meeting_date?: string; meeting_time?: string }>
+  >([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!recordType || !recordId || Number.isNaN(Number(recordId))) {
+      setMeetingsForCalendar([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getCrmMeetingsForRecord(recordType, Number(recordId), {
+          per_page: 200,
+          page: 1,
+        });
+        if (!cancelled) {
+          setMeetingsForCalendar(res?.data ?? []);
+        }
+      } catch {
+        if (!cancelled) setMeetingsForCalendar([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, recordType, recordId]);
 
   useEffect(() => {
     if (isOpen && titleInputRef.current) {
       titleInputRef.current.focus();
     }
   }, [isOpen]);
+
+  const toDateOnly = (v?: string): string | null => {
+    const s = (v ?? '').trim();
+    if (!s) return null;
+    return s.length >= 10 ? s.slice(0, 10) : null;
+  };
+
+  const reminderApiToLocal = (v: string): string | null => {
+    const s = (v ?? '').trim();
+    if (!s) return null;
+    // "YYYY-MM-DD HH:mm:ss" -> "YYYY-MM-DDTHH:mm"
+    if (s.includes(' ')) {
+      const [d, t] = s.split(' ');
+      if (!d || !t) return null;
+      return `${d}T${t.slice(0, 5)}`;
+    }
+    // if already ISO-ish
+    if (s.includes('T')) return s.slice(0, 16);
+    return null;
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedHost(hostEmail || 'user@example.com');
+    prevHostRef.current = hostEmail || 'user@example.com';
+
+    const dateStr = toDateOnly(defaultDate);
+    if (dateStr) {
+      handleDateSelect(new Date(`${dateStr}T00:00:00`));
+    }
+    if (defaultStartTime) setStartTime(defaultStartTime);
+    if (defaultEndTime) setEndTime(defaultEndTime);
+    if (defaultTitle != null) setTitle(defaultTitle);
+    if (defaultLocation != null) setLocation(defaultLocation);
+    if (defaultSummary != null) setSummary(defaultSummary);
+
+    if (defaultReminders?.length) {
+      const next = defaultReminders
+        .map(reminderApiToLocal)
+        .filter(Boolean) as string[];
+      setReminderInputs(next);
+    }
+
+    setAttendees(() => {
+      const base =
+        defaultAttendees?.length
+          ? defaultAttendees
+          : ([hostEmail, attendeeEmail].filter(Boolean) as string[]);
+      return normalizeEmailList(base);
+    });
+  }, [
+    isOpen,
+    hostEmail,
+    attendeeEmail,
+    defaultAttendees,
+    defaultDate,
+    defaultEndTime,
+    defaultLocation,
+    defaultReminders,
+    defaultStartTime,
+    defaultSummary,
+    defaultTitle,
+  ]);
+
+  useEffect(() => {
+    const prev = prevHostRef.current;
+    if (prev && selectedHost && prev !== selectedHost) {
+      setAttendees((prevList) => {
+        const replaced = prevList.map((e) => (e === prev ? selectedHost : e));
+        return normalizeEmailList(replaced);
+      });
+      prevHostRef.current = selectedHost;
+    }
+  }, [selectedHost]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -153,6 +336,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
 
   const handleDateSelect = (date: Date) => {
     setStartDate(date);
+    setCurrentMonth(date);
   };
 
   const handlePrevWeek = () => {
@@ -172,31 +356,31 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
       alert('Please enter a meeting title');
       return;
     }
+    const cleanAttendees = normalizeEmailList(attendees);
+    const cleanReminders = reminderInputs
+      .map(toReminderApiFormat)
+      .filter(Boolean) as string[];
     setScheduleLoading(true);
     try {
       await onSchedule({
         title,
-        hostType,
         hostEmail: selectedHost,
         startDate: startDate.toISOString(),
         startTime,
         endTime,
-        attendees,
+        attendees: cleanAttendees,
         location,
-        reminders,
-        description,
-        internalNote,
+        reminders: cleanReminders,
+        summary: summary.trim(),
       });
       setTitle('');
-      setHostType('user');
       setStartDate(new Date());
       setStartTime('01:00');
       setEndTime('01:30');
       setAttendees([]);
       setLocation('');
-      setReminders([]);
-      setDescription('');
-      setInternalNote('');
+      setReminderInputs([]);
+      setSummary('');
       onClose();
     } finally {
       setScheduleLoading(false);
@@ -214,12 +398,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   }
 
   const locations = [
-    'Conference Room A',
-    'Conference Room B',
     'Video Call',
     'Phone Call',
-    'Client Office',
-    'Custom Location'
+    'In-Person Meeting',
+    'Online Meeting',
+    'Other',
   ];
 
   return (
@@ -323,74 +506,34 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
               }}>
                 Host
               </label>
-              
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#141414',
-                }}>
-                  <input
-                    type="radio"
-                    name="hostType"
-                    checked={hostType === 'user'}
-                    onChange={() => setHostType('user')}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer',
-                    }}
-                  />
-                  User
-                </label>
-                
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  color: '#141414',
-                }}>
-                  <input
-                    type="radio"
-                    name="hostType"
-                    checked={hostType === 'rotation'}
-                    onChange={() => setHostType('rotation')}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer',
-                    }}
-                  />
-                  Meeting rotation
-                </label>
-              </div>
 
               <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowHostDropdown(!showHostDropdown)}
+                <div
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e0',
                     borderRadius: '4px',
-                    fontSize: '14px',
-                    color: '#141414',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
                   }}
                 >
-                  <span>{hostName} &lt;{selectedHost}&gt;</span>
-                  <ChevronDown size={16} />
-                </button>
+                  <div style={{ fontSize: '12px', color: '#718096', marginBottom: '6px' }}>
+                    {hostName}
+                  </div>
+                  <input
+                    type="email"
+                    value={selectedHost}
+                    onChange={(e) => setSelectedHost(e.target.value)}
+                    placeholder="host@example.com"
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '14px',
+                      color: '#141414',
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -436,20 +579,52 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                   }}>
                     Start date
                   </label>
-                  <div style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e0',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    color: '#141414',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = startDateInputRef.current;
+                      if (!el) return;
+                      if (typeof el.showPicker === 'function') el.showPicker();
+                      else el.click();
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#141414',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      position: 'relative',
+                    }}
+                    title="Select date"
+                  >
                     <Calendar size={16} style={{ color: '#718096' }} />
                     <span>{startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</span>
-                  </div>
+                    <input
+                      ref={startDateInputRef}
+                      type="date"
+                      value={startDate.toISOString().slice(0, 10)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        handleDateSelect(new Date(`${v}T00:00:00`));
+                      }}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 0,
+                        pointerEvents: 'none',
+                      }}
+                      aria-hidden="true"
+                      tabIndex={-1}
+                    />
+                  </button>
                 </div>
 
                 <div>
@@ -549,26 +724,79 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
               }}>
                 Attendees
               </label>
-              <button
-                onClick={() => setShowAttendeesDropdown(!showAttendeesDropdown)}
+              <div
                 style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  backgroundColor: '#ffffff',
                   border: '1px solid #cbd5e0',
                   borderRadius: '4px',
-                  fontSize: '14px',
-                  color: '#141414',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  padding: '8px 10px',
+                  backgroundColor: '#ffffff',
                 }}
               >
-                <span>{attendeeCount} attendees</span>
-                <ChevronDown size={16} />
-              </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                  {attendees.map((email) => (
+                    <span
+                      key={email}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        backgroundColor: '#edf2f7',
+                        fontSize: '13px',
+                        color: '#141414',
+                      }}
+                    >
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => setAttendees((prev) => prev.filter((e) => e !== email))}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: '#718096',
+                        }}
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="email"
+                    value={currentAttendeeInput}
+                    onChange={(e) => setCurrentAttendeeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+                        const next = currentAttendeeInput.trim().replace(/,$/, '');
+                        if (next) {
+                          e.preventDefault();
+                          setAttendees((prev) => normalizeEmailList([...prev, next]));
+                          setCurrentAttendeeInput('');
+                        }
+                      }
+                    }}
+                    placeholder={attendees.length === 0 ? 'Enter attendee emails…' : 'Add another email…'}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '14px',
+                      color: '#141414',
+                      padding: '6px 2px',
+                    }}
+                  />
+                  <span style={{ fontSize: '12px', color: '#718096', whiteSpace: 'nowrap' }}>
+                    {attendeeCount} total
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Location */}
@@ -651,7 +879,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
               )}
             </div>
 
-            {/* Scheduled reminder emails */}
+            {/* Reminders */}
             <div style={{ marginBottom: '24px' }}>
               <label style={{ 
                 fontSize: '14px', 
@@ -660,8 +888,50 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 display: 'block',
                 marginBottom: '8px'
               }}>
-                Scheduled reminder emails
+                Reminders
               </label>
+              {reminderInputs.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                  {reminderInputs.map((v, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input
+                        type="datetime-local"
+                        value={v}
+                        onChange={(e) =>
+                          setReminderInputs((prev) =>
+                            prev.map((x, i) => (i === idx ? e.target.value : x)),
+                          )
+                        }
+                        style={{
+                          flex: 1,
+                          border: '1px solid #cbd5e0',
+                          borderRadius: '4px',
+                          padding: '10px 12px',
+                          fontSize: '14px',
+                          color: '#141414',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReminderInputs((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid #cbd5e0',
+                          borderRadius: '4px',
+                          padding: '10px 12px',
+                          cursor: 'pointer',
+                          color: '#141414',
+                        }}
+                        title="Remove reminder"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <button
                 style={{
                   background: 'transparent',
@@ -682,13 +952,14 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 onMouseLeave={(e) => {
                   e.currentTarget.style.textDecoration = 'none';
                 }}
+                onClick={() => setReminderInputs((prev) => [...prev, ''])}
               >
                 <Plus size={16} />
                 Add reminder
               </button>
             </div>
 
-            {/* Attendee description */}
+            {/* Internal note (summary) */}
             <div style={{ marginBottom: '24px' }}>
               <label style={{ 
                 fontSize: '14px', 
@@ -697,12 +968,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 display: 'block',
                 marginBottom: '8px'
               }}>
-                Attendee description
+                Internal note
               </label>
               <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Send a description to your attendees..."
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="Add an internal note..."
                 style={{
                   width: '100%',
                   minHeight: '80px',
@@ -739,33 +1010,6 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
               </button>
             </div>
 
-            {/* Add internal note */}
-            <div>
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#0091ae',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  padding: '0',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                <Plus size={16} />
-                Add internal note
-              </button>
-            </div>
           </div>
 
           {/* Footer */}
@@ -812,7 +1056,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                   Scheduling...
                 </>
               ) : (
-                'Schedule meeting'
+                submitLabel
               )}
             </button>
             <button
@@ -858,7 +1102,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
             }}>
               {/* Left - Today Button */}
               <button
-                onClick={() => setStartDate(new Date())}
+                onClick={() => handleDateSelect(new Date())}
                 style={{
                   padding: '8px 16px',
                   backgroundColor: '#ffffff',
@@ -1002,7 +1246,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  UTC +05:00 Almaty, Aqtau, Aqtobe, Ashgabat
+                  {userTimezoneLabel}
                   <ChevronDown size={14} />
                 </button>
               </div>
@@ -1030,15 +1274,26 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 currentDayDate.setDate(startOfWeek.getDate() + index);
                 
                 const isCurrentDay = isToday(currentDayDate);
+                const isSelectedDay = isSelected(currentDayDate);
                 
                 return (
                   <div
                     key={day}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleDateSelect(currentDayDate)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleDateSelect(currentDayDate);
+                      }
+                    }}
                     style={{
                       padding: '12px',
                       textAlign: 'center',
                       borderRight: index < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
-                      backgroundColor: '#ffffff',
+                      backgroundColor: isSelectedDay ? '#f7fafc' : '#ffffff',
+                      cursor: 'pointer',
                     }}
                   >
                     <div style={{
@@ -1104,6 +1359,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         cursor: 'pointer',
                         position: 'relative',
                       }}
+                      onClick={() => {
+                        const d = getWeekDayDate(dayIndex);
+                        handleDateSelect(d);
+                      }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#f0f4f8';
                       }}
@@ -1111,26 +1370,44 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         e.currentTarget.style.backgroundColor = '#fafafa';
                       }}
                     >
-                      {/* Sample Event on Wednesday at 18:00 */}
-                      {dayIndex === 2 && hour === 18 && (
-                        <div style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: '-60px',
-                          backgroundColor: '#e3f2fd',
-                          border: '1px solid #2196f3',
-                          borderRadius: '4px',
-                          padding: '4px 8px',
-                          fontSize: '12px',
-                          color: '#141414',
-                          fontWeight: '500',
-                          overflow: 'hidden',
-                        }}>
-                          Prime alley x Hub...
-                        </div>
-                      )}
+                      {(() => {
+                        const cellDate = getWeekDayDate(dayIndex);
+                        const dateKey = cellDate.toISOString().slice(0, 10);
+                        const matches = meetingsForCalendar.filter((m) => {
+                          const d = (m.meeting_date || '').slice(0, 10);
+                          if (d !== dateKey) return false;
+                          const t = (m.meeting_time || '').slice(0, 2);
+                          const h = Number(t);
+                          return !Number.isNaN(h) && h === hour;
+                        });
+                        if (matches.length === 0) return null;
+                        const first = matches[0];
+                        const extra = matches.length - 1;
+                        return (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              left: 4,
+                              right: 4,
+                              backgroundColor: '#e3f2fd',
+                              border: '1px solid #2196f3',
+                              borderRadius: '4px',
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              color: '#141414',
+                              fontWeight: '500',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={first.name || 'Meeting'}
+                          >
+                            {first.name || 'Meeting'}
+                            {extra > 0 ? ` (+${extra})` : ''}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

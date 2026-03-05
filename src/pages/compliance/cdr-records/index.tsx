@@ -10,11 +10,12 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import axiosInstance from "@utils/axios";
+import { convertDateTimeWithOffsetToLocal, GlobalDateTimeFormat } from "@utils/Helper";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { Row, Col, Card, Form, Button, Table, Dropdown, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
-import { TrendingUp, Shield, RefreshCw, XCircle, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
+import { TrendingUp, Shield, RefreshCw, XCircle, X, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 

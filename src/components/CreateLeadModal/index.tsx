@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { ReactElement, useState, useEffect, useRef } from "react";
 import {
   Button,
   Row,
   Col,
   Form,
+  Card,
+  Alert,
   Badge,
+  Table,
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -14,13 +17,20 @@ import { useSession } from "next-auth/react";
 import "react-phone-number-input/style.css";
 import { Country, State, City } from "country-state-city";
 import {
+  FiSave,
+  FiArrowLeft,
   FiDatabase,
   FiTarget,
   FiPlus,
 } from "react-icons/fi";
 import {
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
   X,
+  Edit,
+  Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -41,6 +51,7 @@ import {
   BusinessTypeData,
   getDealTemplate,
   DealTemplateData,
+  DealTemplateField,
   getIndustries,
   IndustryData,
   getCrmProducts,

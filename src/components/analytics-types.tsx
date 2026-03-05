@@ -1,6 +1,6 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, Target, Users, Package, Building2, UserPlus, Coffee, UserCheck } from 'lucide-react';
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
+import { TrendingUp, TrendingDown, ShoppingCart, DollarSign, Target, Users, Package, Building2, MapPin, Flag, UserPlus, Coffee, UserCheck } from 'lucide-react';
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
 
 // Helper Components
 interface StatCardProps {

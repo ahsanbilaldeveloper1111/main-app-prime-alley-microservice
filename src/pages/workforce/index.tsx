@@ -4,9 +4,11 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import PageHeader from "@components/PageHeader";
 import EmployeesDashboard from "./dashboard";
 
 const StaffManagement = () => {
