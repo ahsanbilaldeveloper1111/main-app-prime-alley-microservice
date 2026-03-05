@@ -143,7 +143,7 @@ export const routePermissions: RoutePermission[] = [
     //communications services start
     {
         path: '/communications',
-        permissions: [PERMISSIONS.CALL_HISTORY_SERVICES],
+        permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES],
         children: [
             {
                 path: '/dashboard',
@@ -159,24 +159,17 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/call-analysis',
-                permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
+                permissions: [PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML],
                 children: [
                     {
                         path: '/',
-                        permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML]
+                        permissions: [PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML]
                     }
                 ]
             },
             {
                 path: '/wallboards-live',
-                permissions: [PERMISSIONS.CTI_SERVICES],
-                // children: [
-                //     { path: '/',permissions: [PERMISSIONS.VIEW_CTI]},
-                //     { path: '/new',permissions: []},
-                //     { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
-                //     { path: '/management/campaigns',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]},
-                //     { path: '/management/agents',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]},
-                // ]
+                permissions: [PERMISSIONS.VIEW_CTI],
             },
             {
                 path: '/text-messages',

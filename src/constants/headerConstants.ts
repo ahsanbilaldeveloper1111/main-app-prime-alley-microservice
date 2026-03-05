@@ -265,7 +265,62 @@ MENU_COLORS: {
   
   // Permissions
   PERMISSIONS: {
+
+    //Services permissions start
+    CRM_SERVICES: 'crm-services',
+    COMMUNICATIONS_SERVICES: 'communications-services',
+    WORK_PLANNER_SERVICES: 'work-planner-services',
+    PULSE_SERVICES: 'pulse-services',
+    VIRTUAL_AGENTS_SERVICES: 'aiml-services',
+    DNCR_SERVICES: 'dncr-services',
+    ACCOUNTS_SERVICES: 'accounts-services',
     STAFF_MANAGEMENT_SERVICES: 'staff-management-services',
+    REPORTS_SERVICES: 'reports-services',
+    AUDIT_LOGS_SERVICES: 'audit-logs-services',
+    GENERAL_SERVICES: 'general-services',
+    //OLD
+    CONTROL_HUB_SERVICES: 'control-hub-services',
+    GSM_SERVICES: 'gsm-services',
+    CALL_LOGS_SERVICES: 'call-logs-services',
+    CALL_RECORDINGS_SERVICES: 'call-recordings-services',
+    AI_ML_SERVICES: 'ai-ml-services',
+    CTI_SERVICES: 'cti-services',
+    TICKETS_SERVICES: 'tickets-services',
+    TMS_SERVICES: 'tms-services',
+    NETOPS_SERVICES: 'health-care-services',
+    CALL_HISTORY_SERVICES: 'call-history-services',
+    RESOURCES_SERVICES: 'resources-services',
+    //Services permissions end
+
+
+    //Work Planner permissions start
+    VIEW_RECURRING_REMINDERS_WORK_PLANNER: 'view-recurring-reminders-work-planner',
+    VIEW_DIAL_TODO_WORK_PLANNER: 'view-dial-todo-work-planner',
+    VIEW_TASKSLIST_WORK_PLANNER: 'view-tasks-work-planner',
+    VIEW_PROJECTS_WORK_PLANNER: 'view-projects-work-planner',
+    VIEW_PROJECTS_DASHBOARD_WORK_PLANNER: 'view-projects-dashboard-work-planner',
+    VIEW_STATUSES_WORK_PLANNER: 'view-statuses-work-planner',
+    VIEW_CALENDAR_WORK_PLANNER: 'view-calendar-work-planner',
+    VIEW_ORDERS_DELIVERY_WORK_PLANNER: 'view-orders-delivery-work-planner',
+    //Work Planner permissions end
+
+    //Virtual Agents permissions start
+    VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml',
+    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml',
+    VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml',
+    CREATE_CAMPAIGN_AIML: 'create-campaign-aiml',
+    VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml',
+    VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml',
+    VIEW_ANALYTICS_AIML: 'view-analytics-aiml',
+    VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml',
+    //Virtual Agents permissions end
+
+
+
+
+
+
+    
     VIEW_EMPLOYEES_STAFF_MANAGEMENT: 'view-employees-staff-management',
     VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT: 'view-employees-dashboard-staff-management',
     VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT: 'view-employees-onboarding-staff-management',
@@ -279,25 +334,19 @@ MENU_COLORS: {
     UPDATE_LOCATION_STAFF_MANAGEMENT: 'update-location-staff-management',
     DELETE_LOCATION_STAFF_MANAGEMENT: 'delete-location-staff-management',
 
-    CONTROL_HUB_SERVICES: 'control-hub-services',
+    
     VIEW_USERS: 'view-users',
     VIEW_TEAMS: 'view-teams',
     VIEW_RANKS: 'view-ranks',
     VIEW_GROUPS: 'view-groups',
 
 
-    GSM_SERVICES: 'gsm-services',
+    
 
-    WORK_PLANNER_SERVICES: 'work-planner-services',
-    VIEW_RECURRING_REMINDERS_WORK_PLANNER: 'view-recurring-reminders-work-planner',
-    VIEW_DIAL_TODO_WORK_PLANNER: 'view-dial-todo-work-planner',
-    VIEW_TASKSLIST_WORK_PLANNER: 'view-tasks-work-planner',
-    VIEW_PROJECTS_WORK_PLANNER: 'view-projects-work-planner',
-    VIEW_PROJECTS_DASHBOARD_WORK_PLANNER: 'view-projects-dashboard-work-planner',
-    VIEW_STATUSES_WORK_PLANNER: 'view-statuses-work-planner',
 
-    CALL_LOGS_SERVICES: 'call-logs-services',
-    CALL_RECORDINGS_SERVICES: 'call-recordings-services',
+    
+
+    
     VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
     VIEW_CALL_LOGS: 'view-call-logs',
     VIEW_CALL_RECORDINGS: 'view-call-recordings',
@@ -306,9 +355,9 @@ MENU_COLORS: {
     CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
     CALL_REPORTS_BY_TREND_REPORTS: 'call-reports-by-trend-reports',
 
-    REPORTS_SERVICES: 'reports-services',
+    
 
-    AI_ML_SERVICES: 'ai-ml-services',
+    
     TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
     TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
     TRANSLATE_AIML: 'translate-aiml',
@@ -316,7 +365,7 @@ MENU_COLORS: {
     OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
     LIVE_CHAT_AIML: 'live-chat-users',
 
-    CTI_SERVICES: 'cti-services',
+    
     VIEW_CTI: 'view-cti',
     
     DIAL_CALL_CTI:'dial-call-cti',
@@ -325,7 +374,7 @@ MENU_COLORS: {
     VIEW_LIVE_CALLS_AGENT_MANAGEMENT: 'view-teams-tms',
 
 
-    TICKETS_SERVICES: 'tickets-services',
+    
     VIEW_TICKETS_DASHBOARD: 'dashboard-tickets',
     VIEW_TICKETS_LIST: 'view-ticket-tickets',
     VIEW_TICKETS_STATUS: 'ticket-statuses-tickets',
@@ -336,18 +385,15 @@ MENU_COLORS: {
 
 
 
-    TMS_SERVICES: 'tms-services',
-    CRM_SERVICES: 'crm-services',
+    
 
-    DNCR_SERVICES: 'dncr-services',
+    
     CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
     VIEW_CDR_DNCR: 'view-cdr-dncr',
     VIEW_LOCAL_DND_CALL_BLOCK_DNCR: 'view-local-dnd-blocks-dncr',
 
 
-    ACCOUNTS_SERVICES: 'accounts-services',
-
-    NETOPS_SERVICES: 'health-care-services',
+    
     VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
     VIEW_NETOPS_DEVICES: 'devices-netops',
     VIEW_NETOPS_SERVICES: 'services-netops',
@@ -369,8 +415,7 @@ MENU_COLORS: {
     VIEW_COMMUNICATIONS_DASHBOARD: 'view-call-dashboard',
 
 
-    CALL_HISTORY_SERVICES: 'call-history-services',
-    RESOURCES_SERVICES: 'resources-services',
+    
 
     VIEW_COMPANIES_BILLING: 'view-companies-billing',
   

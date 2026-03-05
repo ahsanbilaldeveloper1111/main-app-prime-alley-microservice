@@ -1,5 +1,6 @@
 import React, { ReactElement, useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { Search, ChevronLeft, Clock } from 'lucide-react'
+import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 import Users from '@pages/controlhub/users'
 import Teams from '@pages/controlhub/teams'
@@ -111,6 +112,11 @@ const sidebarGroups: SidebarGroup[] = [
 type Tab = {
   id: string
   label: string
+}
+
+type ControlledTabsProps = {
+  activeTab?: string
+  onTabChange?: (tabId: string) => void
 }
 
 const accountDefaultsTabs: Tab[] = [
@@ -1059,8 +1065,12 @@ const DummyTabContent: React.FC<{ title: string; description: string }> = ({ tit
 )
 
 // ─── Right Panel Pages ────────────────────────────────────────────────────────
-const AccountDefaultsPage: React.FC = () => {
+const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('general')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     general: <GeneralTabContent />,
@@ -1102,7 +1112,10 @@ const AccountDefaultsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1140,8 +1153,12 @@ const usersTeamsTabs: Tab[] = [
   { id: 'ranks-and-permissions', label: 'Ranks and Permissions' },
 ]
 
-const UsersTeamsPage: React.FC = () => {
+const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('user-directory')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'user-directory': <Users />,
@@ -1178,7 +1195,10 @@ const UsersTeamsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1217,8 +1237,12 @@ const smartCrmTabs: Tab[] = [
   { id: 'campaigns', label: 'Campaigns' },
 ]
 
-const SmartCrmPage: React.FC = () => {
+const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('stages')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     stages: <Stages />,
@@ -1257,7 +1281,10 @@ const SmartCrmPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1292,8 +1319,12 @@ const communicationsTabs: Tab[] = [
   { id: 'manual-analysis', label: 'Manual Analysis' },
 ]
 
-const CommunicationsPage: React.FC = () => {
+const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('manage-extensions')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'manage-extensions': <ManageExtensions />,
@@ -1328,7 +1359,10 @@ const CommunicationsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1382,8 +1416,12 @@ const workforceTabs: Tab[] = [
   // { id: 'sub-categories', label: 'Sub Categories' },
 ]
 
-const WorkforcePage: React.FC = () => {
+const WorkforcePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('request-categories')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'request-categories': <RequestCategories />,
@@ -1418,7 +1456,10 @@ const WorkforcePage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1452,8 +1493,12 @@ const billingTabs: Tab[] = [
   { id: 'payment-methods', label: 'Payment Methods' },
 ]
 
-const BillingPage: React.FC = () => {
+const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('payment-methods')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'payment-methods': <PaymentMethods />,
@@ -1487,7 +1532,10 @@ const BillingPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1525,8 +1573,13 @@ const ticketsTabs: Tab[] = [
   { id: 'types', label: 'Types' },
 ]
 
-const TicketsPage: React.FC = () => {
+const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('statuses')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
+
   const tabContentMap: Record<string, React.ReactNode> = {
     statuses: <TicketStatuses />,
     modules: <TicketModules />,
@@ -1544,7 +1597,10 @@ const TicketsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1580,8 +1636,13 @@ const helpCenterTabs: Tab[] = [
   { id: 'types', label: 'FAQ Types' },
 ]
 
-const HelpCenterPage: React.FC = () => {
+const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('modules')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
+
   const tabContentMap: Record<string, React.ReactNode> = {
     modules: <FAQModules />,
     topics: <FAQTopics />,
@@ -1598,7 +1659,10 @@ const HelpCenterPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1634,8 +1698,13 @@ const aiChatTabs: Tab[] = [
   { id: 'global-faqs', label: 'Global FAQs' },
 ]
 
-const AIChatPage: React.FC = () => {
+const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('tools-profiles')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
+
   const tabContentMap: Record<string, React.ReactNode> = {
     'tools-profiles': <ToolProfiles />,
     'faq-profiles': <FaqProfiles />,
@@ -1652,7 +1721,10 @@ const AIChatPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1690,8 +1762,12 @@ const virtualAgentsTabs: Tab[] = [
   { id: 'inbound-faqs', label: 'Inbound FAQs' },
 ]
 
-const VirtualAgentsPage: React.FC = () => {
+const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('trunk-profiles')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'trunk-profiles': <OutboundTrunkProfiles />,
@@ -1729,7 +1805,10 @@ const VirtualAgentsPage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -1768,8 +1847,12 @@ const pulseTabs: Tab[] = [
   { id: 'company-profiling', label: 'Company Profiling' },
 ]
 
-const PulsePage: React.FC = () => {
+const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('host-groups')
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
+  }, [routeActiveTab, activeTab])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'hosts': <Hosts />,
@@ -1808,7 +1891,10 @@ const PulsePage: React.FC = () => {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
               style={{
                 padding: '12px 28px',
                 background: isActive ? '#ffffff' : 'whitesmoke',
@@ -2654,10 +2740,17 @@ const NotificationsSettingsNew: React.FC = () => {
 
 
 // ─── General Settings (Profile + Tasks) ────────────────────────────────────────
-const GeneralSettings = () => {
+const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?: (tabId: 'profile' | 'tasks') => void }> = ({
+  activeTab: routeActiveTab,
+  onTabChange,
+}) => {
   const [activeGeneralTab, setActiveGeneralTab] = useState<"profile" | "tasks">("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (routeActiveTab && routeActiveTab !== activeGeneralTab) setActiveGeneralTab(routeActiveTab)
+  }, [routeActiveTab, activeGeneralTab])
 
   // Profile state
   const [firstName, setFirstName] = useState("Rizwan");
@@ -3113,7 +3206,10 @@ const GeneralSettings = () => {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveGeneralTab(tab.key)}
+              onClick={() => {
+                setActiveGeneralTab(tab.key)
+                onTabChange?.(tab.key)
+              }}
               style={getTab(isActive, isLast)}
             >
               {tab.label}
@@ -3129,34 +3225,56 @@ const GeneralSettings = () => {
 };
 // ─── End GeneralSettings ────────────────────────────────────────────────────────
 
-const sectionPageMap: Record<string, React.ReactNode> = {
-  'general-prefs': <GeneralSettings />,
-  notifications: <NotificationsSettingsNew />,
-  'account-defaults': <AccountDefaultsPage />,
-  'account-cleanup': <GenericPage title="Account Cleanup" />,
-  'audit-log': <GenericPage title="Audit Log" />,
-  'users-teams': <UsersTeamsPage />,
-  'smart-crm': <SmartCrmPage />,
-  'communications': <CommunicationsPage />,
-  'planner': <PlannerPage />,
-  'workforce': <WorkforcePage />,
-  'billing': <BillingPage />,
-  'tickets': <TicketsPage />,
-  'help-center': <HelpCenterPage />,
-  'ai-chat': <AIChatPage />,
-  'virtual-agents': <VirtualAgentsPage />,
-  'pulse': <PulsePage />,
-  'compliance': <GenericPage title="Compliance" />,
-  'product-updates': <GenericPage title="Product Updates" />,
-  integrations: <GenericPage title="Integrations" />,
-  marketplace: <GenericPage title="Marketplace Downloads" />,
-  'tracking-analytics': <GenericPage title="Tracking & Analytics" />,
-  'privacy-consent': <GenericPage title="Privacy & Consent" />,
-  sandboxes: <GenericPage title="Sandboxes" />,
-  security: <GenericPage title="Security" />,
-  approvals: <GenericPage title="Approvals" />,
-  ai: <GenericPage title="AI" />,
-  'payments-account': <GenericPage title="Payments Account" />,
+type SectionRenderer = (opts: { subTab?: string; onSubTabChange?: (tabId: string) => void }) => React.ReactNode
+
+const defaultSubTabBySection: Record<string, string | undefined> = {
+  'general-prefs': 'profile',
+  'account-defaults': 'general',
+  'users-teams': 'user-directory',
+  'smart-crm': 'stages',
+  communications: 'manage-extensions',
+  workforce: 'request-categories',
+  billing: 'payment-methods',
+  tickets: 'statuses',
+  'help-center': 'modules',
+  'ai-chat': 'tools-profiles',
+  'virtual-agents': 'trunk-profiles',
+  pulse: 'host-groups',
+}
+
+const sectionPageMap: Record<string, SectionRenderer> = {
+  'general-prefs': ({ subTab, onSubTabChange }) => (
+    <GeneralSettings
+      activeTab={subTab === 'profile' || subTab === 'tasks' ? (subTab as 'profile' | 'tasks') : undefined}
+      onTabChange={tabId => onSubTabChange?.(tabId)}
+    />
+  ),
+  notifications: () => <NotificationsSettingsNew />,
+  'account-defaults': ({ subTab, onSubTabChange }) => <AccountDefaultsPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  'account-cleanup': () => <GenericPage title="Account Cleanup" />,
+  'audit-log': () => <GenericPage title="Audit Log" />,
+  'users-teams': ({ subTab, onSubTabChange }) => <UsersTeamsPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  'smart-crm': ({ subTab, onSubTabChange }) => <SmartCrmPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  communications: ({ subTab, onSubTabChange }) => <CommunicationsPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  planner: () => <PlannerPage />,
+  workforce: ({ subTab, onSubTabChange }) => <WorkforcePage activeTab={subTab} onTabChange={onSubTabChange} />,
+  billing: ({ subTab, onSubTabChange }) => <BillingPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  tickets: ({ subTab, onSubTabChange }) => <TicketsPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  'help-center': ({ subTab, onSubTabChange }) => <HelpCenterPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  'ai-chat': ({ subTab, onSubTabChange }) => <AIChatPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  'virtual-agents': ({ subTab, onSubTabChange }) => <VirtualAgentsPage activeTab={subTab} onTabChange={onSubTabChange} />,
+  pulse: ({ subTab, onSubTabChange }) => <PulsePage activeTab={subTab} onTabChange={onSubTabChange} />,
+  compliance: () => <GenericPage title="Compliance" />,
+  'product-updates': () => <GenericPage title="Product Updates" />,
+  integrations: () => <GenericPage title="Integrations" />,
+  marketplace: () => <GenericPage title="Marketplace Downloads" />,
+  'tracking-analytics': () => <GenericPage title="Tracking & Analytics" />,
+  'privacy-consent': () => <GenericPage title="Privacy & Consent" />,
+  sandboxes: () => <GenericPage title="Sandboxes" />,
+  security: () => <GenericPage title="Security" />,
+  approvals: () => <GenericPage title="Approvals" />,
+  ai: () => <GenericPage title="AI" />,
+  'payments-account': () => <GenericPage title="Payments Account" />,
 }
 
 
@@ -3164,11 +3282,49 @@ const sectionPageMap: Record<string, React.ReactNode> = {
 
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 const SettingsPage = () => {
+  const router = useRouter()
   const [activeSection, setActiveSection] = useState<string>('general-prefs')
 
   
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  const slug = router.query.slug
+  const routeSegments = useMemo(() => {
+    if (!router.isReady) return [] as string[]
+    if (Array.isArray(slug)) return slug.filter(Boolean)
+    if (typeof slug === 'string' && slug) return [slug]
+    return []
+  }, [router.isReady, slug])
+
+  const routeSection = routeSegments[0]
+  const routeSubTab = routeSegments[1]
+
+  useEffect(() => {
+    if (!router.isReady) return
+    if (routeSection && sectionPageMap[routeSection] && routeSection !== activeSection) {
+      setActiveSection(routeSection)
+    }
+  }, [router.isReady, routeSection, activeSection])
+
+  useEffect(() => {
+    if (!router.isReady) return
+    if (!routeSection) return
+    if (!sectionPageMap[routeSection]) return
+
+    const defaultSubTab = defaultSubTabBySection[routeSection]
+    if (defaultSubTab && !routeSubTab) {
+      router.replace(`/main-settings/${routeSection}/${defaultSubTab}`, undefined, { shallow: true })
+    }
+  }, [router, router.isReady, routeSection, routeSubTab])
+
+  const pushRoute = useCallback(
+    (sectionId: string, subTabId?: string) => {
+      const href = subTabId ? `/main-settings/${sectionId}/${subTabId}` : `/main-settings/${sectionId}`
+      router.push(href, undefined, { shallow: true })
+    },
+    [router]
+  )
 
   return (
     <>
@@ -3345,7 +3501,11 @@ const SettingsPage = () => {
                 return (
                   <div
                     key={item.id}
-                    onClick={() => setActiveSection(item.id)}
+                    onClick={() => {
+                      setActiveSection(item.id)
+                      const defaultSubTab = defaultSubTabBySection[item.id]
+                      pushRoute(item.id, defaultSubTab)
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -3415,7 +3575,10 @@ const SettingsPage = () => {
           height: '100%',
         }}
       >
-        {sectionPageMap[activeSection] ?? (
+        {sectionPageMap[activeSection]?.({
+          subTab: routeSection === activeSection ? routeSubTab : undefined,
+          onSubTabChange: tabId => pushRoute(activeSection, tabId),
+        }) ?? (
           <div style={{ padding: '32px 40px' }}>
             <p style={{ color: '#999', fontSize: '14px' }}>Select a section from the sidebar.</p>
           </div>
