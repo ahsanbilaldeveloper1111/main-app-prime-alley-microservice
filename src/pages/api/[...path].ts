@@ -100,6 +100,10 @@ export default async function handler(
 
   // Reconstruct the path from the catch-all parameter
   const targetPath = Array.isArray(path) ? path.join("/") : path;
+  // Never proxy NextAuth/auth routes to backend; they must be handled by Next.js (session, csrf, etc.)
+  if (targetPath.startsWith("auth/")) {
+    return res.status(404).json({ error: "Not found" });
+  }
   const targetUrl = `${BACKEND_URL}${targetPath}`;
 
   // Special handling for audio downloads

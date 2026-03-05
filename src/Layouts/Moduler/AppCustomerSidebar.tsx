@@ -257,7 +257,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'crm-deals-approval',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
           icon: <Handshake size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_DEALS,
+          permission: PERMISSIONS.APPROVE_REJECT_CRM_DEALS,
           url: '/crm/approvals', 
         },
         {
@@ -270,14 +270,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'crm-company',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_ORDERS,
+          permission: PERMISSIONS.VIEW_COMPANIES_CRM,
           url: '/crm/companies'
         },
         {
           id: 'crm-inbox',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX_CRM,
           icon: <ReceiptText size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_ORDERS,
+          permission: PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM,
           url: '/crm/inbox'
         },
         {
@@ -295,7 +295,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'communications',
       key: 'communications',
-      permission: PERMISSIONS.CALL_HISTORY_SERVICES,
+      permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
       icon: <Phone size={16} />,
       color: MENU_COLORS.CALL_HISTORY,
       title: 'Communications',
@@ -391,20 +391,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/planner/projects',
           permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
         },
-        // { 
-        //   id: 'work-planner-recurring-reminders', 
-        //   title: 'Recurring Reminders', 
-        //   icon: <Bell size={16} />, 
-        //   url: '/planner/recurring-reminders', 
-        //   permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
-        // },
-        // { 
-        //   id: 'planner-todo-list', 
-        //   title: 'To-Do', 
-        //   icon: <Clock size={16} />, 
-        //   url: '/planner/todo', 
-        //   permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
-        // },
         {
           id: 'planner-tasks',
           title: 'Tasks',
@@ -417,16 +403,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Calendar',
           icon: <Calendar size={16} />,
           url: '/planner/calendar',
-          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+          permission: PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER 
         },
-
-      
         { 
           id: 'work-planner-orders', 
           title: 'Orders Delivery', 
           icon: <ReceiptText size={16} />, 
           url: '/planner/orders-delivery', 
-          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+          permission: PERMISSIONS.VIEW_ORDERS_DELIVERY_WORK_PLANNER 
         },
        
       ].filter(item => !item.permission || hasPermission(item.permission))
@@ -437,7 +421,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'virtual-agents',
       key: 'virtual-agents',
-      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+      permission: PERMISSIONS.VIRTUAL_AGENTS_SERVICES,
       icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: "Virtual Agents",
@@ -448,56 +432,56 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'virtual-agents-outbound-agent',
           title: 'Outbound Agent',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
           url: '/agents/outbound-agent'
         },
         {
           id: 'virtual-agents-inbound-agent',
           title: 'Inbound Agent',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/agents/inbound-agent'
         },
         {
           id: 'virtual-agents-agent-campaigns',
           title: 'Agent Campaigns',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
           url: '/agents/agent-campaigns'
         },
         {
           id: 'virtual-agents-create-campaigns',
           title: 'Create Campaign',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.CREATE_CAMPAIGN_AIML,
           url: '/agents/create-campaign'
         },
         {
           id: 'ai-agent-outbound-campaigns-pitch-deck',
           title: 'Pitch Deck',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_PITCH_DECK_AIML,
           url: '/agents/pitch-deck'
         },
         {
           id: 'virtual-agents-live-monitoring',
           title: 'Live Monitoring',
           icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_LIVE_MONITORING_AIML,
           url: '/agents/live-monitoring'
         },
         {
           id: 'virtual-agents-analytics',
           title: 'Analytics',
           icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
           url: '/agents/analytics'
         },
         {
           id: 'virtual-agents-usage-reports',
           title: 'Usage Reports',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
+          permission: PERMISSIONS.VIEW_USAGE_REPORTS_AIML,
           url: '/agents/usage-reports'
         }
       ]
@@ -527,42 +511,42 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'pulse-hosts',
           title: 'Hosts',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_HOSTS_NETOPS,
           url: '/pulse/hosts'
         },
         {
           id: 'pulse-hosts-groups',
           title: 'Hosts Groups',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_HOST_GROUPS_NETOPS,
           url: '/pulse/host-groups'
         },
         {
           id: 'pulse-hosts-alerts',
           title: 'Alerts',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_ALERTS_NETOPS,
           url: '/pulse/alerts'
         },
         {
           id: 'pulse-templates',
           title: 'Templates',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_TEMPLATES_NETOPS,
           url: '/pulse/templates'
         },
         {
           id: 'pulse-events',
           title: 'Events',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_EVENTS_NETOPS,
           url: '/pulse/events'
         },
         {
           id: 'pulse-customers',
           title: 'Customers',
           icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          permission: PERMISSIONS.VIEW_CUSTOMERS_NETOPS,
           url: '/pulse/customers'
         },
 
@@ -578,21 +562,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'pulse-select-server',
           title: 'Server Insights',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
+          permission: PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS,
           url: '/pulse/server-insights'
         },
         {
           id: 'pulse-gateways',
           title: 'Gateways',
           icon: <Wifi size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
+          permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
           url: '/pulse/gateways'
         },
         {
           id: 'pulse-gateway-ports',
           title: 'Gateway Ports',
           icon: <Wifi size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
+          permission: PERMISSIONS.VIEW_GSM_PORTS,
           url: '/pulse/gateway-ports'
         },
        
@@ -730,7 +714,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Order Invoicing', 
           icon: <ShoppingBag size={16} />, 
           url: '/billing/order-invoicing', 
-          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+          permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
         },
         { 
           id: 'finance-invoices', 
@@ -780,7 +764,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'ai-chat-usage-reports',
           title: 'Chat Usage',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
+          permission: PERMISSIONS.CHAT_USAGE_REPORTS,
           url: '/reports/chat-usage'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
@@ -791,7 +775,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       {
         id: 'audit-logs',
         key: 'audit-logs',
-        permission: PERMISSIONS.TMS_SERVICES,
+        permission: PERMISSIONS.AUDIT_LOGS_SERVICES,
         icon: <History size={16} />,
         color: MENU_COLORS.REPORTS,
         title: 'Audit Logs',
@@ -803,7 +787,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'settings',
       key: 'settings',
-      permission: PERMISSIONS.TMS_SERVICES,
+      permission: PERMISSIONS.VIEW_SETTINGS,
       icon: <Settings size={16} />,
       color: MENU_COLORS.REPORTS,
       title: 'Settings',

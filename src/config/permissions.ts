@@ -10,52 +10,66 @@ export interface RoutePermission {
 
 // Define all route permissions in a hierarchical structure
 export const routePermissions: RoutePermission[] = [
+
+    { path: '/settings', permissions: [PERMISSIONS.VIEW_SETTINGS] },
+    {path: '/notifications',permissions: [PERMISSIONS.VIEW_USER_NOTIFICATIONS]},
     
     //profile services start
     {path: '/profile',permissions: ['']},
-    {path: '/settings',permissions: ['']},
+    
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
-    {path: '/live-calls-test',permissions: ['']},
-    {path: '/resources',permissions: ['']},
-    {path: '/notifications',permissions: ['']},
-    {path: '/test-cti-proxy',permissions: ['']},
-   
-    {path: '/resources/faq',permissions: ['']},
-    {path: '/resources/help-materials',permissions: ['']},
-    {path: '/resources/contact-support',permissions: ['']},
+    
+    // {path: '/resources',permissions: ['']},
+    // {path: '/resources/faq',permissions: ['']},
+    // {path: '/resources/help-materials',permissions: ['']},
+    // {path: '/resources/contact-support',permissions: ['']},
+
     {path:'/manager-dashboard',permissions: ['']},
     {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
-    {path:'/live-call-updated',permissions: ['']},
-    {path:'/test-image-storage',permissions: ['']},
-    {path:'/billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
-    {path:'/dialpad-use',permissions: ['']},
-    {path:'/crm-new-dashboard',permissions: ['']},
-    {path:'/help-center-new',permissions: ['']},
-    {path:'/faqs',permissions: ['']},
-    {path:'/faqs/modules',permissions: ['']},
-    {path:'/faqs/items',permissions: ['']},
-    {path:'/faqs/topics',permissions: ['']},
-    {path:'/faqs/types',permissions: ['']},
-    {path:'/crm-tasks',permissions: ['']},
-    {path:'/main-dashboard',permissions: ['']},
-    {path:'/main-settings',permissions: ['']},
+   
+    { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
     
-    {path:'/ai-ml/tenant-faqs',permissions: ['']},
-    { path: '/ai-ml/global-faqs', permissions: [''] },
+    { path: '/dialpad-use', permissions: [PERMISSIONS.VIEW_CTI] },
     
-    {path:'/chat/ai-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
-    {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
-    {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
-    { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.TMS_SERVICES] },
-    {path:'/chat/faq-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
-    {path:'/chat/faq-profiles/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
-    { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.TMS_SERVICES] },
-    { path: '/chat/usage-reports', permissions: [PERMISSIONS.TMS_SERVICES] },
-    {path:'/chat/tools-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/faqs',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
+    {path:'/faqs/modules',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
+    {path:'/faqs/items',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
+    {path:'/faqs/topics',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
+    {path:'/faqs/types',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
+    {
+        path: '/main-settings',
+        permissions: [PERMISSIONS.VIEW_SETTINGS],
+        children: [
+            { path: '/general-prefs', permissions: [PERMISSIONS.VIEW_SETTINGS] },
+            { path: '/notifications', permissions: [PERMISSIONS.VIEW_USER_NOTIFICATIONS] },
+            { path: '/account-defaults', permissions: [PERMISSIONS.VIEW_SETTINGS] },
+            { path: '/users-teams', permissions: [PERMISSIONS.CONTROL_HUB_SERVICES] },
+            { path: '/smart-crm', permissions: [PERMISSIONS.CRM_SERVICES] },
+            { path: '/communications', permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES] },
+            { path: '/planner', permissions: [PERMISSIONS.WORK_PLANNER_SERVICES] },
+            { path: '/virtual-agents', permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES] },
+            { path: '/pulse', permissions: [PERMISSIONS.PULSE_SERVICES] },
+            { path: '/compliance', permissions: [PERMISSIONS.DNCR_SERVICES] },
+            { path: '/workforce', permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES] },
+            { path: '/billing', permissions: [PERMISSIONS.ACCOUNTS_SERVICES] },
+            { path: '/tickets', permissions: [PERMISSIONS.TICKETS_SERVICES] },
+            { path: '/help-center', permissions: [PERMISSIONS.MANAGE_HELP_CENTER] },
+            { path: '/ai-chat', permissions: [PERMISSIONS.AI_ML_SERVICES] },
+        ]
+    },
     
-    { path: '/company', permissions: ['set-company-image-users'] },
-    { path: '/audit-logs', permissions: [''] },
+    
+    {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.MANAGE_AI_BOT_FAQS]},
+    {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT]},
+    { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
+    { path: '/chat/faq-profiles', permissions: [PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT] },
+    { path: '/chat/faq-profiles/tenant', permissions: [PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT] },
+    { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT] },
+    { path: '/chat/usage-reports', permissions: [PERMISSIONS.CHAT_USAGE_REPORTS] },
+    {path:'/chat/tools-profiles',permissions: [PERMISSIONS.VIEW_TOOLS_PROFILE_AI_CHAT]},
+    { path: '/company', permissions: [PERMISSIONS.SET_COMPANY_IMAGE_USERS] },
+    { path: '/audit-logs', permissions: [PERMISSIONS.AUDIT_LOGS_SERVICES] },
    
 
 
@@ -122,18 +136,18 @@ export const routePermissions: RoutePermission[] = [
             { path: '/stages',permissions: [PERMISSIONS.VIEW_CRM_STAGES]},
             { path: '/tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
-            { path: '/activities',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},//activities
+            { path: '/activities',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
 
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            {path:'/companies',permissions: ['']},//companies
-            {path:'/approvals',permissions: ['']},//approvals 
-            {path:'/approvals/approval-detailpage',permissions: ['']},
-            {path:'/inbox',permissions: ['']},
+            {path:'/companies',permissions: [PERMISSIONS.VIEW_COMPANIES_CRM]},
+            {path:'/approvals',permissions: [PERMISSIONS.APPROVE_REJECT_CRM_DEALS]},//approvals 
+            {path:'/approvals/approval-detailpage',permissions: [PERMISSIONS.APPROVE_REJECT_CRM_DEALS]},
+            {path:'/inbox',permissions: [PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM]},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
-            {path:'/main-dashboard',permissions: ['']},
+            {path:'/main-dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]},
             
         ]
     },
@@ -143,7 +157,7 @@ export const routePermissions: RoutePermission[] = [
     //communications services start
     {
         path: '/communications',
-        permissions: [PERMISSIONS.CALL_HISTORY_SERVICES],
+        permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES],
         children: [
             {
                 path: '/dashboard',
@@ -159,24 +173,17 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/call-analysis',
-                permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML],
+                permissions: [PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML],
                 children: [
                     {
                         path: '/',
-                        permissions: [PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML]
+                        permissions: [PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML]
                     }
                 ]
             },
             {
                 path: '/wallboards-live',
-                permissions: [PERMISSIONS.CTI_SERVICES],
-                // children: [
-                //     { path: '/',permissions: [PERMISSIONS.VIEW_CTI]},
-                //     { path: '/new',permissions: []},
-                //     { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
-                //     { path: '/management/campaigns',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]},
-                //     { path: '/management/agents',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]},
-                // ]
+                permissions: [PERMISSIONS.VIEW_CTI],
             },
             {
                 path: '/text-messages',
@@ -199,24 +206,20 @@ export const routePermissions: RoutePermission[] = [
         path: '/planner',
         permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
         children: [
-            { path: '/orders-delivery',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
-            { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
-            { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
-            
-            { path: '/tasks-old', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            { path: '/tasks-old/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-
-            { path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            { path: '/tasks/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            { path: '/calendar', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
-            
+            { path: '/orders-delivery',permissions: [PERMISSIONS.VIEW_ORDERS_DELIVERY_WORK_PLANNER]},
+            {
+                path: '/tasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER],
+                children: [
+                    { path: '/{id}', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] }
+                ]
+             },
+            { path: '/calendar', permissions: [PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER] },
             {
                 path: '/projects', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER],
                 children: [
                     { path: '/{id}', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER] }
                 ]
              },
-            
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
             { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
         ]
@@ -249,14 +252,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
             { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
-            { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            // {
-            //     path: '/companies',
-            //     permissions: [PERMISSIONS.VIEW_COMPANIES_BILLING],
-            //     children: [
-            //         { path: '/product-pricing',permissions: [PERMISSIONS.VIEW_PRODUCT_PRICING_COMPANIES_BILLING]}
-            //     ]
-            // }
+            { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
+           
         ]
         
     },
@@ -266,15 +263,15 @@ export const routePermissions: RoutePermission[] = [
     //virtual agents services start
     {
         path: '/agents',
-        permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
+        permissions: [PERMISSIONS.AI_ML_SERVICES],
         children: [
-            { path: '/outbound-agent',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
-            { path: '/inbound-agent',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
-            { path: '/agent-campaigns', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
-            { path: '/create-campaign',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
-            { path: '/pitch-deck',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
-            { path: '/live-monitoring',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
-            { path: '/analytics',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/outbound-agent',permissions: [PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML]},
+            { path: '/inbound-agent',permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML]},
+            { path: '/agent-campaigns', permissions: [PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML] },
+            { path: '/create-campaign',permissions: [PERMISSIONS.CREATE_CAMPAIGN_AIML]},
+            { path: '/pitch-deck',permissions: [PERMISSIONS.VIEW_PITCH_DECK_AIML]},
+            { path: '/live-monitoring',permissions: [PERMISSIONS.VIEW_LIVE_MONITORING_AIML]},
+            { path: '/analytics',permissions: [PERMISSIONS.VIEW_ANALYTICS_AIML]},
             { path: '/usage-reports',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
         ]
     },
@@ -286,25 +283,24 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.NETOPS_SERVICES],
         children: [
             { path: '/dashboard', permissions: [PERMISSIONS.VIEW_NETOPS_DASHBOARD] },
-            { path: '/customers', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+            { path: '/customers', permissions: [PERMISSIONS.VIEW_CUSTOMERS_NETOPS] },
             {  path: '/devices',permissions: [PERMISSIONS.VIEW_NETOPS_DEVICES]},
             {path: '/services', permissions: [PERMISSIONS.VIEW_NETOPS_SERVICES]},
             { path: '/alerts',permissions: [PERMISSIONS.VIEW_NETOPS_ALERTS]},
             {path: '/uptime-sla',permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]},
-            {path: '/server-insights',permissions: [PERMISSIONS.NETOPS_SERVICES]},
-            {path: '/application-monitoring',permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            {path: '/server-insights',permissions: [PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS]},
+            {path: '/application-monitoring',permissions: [PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS]},
             {
-                path: '/hosts', permissions: [PERMISSIONS.NETOPS_SERVICES],
+                path: '/hosts', permissions: [PERMISSIONS.VIEW_HOSTS_NETOPS],
                 children: [
-                    { path: '/:hostid', permissions: [PERMISSIONS.NETOPS_SERVICES] },
+                    { path: '/:hostid', permissions: [PERMISSIONS.VIEW_HOSTS_NETOPS] },
                 ]
             },
-            { path: '/host-groups', permissions: [PERMISSIONS.NETOPS_SERVICES] },
-            { path: '/templates', permissions: [PERMISSIONS.NETOPS_SERVICES] },
-            { path: '/events', permissions: [PERMISSIONS.NETOPS_SERVICES]},
-            { path: '/triggers', permissions: [PERMISSIONS.NETOPS_SERVICES]},
-            { path: '/gateways', permissions: [PERMISSIONS.NETOPS_SERVICES]},
-            { path: '/gateway-ports', permissions: [PERMISSIONS.NETOPS_SERVICES]},
+            { path: '/host-groups', permissions: [PERMISSIONS.VIEW_HOST_GROUPS_NETOPS] },
+            { path: '/templates', permissions: [PERMISSIONS.VIEW_TEMPLATES_NETOPS] },
+            { path: '/events', permissions: [PERMISSIONS.VIEW_EVENTS_NETOPS]},
+            { path: '/gateways', permissions: [PERMISSIONS.VIEW_GSM_MANAGEMENT]},
+            { path: '/gateway-ports', permissions: [PERMISSIONS.VIEW_GSM_PORTS]},
         ]
     },
     //netops services end
@@ -338,7 +334,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/crm-insights',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
             { path: '/call-analytics',permissions: [PERMISSIONS.VIEW_CALL_REPORTS]},
-            { path: '/chat-usage', permissions: [PERMISSIONS.REPORTS_SERVICES] },
+            { path: '/chat-usage', permissions: [PERMISSIONS.CHAT_USAGE_REPORTS] },
         ]
     },
     //reports services end
@@ -346,26 +342,10 @@ export const routePermissions: RoutePermission[] = [
    
     {path: '/audit-logs',permissions: ['']},
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     
     {
         path: '/help-center',
-        permissions: [''],
+        permissions: [PERMISSIONS.VIEW_HELP_CENTER],
         children: [
             { path: '/knowledge-base', permissions: [''] },
             { path: '/knowledge-base/[id]', permissions: [''] },
