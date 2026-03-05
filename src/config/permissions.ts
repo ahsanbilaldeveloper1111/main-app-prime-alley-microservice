@@ -71,7 +71,9 @@ export const routePermissions: RoutePermission[] = [
     { path: '/company', permissions: [PERMISSIONS.SET_COMPANY_IMAGE_USERS] },
     { path: '/audit-logs', permissions: [PERMISSIONS.AUDIT_LOGS_SERVICES] },
    
-
+    {path:'/crm/quotes',permissions: ['']},
+    {path:'/billing/quotes',permissions: ['']},
+    {path:'/billing/products',permissions: ['']},
 
 
 
