@@ -1,5 +1,5 @@
 import React, { ReactElement, useState, useRef, useMemo, useCallback, useEffect } from 'react'
-import { Search, ChevronLeft, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 import Users from '@pages/controlhub/users'
@@ -47,71 +47,14 @@ import UserDefaults from '@components/UserDefaults'
 import GenericTable from '@components/GenericTable'
 import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
-// ─── Types ────────────────────────────────────────────────────────────────────
-type SidebarItem = {
-  id: string
-  label: string
-  badge?: string
-  externalLink?: boolean
-}
-
-type SidebarGroup = {
-  heading: string
-  items: SidebarItem[]
-}
-
-// ─── Sidebar Data ─────────────────────────────────────────────────────────────
-const sidebarGroups: SidebarGroup[] = [
-  {
-    heading: 'Your Preferences',
-    items: [
-      { id: 'general-prefs', label: 'General' },
-      { id: 'notifications', label: 'Notifications' },
-    ],
-  },
-  {
-    heading: 'Services',
-    items: [
-      { id: 'account-defaults', label: 'Account Defaults' },
-
-      { id: 'users-teams', label: 'Users & Teams' },
-      { id: 'smart-crm', label: 'Smart CRM' },
-      { id: 'communications', label: 'Communications' },
-      { id: 'planner', label: 'Planner' },
-      { id: 'virtual-agents', label: 'Virtual Agents' },
-      { id: 'pulse', label: 'Pulse' },
-      
-      
-      { id: 'compliance', label: 'Compliance', badge: 'Beta' },
-      { id: 'workforce', label: 'Workforce' },
-      { id: 'billing', label: 'Billing' },
-      
-      { id: 'tickets', label: 'Tickets' },
-      { id: 'help-center', label: 'Help Center' },
-      { id: 'ai-chat', label: 'AI Chat' },
-     
-
-      
-      // { id: 'account-cleanup', label: 'Account Cleanup', badge: 'Beta' },
-      // { id: 'audit-log', label: 'Audit Log' },
-      // { id: 'product-updates', label: 'Product Updates', externalLink: true },
-      // { id: 'integrations', label: 'Integrations' },
-      // { id: 'marketplace', label: 'Marketplace Downloads' },
-      // { id: 'tracking-analytics', label: 'Tracking & Analytics' },
-      // { id: 'privacy-consent', label: 'Privacy & Consent' },
-      // { id: 'sandboxes', label: 'Sandboxes' },
-      // { id: 'security', label: 'Security' },
-      // { id: 'approvals', label: 'Approvals' },
-      // { id: 'ai', label: 'AI' },
-      // { id: 'payments-account', label: 'Payments Account' },
-    ],
-  },
-]
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // ─── Tab Definitions ──────────────────────────────────────────────────────────
 type Tab = {
   id: string
   label: string
+  permission?: string
 }
 
 type ControlledTabsProps = {
@@ -1037,33 +980,6 @@ const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = (
 
 
 
-
-// ─── Dummy tab content ────────────────────────────────────────────────────────
-const DummyTabContent: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-  <div>
-    <p style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '14px', color: '#555', marginBottom: '24px' }}>
-      {description}
-    </p>
-    <Divider />
-    <div
-      style={{
-        background: '#f8f8f8',
-        border: '1px dashed #ccc',
-        borderRadius: '6px',
-        padding: '48px 32px',
-        textAlign: 'center',
-        color: '#999',
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        fontSize: '14px',
-      }}
-    >
-      <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚙️</div>
-      <div style={{ fontWeight: 500, color: '#555', marginBottom: '6px' }}>{title}</div>
-      <div>No configuration available yet.</div>
-    </div>
-  </div>
-)
-
 // ─── Right Panel Pages ────────────────────────────────────────────────────────
 const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
   const [activeTab, setActiveTab] = useState('general')
@@ -1147,10 +1063,10 @@ const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAc
 
 // ─── Users & Teams (from settings: User Directory, Teams, Groups, Ranks) ────────
 const usersTeamsTabs: Tab[] = [
-  { id: 'user-directory', label: 'User Directory' },
-  { id: 'supervisor-teams', label: 'Supervisor Teams' },
-  { id: 'management-groups', label: 'Management Groups' },
-  { id: 'ranks-and-permissions', label: 'Ranks and Permissions' },
+  { id: 'user-directory', label: 'User Directory', permission: PERMISSIONS.VIEW_USERS_CONTROLHUB },
+  { id: 'supervisor-teams', label: 'Supervisor Teams', permission: PERMISSIONS.VIEW_TEAMS_CONTROLHUB },
+  { id: 'management-groups', label: 'Management Groups', permission: PERMISSIONS.VIEW_GROUPS_CONTROLHUB },
+  { id: 'ranks-and-permissions', label: 'Ranks and Permissions', permission: PERMISSIONS.VIEW_RANKS_CONTROLHUB },
 ]
 
 const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1162,6 +1078,7 @@ const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'user-directory': <Users />,
+    
     'supervisor-teams': <Teams />,
     'management-groups': <Groups />,
     'ranks-and-permissions': <Ranks />,
@@ -1229,12 +1146,12 @@ const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
 
 // ─── Smart CRM (from settings: Campaigns, Industries, Products, Stages, etc.) ───
 const smartCrmTabs: Tab[] = [
-  { id: 'stages', label: 'Stages' },
-  { id: 'product-groups', label: 'Product Groups' },
-  { id: 'products', label: 'Products' },
-  { id: 'deal-templates', label: 'Deal Templates' },
-  { id: 'business-types', label: 'Business Types' },
-  { id: 'campaigns', label: 'Campaigns' },
+  { id: 'stages', label: 'Stages', permission: PERMISSIONS.VIEW_CRM_STAGES },
+  { id: 'product-groups', label: 'Product Groups',permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
+  { id: 'products', label: 'Products', permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+  { id: 'deal-templates', label: 'Deal Templates', permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
+  { id: 'business-types', label: 'Business Types', permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },
+  { id: 'campaigns', label: 'Campaigns', permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
 ]
 
 const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1315,8 +1232,8 @@ const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab
 
 // ─── Communications (from settings: Manage Extensions, Backend Operations, Manual Analysis) ───
 const communicationsTabs: Tab[] = [
-  { id: 'manage-extensions', label: 'Manage Analysis' },
-  { id: 'manual-analysis', label: 'Manual Analysis' },
+  { id: 'manage-extensions', label: 'Manage Analysis', permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML },
+  { id: 'manual-analysis', label: 'Manual Analysis', permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML },
 ]
 
 const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1412,7 +1329,7 @@ const PlannerPage: React.FC = () => (
 
 // ─── Workforce (from settings: Request Categories, Sub Categories) ────────────
 const workforceTabs: Tab[] = [
-  { id: 'request-categories', label: 'Request Categories' },
+  { id: 'request-categories', label: 'Request Categories', permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT },
   // { id: 'sub-categories', label: 'Sub Categories' },
 ]
 
@@ -1490,7 +1407,7 @@ const WorkforcePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTa
 
 // ─── Billing (from settings: Payment Methods) ───────────────────────────────────
 const billingTabs: Tab[] = [
-  { id: 'payment-methods', label: 'Payment Methods' },
+  { id: 'payment-methods', label: 'Payment Methods', permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING },
 ]
 
 const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1566,11 +1483,11 @@ const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
 
 // ─── Tickets (from settings: Statuses, Modules, Categories, Sub Categories, Types) ───
 const ticketsTabs: Tab[] = [
-  { id: 'statuses', label: 'Statuses' },
-  { id: 'modules', label: 'Modules' },
-  { id: 'categories', label: 'Categories' },
-  { id: 'sub-categories', label: 'Sub Categories' },
-  { id: 'types', label: 'Types' },
+  { id: 'statuses', label: 'Statuses', permission: PERMISSIONS.VIEW_TICKETS_STATUS },
+  { id: 'modules', label: 'Modules', permission: PERMISSIONS.VIEW_TICKETS_MODULES },
+  { id: 'categories', label: 'Categories', permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
+  { id: 'sub-categories', label: 'Sub Categories', permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
+  { id: 'types', label: 'Types', permission: PERMISSIONS.VIEW_TICKETS_TYPES },
 ]
 
 const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1630,10 +1547,10 @@ const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
 
 // ─── Help Center (from settings: FAQ Modules, Topics, Items, Types) ───────────
 const helpCenterTabs: Tab[] = [
-  { id: 'modules', label: 'FAQ Modules' },
-  { id: 'topics', label: 'FAQ Topics' },
-  { id: 'items', label: 'FAQ Items' },
-  { id: 'types', label: 'FAQ Types' },
+  { id: 'modules', label: 'FAQ Modules',permission: PERMISSIONS.MANAGE_HELP_CENTER },
+  { id: 'topics', label: 'FAQ Topics',permission: PERMISSIONS.MANAGE_HELP_CENTER },
+  { id: 'items', label: 'FAQ Items',permission: PERMISSIONS.MANAGE_HELP_CENTER },
+  { id: 'types', label: 'FAQ Types',permission: PERMISSIONS.MANAGE_HELP_CENTER },
 ]
 
 const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1692,10 +1609,10 @@ const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
 
 // ─── AI Chat (from settings: Tools Profiles, FAQ Profiles, Tenant Profile, Global FAQs) ───
 const aiChatTabs: Tab[] = [
-  { id: 'tools-profiles', label: 'Tools Profiles' },
-  { id: 'faq-profiles', label: 'FAQ Profiles' },
-  { id: 'tenant-profile', label: 'Tenant Profile' },
-  { id: 'global-faqs', label: 'Global FAQs' },
+  { id: 'tools-profiles', label: 'Tools Profiles',permission: PERMISSIONS.VIEW_TOOLS_PROFILE_AI_CHAT },
+  { id: 'faq-profiles', label: 'FAQ Profiles',permission: PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT },
+  { id: 'tenant-profile', label: 'Tenant Profile',permission: PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT },
+  { id: 'global-faqs', label: 'Global FAQs',permission: PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT },
 ]
 
 const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1754,12 +1671,12 @@ const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, 
 
 // ─── Virtual Agents (from settings: Outbound AI Agent – Trunk Profiles, Bot Profiles) ───
 const virtualAgentsTabs: Tab[] = [
-  { id: 'trunk-profiles', label: 'Outbound Trunks' },
-  { id: 'bot-profiles', label: 'Outbound Bots' },
+  { id: 'trunk-profiles', label: 'Outbound Trunks',permission: PERMISSIONS.LIST_TRUNKS_AIML },
+  { id: 'bot-profiles', label: 'Outbound Bots',permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML },
 
-  { id: 'inbound-trunks', label: 'Inbound Trunks' },
-  { id: 'inbound-bots', label: 'Inbound Bots' },
-  { id: 'inbound-faqs', label: 'Inbound FAQs' },
+  { id: 'inbound-trunks', label: 'Inbound Trunks',permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML },
+  { id: 'inbound-bots', label: 'Inbound Bots',permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML },
+  { id: 'inbound-faqs', label: 'Inbound FAQs' , permission: PERMISSIONS.MANAGE_AI_BOT_FAQS},
 ]
 
 const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -1839,12 +1756,12 @@ const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActi
 
 // ─── Pulse (Host Groups, Alerts) ───
 const pulseTabs: Tab[] = [
-  { id: 'hosts', label: 'Hosts' },
-  { id: 'host-groups', label: 'Host Groups' },
-  { id: 'events', label: 'Events' },
-  { id: 'assign-devices', label: 'Assign Devices' },
-  { id: 'sync-gsm', label: 'Sync GSM' },
-  { id: 'company-profiling', label: 'Company Profiling' },
+  { id: 'hosts', label: 'Hosts',permission: PERMISSIONS.VIEW_HOSTS_NETOPS },
+  { id: 'host-groups', label: 'Host Groups',permission: PERMISSIONS.VIEW_HOST_GROUPS_NETOPS },
+  { id: 'events', label: 'Events',permission: PERMISSIONS.VIEW_EVENTS_NETOPS },
+  { id: 'assign-devices', label: 'Assign Devices',permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
+  { id: 'sync-gsm', label: 'Sync GSM',permission: PERMISSIONS.VIEW_GSM_SYNC },
+  { id: 'company-profiling', label: 'Company Profiling',permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING },
 ]
 
 const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
@@ -3225,24 +3142,9 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 };
 // ─── End GeneralSettings ────────────────────────────────────────────────────────
 
-type SectionRenderer = (opts: { subTab?: string; onSubTabChange?: (tabId: string) => void }) => React.ReactNode
+export type SectionRenderer = (opts: { subTab?: string; onSubTabChange?: (tabId: string) => void }) => React.ReactNode
 
-const defaultSubTabBySection: Record<string, string | undefined> = {
-  'general-prefs': 'profile',
-  'account-defaults': 'general',
-  'users-teams': 'user-directory',
-  'smart-crm': 'stages',
-  communications: 'manage-extensions',
-  workforce: 'request-categories',
-  billing: 'payment-methods',
-  tickets: 'statuses',
-  'help-center': 'modules',
-  'ai-chat': 'tools-profiles',
-  'virtual-agents': 'trunk-profiles',
-  pulse: 'host-groups',
-}
-
-const sectionPageMap: Record<string, SectionRenderer> = {
+export const sectionPageMap: Record<string, SectionRenderer> = {
   'general-prefs': ({ subTab, onSubTabChange }) => (
     <GeneralSettings
       activeTab={subTab === 'profile' || subTab === 'tasks' ? (subTab as 'profile' | 'tasks') : undefined}
@@ -3280,317 +3182,17 @@ const sectionPageMap: Record<string, SectionRenderer> = {
 
 
 
-// ─── Main Settings Page ───────────────────────────────────────────────────────
-const SettingsPage = () => {
+// ─── Main Settings Index: redirect to default section ────────────────────────
+const MainSettingsIndex = () => {
   const router = useRouter()
-  const [activeSection, setActiveSection] = useState<string>('general-prefs')
-
-  
-  const [showSearch, setShowSearch] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-
-  const slug = router.query.slug
-  const routeSegments = useMemo(() => {
-    if (!router.isReady) return [] as string[]
-    if (Array.isArray(slug)) return slug.filter(Boolean)
-    if (typeof slug === 'string' && slug) return [slug]
-    return []
-  }, [router.isReady, slug])
-
-  const routeSection = routeSegments[0]
-  const routeSubTab = routeSegments[1]
-
   useEffect(() => {
-    if (!router.isReady) return
-    if (routeSection && sectionPageMap[routeSection] && routeSection !== activeSection) {
-      setActiveSection(routeSection)
-    }
-  }, [router.isReady, routeSection, activeSection])
-
-  useEffect(() => {
-    if (!router.isReady) return
-    if (!routeSection) return
-    if (!sectionPageMap[routeSection]) return
-
-    const defaultSubTab = defaultSubTabBySection[routeSection]
-    if (defaultSubTab && !routeSubTab) {
-      router.replace(`/main-settings/${routeSection}/${defaultSubTab}`, undefined, { shallow: true })
-    }
-  }, [router, router.isReady, routeSection, routeSubTab])
-
-  const pushRoute = useCallback(
-    (sectionId: string, subTabId?: string) => {
-      const href = subTabId ? `/main-settings/${sectionId}/${subTabId}` : `/main-settings/${sectionId}`
-      router.push(href, undefined, { shallow: true })
-    },
-    [router]
-  )
-
-  return (
-    <>
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .main-content-wrapper {
-            overflow: hidden;
-            height: calc(100vh - 50px);
-          }
-        `
-      }} />
-      <div
-        style={{
-          display: 'flex',
-          height: '100vh',
-          overflow: 'hidden',
-          background: '#ffffff',
-          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        }}
-      >
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside
-        style={{
-          width: '255px',
-          minWidth: '255px',
-          background: '#ffffff',
-          borderRight: '1px solid #e8e8e8',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0,
-          height: '100%',
-          overflow: 'hidden',
-          padding: "21px"
-        }}
-      >
-        {/* Back to Dashboard */}
-        <div style={{ paddingLeft: '20px', paddingRight: '20px', marginBottom: '20px' }}>
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'transparent',
-              border: '1px solid #e0e0e0',
-              borderRadius: '4px',
-              padding: '10px 22px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-              color: '#141414',
-              fontWeight: 300,
-              position: 'relative',
-              left: '-45px',
-            }}
-          >
-            <span style={{ fontSize: '14px' }}><ChevronLeft size={18} /></span> Dashboard
-          </button>
-        </div>
-
-        {/* Settings heading + search icon */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: '20px',
-            paddingRight: '20px',
-            marginBottom: '20px',
-          }}
-        >
-          <span
-            style={{
-              fontSize: '20px',
-              fontStyle: 'normal',
-              fontWeight: 600,
-              textTransform: 'none',
-              fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-              letterSpacing: '0px',
-              lineHeight: '24px',
-              color: '#141414',
-            }}
-          >
-            Settings
-          </span>
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-              color: '#555',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            title="Search settings"
-          >
-            <Search size={18} />
-          </button>
-        </div>
-
-        {/* Search Input */}
-        {showSearch && (
-          <div style={{ paddingLeft: '20px', paddingRight: '20px', marginBottom: '16px' }}>
-            <div style={{ position: 'relative' }}>
-              <Search
-                size={16}
-                style={{
-                  position: 'absolute',
-                  left: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#888',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Search settings..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '8px 12px 8px 34px',
-                  fontSize: '13px',
-                  fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                  color: '#141414',
-                  border: '1px solid #d0d0d0',
-                  borderRadius: '4px',
-                  outline: 'none',
-                  background: '#fff',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                onBlur={(e) => (e.currentTarget.style.borderColor = '#d0d0d0')}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Groups */}
-        {sidebarGroups.map(group => {
-          // Filter items based on search query
-          const filteredItems = searchQuery.trim()
-            ? group.items.filter(item =>
-                item.label.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-            : group.items
-
-          // Skip group if no items match search
-          if (filteredItems.length === 0) return null
-
-          return (
-            <div key={group.heading} style={{ marginBottom: '8px' }}>
-              <div
-                style={{
-                  paddingLeft: '20px',
-                  paddingRight: '20px',
-                  paddingTop: '12px',
-                  paddingBottom: '6px',
-                  fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '16px',
-                  color: '#141414',
-                  lineHeight: '20px',
-                }}
-              >
-                {group.heading}
-              </div>
-              {filteredItems.map(item => {
-                const isActive = activeSection === item.id
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      setActiveSection(item.id)
-                      const defaultSubTab = defaultSubTabBySection[item.id]
-                      pushRoute(item.id, defaultSubTab)
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingLeft: '20px',
-                      paddingRight: '16px',
-                      paddingTop: '5px',
-                      paddingBottom: '5px',
-                      cursor: 'pointer',
-                      background: isActive ? '#whitesmoke' : 'transparent',
-                      borderLeft: isActive ? '3px solid #141414' : '3px solid transparent',
-                      color: 'rgb(20, 20, 20)',
-                      fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-                      fontSize: '14px',
-                      fontWeight: isActive ? 400 : 300,
-                      letterSpacing: '0px',
-                      lineHeight: '24px',
-                      transition: 'background 0.12s, border-color 0.12s',
-                      userSelect: 'none',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isActive) {
-                        ;(e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!isActive) {
-                        ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
-                      }
-                    }}
-                  >
-                    <span>{item.label}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {item.badge && (
-                        <span
-                          style={{
-                            background: '#7b5cf5',
-                            color: '#fff',
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            padding: '1px 6px',
-                            borderRadius: '3px',
-                            letterSpacing: '0.3px',
-                          }}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                      {item.externalLink && (
-                        <span style={{ fontSize: '11px', color: '#aaa' }}>↗</span>
-                      )}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </aside>
-
-      {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <main
-        style={{
-          flex: 1,
-          background: '#ffffff',
-          overflowY: 'auto',
-          height: '100%',
-        }}
-      >
-        {sectionPageMap[activeSection]?.({
-          subTab: routeSection === activeSection ? routeSubTab : undefined,
-          onSubTabChange: tabId => pushRoute(activeSection, tabId),
-        }) ?? (
-          <div style={{ padding: '32px 40px' }}>
-            <p style={{ color: '#999', fontSize: '14px' }}>Select a section from the sidebar.</p>
-          </div>
-        )}
-      </main>
-    </div>
-    </>
-  )
+    router.replace('/main-settings/general-prefs')
+  }, [router])
+  return null
 }
 
-SettingsPage.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+MainSettingsIndex.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>
+}
 
-export default SettingsPage
+export default MainSettingsIndex

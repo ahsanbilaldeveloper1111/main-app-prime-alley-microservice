@@ -268,18 +268,23 @@ MENU_COLORS: {
 
     //Services permissions start
     CRM_SERVICES: 'crm-services',
-    COMMUNICATIONS_SERVICES: 'communications-services',
+    COMMUNICATIONS_SERVICES: 'communications-services-services',
     WORK_PLANNER_SERVICES: 'work-planner-services',
     PULSE_SERVICES: 'pulse-services',
-    VIRTUAL_AGENTS_SERVICES: 'aiml-services',
+    VIRTUAL_AGENTS_SERVICES: 'ai-ml-services',
     DNCR_SERVICES: 'dncr-services',
     ACCOUNTS_SERVICES: 'accounts-services',
     STAFF_MANAGEMENT_SERVICES: 'staff-management-services',
     REPORTS_SERVICES: 'reports-services',
-    AUDIT_LOGS_SERVICES: 'audit-logs-services',
-    GENERAL_SERVICES: 'general-services',
+    AUDIT_LOGS_SERVICES: 'audit-logs-services-services',
+    GENERAL_SERVICES: 'general-services-services',
     //OLD
     CONTROL_HUB_SERVICES: 'control-hub-services',
+    VIEW_USERS_CONTROLHUB: 'view-users',
+    VIEW_RANKS_CONTROLHUB: 'view-ranks',
+    VIEW_GROUPS_CONTROLHUB: 'view-groups',
+    VIEW_TEAMS_CONTROLHUB: 'view-teams',
+
     GSM_SERVICES: 'gsm-services',
     CALL_LOGS_SERVICES: 'call-logs-services',
     CALL_RECORDINGS_SERVICES: 'call-recordings-services',
@@ -290,6 +295,7 @@ MENU_COLORS: {
     NETOPS_SERVICES: 'health-care-services',
     CALL_HISTORY_SERVICES: 'call-history-services',
     RESOURCES_SERVICES: 'resources-services',
+    LIST_TRUNKS_AIML: 'list-trunks-aiml',
     //Services permissions end
 
 
@@ -300,23 +306,61 @@ MENU_COLORS: {
     VIEW_PROJECTS_WORK_PLANNER: 'view-projects-work-planner',
     VIEW_PROJECTS_DASHBOARD_WORK_PLANNER: 'view-projects-dashboard-work-planner',
     VIEW_STATUSES_WORK_PLANNER: 'view-statuses-work-planner',
-    VIEW_CALENDAR_WORK_PLANNER: 'view-calendar-work-planner',
-    VIEW_ORDERS_DELIVERY_WORK_PLANNER: 'view-orders-delivery-work-planner',
+    VIEW_CALENDAR_WORK_PLANNER: 'view-calendar-work-planner-work-planner',
+    VIEW_ORDERS_DELIVERY_WORK_PLANNER: 'view-orders-delivery-work-planner-work-planner',
     //Work Planner permissions end
 
     //Virtual Agents permissions start
-    VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml',
-    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml',
-    VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml',
-    CREATE_CAMPAIGN_AIML: 'create-campaign-aiml',
-    VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml',
-    VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml',
-    VIEW_ANALYTICS_AIML: 'view-analytics-aiml',
-    VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml',
+    VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml-aiml',
+    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml-aiml',
+    CREATE_CAMPAIGN_AIML: 'view-create-campaign-aiml-aiml',
+    VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml-aiml',
+    VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml-aiml',
+    VIEW_ANALYTICS_AIML: 'view-analytics-aiml-aiml',
+    VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml-aiml',
     //Virtual Agents permissions end
 
+    //pulse permissions start
+
+    VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
+    VIEW_NETOPS_DEVICES: 'devices-netops',
+    VIEW_NETOPS_SERVICES: 'services-netops',
+    VIEW_NETOPS_ALERTS: 'alerts-netops',
+    VIEW_NETOPS_UPTIME_SLA: 'uptime-sla-netops',
+    ADD_NEW_DEVICE: 'add-device-netops',
+    EDIT_DEVICE: 'edit-device-netops',
+    DELETE_DEVICE: 'delete-device-netops',
+
+    VIEW_SERVICES_NETOPS: 'services-netops',
+    ADD_NEW_SERVICE: 'add-service-netops',
+    EDIT_SERVICE: 'edit-service-netops',
+    DELETE_SERVICE: 'delete-service-netops',
+
+    VIEW_ALERTS_NETOPS: 'alerts-netops',
+    RESOLVE_ALERT: 'resolve-alert-netops',
+    MONITER_NETOPS: 'moniter-netops',
+
+    VIEW_HOSTS_NETOPS: 'hosts-netops-netops',
+    VIEW_HOST_GROUPS_NETOPS: 'host-groups-netops-netops',
+    VIEW_TEMPLATES_NETOPS: 'templates-netops-netops',
+    VIEW_EVENTS_NETOPS: 'events-netops-netops',
+    ACKNOWLEDGED_EVENTS_NETOPS: 'acknowledged-events-netops-netops',
+    VIEW_CUSTOMERS_NETOPS: 'customers-netops-netops',
+    ADD_CUSTOMER_NETOPS: 'add-customer-netops-netops',
+    ALERT_NETOPS: 'alert-netops-netops',
+    VIEW_SERVER_INSIGHTS_NETOPS: 'server-insights-netops-netops',
+    ADD_HOST_NETOPS: 'add-host-netops-netops',
+    UPDATE_HOST_NETOPS: 'update-host-netops-netops',
+    DELETE_HOST_NETOPS: 'delete-host-netops-netops',
+    REFRESH_HOST_CACHE_NETOPS: 'refresh-host-cache-netops-netops',
+    ADD_HOST_GROUP_NETOPS: 'add-host-group-netops-netops',
+    UPDATE_HOST_GROUP_NETOPS: 'update-host-group-netops-netops',
+    DELETE_HOST_GROUP_NETOPS: 'delete-host-group-netops-netops',
+    //pulse permissions end
 
 
+    LIVE_CHAT_USERS: 'live-chat-users',
 
 
 
@@ -354,6 +398,26 @@ MENU_COLORS: {
     CALL_REPORTS_BY_STATISTICS_REPORTS: 'call-reports-by-statistics-reports',
     CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
     CALL_REPORTS_BY_TREND_REPORTS: 'call-reports-by-trend-reports',
+    CHAT_USAGE_REPORTS: 'view-chat-usage-reports-reports',
+
+    VIEW_SETTINGS: 'view-settings-general-general',
+    VIEW_HELP_CENTER: 'view-help-center-general-general',
+    SET_COMPANY_IMAGE_USERS: 'set-company-image-users',
+    MANAGE_HELP_CENTER: 'manage-help-center-general-general',
+
+    //AI chat permissions start
+    VIEW_TOOLS_PROFILE_AI_CHAT: 'view-tools-profile-ai-chat',
+    ADD_TOOL_PROFILE_AI_CHAT: 'add-tool-profile-ai-chat',
+    EDIT_TOOL_PROFILE_AI_CHAT: 'edit-tool-profile-ai-chat',
+    DELETE_TOOL_PROFILE_AI_CHAT: 'delete-tool-profile-ai-chat',
+    TEST_TOOL_PROFILE_AI_CHAT: 'test-tools-profile-ai-chat',
+    VIEW_EXECUTOR_AI_CHAT: 'view-executor-ai-chat',
+    RELOAD_EXECUTOR_AI_CHAT: 'reload-executor-ai-chat',
+    VIEW_FAQS_PROFILE_AI_CHAT: 'view-faqs-profile-ai-chat',
+    MANAGE_TENANT_PROFILE_AI_CHAT: 'view-tenant-profile-ai-chat',
+    MANAGE_GLOBAL_FAQS_AI_CHAT: 'manage-global-faqs-ai-chat',
+    MANAGE_AI_BOT_FAQS: 'manage-ai-bot-faqs-ai-chat-ai-chat',
+    //AI chat permissions end
 
     
 
@@ -394,23 +458,6 @@ MENU_COLORS: {
 
 
     
-    VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
-    VIEW_NETOPS_DEVICES: 'devices-netops',
-    VIEW_NETOPS_SERVICES: 'services-netops',
-    VIEW_NETOPS_ALERTS: 'alerts-netops',
-    VIEW_NETOPS_UPTIME_SLA: 'uptime-sla-netops',
-    ADD_NEW_DEVICE: 'add-device-netops',
-    EDIT_DEVICE: 'edit-device-netops',
-    DELETE_DEVICE: 'delete-device-netops',
-
-    VIEW_SERVICES_NETOPS: 'services-netops',
-    ADD_NEW_SERVICE: 'add-service-netops',
-    EDIT_SERVICE: 'edit-service-netops',
-    DELETE_SERVICE: 'delete-service-netops',
-
-    VIEW_ALERTS_NETOPS: 'alerts-netops',
-    RESOLVE_ALERT: 'resolve-alert-netops',
-    MONITER_NETOPS: 'moniter-netops',
 
     VIEW_COMMUNICATIONS_DASHBOARD: 'view-call-dashboard',
 
@@ -433,6 +480,7 @@ MENU_COLORS: {
     VIEW_CUSTOMER_ORDERS_BILLING: 'orders-billing',
     VIEW_BILLING_HISTORY_BILLING: 'billing-history-billing',
     VIEW_INVOICES_BILLING: 'invoices-billing',
+    VIEW_ORDER_INVOICES_BILLING: 'view-order-invoices-billing-billing',
     VIEW_PAYMENT_METHODS_BILLING: 'payment-methods-billing',
 
     VIEW_CRM_DASHBOARD: 'dashboard-crm',
@@ -463,6 +511,10 @@ MENU_COLORS: {
     CREATE_CRM_BUSINESS_TYPES: 'add-crm-business-types',
     EDIT_CRM_BUSINESS_TYPES: 'edit-crm-business-types',
     DELETE_CRM_BUSINESS_TYPES: 'delete-crm-business-types',
+    VIEW_COMPANIES_CRM: 'view-companies-crm',
+    ADD_COMPANY_CRM: 'add-company-crm',
+    EDIT_COMPANY_CRM: 'edit-company-crm',
+    DELETE_COMPANY_CRM: 'delete-company-crm',
 
     VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
     VIEW_GSM_MANAGEMENT: 'view-gsm-management',
