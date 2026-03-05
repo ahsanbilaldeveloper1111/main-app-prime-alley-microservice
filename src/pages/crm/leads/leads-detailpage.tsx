@@ -409,7 +409,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         "--",
     },
     {
-      label: "Associate with",
+      label: "Owner",
       value: associateName,
     },
     { label: "Source", value: (lead as any)?.source ?? "--" },
