@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Search, ChevronLeft } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { usePermissions } from '@utils/permissionUtils'
-import { sidebarGroups, defaultSubTabBySection } from '../config/settingsConfig'
+import { sidebarGroups, defaultSubTabBySection } from '@config/mainSettingsConfig'
 
 type SidebarProps = {
   activeSection: string

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import Layout from '@layout/index'
 import SettingsLayout from './partials/SettingsLayout'
 import { sectionPageMap } from './index'
-import { defaultSubTabBySection } from './config/settingsConfig'
+import { defaultSubTabBySection } from '@config/mainSettingsConfig'
 
 const MainSettingsSectionPage = () => {
   const router = useRouter()
