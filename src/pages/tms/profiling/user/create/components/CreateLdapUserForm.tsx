@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, Form, Button, InputGroup } from "react-bootstrap";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { VerifyLdapUserParams, CreateUpdateLdapUserParams } from "@models/tms/UnfidiedOp";
 import { Company, User, UserType } from "@models/tms";
 import { generateComplexId } from "@utils/Helper";

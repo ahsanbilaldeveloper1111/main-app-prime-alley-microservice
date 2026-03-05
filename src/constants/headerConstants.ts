@@ -35,14 +35,14 @@ export const HEADER_CONSTANTS = {
 
     REPORTS: 'Unified Reports',
     CALL_REPORTS: 'Call Analytics',
-    AI_INSIGHTS: 'AI Insights',
+    AI_INSIGHTS: 'Calls Analysis',
     LIVE_CALLS: 'Live Calls',
     TICKETS: 'Tickets',
     AUTOMATION: 'Campaign Manager',
     CRM: 'CRM',
     DNCR: 'DNCR',
     COMPLIANCES: 'Compliance',
-
+    FINANCE: 'Finance',
     BILLING: 'Billing & Payments',
     INVOICES_BILLING: 'Invoices',
     EXPENSES_BILLING: 'Expenses',
@@ -54,7 +54,7 @@ export const HEADER_CONSTANTS = {
     SUPPLIERS_BILLING: 'Suppliers',
     PRODUCT_PRICING_BILLING: 'Product Pricing',
 
-    NETOPS: 'Device Insights',
+    NETOPS: 'NetOps',
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
     OMNI_CHANNEL: 'Omni Channel',
@@ -142,11 +142,15 @@ MENU_COLORS: {
     CRM_DASHBOARD: 'Dashboard',
     LEADS: 'Leads',
     DEALS: 'Deals',
+    DEALS_APPROVAL: 'Approvals',
     OPPORTUNITIES: 'Opportunities',
     STAGES: 'Stages',
     LOST_REASONS_CRM: 'Lost Reasons',
     DATA_MANAGEMENT: 'Prospects',
     CAMPAIGNS: 'Campaigns',
+    COMPANY: 'Companies',
+    INBOX_CRM: 'Inbox',
+    CRM_ACTIVITY: 'Activities',
     
     // Call Recordings
     RECORDINGS_DASHBOARD: 'Dashboard',
@@ -200,7 +204,8 @@ MENU_COLORS: {
     NETOPS_DEVICES: 'Devices',
     NETOPS_SERVICES: 'Service status',
     NETOPS_ALERTS: 'Alerts and Notifications',
-    NETOPS_UPTIME_SLA: 'Uptime & SLA Monitoring',
+    NETOPS_UPTIME_SLA: 'Uptime & SLA',
+    SERVER_INSIGHTS: 'Server Insights',
 
     // Resources
     FAQ: 'FAQ',
@@ -260,76 +265,64 @@ MENU_COLORS: {
   
   // Permissions
   PERMISSIONS: {
+
+    //Services permissions start
+    CRM_SERVICES: 'crm-services',
+    COMMUNICATIONS_SERVICES: 'communications-services-services',
+    WORK_PLANNER_SERVICES: 'work-planner-services',
+    PULSE_SERVICES: 'pulse-services',
+    VIRTUAL_AGENTS_SERVICES: 'ai-ml-services',
+    DNCR_SERVICES: 'dncr-services',
+    ACCOUNTS_SERVICES: 'accounts-services',
     STAFF_MANAGEMENT_SERVICES: 'staff-management-services',
-    VIEW_EMPLOYEES_STAFF_MANAGEMENT: 'view-employees-staff-management',
-    VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT: 'view-employees-dashboard-staff-management',
-    VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT: 'view-employees-onboarding-staff-management',
-    VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT: 'view-approval-request-staff-management',
-    VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT: 'view-organizational-chart-staff-management',
-
+    REPORTS_SERVICES: 'reports-services',
+    AUDIT_LOGS_SERVICES: 'audit-logs-services-services',
+    GENERAL_SERVICES: 'general-services-services',
+    //OLD
     CONTROL_HUB_SERVICES: 'control-hub-services',
-    VIEW_USERS: 'view-users',
-    VIEW_TEAMS: 'view-teams',
-    VIEW_RANKS: 'view-ranks',
-    VIEW_GROUPS: 'view-groups',
-
+    VIEW_USERS_CONTROLHUB: 'view-users',
+    VIEW_RANKS_CONTROLHUB: 'view-ranks',
+    VIEW_GROUPS_CONTROLHUB: 'view-groups',
+    VIEW_TEAMS_CONTROLHUB: 'view-teams',
 
     GSM_SERVICES: 'gsm-services',
+    CALL_LOGS_SERVICES: 'call-logs-services',
+    CALL_RECORDINGS_SERVICES: 'call-recordings-services',
+    AI_ML_SERVICES: 'ai-ml-services',
+    CTI_SERVICES: 'cti-services',
+    TICKETS_SERVICES: 'tickets-services',
+    TMS_SERVICES: 'tms-services',
+    NETOPS_SERVICES: 'health-care-services',
+    CALL_HISTORY_SERVICES: 'call-history-services',
+    RESOURCES_SERVICES: 'resources-services',
+    LIST_TRUNKS_AIML: 'list-trunks-aiml',
+    //Services permissions end
 
-    WORK_PLANNER_SERVICES: 'work-planner-services',
+
+    //Work Planner permissions start
     VIEW_RECURRING_REMINDERS_WORK_PLANNER: 'view-recurring-reminders-work-planner',
     VIEW_DIAL_TODO_WORK_PLANNER: 'view-dial-todo-work-planner',
     VIEW_TASKSLIST_WORK_PLANNER: 'view-tasks-work-planner',
+    VIEW_PROJECTS_WORK_PLANNER: 'view-projects-work-planner',
+    VIEW_PROJECTS_DASHBOARD_WORK_PLANNER: 'view-projects-dashboard-work-planner',
+    VIEW_STATUSES_WORK_PLANNER: 'view-statuses-work-planner',
+    VIEW_CALENDAR_WORK_PLANNER: 'view-calendar-work-planner-work-planner',
+    VIEW_ORDERS_DELIVERY_WORK_PLANNER: 'view-orders-delivery-work-planner-work-planner',
+    //Work Planner permissions end
 
+    //Virtual Agents permissions start
+    VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml-aiml',
+    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml-aiml',
+    CREATE_CAMPAIGN_AIML: 'view-create-campaign-aiml-aiml',
+    VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml-aiml',
+    VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml-aiml',
+    VIEW_ANALYTICS_AIML: 'view-analytics-aiml-aiml',
+    VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml-aiml',
+    //Virtual Agents permissions end
 
-    CALL_LOGS_SERVICES: 'call-logs-services',
-    CALL_RECORDINGS_SERVICES: 'call-recordings-services',
-    VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
-    VIEW_CALL_LOGS: 'view-call-logs',
-    VIEW_CALL_RECORDINGS: 'view-call-recordings',
-    VIEW_CALL_REPORTS: 'view-call-reports',
-    CALL_REPORTS_BY_STATISTICS_REPORTS: 'call-reports-by-statistics-reports',
-    CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
-    CALL_REPORTS_BY_TREND_REPORTS: 'call-reports-by-trend-reports',
+    //pulse permissions start
 
-    REPORTS_SERVICES: 'reports-services',
-
-    AI_ML_SERVICES: 'ai-ml-services',
-    TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
-    TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
-    TRANSLATE_AIML: 'translate-aiml',
-    OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
-    LIVE_CHAT_AIML: 'live-chat-users',
-
-    CTI_SERVICES: 'cti-services',
-    VIEW_CTI:'view-cti',
-    DIAL_CALL_CTI:'dial-call-cti',
-    CTI_MONITORING:'dashboard-cti',
-
-
-    TICKETS_SERVICES: 'tickets-services',
-    VIEW_TICKETS_DASHBOARD: 'dashboard-tickets',
-    VIEW_TICKETS_LIST: 'view-ticket-tickets',
-    VIEW_TICKETS_STATUS: 'ticket-statuses-tickets',
-    VIEW_TICKETS_MODULES: 'ticket-modules-tickets',
-    VIEW_TICKETS_TYPES: 'view-ticket-types-tickets',
-    VIEW_TICKETS_CATEGORIES: 'manage-ticket-module-category-tickets',
-    VIEW_TICKETS_SUBCATEGORIES: 'manage-ticket-module-subcategory-tickets',
-
-
-
-    TMS_SERVICES: 'tms-services',
-    CRM_SERVICES: 'crm-services',
-
-    DNCR_SERVICES: 'dncr-services',
-    CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
-    VIEW_CDR_DNCR: 'view-cdr-dncr',
-    VIEW_LOCAL_DND_CALL_BLOCK_DNCR: 'view-local-dnd-blocks-dncr',
-
-
-    ACCOUNTS_SERVICES: 'accounts-services',
-
-    NETOPS_SERVICES: 'health-care-services',
     VIEW_NETOPS_DASHBOARD: 'dashboard-netops',
     VIEW_NETOPS_DEVICES: 'devices-netops',
     VIEW_NETOPS_SERVICES: 'services-netops',
@@ -348,9 +341,128 @@ MENU_COLORS: {
     RESOLVE_ALERT: 'resolve-alert-netops',
     MONITER_NETOPS: 'moniter-netops',
 
+    VIEW_HOSTS_NETOPS: 'hosts-netops-netops',
+    VIEW_HOST_GROUPS_NETOPS: 'host-groups-netops-netops',
+    VIEW_TEMPLATES_NETOPS: 'templates-netops-netops',
+    VIEW_EVENTS_NETOPS: 'events-netops-netops',
+    ACKNOWLEDGED_EVENTS_NETOPS: 'acknowledged-events-netops-netops',
+    VIEW_CUSTOMERS_NETOPS: 'customers-netops-netops',
+    ADD_CUSTOMER_NETOPS: 'add-customer-netops-netops',
+    ALERT_NETOPS: 'alert-netops-netops',
+    VIEW_SERVER_INSIGHTS_NETOPS: 'server-insights-netops-netops',
+    ADD_HOST_NETOPS: 'add-host-netops-netops',
+    UPDATE_HOST_NETOPS: 'update-host-netops-netops',
+    DELETE_HOST_NETOPS: 'delete-host-netops-netops',
+    REFRESH_HOST_CACHE_NETOPS: 'refresh-host-cache-netops-netops',
+    ADD_HOST_GROUP_NETOPS: 'add-host-group-netops-netops',
+    UPDATE_HOST_GROUP_NETOPS: 'update-host-group-netops-netops',
+    DELETE_HOST_GROUP_NETOPS: 'delete-host-group-netops-netops',
+    //pulse permissions end
 
-    CALL_HISTORY_SERVICES: 'call-history-services',
-    RESOURCES_SERVICES: 'resources-services',
+
+    LIVE_CHAT_USERS: 'live-chat-users',
+
+
+
+    
+    VIEW_EMPLOYEES_STAFF_MANAGEMENT: 'view-employees-staff-management',
+    VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT: 'view-employees-dashboard-staff-management',
+    VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT: 'view-employees-onboarding-staff-management',
+    VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT: 'view-approval-request-staff-management',
+    VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT: 'view-organizational-chart-staff-management',
+    VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT: 'view-request-categories-staff-management',
+    VIEW_ATTENDENCE_STAFF_MANAGEMENT:'view-attendences-staff-management',
+
+    VIEW_LOCATIONS_STAFF_MANAGEMENT: 'view-locations-staff-management',
+    ADD_LOCATION_STAFF_MANAGEMENT: 'add-location-staff-management',
+    UPDATE_LOCATION_STAFF_MANAGEMENT: 'update-location-staff-management',
+    DELETE_LOCATION_STAFF_MANAGEMENT: 'delete-location-staff-management',
+
+    
+    VIEW_USERS: 'view-users',
+    VIEW_TEAMS: 'view-teams',
+    VIEW_RANKS: 'view-ranks',
+    VIEW_GROUPS: 'view-groups',
+
+
+    
+
+
+    
+
+    
+    VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
+    VIEW_CALL_LOGS: 'view-call-logs',
+    VIEW_CALL_RECORDINGS: 'view-call-recordings',
+    VIEW_CALL_REPORTS: 'view-call-reports',
+    CALL_REPORTS_BY_STATISTICS_REPORTS: 'call-reports-by-statistics-reports',
+    CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
+    CALL_REPORTS_BY_TREND_REPORTS: 'call-reports-by-trend-reports',
+    CHAT_USAGE_REPORTS: 'view-chat-usage-reports-reports',
+
+    VIEW_SETTINGS: 'view-settings-general-general',
+    VIEW_HELP_CENTER: 'view-help-center-general-general',
+    SET_COMPANY_IMAGE_USERS: 'set-company-image-users',
+    MANAGE_HELP_CENTER: 'manage-help-center-general-general',
+
+    //AI chat permissions start
+    VIEW_TOOLS_PROFILE_AI_CHAT: 'view-tools-profile-ai-chat',
+    ADD_TOOL_PROFILE_AI_CHAT: 'add-tool-profile-ai-chat',
+    EDIT_TOOL_PROFILE_AI_CHAT: 'edit-tool-profile-ai-chat',
+    DELETE_TOOL_PROFILE_AI_CHAT: 'delete-tool-profile-ai-chat',
+    TEST_TOOL_PROFILE_AI_CHAT: 'test-tools-profile-ai-chat',
+    VIEW_EXECUTOR_AI_CHAT: 'view-executor-ai-chat',
+    RELOAD_EXECUTOR_AI_CHAT: 'reload-executor-ai-chat',
+    VIEW_FAQS_PROFILE_AI_CHAT: 'view-faqs-profile-ai-chat',
+    MANAGE_TENANT_PROFILE_AI_CHAT: 'view-tenant-profile-ai-chat',
+    MANAGE_GLOBAL_FAQS_AI_CHAT: 'manage-global-faqs-ai-chat',
+    MANAGE_AI_BOT_FAQS: 'manage-ai-bot-faqs-ai-chat-ai-chat',
+    //AI chat permissions end
+
+    
+
+    
+    TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
+    TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
+    TRANSLATE_AIML: 'translate-aiml',
+    MANAGE_EXTENSIONS_AIML: 'manage-extensions-aiml',
+    OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
+    LIVE_CHAT_AIML: 'live-chat-users',
+
+    
+    VIEW_CTI: 'view-cti',
+    
+    DIAL_CALL_CTI:'dial-call-cti',
+    CTI_MONITORING:'dashboard-cti',
+    VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT: 'view-campaigns-tms',
+    VIEW_LIVE_CALLS_AGENT_MANAGEMENT: 'view-teams-tms',
+
+
+    
+    VIEW_TICKETS_DASHBOARD: 'dashboard-tickets',
+    VIEW_TICKETS_LIST: 'view-ticket-tickets',
+    VIEW_TICKETS_STATUS: 'ticket-statuses-tickets',
+    VIEW_TICKETS_MODULES: 'ticket-modules-tickets',
+    VIEW_TICKETS_TYPES: 'view-ticket-types-tickets',
+    VIEW_TICKETS_CATEGORIES: 'manage-ticket-module-category-tickets',
+    VIEW_TICKETS_SUBCATEGORIES: 'manage-ticket-module-subcategory-tickets',
+
+
+
+    
+
+    
+    CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
+    VIEW_CDR_DNCR: 'view-cdr-dncr',
+    VIEW_LOCAL_DND_CALL_BLOCK_DNCR: 'view-local-dnd-blocks-dncr',
+
+
+    
+
+    VIEW_COMMUNICATIONS_DASHBOARD: 'view-call-dashboard',
+
+
+    
 
     VIEW_COMPANIES_BILLING: 'view-companies-billing',
   
@@ -365,8 +477,10 @@ MENU_COLORS: {
     VIEW_CUSTOMER_DASHBOARD_BILLING: 'dashboard-billing',
     VIEW_ACCOUNT_OVERVIEW_BILLING: 'account-overview-billing',
     VIEW_PRODUCT_DETAILS_BILLING: 'products-billing',
+    VIEW_CUSTOMER_ORDERS_BILLING: 'orders-billing',
     VIEW_BILLING_HISTORY_BILLING: 'billing-history-billing',
     VIEW_INVOICES_BILLING: 'invoices-billing',
+    VIEW_ORDER_INVOICES_BILLING: 'view-order-invoices-billing-billing',
     VIEW_PAYMENT_METHODS_BILLING: 'payment-methods-billing',
 
     VIEW_CRM_DASHBOARD: 'dashboard-crm',
@@ -397,6 +511,10 @@ MENU_COLORS: {
     CREATE_CRM_BUSINESS_TYPES: 'add-crm-business-types',
     EDIT_CRM_BUSINESS_TYPES: 'edit-crm-business-types',
     DELETE_CRM_BUSINESS_TYPES: 'delete-crm-business-types',
+    VIEW_COMPANIES_CRM: 'view-companies-crm',
+    ADD_COMPANY_CRM: 'add-company-crm',
+    EDIT_COMPANY_CRM: 'edit-company-crm',
+    DELETE_COMPANY_CRM: 'delete-company-crm',
 
     VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
     VIEW_GSM_MANAGEMENT: 'view-gsm-management',
@@ -409,9 +527,20 @@ MENU_COLORS: {
     VIEW_UNIFIED_WORKSPACE: 'unified-workspace-services',
     VIEW_USER_NOTIFICATIONS: 'notifications-users',
 
-    
-    
-    
+    // AI Compose (CRM) - WhatsApp, SMS, Email, Meetings
+    SEND_WHATSAPP_MESSAGE_CRM: 'send-whatsapp-message-crm',
+    VIEW_WHATSAPP_MESSAGES_CRM: 'view-whatsapp-messages-crm',
+    SEND_SMS_CRM: 'send-sms-crm',
+    VIEW_SMS_CRM: 'view-sms-crm',
+    SEND_EMAIL_CRM: 'send-email-crm',
+    VIEW_EMAILS_CRM: 'view-emails-crm',
+    CREATE_MEETING_CRM: 'create-meeting-crm',
+    VIEW_MEETINGS_CRM: 'view-meetings-crm',
+
+    // CRM Deals
+    APPROVE_REJECT_CRM_DEALS: 'approve-reject-crm-deals',
+    DOWNLOAD_DOCUMENT_CRM_DEALS: 'download-document-crm-deals',
+
   } as const
 } as const;
 

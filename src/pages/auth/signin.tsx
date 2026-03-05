@@ -1,7 +1,7 @@
 import NonLayout from "@layout/NonLayout";
 import Image from "next/image";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
@@ -161,7 +161,7 @@ const Signin = () => {
           );
         }
       } else {
-        toast.success("Login successful");
+        // toast.success("Login successful");
         
         // Set sessionStorage flag to indicate active browser session
         // This prevents browser close detection from clearing sessions after signin
@@ -297,7 +297,20 @@ const Signin = () => {
       }, 5000);
     } else if (status === "authenticated" && session) {
       setSessionLoading(false);
-      // User is already logged in, redirect them
+      // If NextAuth says authenticated but we have no access token in sessionStorage,
+      // we're likely in a "session expired" loop: user was sent here after tokens were cleared
+      // but NextAuth cookie wasn't cleared yet. Don't redirect to dashboard or we'll loop.
+      const hasAppTokens =
+        typeof window !== "undefined" &&
+        window.sessionStorage?.getItem("accessToken");
+      if (!hasAppTokens) {
+        // Best-effort: clear server-side NextAuth session payload store, then sign out
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+        // Stale NextAuth session without app tokens – clear it and show sign-in form
+        signOut({ redirect: false });
+        return;
+      }
+      // User is already logged in with valid app session, redirect them
       const redirectUrl = callbackUrl
         ? decodeURIComponent(callbackUrl as string)
         : "/dashboard";
@@ -353,14 +366,15 @@ const Signin = () => {
                 <div className="row">
                   <div className="col my-1">
                     <p className="m-0">
-                      © {new Date().getFullYear()} All rights reserved. Powered by{" "}
+                      © {new Date().getFullYear()} All rights reserved.
+                      {/* Powered by{" "}
                       <a
                         href="https://primealley.com/"
                         target="_blank"
                         className="text-primary"
                       >
                         Prime Alley Technology LLC
-                      </a>
+                      </a> */}
                     </p>
                   </div>
                   <div className="col-auto my-1">
@@ -382,10 +396,10 @@ const Signin = () => {
             <div className="auth-form">
               <div className="card my-5 mx-3">
                 <div className="card-body">
-                   <Image  
+                   {/* <Image  
                    src={logodark} className="img-brand img-fluid mb-3" alt="Business Workspace AI-Powered"
                    width={200}
-                    />
+                    /> */}
                   <h4 className="f-w-500 mb-1">Welcome Back</h4>
                   <p className="mb-3">Sign in to your account</p>
                   

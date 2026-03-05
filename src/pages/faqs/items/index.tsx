@@ -1,6 +1,5 @@
 import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -19,19 +18,7 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { Edit, Info, Trash2, HelpCircle, Plus } from 'lucide-react';
 import Select from 'react-select';
-
-// Dynamically import CKEditor only on client side to avoid SSR issues
-const CKEditorWrapper = dynamic(
-  () => import('@components/CKEditorWrapper'),
-  { 
-    ssr: false,
-    loading: () => (
-      <div className="p-3 text-center text-muted" style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Loading editor...
-      </div>
-    )
-  }
-);
+import RichTextEditor from '@pages/help-center/partials/RichTextEditor';
 
 const FAQItems = () => {
   const columns: Column[] = [
@@ -285,7 +272,7 @@ const FAQItems = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={4}>
-                <h2 className="mb-0">FAQ Items</h2>
+                {/* <h2 className="mb-0">FAQ Items</h2> */}
               </Col>
               <Col md={8} className="d-flex justify-content-end">
                 <div className="action-buttons">
@@ -385,20 +372,12 @@ const FAQItems = () => {
               </label>
               <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
                 {isEditModalEntered && (
-                  <CKEditorWrapper
+                  <RichTextEditor
                     key={`edit-${selectedItem}-${showEditItemModal}`}
-                    data={itemFormData.answer}
-                    onChange={(_event: any, editor: any) => {
-                      try {
-                        const data = editor.getData();
-                        setItemFormData({ ...itemFormData, answer: data });
-                      } catch (error) {
-                        console.error('Error getting editor data:', error);
-                      }
-                    }}
-                    config={{
-                      toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help'
-                    }}
+                    value={itemFormData.answer}
+                    onChange={(html: string) => setItemFormData({ ...itemFormData, answer: html })}
+                    placeholder="Enter the answer..."
+                    minHeight="150px"
                   />
                 )}
               </div>
@@ -531,20 +510,12 @@ const FAQItems = () => {
               </label>
               <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
                 {isCreateModalEntered && (
-                  <CKEditorWrapper
+                  <RichTextEditor
                     key={`create-${showCreateItemModal}`}
-                    data={itemFormData.answer}
-                    onChange={(_event: any, editor: any) => {
-                      try {
-                        const data = editor.getData();
-                        setItemFormData({ ...itemFormData, answer: data });
-                      } catch (error) {
-                        console.error('Error getting editor data:', error);
-                      }
-                    }}
-                    config={{
-                      toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help'
-                    }}
+                    value={itemFormData.answer}
+                    onChange={(html: string) => setItemFormData({ ...itemFormData, answer: html })}
+                    placeholder="Enter the answer..."
+                    minHeight="150px"
                   />
                 )}
               </div>

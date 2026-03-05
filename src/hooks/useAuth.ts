@@ -4,6 +4,8 @@ import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
 import { sessionStore } from '../utils/sessionStore';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
+import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
+import { authAPI } from '../utils/api';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -28,20 +30,22 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
+      // Clear server-side NextAuth session payload + cookies first (best effort)
+      await authAPI.logout();
       clearTokens();
-      
-      await signOut();
-      
-      // Simple redirect to login page
+      clearSessionCookiesClient(true);
+      const callbackUrl = getLogoutCallbackUrl();
+      await signOut({ callbackUrl, redirect: false });
+
+      // Redirect to login on current domain
       if (typeof window !== 'undefined') {
-        window.location.href = '/auth/signin';
+        window.location.href = callbackUrl;
       }
       
     } catch (error) {
       console.error('Logout error:', error);
-      // Still redirect even if signOut fails
       if (typeof window !== 'undefined') {
-        window.location.href = '/auth/signin';
+        window.location.href = getLogoutCallbackUrl();
       }
     }
   };

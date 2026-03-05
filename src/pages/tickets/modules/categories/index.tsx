@@ -16,9 +16,9 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { ModuleSlug } from '@utils/Helper';
+import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { Info, Trash2 } from 'lucide-react';
-
+import moment from 'moment';
 
 
 interface Submodule {
@@ -271,7 +271,7 @@ const ModuleCategories = () => {
       sortable: true,
       cell: (props: Submodule) => (
         <span className="text-muted">
-          {new Date(props.created_at).toLocaleDateString()}
+          {moment(props.created_at).format(GlobalDateTimeFormat)}
         </span>
       )
     },
@@ -326,7 +326,7 @@ const ModuleCategories = () => {
       />
 
       <PageHeader
-        title="Categories"
+        title=""
         buttons={
           <>
          <Button 

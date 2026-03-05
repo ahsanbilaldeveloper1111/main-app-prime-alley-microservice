@@ -183,7 +183,7 @@ Bottom bar shows call has started! ✅
 ## Complete Flow Example: Calling from CRM Page
 
 ### Step 1: User clicks call button
-**File:** `src/pages/crm/data/index.tsx` (line ~1600)
+**File:** `src/pages/crm/prospects/index.tsx` (line ~1600)
 
 ```typescript
 const handleCallClick = async (item: CrmDataItem) => {
@@ -249,7 +249,7 @@ The `makeCallAPI` function sends POST request to `/api/cti/make-call`
 | `src/hooks/useCtiStomp.ts` | Manages WebSocket/SSE connection (single instance) |
 | `src/components/GlobalFloatingCallBar.tsx` | Bottom bar that shows on all pages |
 | `src/pages/_app.tsx` | Renders `GlobalFloatingCallBar` globally |
-| `src/pages/crm/data/index.tsx` | Example: Uses `dialNumber` to make calls |
+| `src/pages/crm/prospects/index.tsx` | Example: Uses `dialNumber` to make calls |
 
 ## How to Use in Any Page
 

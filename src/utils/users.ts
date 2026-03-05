@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiErrorFromCatch } from "./sentryLogger";
 import axiosInstance from "./axios";
 
 interface PaginationParams {
@@ -59,6 +60,7 @@ export const getAllUsers = async (params: PaginationParams = {}) => {
     
     return response?.data?.data;
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -80,6 +82,7 @@ export const getParentUsers = async () => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -114,6 +117,7 @@ export const getUserById = async (id: string, encrypt: boolean = true) => {
     }
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -137,6 +141,7 @@ export const GetUserProfile = async (id: string, encrypt: boolean = true) => {
     }
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -158,6 +163,7 @@ export const getUserProfileData = async (user_id: string) => {
     }
     return null;
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -216,6 +222,7 @@ export const updateUserProfile = async (user_id: string, profileData: any, profi
     }
     return false;
   } catch (error: any) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     toast.error(error?.response?.data?.message || 'Failed to update profile');
     throw error;
@@ -252,6 +259,7 @@ export const assignRoleToUser = async (id: string, role_id: string) => {
     }
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -282,6 +290,7 @@ export const assignRankBulk = async (rank_id: string | number, user_ids: string[
     return false;
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     toast.error('Failed to assign ranks');
     throw error;
@@ -320,6 +329,7 @@ export const assignGroupToUser = async (id: string, group_id: string) => {
     }
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -356,6 +366,7 @@ export const updateUserStatus = async (id: string, status: string) => {
     }
    
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -380,6 +391,7 @@ export const getUserPermissions = async (id: string) => {
       return false;
     }
     } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -403,7 +415,7 @@ export const UpdateExtendedPermission = async (id: string, permissions: string[]
       }
     }
   } catch (error) {
-    
+    reportApiErrorFromCatch(error, 'users');
   }
 }
 
@@ -424,6 +436,7 @@ export const UpdateBlockedPermission = async (id: string, permissions: string[])
       }
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -450,6 +463,7 @@ export const linkUsers = async (user_id: string, link_id: string, module_id: str
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -475,6 +489,7 @@ export const unlinkUsers = async (id: string, linkedUser: string, moduleId: stri
       return false;
     }   
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -498,6 +513,7 @@ export const GetHierarchyData = async (moduleSlug?: string) => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -521,6 +537,7 @@ export const GetCustomFields = async (user_id: string) => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -547,6 +564,7 @@ export const AddCustomFields = async (user_id: string, field_name: string,field_
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -572,6 +590,7 @@ export const UpdateCustomFields = async (id: string, field_name: string,field_va
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -595,6 +614,7 @@ export const DeleteCustomFields = async (id: string) => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -616,6 +636,7 @@ export const GetModules = async () => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -638,6 +659,7 @@ export const MarkAsCompanyAdmin = async (id: string, is_company_admin: boolean) 
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -660,6 +682,7 @@ export const SyncLdapUsers = async () => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -686,6 +709,7 @@ export const LinkCompany = async (user_id: string, company_id: string, module_id
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -710,6 +734,7 @@ export const UnlinkCompany = async (id: string) => {
       return false;
     }   
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -731,6 +756,29 @@ export const GetCompanies = async () => {
       return false;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+export const GetDepartments = async () => {
+  try {
+    const response = await axiosInstance.get(`users/departments`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData?.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to get companies');
+      return false;
+    }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -746,6 +794,7 @@ export const SyncBillingCompanies = async () => {
       }
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -773,6 +822,7 @@ export const getUserAccessLevelSummary = async (userId?: string, encFlag?: boole
       return null;
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
@@ -792,7 +842,24 @@ export const resetUserPassword = async (
     const response = await axiosInstance.post(endpoint, data);
     return response?.data;
   } catch (error: any) {
+    reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
     throw error;
   }
 }
+
+export const mainAppAuditLogs = async (params: Record<string, unknown> = {}) => {
+  try {
+    const response = await axiosInstance.get(`users/audit-logs`, { params });
+    if (response) {
+      const responseData = response.data;
+      if (responseData.code === 200) {
+        return responseData.data;
+      }
+    }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+};

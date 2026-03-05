@@ -1,16 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function SignOut() {
+  const { logout } = useAuth();
+
   useEffect(() => {
-    // Immediately sign out and redirect to signin page
-    signOut({ 
-      callbackUrl: '/auth/signin',
-      redirect: true
-    });
-  }, []);
+    logout();
+  }, [logout]);
 
   // Return null since this page will never be visible
   return null;

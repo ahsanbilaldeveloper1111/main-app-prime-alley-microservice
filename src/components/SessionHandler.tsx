@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import tokenService from '../utils/tokenService';
-import { useBrowserCloseDetection } from '../hooks/useBrowserCloseDetection';
 
 interface SessionHandlerProps {
   children: React.ReactNode;
@@ -12,9 +11,6 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
   const { data: session, status } = useSession();
   const router = useRouter();
   
-  // Detect browser close and clear all sessions
-  //useBrowserCloseDetection();
-
   useEffect(() => {
     // Handle session state changes
     if (status === 'loading') {
@@ -22,24 +18,23 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
       return;
     }
 
+    const { pathname } = router;
 
-    if (status === 'authenticated' && session) {
-      // User is authenticated, initialize token service
-      //console.log('Session authenticated, initializing token service');
-      tokenService.initializeFromSession(session).catch((error) => {
-        console.error('Failed to initialize token service:', error);
-      });
-    } else if (status === 'unauthenticated') {
+    // Don't run auth enforcement on auth pages.
+    if (pathname.startsWith('/auth/')) {
+      return;
+    }
+
+    if (status === 'unauthenticated') {
       // User is not authenticated, clear tokens and redirect
-      //console.log('Session unauthenticated, clearing tokens');
       tokenService.clearTokens();
       
       // Only redirect if not already on auth page
-      if (!router.pathname.startsWith('/auth/')) {
+      if (!pathname.startsWith('/auth/')) {
         router.push('/auth/signin');
       }
     }
-  }, [status, session, router]);
+  }, [status, router]);
 
   // Show loading state while session is being determined
   if (status === 'loading') {

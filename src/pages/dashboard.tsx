@@ -1,928 +1,784 @@
-import React,{ReactElement, useEffect, useState} from 'react'
-import Layout from '@layout/index'
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import "@assets/scss/dashboard.scss";
-import "@assets/scss/common.scss";
-import {  Row, Col, Card, Button, ProgressBar, Badge, Form } from 'react-bootstrap';
+"use client";
+
+import React, { ReactElement, useState } from "react";
+import Layout from "@layout/index";
 import {
-  Search,
-  FileText,
-  Users,
-  ShoppingCart,
+  CheckSquare,
+  AlertTriangle,
+  List,
   Phone,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  MessageSquare,
-  PhoneCall,
-  AlertOctagon,
-  DollarSign,
-  Wrench,
-  Package,
-  Ban,
-  PhoneMissed,
-  PhoneIncoming,
-  PhoneOff,
-} from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import TimezoneSearch from '@components/TimezoneSearch';
-import { GetTranscriptionOverview } from '@utils/calls';
-import { getCrmDashboardOverview } from '@utils/crm';
-import { toast } from 'react-toastify';
+  Mail,
+  Linkedin,
+  ExternalLink,
+  Plus,
+  Play,
+  MoreHorizontal,
+  Calendar,
+  TrendingUp,
+  Zap,
+  ChevronDown,
+  GripVertical,
+  Info,
+  HelpCircle,
+} from "lucide-react";
+import { toast } from "react-toastify";
+import CompanyData from "@pages/crm/companies";
+import DealsData from "@pages/crm/deals";
+import TasksData from "@pages/planner/tasks";
+import AssociateTaskModal from "@components/AssociateTaskModal";
+import CreateTaskSidebar from "@components/CreateTaskSidebar";
+import UserActivityByCategory from "@components/UserActivityByCategory";
+import TwoCharts from "@components/TwoCharts";
+import SchedulePage from "@components/SchedulePage";
+import {useSession} from "next-auth/react";
 
-// Helper function to format numbers with commas
-const formatNumber = (value: number | undefined | null): string => {
-  const num = value || 0;
-  return num.toLocaleString('en-US');
+// ─── Styles (inline via style tag approach using className strings) ───────────
+
+const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    fontFamily: FONT,
+    backgroundColor: "#f5f5f5",
+    minHeight: "100vh",
+    color: "#141414",
+  },
+  header: {
+    backgroundColor: "#ffffff",
+    borderBottom: "1px solid #e5e5e5",
+    padding: "0 24px",
+  },
+  headerTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: "16px",
+    paddingBottom: "0",
+  },
+  headerTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    fontWeight: 600,
+    fontSize: "18px",
+    color: "#141414",
+  },
+  headerDivider: {
+    color: "#bbb",
+    fontWeight: 300,
+    fontSize: "20px",
+  },
+  headerUser: {
+    fontWeight: 400,
+    fontSize: "18px",
+    color: "#141414",
+  },
+  helpBtn: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "50%",
+    border: "1px solid #e0e0e0",
+    backgroundColor: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    color: "#666",
+  },
+  nav: {
+    display: "flex",
+    gap: "0",
+    marginTop: "8px",
+  },
+  navTab: {
+    fontWeight: 400,
+    fontSize: "14px",
+    color: "#141414",
+    whiteSpace: "nowrap" as const,
+    padding: "10px 16px",
+    cursor: "pointer",
+    borderBottom: "2px solid transparent",
+    textDecoration: "none",
+    display: "block",
+  },
+  navTabActive: {
+    borderBottom: "2px solid #006162",
+    fontWeight: 600,
+    color: "#006162",
+  },
+  content: {
+    padding: "24px",
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "16px",
+  },
+  section: {
+    backgroundColor: "#ffffff",
+    borderRadius: "8px",
+    border: "1px solid #e5e5e5",
+    overflow: "hidden",
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "14px 16px",
+  },
+  sectionTitle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "15px",
+    fontWeight: 600,
+    color: "#141414",
+  },
+  sectionActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  viewAllLink: {
+    fontSize: "13px",
+    color: "#006162",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+    cursor: "pointer",
+    fontWeight: 400,
+  },
+  btn: {
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-block",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    backgroundColor: "#ffffff",
+    borderColor: "rgb(138, 138, 138)",
+    color: "#141414",
+    textDecoration: "none",
+    borderRadius: "4px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    verticalAlign: "middle",
+    paddingBlock: "8px",
+    paddingInline: "16px",
+    maxWidth: "100%",
+    fontFamily: FONT,
+    fontSize: "12px",
+    fontWeight: 300,
+    letterSpacing: "0px",
+    lineHeight: "14px",
+    textUnderlineOffset: "24%",
+  },
+  btnPrimary: {
+    backgroundColor: "#bfc9d4",
+    borderColor: "#bfc9d4",
+    color: "#000000",
+  },
+  taskFilters: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "12px 16px",
+    flexWrap: "wrap" as const,
+  },
+  taskFiltersContainer: {
+    display: "flex",
+    border: "1px solid rgb(138, 138, 138)",
+    borderRadius: "4px",
+    overflow: "hidden",
+  },
+  taskFilterBtn: {
+    cursor: "pointer",
+    display: "inline-block",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    backgroundColor: "#ffffff",
+    color: "#141414",
+    border: "none",
+    borderRight: "1px solid rgb(138, 138, 138)",
+    padding: "8px 16px",
+    fontFamily: FONT,
+    fontSize: "12px",
+    fontWeight: 300,
+    lineHeight: "14px",
+  },
+  taskFilterBtnLast: {
+    borderRight: "none",
+  },
+  taskFilterBtnActive: {
+    backgroundColor: "#e6e6e6",
+  },
+  statsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(6, 1fr)",
+    padding: "0 15px 15px 15px",
+  },
+  statCard: {
+    padding: "20px",
+    border: "1px solid #ccc",
+    borderRadius: "10px",
+    margin: "0px 5px",
+  },
+  statLabel: {
+    fontSize: "14px",
+    fontStyle: "unset" as const,
+    fontWeight: 600,
+    textTransform: "unset" as const,
+    fontFamily: FONT,
+    letterSpacing: "0px",
+    lineHeight: "18px",
+    color: "#141414",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  statValue: {
+    fontSize: "22px",
+    fontWeight: 700,
+    color: "#006162",
+    marginTop: "4px",
+    cursor: "pointer",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "40px 24px",
+    textAlign: "center" as const,
+  },
+  emptyIllustration: {
+    marginBottom: "16px",
+  },
+  emptyTitle: {
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#141414",
+    marginBottom: "6px",
+  },
+  emptyText: {
+    fontSize: "13px",
+    color: "#666",
+    marginBottom: "12px",
+    maxWidth: "400px",
+  },
+  emptyLink: {
+    fontSize: "13px",
+    color: "#006162",
+    textDecoration: "underline",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+  },
+  suggestedCard: {
+    margin: "12px 16px",
+    border: "1px solid #e5e5e5",
+    borderRadius: "6px",
+    padding: "14px 16px",
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+  },
+  suggestedLeft: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    flex: 1,
+  },
+  suggestedIcon: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    backgroundColor: "#f0f0f0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: "2px",
+  },
+  suggestedText: {
+    fontSize: "13px",
+    color: "#141414",
+    lineHeight: "18px",
+  },
+  suggestedSubtext: {
+    fontSize: "12px",
+    color: "#666",
+    marginTop: "2px",
+  },
+  followUpLink: {
+    fontSize: "12px",
+    color: "#006162",
+    cursor: "pointer",
+    textDecoration: "none",
+    marginTop: "6px",
+    display: "block",
+    fontWeight: 500,
+  },
+  suggestedRight: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    flexShrink: 0,
+  },
+  dealInfo: {
+    textAlign: "right" as const,
+  },
+  dealName: {
+    fontSize: "13px",
+    color: "#006162",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  dealAmount: {
+    fontSize: "12px",
+    color: "#141414",
+    marginTop: "2px",
+  },
+  dealClose: {
+    fontSize: "12px",
+    color: "#141414",
+  },
+  dealAvatar: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    backgroundColor: "#d4e8ff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#006162",
+    flexShrink: 0,
+  },
+  gripIcon: {
+    color: "#bbb",
+    cursor: "grab",
+    display: "flex",
+    alignItems: "center",
+  },
 };
 
-// Custom Tooltip for PieChart to avoid hiding center text
-const CustomPieTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <div
-        style={{
-          backgroundColor: '#fff',
-          border: '1px solid #ddd',
-          borderRadius: '4px',
-          fontSize: '0.75rem',
-          padding: '6px 10px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          pointerEvents: 'none',
-          zIndex: 1000,
-          position: 'relative'
-        }}
-      >
-        <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{data.name}</div>
-        <div style={{ color: '#666' }}>{formatNumber(data.value)}</div>
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SectionHeader({
+  title,
+  actionSlot,
+  infoIcon = false,
+  onToggle,
+  isCollapsed = false,
+}: {
+  title: string;
+  actionSlot?: React.ReactNode;
+  infoIcon?: boolean;
+  onToggle?: () => void;
+  isCollapsed?: boolean;
+}) {
+  return (
+    <div style={styles.sectionHeader}>
+      <div style={styles.sectionTitle}>
+        <div style={styles.gripIcon}>
+          <GripVertical size={14} />
+        </div>
+        <div
+          onClick={onToggle}
+          style={{
+            cursor: onToggle ? "pointer" : "default",
+            display: "flex",
+            alignItems: "center",
+            transition: "transform 0.2s ease",
+            transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          }}
+        >
+          <ChevronDown size={14} color="#666" />
+        </div>
+        {title}
+        {infoIcon && <Info size={13} color="#999" />}
       </div>
-    );
-  }
-  return null;
-};
-
-const Dashboard = () => {
-  const router = useRouter();
-  const { data: session } = useSession();
-    
-  const [transcriptionOverview, setTranscriptionOverview] = useState<any>(null);
-  const [crmDashboardData, setCrmDashboardData] = useState<any>(null);
-  const [meetingCount, setMeetingCount] = useState<number>(0);
-  const [followUpCount, setFollowUpCount] = useState<number>(0);
-  const [tasksCount, setTasksCount] = useState<number>(0);
-  const [missedCallsCount, setMissedCallsCount] = useState<number>(4);
-  const [callbacksDueCount, setCallbacksDueCount] = useState<number>(2);
-  const [voicemailsCount, setVoicemailsCount] = useState<number>(3);
-
-
-  useEffect(() => {
-    getCrmDashboardOverview().then((data) => {
-      console.log("CRM Dashboard Overview", data);
-      if (data) {
-        setCrmDashboardData(data);
-      }
-    });
-  }, []);
-
-
-
-  useEffect(() => {
-    GetTranscriptionOverview().then((data) => {
-     
-      if(data){
-        console.log("Transcription Overview summary", data);
-        setTranscriptionOverview(data);
-      } 
-      
-    });
-    
-    // TODO: Replace with actual API call to fetch meeting, follow up, and tasks counts
-    // For now using mock data
-    setMeetingCount(15);
-    setFollowUpCount(8);
-    setTasksCount(12);
-    
-    // TODO: Replace with actual API call to fetch missed calls, callbacks due, and voicemails counts
-    // For now using mock data
-    setMissedCallsCount(4);
-    setCallbacksDueCount(2);
-    setVoicemailsCount(3);
-  }, []);
-
-    return (
-        <React.Fragment>
-
-
-      {/* Main Content Area */}
-      <div className="content-wrapper crm-dashboard-content">
-        
-        {/* Header Navigation */}
-<Row className="mb-4">
-  <Col xs={12} md={6}>
-    <div className="d-flex gap-2 mb-3">
-      {/* <Button variant="primary" size="sm">Today</Button>
-      <Button variant="outline-secondary" size="sm">This Week</Button>
-      <Button variant="outline-secondary" size="sm">This Month</Button> */}
+      <div style={styles.sectionActions}>{actionSlot}</div>
     </div>
-  </Col>
-  <Col xs={12} md={6}>
-    <div className="d-flex align-items-center justify-content-end bg-white border rounded" style={{ padding: '0' }}>
-      <div className="position-relative flex-grow-1">
-        <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
-        <Form.Control
-          type="text"
-          placeholder="Search across your workspace"
-          className="ps-5"
-          style={{ height: '40px', border: 'none', boxShadow: 'none' }}
-        />
-      </div>
-      <div style={{ borderLeft: '1px solid #e0e0e0', paddingLeft: '12px', paddingRight: '4px' }}>
-        <TimezoneSearch />
-      </div>
-    </div>
-  </Col>
-</Row>
-
-        {/* Title */}
-        <h4 className="mb-4 fw-bold">My CRM Workspace</h4>
-
-        {/* Top Row - Main Cards */}
-        <Row className="g-3 mb-3">
-
-          {/* My Sales Summary */}
-          <Col xs={12} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">My Sales Summary</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="d-flex flex-column gap-3">
-                  {/* Leads */}
-                  {(() => {
-                    const totalCount = crmDashboardData?.crm_data_count || 0;
-                    const convertedCount = crmDashboardData?.converted_to_tickets || 0;
-                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
-                    return (
-                      <div>
-                        <div className="d-flex align-items-center justify-content-between mb-1">
-                          <div className="d-flex align-items-center gap-2">
-                            <FileText className="text-success" size={18} />
-                            <span className="small fw-semibold">Leads</span>
-                          </div>
-                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>{formatNumber(totalCount)}</span> */}
-                        </div>
-                        <ProgressBar 
-                          now={percentage} 
-                          variant="success" 
-                          style={{ height: '6px', borderRadius: '3px' }} 
-                        />
-                        <div className="d-flex justify-content-between mt-1">
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  
-                  {/* Deals */}
-                  {(() => {
-                    const totalCount = crmDashboardData?.crm_data_count || 0;
-                    const convertedCount = crmDashboardData?.leads_converted_to_deals || 0;
-                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
-                    return (
-                      <div>
-                        <div className="d-flex align-items-center justify-content-between mb-1">
-                          <div className="d-flex align-items-center gap-2">
-                            <Users className="text-info" size={18} />
-                            <span className="small fw-semibold">Deals</span>
-                          </div>
-                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>s{formatNumber(totalCount)}</span> */}
-                        </div>
-                        <ProgressBar 
-                          now={percentage} 
-                          variant="info" 
-                          style={{ height: '6px', borderRadius: '3px' }} 
-                        />
-                        <div className="d-flex justify-content-between mt-1">
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  
-                  {/* Orders */}
-                  {(() => {
-                    const totalCount = crmDashboardData?.crm_data_count || 0;
-                    const convertedCount = crmDashboardData?.deals_converted_to_orders || 0;
-                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
-                    return (
-                      <div>
-                        <div className="d-flex align-items-center justify-content-between mb-1">
-                          <div className="d-flex align-items-center gap-2">
-                            <ShoppingCart className="text-warning" size={18} />
-                            <span className="small fw-semibold">Orders</span>
-                          </div>
-                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>{formatNumber(totalCount)}</span> */}
-                        </div>
-                        <ProgressBar 
-                          now={percentage} 
-                          variant="warning" 
-                          style={{ height: '6px', borderRadius: '3px' }} 
-                        />
-                        <div className="d-flex justify-content-between mt-1">
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Meetings, Follow Ups, Tasks */}
-          <Col xs={12} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3 d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h6 className="mb-0 fw-bold">Meetings, Follow Ups & Tasks</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="d-flex gap-3 mb-2 flex-grow-1">
-                  {/* Chart Column */}
-                  <div
-                    className="d-flex flex-column align-items-center justify-content-center"
-                    style={{ flex: 1 }}
-                  >
-                    <div
-                      className="position-relative"
-                      style={{ width: '120px', height: '120px' }}
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                          <Tooltip 
-                            content={<CustomPieTooltip />}
-                            allowEscapeViewBox={{ x: true, y: true }}
-                            cursor={false}
-                            offset={15}
-                            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
-                          />
-                          <Pie
-                            data={[
-                              { name: 'Meetings', value: crmDashboardData?.total_meetings || 0, color: '#0d6efd' },
-                              { name: 'Follow Ups', value: crmDashboardData?.total_followups || 0, color: '#198754' },
-                              { name: 'Tasks', value: crmDashboardData?.total_tasks || 0, color: '#ffc107' }
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={42}
-                            outerRadius={58}
-                            startAngle={90}
-                            endAngle={-270}
-                            dataKey="value"
-                            strokeWidth={0}
-                          >
-                            <Cell fill="#0d6efd" />
-                            <Cell fill="#198754" />
-                            <Cell fill="#ffc107" />
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-
-                      {/* Center Text */}
-                      <div className="position-absolute top-50 start-50 translate-middle d-flex flex-column align-items-center">
-                        <span
-                          className="fw-bold text-dark"
-                          style={{ fontSize: '2rem', lineHeight: 1 }}
-                        >
-                          {formatNumber((crmDashboardData?.total_meetings || 0) + (crmDashboardData?.total_followups || 0) + (crmDashboardData?.total_tasks || 0))}
-                        </span>
-                      </div>
-                    </div>
-                    <small className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>Total</small>
-                  </div>
-
-                  {/* Stats Column */}
-                  <div
-                    className="d-flex flex-column justify-content-center gap-2"
-                    style={{ flex: 1 }}
-                  >
-                    <div>
-                      <div className="text-muted small mb-1">
-                        Meetings
-                      </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_meetings || 0)}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-muted small mb-1">
-                        Follow Ups
-                      </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_followups || 0)}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-muted small mb-1">
-                        Tasks
-                      </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_tasks || 0)}</div>
-                    </div>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          
-          {/* Overdue Today */}
-          <Col xs={12} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3 d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Overdue Today</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
-                <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <Clock className="text-info" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
-                    </div>
-                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.scheduled_calls || 0)}</Badge>
-                  </div>
-                  
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <AlertCircle className="text-danger" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Tasks</span>
-                    </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.overdue_tasks || 0)}</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <Phone className="text-danger" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Follow-Ups</span>
-                    </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.overdue_followups || 0)}</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <FileText className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Lost Leads</span>
-                    </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.lost_leads || 0)}</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <FileText className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Lost Deals</span>
-                    </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.lost_deals || 0)}</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <DollarSign className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Cancelled Orders</span>
-                    </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.cancelled_orders || 0)}</Badge>
-                  </div>
-                  
-                </div>
-                {session?.user?.permissions?.includes('dashboard-crm') && (
-                  <Button 
-                    variant="primary" 
-                    className="mx-auto d-block mt-auto" 
-                    
-                    onClick={() => router.push('/crm/dashboard')}
-                  >
-                    Visit Dashboard
-                  </Button>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Next Best Actions */}
-          <Col xs={12} lg={3}>
-            <Card className="h-100 shadow-sm">
-              {/* <Card.Body className="p-3 d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Next Best Actions</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <ul className="list-unstyled mb-2 flex-grow-1">
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Call: Next Lead</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Update: Pending Deal</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Follow-Up: Overdue Quote</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Review: New Prospect</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Send: Proposal Email</li>
-                </ul>
-                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>Start Work</Button>
-              </Card.Body> */}
-
-<Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Quick Help</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="row g-2">
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">CRM</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Live Calls</Button>
-                  </div>
-                  
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Dialer</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Live Wallboards</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Billing</Button>
-                  </div>                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Control Hub</Button>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* My Call Details */}
-        <h5 className="mb-2 fw-bold">My Call Details</h5>
-
-        {/* Call Details Row */}
-        <Row className="g-3 mb-3">
-          {/* Calls Today */}
-          <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Calls Today</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="d-flex justify-content-around align-items-center  mb-3">
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-primary mb-0">{formatNumber(transcriptionOverview?.calls?.total)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Total Calls</small>
-                  </div>
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.calls?.outbound)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Outbound</small>
-                  </div>
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.calls?.inbound)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Inbound</small>
-                  </div>
-                </div>
-
-                <div className="d-flex justify-content-around align-items-center">
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-primary mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.answered)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Answered</small>
-                  </div>
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.unanswered)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Unanswered</small>
-                  </div>
-                  <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.missed_calls)}</div>
-                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Missed Calls</small>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Missed & Callbacks */}
-          <Col xs={12} md={6} lg={3}>
-            <Card 
-              className="h-100 shadow-sm" 
-              style={{
-                opacity: 0.8,
-                pointerEvents: 'none',
-                cursor: 'not-allowed'
-              }}
-            >
-              <Card.Body className="p-3 d-flex flex-column">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">AI Analysis</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="d-flex gap-3 mb-2 flex-grow-1">
-                  {/* Left Column - List */}
-                  <div className="d-flex flex-column gap-2" style={{ flex: 1.5 }}>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>100</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Analyzed Calls</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>40</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Qualified Calls</span>
-                    </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Unqualified Calls</span>
-                    </div>
-                   
-                    <div className="d-flex align-items-center gap-2">
-                      <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{voicemailsCount}</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Inquiries</span>
-                    </div>
-                  </div>
-                  
-                  {/* Right Column - Bar Chart */}
-                  <div style={{ flex: 0.5, minWidth: '80px' }}>
-                    <ResponsiveContainer width="100%" height={80}>
-                      <BarChart
-                        data={[
-                          { name: 'Missed', value: missedCallsCount, color: '#dc3545' },
-                          { name: 'Callback', value: callbacksDueCount, color: '#fd7e14' },
-                          { name: 'Voice', value: voicemailsCount, color: '#ffc107' }
-                        ]}
-                        layout="vertical"
-                        margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis type="category" dataKey="name" hide />
-                        <Tooltip contentStyle={{ fontSize: '0.75rem', padding: '4px 8px' }} />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                          {[
-                            { name: 'Missed', value: missedCallsCount, color: '#dc3545' },
-                            { name: 'Callback', value: callbacksDueCount, color: '#fd7e14' },
-                            { name: 'Voice', value: voicemailsCount, color: '#ffc107' }
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                
-                <Button disabled={true} variant="primary" className="mx-auto d-block mt-auto" style={{  }}>
-                  <Phone size={16} className="me-2" /> Go to AI Insights
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Call Analytics - Merged Card */}
-          <Col xs={12} md={12} lg={6}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3 d-flex flex-column">
-                <Row className="g-3 mb-2 flex-grow-1">
-                  {/* Call Outcomes Section */}
-                  <Col xs={12} md={6}>
-                    <div className="d-flex flex-column h-100">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h6 className="mb-0 fw-bold">Call Outcomes</h6>
-                        <span className="text-muted">•••</span>
-                      </div>
-                      <div className="d-flex gap-2 mb-2 flex-grow-1">
-                        {/* Donut Chart */}
-                        <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
-                          {(() => {
-                            const internalCalls = transcriptionOverview?.call_outcomes?.internal_calls || 0;
-                            const externalCalls = transcriptionOverview?.call_outcomes?.external_calls || 0;
-                            const national = transcriptionOverview?.call_outcomes?.national || 0;
-                            const international = transcriptionOverview?.call_outcomes?.international || 0;
-                            const total = internalCalls + externalCalls + national + international;
-                            
-                            if (total === 0) {
-                              return (
-                                <div style={{ width: '110px', height: '110px' }} className="d-flex flex-column align-items-center justify-content-center">
-                                  <Phone className="text-muted" size={18} style={{ opacity: 0.5 }} />
-                                  <small className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>No Data</small>
-                                </div>
-                              );
-                            }
-                            
-                            return (
-                              <div style={{ width: '110px', height: '110px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <PieChart>
-                                    <Pie
-                                      data={[
-                                        { name: 'Internal Calls', value: internalCalls, color: '#28a745' },
-                                        { name: 'External Calls', value: externalCalls, color: '#dc3545' },
-                                        { name: 'National', value: national, color: '#ffc107' },
-                                        { name: 'International', value: international, color: '#17a2b8' }
-                                      ]}
-                                      cx="50%"
-                                      cy="50%"
-                                      innerRadius={28}
-                                      outerRadius={48}
-                                      paddingAngle={2}
-                                      dataKey="value"
-                                    >
-                                      {['#28a745', '#dc3545', '#ffc107', '#17a2b8'].map((color, index) => (
-                                        <Cell key={index} fill={color} />
-                                      ))}
-                                    </Pie>
-                                  </PieChart>
-                                </ResponsiveContainer>
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Stats Summary */}
-                        <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Internal Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.internal_calls)}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-danger" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>External Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.external_calls)}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>National</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.national)}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-info" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>International</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.international)}</span>
-                          </div>
-                          
-                        </div>
-                      </div>
-                      <Button 
-                        variant="primary" 
-                        className="mx-auto d-block mt-auto" 
-                       
-                        onClick={() => {
-                          if (session?.user?.permissions?.includes('dashboard-call-logs')) {
-                            router.push('/call-logs/dashboard');
-                          }
-                        }}
-                        disabled={!session?.user?.permissions?.includes('dashboard-call-logs') && !session?.user?.permissions?.includes('view-call-logs')}
-                      >
-                        Visit Dashboard
-                      </Button>
-                    </div>
-                  </Col>
-
-                  {/* Vertical Divider */}
-                  <Col xs={12} md={6} className="border-start border-md-1 border-0">
-                    
-                    
-                    <div className="d-flex flex-column h-100">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h6 className="mb-0 fw-bold">Missed & Callbacks</h6>
-                        <span className="text-muted">•••</span>
-                      </div>
-                      <div className="d-flex gap-2 flex-grow-1">
-                        {/* Donut Chart */}
-                        <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
-                          {(() => {
-                            const missedCalls = transcriptionOverview?.missed_callbacks?.missed_calls || 0;
-                            const answered = transcriptionOverview?.missed_callbacks?.answered || 0;
-                            const unanswered = transcriptionOverview?.missed_callbacks?.unanswered || 0;
-                            const total = missedCalls + answered + unanswered;
-                            
-                            if (total === 0) {
-                              return (
-                                <div style={{ width: '110px', height: '110px' }} className="d-flex flex-column align-items-center justify-content-center">
-                                  <Phone className="text-muted" size={18} style={{ opacity: 0.5 }} />
-                                  <small className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>No Data</small>
-                                </div>
-                              );
-                            }
-                            
-                            return (
-                              <div style={{ width: '110px', height: '110px' }}>
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <PieChart>
-                                    <Tooltip 
-                                      content={<CustomPieTooltip />}
-                                      allowEscapeViewBox={{ x: true, y: true }}
-                                      cursor={false}
-                                      offset={70}
-                                    />
-                                    <Pie
-                                      data={[
-                                        { name: 'Missed Calls', value: missedCalls, color: '#ffc107' },
-                                        { name: 'Answered', value: answered, color: '#28a745' },
-                                        { name: 'Unanswered', value: unanswered, color: '#dc3545' }
-                                      ]}
-                                      cx="50%"
-                                      cy="50%"
-                                      innerRadius={28}
-                                      outerRadius={48}
-                                      paddingAngle={2}
-                                      dataKey="value"
-                                    >
-                                      {['#ffc107', '#28a745', '#dc3545'].map((color, index) => (
-                                        <Cell key={index} fill={color} />
-                                      ))}
-                                    </Pie>
-                                  </PieChart>
-                                </ResponsiveContainer>
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Stats Summary */}
-                        <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
-                          <div className="d-flex align-items-center gap-1">
-                            <PhoneMissed className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Missed Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.missed_calls || 0)}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <PhoneIncoming className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Answered Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.answered || 0)}</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <PhoneOff className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Unanswered Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.unanswered || 0)}</span>
-                          </div>
-                          {/* 
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Voicemails</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>15</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Failed Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>12</span>
-                          </div> */}
-                          
-                        </div>
-                      </div>
-                    </div>
-
-
-
-
-
-
-
-
-
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-          </Col>
-
-        </Row>
-
-        {/* Resources & Knowledge */}
-        <h5 className="mb-2 fw-bold">Resources & Knowledge</h5>
-
-        <Row className="g-3 mb-3">
-          {/* Quick Help */}
-          <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
-            <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Quick Help</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <div className="row g-2">
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">CRM</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Live Calls</Button>
-                  </div>
-                  
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">AI Insights</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Live Wallboards</Button>
-                  </div>
-                  <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">Control Hub</Button>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Recommended Guides */}
-          <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Recommended Guides</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <ul className="list-unstyled mb-0">
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Lead Follow-Up Tips</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Effective Call Scripts</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Handling Objections</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Email Templates</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Closing Techniques</li>
-                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Product Knowledge Base</li>
-                </ul>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* Templates */}
-          <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Templates</h6>
-                  <span className="text-muted">•••</span>
-                </div>
-                <Row className="g-2">
-                  <Col xs={4}>
-                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
-                      <MessageSquare className="text-primary mb-2" size={28} />
-                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Messages</small>
-                    </div>
-                  </Col>
-                  <Col xs={4}>
-                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
-                      <PhoneCall className="text-primary mb-2" size={28} />
-                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Call Script</small>
-                    </div>
-                  </Col>
-                  <Col xs={4}>
-                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
-                      <AlertOctagon className="text-primary mb-2" size={28} />
-                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Objection</small>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* My Day Summary */}
-          <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">My Day Summary</h6>
-                </div>
-                <div className="mb-0">
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <Badge bg="primary" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
-                      <Clock size={12} />
-                    </Badge>
-                    <span style={{ fontSize: '0.85rem' }}>Online Time</span>
-                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>5h 20m</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <Badge bg="primary" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
-                      <Phone size={12} />
-                    </Badge>
-                    <span style={{ fontSize: '0.85rem' }}>On-Call Time</span>
-                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>2h 15m</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <Badge bg="success" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
-                      <CheckCircle size={12} />
-                    </Badge>
-                    <span style={{ fontSize: '0.85rem' }}>Tasks Done</span>
-                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>8/12</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
-                      <ShoppingCart size={12} />
-                    </Badge>
-                    <span style={{ fontSize: '0.85rem' }}>Deals Closed</span>
-                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>3</span>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-     
-      </div>
-
-  
-        </React.Fragment>
-    )
+  );
 }
 
-Dashboard.getLayout = (page: ReactElement) => {
-    return <Layout>{page}</Layout>;
+function OutreachIllustration() {
+  return (
+    <svg width="80" height="70" viewBox="0 0 80 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="30" width="60" height="32" rx="4" fill="#e8f0fe" />
+      <rect x="18" y="38" width="20" height="3" rx="1.5" fill="#93b4f5" />
+      <rect x="18" y="44" width="32" height="3" rx="1.5" fill="#c5d7fb" />
+      <rect x="18" y="50" width="26" height="3" rx="1.5" fill="#c5d7fb" />
+      <circle cx="55" cy="20" r="10" fill="#fde68a" />
+      <circle cx="55" cy="20" r="6" fill="#f59e0b" />
+      <line x1="55" y1="8" x2="55" y2="5" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="55" y1="35" x2="55" y2="32" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="43" y1="20" x2="40" y2="20" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+      <line x1="70" y1="20" x2="67" y2="20" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CalendarIllustration() {
+  return (
+    <svg width="80" height="75" viewBox="0 0 80 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="12" y="18" width="56" height="48" rx="4" fill="#fff3cd" stroke="#ffc107" strokeWidth="1.5" />
+      <rect x="12" y="18" width="56" height="14" rx="4" fill="#ffc107" />
+      <rect x="22" y="12" width="6" height="12" rx="3" fill="#e65100" />
+      <rect x="52" y="12" width="6" height="12" rx="3" fill="#e65100" />
+      {[0, 1, 2, 3].map((row) =>
+        [0, 1, 2, 3, 4, 5, 6].map((col) => (
+          <rect
+            key={`${row}-${col}`}
+            x={20 + col * 6}
+            y={38 + row * 7}
+            width="4"
+            height="4"
+            rx="1"
+            fill="#fde68a"
+          />
+        ))
+      )}
+    </svg>
+  );
+}
+
+function StalledIllustration() {
+  return (
+    <svg width="80" height="75" viewBox="0 0 80 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="8" y="40" width="18" height="28" rx="2" fill="#c7d2fe" />
+      <rect x="31" y="28" width="18" height="40" rx="2" fill="#818cf8" />
+      <rect x="54" y="16" width="18" height="52" rx="2" fill="#4f46e5" />
+      <polyline points="17,38 40,26 63,14" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="4 3" />
+    </svg>
+  );
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+
+const navTabs = ["Summary", "Companies", "Deals", "Tasks", "Calendar"];
+
+type NextPageWithLayout = React.FC & {
+  getLayout?: (page: ReactElement) => ReactElement;
 };
+
+const SalesDashboard: NextPageWithLayout = () => {
+  const { data: session, status } = useSession();
   
-export default Dashboard
+
+
+
+  const [activeTab, setActiveTab] = useState("Summary");
+  const [showCreate, setShowCreate] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [activeTaskFilter, setActiveTaskFilter] = useState("All tasks");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  return (
+    <div style={styles.page}>
+      {/* ── Header ── */}
+      <div style={styles.header}>
+        <div style={styles.headerTop}>
+          <div style={styles.headerTitle}>
+            <span>Welcome</span>
+            <span style={styles.headerDivider}>|</span>
+            <span style={styles.headerUser}>{session?.user?.name}</span>
+          </div>
+          {/* <div style={styles.helpBtn}>
+            <HelpCircle size={15} color="#666" />
+          </div> */}
+        </div>
+        <nav style={styles.nav}>
+          {navTabs.map((tab) => (
+            <a
+              key={tab}
+              style={{
+                ...styles.navTab,
+                ...(activeTab === tab ? styles.navTabActive : {}),
+              }}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      {/* ── Content ── */}
+      <div style={styles.content}>
+        {activeTab === "Summary" && (
+        <>
+        {/* ── Tasks Section ── */}
+        <div style={styles.section}>
+          <SectionHeader
+            title="Tasks"
+            actionSlot={
+              <a style={styles.viewAllLink}>
+                View all <ExternalLink size={11} />
+              </a>
+            }
+            onToggle={() => toggleSection("tasks")}
+            isCollapsed={collapsedSections.has("tasks")}
+          />
+
+          {!collapsedSections.has("tasks") && (
+          <>
+          {/* Filter tabs */}
+          <div style={styles.taskFilters}>
+            <div style={styles.taskFiltersContainer}>
+              {["All tasks", "Due today", "Overdue", "Due tomorrow"].map((f, index, arr) => (
+                <button
+                  key={f}
+                  style={{
+                    ...styles.taskFilterBtn,
+                    ...(activeTaskFilter === f ? styles.taskFilterBtnActive : {}),
+                    ...(index === arr.length - 1 ? styles.taskFilterBtnLast : {}),
+                  }}
+                  onClick={() => setActiveTaskFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button style={styles.btn} onClick={() => setShowCreate(true)}>
+                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Plus size={12} /> Create task
+                </span>
+              </button>
+              {/* <button
+  style={{ ...styles.btn, ...styles.btnPrimary }}
+  onClick={() => setIsModalOpen(true)}
+>
+  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+    <Play size={12} /> Start tasks
+  </span>
+</button> */}
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div style={styles.statsGrid}>
+            {[
+              { label: "All tasks", value: "7", icon: <CheckSquare size={16} color="#666" /> },
+              { label: "High priority", value: "3", icon: <AlertTriangle size={16} color="#666" /> },
+              { label: "To-dos", value: "4", icon: <List size={16} color="#666" /> },
+              { label: "Calls", value: "2", icon: <Phone size={16} color="#666" /> },
+              { label: "Emails", value: "1", icon: <Mail size={16} color="#666" /> },
+              { label: "LinkedIn", value: "0", icon: <Linkedin size={16} color="#22c55e" />, done: true },
+            ].map((stat, i) => (
+              <div
+                key={stat.label}
+                style={{
+                  ...styles.statCard,
+                  
+                }}
+              >
+                <div style={styles.statLabel}>
+                  {stat.label}
+                  {stat.done ? (
+                    <span
+                      style={{
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "50%",
+                        backgroundColor: "#22c55e",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    stat.icon
+                  )}
+                </div>
+                <div
+                  style={{
+                    ...styles.statValue,
+                    color: stat.value === "0" ? "#141414" : "#006162",
+                    fontWeight: stat.value === "0" ? 400 : 700,
+                  }}
+                >
+                  {stat.value}
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
+          )}
+        </div>
+
+        {/* ── User Activity By Category ── */}
+        <div style={styles.section}>
+          <SectionHeader
+            title="User activity by category"
+            infoIcon
+            onToggle={() => toggleSection("userActivity")}
+            isCollapsed={collapsedSections.has("userActivity")}
+          />
+          {!collapsedSections.has("userActivity") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <UserActivityByCategory />
+            </div>
+          )}
+        </div>
+
+        <div style={styles.section}>
+          <SectionHeader
+            title="Activity"
+            infoIcon
+            onToggle={() => toggleSection("twoCharts")}
+            isCollapsed={collapsedSections.has("twoCharts")}
+          />
+          {!collapsedSections.has("twoCharts") && (
+            <div style={{ padding: "12px 16px 16px" }}>
+              <TwoCharts />
+            </div>
+          )}
+        </div>
+
+       
+        </>
+        )}
+
+        {activeTab === "Companies" && (
+        //   <div style={styles.section}>
+        //     <SectionHeader title="Companies" />
+        //     <div style={styles.emptyState}>
+        //       <div style={styles.emptyTitle}>Companies View</div>
+        //       <p style={styles.emptyText}>
+        //         This is the Companies tab content. Company management features will be displayed here.
+        //       </p>
+        //     </div>
+        //   </div>
+
+        <CompanyData />
+        )}
+
+        {activeTab === "Deals" && (
+        //   
+        <DealsData />
+        )}
+
+        {activeTab === "Tasks" && (
+        <TasksData />
+        )}
+
+        {activeTab === "Calendar" && (
+          <SchedulePage />
+          // <div style={styles.section}>
+          //   <SectionHeader title="Schedule" />
+          //   <div style={styles.emptyState}>
+          //     <div style={styles.emptyTitle}>Schedule View</div>
+          //     <p style={styles.emptyText}>
+          //       This is the Schedule tab content. Calendar and scheduling features will be displayed here.
+          //     </p>
+          //   </div>
+          // </div>
+        )}
+
+        {/* {activeTab === "Dashboard" && (
+          <div style={styles.section}>
+            <SectionHeader title="Dashboard Analytics" />
+            <div style={styles.emptyState}>
+              <div style={styles.emptyTitle}>Dashboard View</div>
+              <p style={styles.emptyText}>
+                This is the Dashboard tab content. Analytics and insights will be displayed here.
+              </p>
+            </div>
+          </div>
+        )} */}
+      </div>
+
+      {/* ── Got feedback button ── */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: "16px",
+          right: "16px",
+          backgroundColor: "#ffffff",
+          border: "1px solid #e0e0e0",
+          borderRadius: "4px",
+          padding: "8px 14px",
+          fontSize: "12px",
+          color: "#141414",
+          cursor: "pointer",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          fontFamily: FONT,
+        }}
+      >
+        Got feedback?
+      </div>
+      <AssociateTaskModal
+  isOpen={isModalOpen}
+  onClose={() => setIsModalOpen(false)}
+  taskName="AI bot offer"
+  onAddAssociations={() => console.log("Add associations clicked")}
+  onMarkComplete={() => { console.log("Marked complete"); setIsModalOpen(false); }}
+  onSkipTask={() => { console.log("Skipped task"); setIsModalOpen(false); }}
+/>
+
+ {/* ── Create / Edit task sidebar (new component) ── */}
+ <CreateTaskSidebar
+            isOpen={showCreate}
+            onClose={() => { setShowCreate(false); setEditId(null); }}
+            onSubmit={(formData, addAnother) => {
+              console.log("Task form submitted:", formData, "Add another:", addAnother);
+              // TODO: Call API to create/update task here
+              // await createTask(formData) or await updateTask(editId, formData)
+              toast.success(editId ? "Task updated" : "Task created");
+              // Optionally refresh task list here if needed
+              if (!addAnother) { setShowCreate(false); setEditId(null); }
+            }}
+            taskId={editId}
+            loading={saving}
+            assigneeOptions={[
+              { value: "U001", label: "John Smith" },
+              { value: "U002", label: "Sarah Johnson" },
+              { value: "U003", label: "Mike Davis" },
+              { value: "U004", label: "Emily Chen" },
+            ]}
+            queueOptions={[
+              { value: "queue-1", label: "Sales Queue" },
+              { value: "queue-2", label: "Support Queue" },
+            ]}
+            recordOptions={[
+              { value: "contact-1", label: "Contact Records" },
+              { value: "company-1", label: "Company Records" },
+              { value: "deal-1", label: "Deal Records" },
+            ]}
+          />
+    </div>
+  );
+};
+
+SalesDashboard.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default SalesDashboard;

@@ -504,25 +504,27 @@ export default function ChatbotWidget() {
 
   if (!isOpen) {
     return (
-      <button
-        style={{ 
-          borderRadius: '50%',
-          bottom: '1.5rem',
-          right: '1.5rem',
-          width: '3.5rem',
-          height: '3.5rem',
-          zIndex: 999,
-          background: '#1788d4'
-        }}
-        onClick={() => setIsOpen(true)}
-        className="position-fixed text-white shadow-lg d-flex align-items-center justify-content-center border-0"
-        aria-label="Open chat"
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1788d4'}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1788d4'}
+      <></>
+      // <button
+      //   style={{ 
+      //     borderRadius: '50%',
+      //     bottom: '1.5rem',
+      //     right: '1.5rem',
+      //     width: '3.5rem',
+      //     height: '3.5rem',
+      //     zIndex: 999,
+      //     background: '#1788d4',
+      //     display: 'none',
+      //   }}
+      //   onClick={() => setIsOpen(true)}
+      //   className="position-fixed text-white shadow-lg d-flex align-items-center justify-content-center border-0"
+      //   aria-label="Open chat"
+      //   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1788d4'}
+      //   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1788d4'}
        
-      >
-        <Bot size={24} />
-      </button>
+      // >
+      //   <Bot size={24} />
+      // </button>
     );
   }
 

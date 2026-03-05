@@ -1,8 +1,9 @@
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
 import { toast } from 'react-toastify';
 import { clearAllLocalStorage } from './localStorageUtils';
+import { clearSessionCookiesClient } from './cookieUtils';
 import axiosInstance from './axios';
-import directApi from './directApi';
 
 interface TokenData {
   accessToken: string;
@@ -21,9 +22,10 @@ class TokenService {
     sessionTimer: null,
     refreshTimer: null
   };
+  private logoutInProgress = false;
   
-  // Buffer time to refresh before expiry (30 seconds)
-  private readonly REFRESH_BUFFER = 30 * 1000; // Buffer for 5-minute session token
+  // Buffer time to refresh before expiry (milliseconds)
+  private readonly REFRESH_BUFFER = 30 * 1000;
   private checkInterval: NodeJS.Timeout | null = null;
   private isRefreshing = false;
   private refreshPromise: Promise<string | null> | null = null;
@@ -142,57 +144,8 @@ class TokenService {
     }
   }
 
-  // Sync tokens to cookies for NextAuth to read
-  private async syncTokensToCookies(tokens: Partial<TokenData>): Promise<void> {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    // Get current tokens if partial tokens don't have all fields
-    const currentTokens = this.getTokens();
-    
-    // Ensure refreshToken is always a string, never an object
-    let refreshTokenValue = tokens.refreshToken || currentTokens?.refreshToken || '';
-    if (typeof refreshTokenValue !== 'string') {
-      // If it's an object (including empty object), use current token or empty string
-      refreshTokenValue = currentTokens?.refreshToken || '';
-    }
-    
-    const tokensToSync: TokenData = {
-      accessToken: tokens.accessToken || currentTokens?.accessToken || '',
-      refreshToken: refreshTokenValue,
-      accessTokenExpires: tokens.accessTokenExpires || currentTokens?.accessTokenExpires || 0,
-      refreshTokenExpires: tokens.refreshTokenExpires || currentTokens?.refreshTokenExpires || 0,
-    };
-
-    if (!tokensToSync.accessToken || !tokensToSync.refreshToken) {
-      return;
-    }
-
-    try {
-      // Call sync endpoint to write tokens to cookies
-      await axiosInstance.post('/auth/sync-tokens', {
-        access_token: tokensToSync.accessToken,
-        refresh_token: tokensToSync.refreshToken,
-        access_token_expires: tokensToSync.accessTokenExpires,
-        refresh_token_expires: tokensToSync.refreshTokenExpires,
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 5000, // 5 second timeout
-      });
-    } catch (error) {
-      // Log but don't throw - cookie sync is best effort
-      // NextAuth will still work, just might need to refresh on next session access
-      console.warn('Failed to sync tokens to cookies:', error);
-    }
-  }
-
   // Refresh token function with support for both session and refresh token
   private async refreshToken(forceRefreshToken: boolean = false): Promise<string | null> {
-    //console.log('🔄 Token refresh requested:', { forceRefreshToken });
-    
     // Prevent multiple simultaneous refresh attempts
     if (this.isRefreshing) {
       //console.log('⚠️ Token refresh already in progress, waiting for completion');
@@ -208,36 +161,9 @@ class TokenService {
         return null;
       }
 
-        // console.log('📊 Current tokens status:', {
-        //   hasAccessToken: !!tokens.accessToken,
-        //   hasRefreshToken: !!tokens.refreshToken,
-        //   accessTokenExpiresIn: Math.floor((tokens.accessTokenExpires - Date.now()) / 1000) + 's',
-        //   refreshTokenExpiresIn: Math.floor((tokens.refreshTokenExpires - Date.now()) / 1000) + 's'
-        // });
-
         const now = Date.now();
         const refreshTokenExpiry = tokens.refreshTokenExpires;
         const needsRefreshToken = forceRefreshToken || (refreshTokenExpiry - now) <= this.REFRESH_BUFFER;
-
-        // console.log('Refreshing tokens...', {
-        //   needsRefreshToken,
-        //   forceRefreshToken,
-        //   timeUntilRefreshExpiry: refreshTokenExpiry - now
-        // });
-
-        // console.log('📤 Sending refresh request:', {
-        //   needsRefreshToken,
-        //   forceRefreshToken,
-        //   timeUntilRefreshExpiry: Math.floor((refreshTokenExpiry - now) / 1000) + 's'
-        // });
-
-        // Create form data for refresh token request
-        // console.log('🔍 Debug refresh token request:', {
-        //   currentRefreshToken: tokens.refreshToken,
-        //   needsRefreshToken,
-        //   tokenExpiry: new Date(tokens.refreshTokenExpires).toISOString(),
-        //   timeLeft: Math.floor((tokens.refreshTokenExpires - Date.now()) / 1000) + 's'
-        // });
 
         const formData = new URLSearchParams();
         formData.append('refresh_token', tokens.refreshToken);
@@ -260,48 +186,27 @@ class TokenService {
           // console.log('📥 Raw response:', response);
         } catch (error: any) {
           if (error.response) {
-            // console.error('🚨 Refresh request failed:', {
-            //   status: error.response.status,
-            //   statusText: error.response.statusText,
-            //   data: error.response.data,
-            //   headers: error.response.headers,
-            //   requestUrl: error.config?.url,
-            //   requestMethod: error.config?.method,
-            //   requestHeaders: error.config?.headers,
-            //   requestData: error.config?.data
-            // });
           } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || 
                      error.code === 'ERR_CONNECTION_TIMED_OUT' || error.code === 'ETIMEDOUT' ||
                      error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
-            // console.error('🚨 Refresh request timed out or network error:', error.message, error.code);
-            // Don't throw on timeout/network errors, let it retry on next check
-            // Don't call handleTokenRefreshFailure for network/timeout errors
+            
             this.isRefreshing = false;
             this.refreshPromise = null;
             return null;
           } else {
-            // console.error('🚨 Refresh request failed with error:', error.message, error.code);
-            // Only throw for non-network errors so handleTokenRefreshFailure can decide
+            
             throw error;
           }
         }
 
         if (!response || !response.data) {
-          // console.error('🚨 Invalid response from refresh token API');
+          
           this.isRefreshing = false;
           this.refreshPromise = null;
           return null;
         }
 
       const data = response.data;
-        // console.log('📥 Refresh response received:', {
-        //   status: response.status,
-        //   code: data.code,
-        //   hasAccessToken: !!data.data?.access_token,
-        //   hasRefreshToken: typeof data.data?.refresh_token === 'string' || !!data.data?.refresh_token?.access_token,
-        //   newExpiresIn: data.data?.expires_in,
-        //   newRefreshExpiresIn: data.data?.refresh_token_expires_in || data.data?.refresh_token?.expires_in
-        // });
 
         console.log("ZEZEZE REFRESH DATA a", data);
         if (data.code === 200 && data.data?.access_token) {
@@ -357,9 +262,6 @@ class TokenService {
 
           this.saveTokens(newTokens);
           
-          // Sync tokens to cookies for NextAuth
-          await this.syncTokensToCookies(newTokens);
-          
           this.setupTokenRefreshTimers();
           
           // console.log('Tokens refreshed successfully');
@@ -384,56 +286,43 @@ class TokenService {
 
   // Handle token refresh failure
   private setupTokenRefreshTimers(): void {
-    // console.log('🔄 Setting up token refresh timers...');
+     // console.log('Setting up token refresh timers...');
     
     // Clear existing timers
     if (this.timers.sessionTimer) {
-      // console.log('⚠️ Clearing existing session timer');
+      console.log('⚠️ Clearing existing session timer 1');
       clearTimeout(this.timers.sessionTimer);
+      this.timers.sessionTimer = null;
     }
     if (this.timers.refreshTimer) {
-      // console.log('⚠️ Clearing existing refresh timer');
+      console.log('⚠️ Clearing existing refresh timer 2');
       clearTimeout(this.timers.refreshTimer);
+      this.timers.refreshTimer = null;
     }
 
     const tokens = this.getTokens();
     if (!tokens) {
-      // console.log('❌ No tokens found, cannot setup refresh timers');
+      console.log('❌ No tokens found, cannot setup refresh timers');
       return;
     }
 
     const now = Date.now();
-    // console.log('📊 Current token status:', {
-    //   accessTokenExpiresIn: Math.floor((tokens.accessTokenExpires - now) / 1000) + 's',
-    //   refreshTokenExpiresIn: Math.floor((tokens.refreshTokenExpires - now) / 1000) + 's',
-    //   currentTime: new Date(now).toISOString(),
-    //   accessTokenExpireTime: new Date(tokens.accessTokenExpires).toISOString(),
-    //   refreshTokenExpireTime: new Date(tokens.refreshTokenExpires).toISOString(),
-    //   timeUntilAccessRefresh: Math.floor(((tokens.accessTokenExpires - now) - this.REFRESH_BUFFER) / 1000) + 's',
-    //   timeUntilRefreshTokenRefresh: Math.floor(((tokens.refreshTokenExpires - now) - this.REFRESH_BUFFER) / 1000) + 's',
-    //   refreshBufferSeconds: Math.floor(this.REFRESH_BUFFER / 1000) + 's'
-    // });
     
-    // Setup session token refresh timer (15 minutes - buffer)
+    // Setup access token refresh timer (refresh slightly before expiry)
     const sessionTimeUntilRefresh = Math.max(0, (tokens.accessTokenExpires - now) - this.REFRESH_BUFFER);
-    // console.log('⏰ Setting session refresh timer for:', Math.floor(sessionTimeUntilRefresh / 1000) + 's');
     this.timers.sessionTimer = setTimeout(async () => {
-      // console.log('🔄 Session token refresh triggered');
+      console.log('Step 1');
       await this.refreshToken(false);
     }, sessionTimeUntilRefresh);
 
-    // Setup refresh token refresh timer (2 hours - buffer)
+    // Setup refresh token refresh timer (refresh slightly before expiry)
     const refreshTimeUntilRefresh = Math.max(0, (tokens.refreshTokenExpires - now) - this.REFRESH_BUFFER);
-    // console.log('⏰ Setting refresh token timer for:', Math.floor(refreshTimeUntilRefresh / 1000) + 's');
     this.timers.refreshTimer = setTimeout(async () => {
-      // console.log('🔄 Refresh token refresh triggered');
+      console.log('Step 2');
       await this.refreshToken(true);
     }, refreshTimeUntilRefresh);
 
-    // console.log('Token refresh timers set:', {
-    //   sessionRefreshIn: Math.floor(sessionTimeUntilRefresh / 1000) + 's',
-    //   refreshTokenRefreshIn: Math.floor(refreshTimeUntilRefresh / 1000) + 's'
-    // });
+   
   }
 
   private handleTokenRefreshFailure(error: any): void {
@@ -456,11 +345,35 @@ class TokenService {
     // if (error?.response?.status === 401 || error?.response?.status === 403) {
       // console.log('Token refresh failed with auth error, clearing session...');
       if (typeof window !== 'undefined' && window.sessionStorage) {
+        // Prevent repeated redirects/toasts when multiple requests fail at once
+        if (this.logoutInProgress || (window as any).__authLogoutInProgress) {
+          return;
+        }
+
+        // Never spam "session expired" flow on auth pages
+        if (window.location.pathname.startsWith('/auth/')) {
+          this.stop();
+          return;
+        }
+
+        this.logoutInProgress = true;
+        (window as any).__authLogoutInProgress = true;
+        this.stop();
+
+        // Best-effort: clear server-side NextAuth session payload before wiping cookies,
+        // otherwise the server can still consider the old cookie session valid.
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+
         sessionStorage.clear();
         clearAllLocalStorage();
-        signOut();
-        window.location.href = '/auth/signin';
-        toast.error('Session expired - Please login again');
+        clearSessionCookiesClient(true);
+        const callbackUrl = getLogoutCallbackUrl();
+        // Await signOut so NextAuth session cookie is cleared before redirect.
+        // Otherwise signin page may still see "authenticated" and redirect to dashboard, causing a loop.
+        signOut({ callbackUrl, redirect: false }).then(() => {
+          toast.error('Session expired - Please login again', { toastId: 'session-expired' });
+          window.location.replace(callbackUrl);
+        });
       }
     // } else {
       // console.log('Token refresh failed but not an auth error, keeping session active:', error?.response?.status);
@@ -505,51 +418,11 @@ class TokenService {
       return;
     }
 
-    // Check if access token is expired or about to expire (2 minutes before expiry)
-    // Since tokens last 15 minutes, we refresh when 2 minutes remain
-    const timeUntilExpiry = tokens.accessTokenExpires - now;
-    const REFRESH_THRESHOLD = 2 * 60 * 1000; // 2 minutes before expiry
-    
-    // Only refresh if token is actually expired or will expire within 2 minutes
-    if (timeUntilExpiry <= REFRESH_THRESHOLD && timeUntilExpiry > 0) {
-      // console.log('🔄 Access token expired or expiring soon, refreshing proactively...', {
-      //   timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + 's',
-      //   expiresAt: new Date(tokens.accessTokenExpires).toISOString()
-      // });
-      
-      this.isRefreshing = true;
-      this.refreshPromise = this.refreshToken();
-      
-      try {
-        const newToken = await this.refreshPromise;
-        if (!newToken) {
-          // console.log('⚠️ Token refresh failed, but not clearing session immediately');
-          // Increment failure count
-          this.consecutiveFailures++;
-          this.lastFailureTime = Date.now();
-          // Don't immediately clear session on refresh failure
-          // Let the axios interceptor handle it
-        } else {
-          // console.log('✅ Token refreshed successfully in background');
-          // Reset failure count on success
-          this.consecutiveFailures = 0;
-          this.lastFailureTime = null;
-        }
-      } catch (error) {
-        // console.error('❌ Token refresh error:', error);
-        // Increment failure count
-        this.consecutiveFailures++;
-        this.lastFailureTime = Date.now();
-        // Don't immediately clear session on error
-        // Let the axios interceptor handle it
-      } finally {
-        this.isRefreshing = false;
-        this.refreshPromise = null;
-      }
-    } else {
-      //console.log('Access token is still valid', {
-      //  timeUntilExpiry: Math.floor(timeUntilExpiry / 1000) + 's'
-      //});
+    // Timer-only strategy:
+    // Access token refresh is handled by `setupTokenRefreshTimers()` (expiry - REFRESH_BUFFER).
+    // This interval only enforces refresh-token expiry and keeps timers present.
+    if (!this.timers.sessionTimer || !this.timers.refreshTimer) {
+      this.setupTokenRefreshTimers();
     }
   }
 
@@ -560,11 +433,10 @@ class TokenService {
     // Stop any existing intervals
     this.stop();
 
-    // Check token every 20 seconds for more proactive refresh
-    // This ensures we catch tokens expiring soon and refresh them before they expire
+    // Check periodically to enforce refresh-token expiry and keep timers scheduled.
     this.checkInterval = setInterval(async () => {
       await this.checkAndRefreshToken();
-    }, 20000); // 20 seconds - more frequent checks for proactive refresh
+    }, 20000);
 
     // Initial check
     this.checkAndRefreshToken();
@@ -595,6 +467,14 @@ class TokenService {
 
   // Force refresh token (for manual refresh)
   public async forceRefresh(): Promise<string | null> {
+    if (typeof window !== 'undefined') {
+      if (this.logoutInProgress || (window as any).__authLogoutInProgress) {
+        return null;
+      }
+      if (window.location.pathname.startsWith('/auth/')) {
+        return null;
+      }
+    }
     //console.log('Force refreshing token...');
     const token = await this.refreshToken();
     if(typeof window !== 'undefined' && window.sessionStorage) {
@@ -666,9 +546,6 @@ class TokenService {
       }
       
       this.saveTokens(tokenData);
-      
-      // Sync tokens to cookies for NextAuth
-      await this.syncTokensToCookies(tokenData);
       
       this.start();
     //  console.log('Token service initialized successfully');

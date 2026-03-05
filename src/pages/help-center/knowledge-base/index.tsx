@@ -8,7 +8,8 @@ import KnowledgeBase from "../partials/knowledge-base";
 const KnowledgeBasePage = () => {
   const router = useRouter();
   const searchQuery = (router.query.search as string) || '';
-
+  const moduleId = (router.query.moduleId as string) || '';
+  const moduleName = (router.query.moduleName as string) || '';
   const handleBack = () => {
     router.push('/help-center');
   };
@@ -27,6 +28,8 @@ const KnowledgeBasePage = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="Help Center" mainLink="/help-center" subTitle="Knowledge Base" />
       <KnowledgeBase 
+        moduleId={moduleId}
+        moduleName={moduleName}
         onBack={handleBack}
         searchQuery={searchQuery}
         onArticleClick={handleArticleClick}

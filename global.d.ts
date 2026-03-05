@@ -1,3 +1,4 @@
+declare module '@sentry/nextjs';
 declare module 'react-table';
 declare module 'feather-icons';
 declare module 'feather-icons-react';

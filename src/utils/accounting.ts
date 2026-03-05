@@ -116,7 +116,8 @@ const transformApiResponse = (apiResponse: any): TransformedResponse => {
 
 export const GetProducts = async (params: PaginationParams = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-products', { params});
+   // const response = await axiosInstance.get('accounting/get-products', { params });//products/all'
+    const response = await axiosInstance.get('accounting/products/all', { params });
     const formattedResponse = transformApiResponse(response.data);
     console.log('formattedResponse', formattedResponse);
     return formattedResponse;
@@ -137,9 +138,9 @@ export const GetProductCategories = async (): Promise<any[]> => {
   }
 };
 
-export const GetPaymentMethods = async () => {
+export const GetPaymentMethods = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-payment-methods');
+    const response = await axiosInstance.get('accounting/get-payment-methods', { params });
     const formattedResponse = extractData(response.data);
     return formattedResponse;
   } catch (error: any) {
@@ -197,52 +198,52 @@ export const GetPayments = async (params: PaginationParams = {}) => {
 };
 
 //Dashboard apis start
-export const GetDashboardCounters = async () => {
+export const GetDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-dashboard-counter');
+    const response = await axiosInstance.get('accounting/get-dashboard-counter', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch dashboard counters");
     throw error;
   }
 };
-export const GetProfitLossData = async () => {
+export const GetProfitLossData = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting//get-profit-loss');
+    const response = await axiosInstance.get('accounting//get-profit-loss', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch profit loss data");
     throw error;
   }
 };
-export const GetTopProducts = async () => {
+export const GetTopProducts = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-top-products');
+    const response = await axiosInstance.get('accounting/get-top-products', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch top products");
     throw error;
   }
 };
-export const GetRecentActivity = async () => {
+export const GetRecentActivity = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-recent-activity');
+    const response = await axiosInstance.get('accounting/get-recent-activity', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch recent activity");
     throw error;
   }
 };
-export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string) => {
+export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string, params: { crm_company_id?: string | number } = {}) => {
   try {
-    const params: any = {};
+    const queryParams: any = { ...params };
     if (start_date) {
-      params.start_date = start_date;
+      queryParams.start_date = start_date;
     }
     if (end_date) {
-      params.end_date = end_date;
+      queryParams.end_date = end_date;
     }
-    const response = await axiosInstance.get('accounting/get-analytics-by-month', { params });
+    const response = await axiosInstance.get('accounting/get-analytics-by-month', { params: queryParams });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch analytics by month");
@@ -250,9 +251,9 @@ export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string
   }
 };
 //Dashboard apis end
-export const GetCompanyDetails = async () => {
+export const GetCompanyDetails = async (params: { crm_company_id?: string | number } = {}) => {
   try {
-    const response = await axiosInstance.get('accounting/get-company-details');
+    const response = await axiosInstance.get('accounting/get-company-details', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch company details");
@@ -286,6 +287,16 @@ export const CompletePayment = async (payload: any) => {
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to update company details");
+    throw error;
+  }
+};
+
+export const GetAccountAuditLogs = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.get('accounting/audit-logs', { params });
+    return response.data ?? [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch account audit logs");
     throw error;
   }
 };

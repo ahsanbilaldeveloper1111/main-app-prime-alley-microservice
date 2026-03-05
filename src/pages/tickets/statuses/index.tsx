@@ -22,6 +22,7 @@ import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiPlus, FiTrash2 } from "react-icons/fi";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { CheckCircle, Tag, X, Edit, Trash2, Circle, Info, Eye } from 'lucide-react';
+import { GlobalDateTimeFormat } from '@utils/Helper';
 
 
 const TicketStatuses = () => {
@@ -53,7 +54,7 @@ const TicketStatuses = () => {
         { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at, sortable: true,
             cell: (props: any) => (
                 <span className="text-muted">
-                    {moment(props.created_at).format('DD/MM/YYYY')}
+                    {moment(props.created_at).format(GlobalDateTimeFormat)}
                 </span>
             )
          },
@@ -186,8 +187,8 @@ const TicketStatuses = () => {
         <React.Fragment>
             <BreadcrumbItem mainTitle="Tickets" mainLink="/tickets/statuses" subTitle="Ticket Status" />
             <PageHeader
-                title="Ticket Statuses"
-                description="Manage and organize ticket statuses"
+                title=""
+                description=""
                 showSearch={false}
                 searchPlaceholder="Search statuses..."
                 searchValue={currentFilters.search || ""}

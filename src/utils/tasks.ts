@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 
 // ==================== Types/Interfaces ====================
@@ -76,6 +77,8 @@ interface ListTasksParams {
   frequency?: string;
   is_active?: boolean;
   withRelations?: string[];
+  created_at_from?: string;
+  created_at_to?: string;
   extension_numbers?: string[];
   order?: {
     column?: string;
@@ -90,10 +93,12 @@ interface CreateTaskData {
   status_id?: number;
   priority?: string;
   due_date?: string;
+  due_time?: string;
   start_date?: string;
   estimated_hours?: string;
   progress?: number;
   extension_numbers?: string[];
+  watchers?: string[];
   label_ids?: number[];
   timezone?: string;
   type?: "regular" | "recurring" | "todo";
@@ -124,7 +129,12 @@ interface UpdateTaskData {
   status_id?: number;
   project_id?: number;
   due_date?: string;
+  due_time?: string;
+  timezone?: string;
+  start_date?: string;
+  end_date?: string;
   extension_numbers?: string[];
+  watchers?: string[];
   label_ids?: number[];
 }
 
@@ -155,6 +165,10 @@ interface UpdateRecurringTaskData {
  * @param returnDataOnSuccess - Whether to return data on success (default: true)
  * @returns The response data if successful, null/false if failed
  */
+const reportTasksApiError = (response: any, errorMessage: string) => {
+  reportApiError("tasks", errorMessage, { apiResponse: response, responseData: response?.data });
+};
+
 const validateResponse = (
   response: any,
   errorMessage: string,
@@ -162,6 +176,7 @@ const validateResponse = (
   returnDataOnSuccess: boolean = true
 ): any => {
   if (!response?.data) {
+    reportTasksApiError(response, errorMessage);
     toast.error(errorMessage);
     return returnDataOnSuccess ? null : false;
   }
@@ -170,6 +185,7 @@ const validateResponse = (
 
   // Check if success field exists and is false
   if (responseData.success === false) {
+    reportTasksApiError(response, responseData.message || errorMessage);
     toast.error(responseData.message || errorMessage);
     return returnDataOnSuccess ? null : false;
   }
@@ -200,6 +216,7 @@ const validateArrayResponse = (
   errorMessage: string
 ): any[] => {
   if (!response?.data) {
+    reportTasksApiError(response, errorMessage);
     toast.error(errorMessage);
     return [];
   }
@@ -207,6 +224,7 @@ const validateArrayResponse = (
   const responseData = response.data;
 
   if (responseData.success === false) {
+    reportTasksApiError(response, responseData.message || errorMessage);
     toast.error(responseData.message || errorMessage);
     return [];
   }
@@ -252,6 +270,7 @@ export const listProjects = async (params: ListProjectsParams = {}) => {
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {
+        reportTasksApiError(response, responseData.message || 'Failed to fetch projects');
         toast.error(responseData.message || 'Failed to fetch projects');
         return null;
       }
@@ -308,6 +327,7 @@ export const getProject = async (
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {
+        reportTasksApiError(response, responseData.message || 'Failed to fetch project');
         toast.error(responseData.message || 'Failed to fetch project');
         return null;
       }
@@ -533,7 +553,7 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     const {
       page = 1,
       limit = 20,
-      type = "regular",
+      type="",
       project_id,
       search = "",
       status_id,
@@ -544,6 +564,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
       frequency,
       is_active,
       withRelations,
+      created_at_from,
+      created_at_to,
       extension_numbers,
       order
     } = params;
@@ -565,6 +587,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     if (due_date_to) formattedParams.append('due_date_to', due_date_to);
     if (frequency) formattedParams.append('frequency', frequency);
     if (is_active !== undefined) formattedParams.append('is_active', is_active.toString());
+    if (created_at_from) formattedParams.append('created_at_from', created_at_from);
+    if (created_at_to) formattedParams.append('created_at_to', created_at_to);
     
     // Add order parameters if provided
     if (order?.column) {
@@ -598,6 +622,7 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {
+        reportTasksApiError(response, responseData.message || 'Failed to fetch tasks');
         toast.error(responseData.message || 'Failed to fetch tasks');
         return null;
       }
@@ -991,3 +1016,76 @@ export const deleteLabel = async (labelId: string | number) => {
     throw error;
   }
 };
+
+
+
+// ==================== Task Documents API ====================
+
+/**
+ * Get documents for a task
+ */
+export const getTaskDocuments = async (taskId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/${taskId}/documents`);
+    if (response?.data) {
+      const responseData = response.data;
+      if (responseData.success === false) {
+        reportTasksApiError(response, responseData.message || 'Failed to fetch task documents');
+        toast.error(responseData.message || 'Failed to fetch task documents');
+        return null;
+      }
+      return responseData.data ?? responseData;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to fetch task documents');
+    throw error;
+  }
+};
+
+/**
+ * Upload document(s) for a task
+ */
+export const postTaskDocuments = async (taskId: string | number, data: FormData) => {
+  try {
+    const response = await axiosInstance.post(`${prefix}/tasks/${taskId}/documents`, data);
+    return validateResponse(response, 'Failed to upload task document', 'Document uploaded successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to upload task document');
+    throw error;
+  }
+};
+
+/**
+ * Delete a task document
+ */
+export const deleteTaskDocument = async (taskId: string | number, documentId: string | number) => {
+  try {
+    const response = await axiosInstance.delete(`${prefix}/tasks/${taskId}/documents/${documentId}`);
+    return validateResponse(response, 'Failed to delete task document', 'Document deleted successfully', false);
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to delete task document');
+    throw error;
+  }
+};
+
+/**
+ * Download a task document
+ */
+export const getTaskDocumentDownload = async (taskId: string | number, documentId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/${taskId}/documents/${documentId}/download`, {
+      responseType: 'blob',
+    });
+    return response?.data ?? null;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to download task document');
+    throw error;
+  }
+};
+
+

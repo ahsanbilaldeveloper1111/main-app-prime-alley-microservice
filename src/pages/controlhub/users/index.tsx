@@ -16,6 +16,7 @@ import InsightTab from './partials/InsightTab';
 import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
 import ResetPasswordModal from '@components/ResetPasswordModal';
+import ChangeStatusModal from './partials/ChangeStatusModal';
 
 // Import hooks and utilities
 import { useUserColumns } from '@hooks/controlhub/users/userColumns';
@@ -36,6 +37,11 @@ const Users = () => {
     const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
     const [selectedUsername, setSelectedUsername] = useState<string>('');
 
+    // Change status modal state
+    const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
+    const [changeStatusRow, setChangeStatusRow] = useState<any>(null);
+    const [changeStatusNewStatus, setChangeStatusNewStatus] = useState<string | null>(null);
+
     // Handle reset password button click
     const handleResetPasswordClick = useCallback((username: string) => {
         setSelectedUsername(username);
@@ -48,7 +54,7 @@ const Users = () => {
         setSelectedUsername('');
     }, []);
 
-    // Use custom hooks
+    // Use custom hooks (baseColumns first so useUsersData can use it)
     const { baseColumns } = useUserColumns(session, [], { onResetPassword: handleResetPasswordClick });
     
     const {
@@ -58,9 +64,29 @@ const Users = () => {
         fetchUsers,
         handleFiltersChange
     } = useUsersData(session, baseColumns, roleId);
-    
-    // Get columns with custom fields
-    const { columns } = useUserColumns(session, customFieldColumns, { onResetPassword: handleResetPasswordClick });
+
+    // Refresh list after status change
+    const handleAfterStatusChange = useCallback(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    const handleStatusOptionSelect = useCallback((row: any, status: string) => {
+        setChangeStatusRow(row);
+        setChangeStatusNewStatus(status);
+        setShowChangeStatusModal(true);
+    }, []);
+
+    const handleCloseChangeStatusModal = useCallback(() => {
+        setShowChangeStatusModal(false);
+        setChangeStatusRow(null);
+        setChangeStatusNewStatus(null);
+    }, []);
+
+    const { columns } = useUserColumns(session, customFieldColumns, {
+        onResetPassword: handleResetPasswordClick,
+        onChangeStatus: handleAfterStatusChange,
+        onStatusOptionSelect: handleStatusOptionSelect
+    });
     
     const {
         growthChart,
@@ -160,6 +186,14 @@ const Users = () => {
                     show={showResetPasswordModal}
                     onHide={handleCloseResetPasswordModal}
                     username={selectedUsername}
+                />
+
+                <ChangeStatusModal
+                    show={showChangeStatusModal}
+                    onHide={handleCloseChangeStatusModal}
+                    row={changeStatusRow}
+                    newStatus={changeStatusNewStatus}
+                    onSuccess={handleAfterStatusChange}
                 />
             </React.Fragment>
         </ProtectedRoute>

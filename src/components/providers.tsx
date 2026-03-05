@@ -28,28 +28,30 @@ export default function Providers({ children, store }: ProvidersProps) {
       // Don't refetch when offline
       refetchWhenOffline={false}
     >
-      <CtiProvider>
-        <IncomingCallProvider>
-          <DialerModalProvider>
-          <NotificationProvider>
-            {/* <FirebaseNotificationProvider> */}
-              <TokenServiceProvider>
-                <SessionHandler>
-                  <GlobalInputCapitalization />
-                  {store ? (
-                    <Provider store={store}>
-                      {children}
-                    </Provider>
-                  ) : (
-                    children
-                  )}
-                </SessionHandler>
-              </TokenServiceProvider>
-            {/* </FirebaseNotificationProvider> */}
-          </NotificationProvider>
+      {/* TokenServiceProvider must run before CtiProvider so session tokens are in sessionStorage
+          before /api/cti/connect is called; otherwise the request is sent without Authorization and returns 401. */}
+      <TokenServiceProvider>
+        <CtiProvider>
+          <IncomingCallProvider>
+            <DialerModalProvider>
+            <NotificationProvider>
+              {/* <FirebaseNotificationProvider> */}
+              <SessionHandler>
+                <GlobalInputCapitalization />
+                {store ? (
+                  <Provider store={store}>
+                    {children}
+                  </Provider>
+                ) : (
+                  children
+                )}
+              </SessionHandler>
+              {/* </FirebaseNotificationProvider> */}
+            </NotificationProvider>
           </DialerModalProvider>
         </IncomingCallProvider>
       </CtiProvider>
+      </TokenServiceProvider>
     </SessionProvider>
   );
 } 

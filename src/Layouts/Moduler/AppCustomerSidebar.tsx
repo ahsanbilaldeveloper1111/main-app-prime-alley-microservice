@@ -57,16 +57,24 @@ import {
   Folder,
   UserPlus,
   CheckCheck,
-  Layers2
+  Layers2,
+  Map,
+  ChevronRight,
+  ChevronLeft,
+  House
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
+import logodark from '@assets/images/Prime-Alley-Logo.png';
 
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
+import { getCurrentUserCompanyImage } from "@utils/company";
+import { useSession } from "next-auth/react";
 
 // Destructure constants for easier use
-const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
+const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
 
 interface SubMenuItem {
   id: string;
@@ -91,31 +99,98 @@ interface MainMenuItem {
   target?: string;
 }
 
+const SIDEBAR_WIDTH_COLLAPSED = 65;
+const SIDEBAR_WIDTH_EXPANDED = 235;
+
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  /** When provided, sidebar expand/collapse is controlled by parent (e.g. for topbar alignment) */
+  isSidebarExpanded?: boolean;
+  setSidebarExpanded?: (expanded: boolean) => void;
 }
 
 const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({ 
   sidebarOpen, 
-  setSidebarOpen
+  setSidebarOpen,
+  isSidebarExpanded: controlledExpanded,
+  setSidebarExpanded: setControlledExpanded,
 }) => {
-  const [expandedModules, setExpandedModules] = useState<string[]>(['billing']);
+  const { data: session, status } = useSession();
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const isSidebarExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setIsSidebarExpanded = setControlledExpanded ?? setInternalExpanded;
+  const [activeModule, setActiveModule] = useState<string | null>(null);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
+  const [hoveredItemRect, setHoveredItemRect] = useState<{ top: number; height: number } | null>(null);
+  const [isFlyoutPinned, setIsFlyoutPinned] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const prevPathnameRef = useRef<string>('');
-  
+  const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<string | null>(null);
+  const companyImageUrlRef = useRef<string | null>(null);
+
+  const [userCompanyName, setUserCompanyName] = useState('');
+  useEffect(() => {
+		if (status !=="loading" && session) {
+		  if (typeof window !== "undefined") {
+		    setUserCompanyName(session.user.company_name || '');
+		  }
+		}
+	}, [ status, session]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUserCompanyImage()
+      .then((blob) => {
+        if (cancelled) return;
+        if (blob && blob.size > 0) {
+          const url = URL.createObjectURL(blob);
+          companyImageUrlRef.current = url;
+          setCurrentUserCompanyImageUrl(url);
+        } else {
+          setCurrentUserCompanyImageUrl(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentUserCompanyImageUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      const url = companyImageUrlRef.current;
+      if (url) {
+        URL.revokeObjectURL(url);
+        companyImageUrlRef.current = null;
+      }
+    };
+  }, []);
+
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
 
-  const mainMenuItems: MainMenuItem[] = [
+  // Only these modules are enabled; others are hidden (can re-enable by adding id to this list)
+  const ENABLED_MODULE_IDS = [
+    'dashboard',     
+    'crm',          
+    'communications',
+    'planner',
+    'pulse',
+    'virtual-agents',
+    'finance',
+    'compliance',
+    'workforce',
+    'unified-reports',
+    'audit-logs',
+    'settings',
+  ];
 
+  const mainMenuItems: MainMenuItem[] = [
     {
       id: 'dashboard',
       key: 'dashboard',
       permission: '',
-      icon: <LayoutDashboard size={20} />,
+      icon: <House size={16} />,
       color: MENU_COLORS.DASHBOARD,
       title: "Overview",
       label: "Overview",
@@ -124,22 +199,23 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'dashboard-unified-workspace',
       key: 'dashboard-unified-workspace',
-      icon: <LayoutDashboard size={20} />,
+      icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.DASHBOARD,
       permission: PERMISSIONS.VIEW_UNIFIED_WORKSPACE,
       title: "Unified Workspace",
       label: "Unified Workspace",
       url: '/unified-workspace',
     },
-    
+
+    //crm services start
     {
       id: 'crm',
       key: 'crm',
       permission: PERMISSIONS.CRM_SERVICES,
-      icon: <Briefcase size={20} />,
+      icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
-      title: "CRM Workspace",
-      label: "CRM Workspace",
+      title: "Smart CRM",
+      label: "Smart CRM",
       url: '',
       subItems: [
         {
@@ -150,11 +226,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/dashboard'
         },
         {
-          id: 'crm-data-management',
+          id: 'crm-prospects-management',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data'
+          url: '/crm/prospects',
         },
         {
           id: 'crm-leads',
@@ -178,72 +254,52 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/orders'
         },
         {
-          id: 'crm-history',
-          title: 'Activity Tracker',
+          id: 'crm-deals-approval',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
+          icon: <Handshake size={16} />,
+          permission: PERMISSIONS.APPROVE_REJECT_CRM_DEALS,
+          url: '/crm/approvals', 
+        },
+        {
+          id: 'crm-separator-1',
+          title: '---',
+          icon: null,
+          url: ''
+        },
+        {
+          id: 'crm-company',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
+          icon: <ReceiptText size={16} />,
+          permission: PERMISSIONS.VIEW_COMPANIES_CRM,
+          url: '/crm/companies'
+        },
+        {
+          id: 'crm-inbox',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX_CRM,
+          icon: <ReceiptText size={16} />,
+          permission: PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM,
+          url: '/crm/inbox'
+        },
+        {
+          id: 'crm-activities',
+          title: (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>).CRM_ACTIVITY ?? 'Activities',
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: '/crm/history'
+          url: '/crm/activities'
         },
-        // {
-        //   id:'crm-approvals',
-        //   title: 'Quotes & Approvals',
-        //   icon: <FileText size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_HISTORY,
-        //   url: '/crm/approvals'
-        // }
-       
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
-
+    //crm services end
+    
+    //communications services start
     {
-      id: 'live-calls',
-      key: 'live-calls',
-      permission: PERMISSIONS.VIEW_CTI,
-      icon: <MonitorCheck size={20} />,
-      color: MENU_COLORS.LIVE_CALLS,
-      title: "Live Wallboards",
-      label: "Live Wallboards",
-      url: '/live-calls'
-      // subItems: [
-      //   {
-      //     id: 'live-calls-dashboard',
-      //     title: HEADER_CONSTANTS.SUBMENU_LABELS.LIVE_VIEW,
-      //     icon: <LayoutDashboard size={16} />,
-      //     permission: PERMISSIONS.VIEW_CTI,
-      //     url: '/live-calls'
-      //   },
-      //   {
-      //     id: 'live-calls-dashboard-new',
-      //     title: 'Live Call New',
-      //     icon: <LayoutDashboard size={16} />,
-      //     permission: PERMISSIONS.VIEW_CTI,
-      //     url: '/live-calls/new'
-      //   },
-      //   {
-      //     id: 'live-calls-monitoring',
-      //     title: HEADER_CONSTANTS.SUBMENU_LABELS.CALL_MONITORING,
-      //     icon: <Phone size={16} />,
-      //     permission: PERMISSIONS.CTI_MONITORING,
-      //     url: '/cti/monitoring'
-      //   },
-        // {
-        //   id: 'live-calls-dialer',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DIALER,
-        //   icon: <Phone size={16} />,
-        //   permission: PERMISSIONS.DIAL_CALL_CTI,
-        //   url: '/cti/dialer'
-        // }
-      //].filter(item => !item.permission || hasPermission(item.permission))
-    },
-
-    {
-      id: 'call-history',
-      key: 'call-history',
-      permission: PERMISSIONS.CALL_HISTORY_SERVICES,
-      icon: <Phone size={20} />,
+      id: 'communications',
+      key: 'communications',
+      permission: PERMISSIONS.COMMUNICATIONS_SERVICES,
+      icon: <Phone size={16} />,
       color: MENU_COLORS.CALL_HISTORY,
-      title: 'Call Details',
-      label: 'Call Details',
+      title: 'Communications',
+      label: 'Communications',
       url: '',
       subItems: [
         {
@@ -251,675 +307,442 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
-          url: '/call-logs/dashboard'
+          url: '/communications/dashboard'
         },
         {
           id: 'call-history-logs',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_LOGS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_LOGS,
-          url: '/call-logs'
+          url: '/communications/call-logs'
         },
         {
           id: 'call-history-recordings',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_RECORDINGS,
           icon: <Voicemail size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
-          url: '/call-recordings'
+          url: '/communications/recordings'
         },
-        
-        // {
-        //   id: 'call-reports',
-        //   key: 'call-reports',
-        //   permission: PERMISSIONS.VIEW_CALL_REPORTS,
-        //   icon: <ChartNoAxesCombined size={20} />,
-        //   title: MENU_LABELS.CALL_REPORTS,
-        //   url: '/call-reports',
-        // }
+        {
+          id: 'ai-ml-calls-analysis',
+          title: 'Calls Analysis',
+          icon: <FileChartPie size={16} />,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
+          url: '/communications/call-analysis'
+        },
+        {
+          id: 'wallboards-live',
+          title: "Wallboards (Live)",
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.VIEW_CTI,
+          url: '/communications/wallboards-live'
+        },
+        {
+          id: 'text-messages-communications',
+          title: "Text Messages",
+          icon: <MessageCircle size={16} />,
+          permission: PERMISSIONS.VIEW_GSM_INBOX,
+          url: '/communications/text-messages'
+        },
+
+        {
+          id: 'live-calls-campaign-manager',
+          title: 'Campaigns Manager',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT,
+          url: '/communications/campaign-manager'
+        },
+        {
+          id: 'live-calls-campaign-console',
+          title: 'Campaign Console',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
+          url: '/communications/campaign-console'
+        },
+
+
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //communications services end
 
-    // {
-    //   id: 'call-reports',
-    //   key: 'call-reports',
-    //   permission: PERMISSIONS.REPORTS_SERVICES,
-    //   icon: <ChartNoAxesCombined size={20} />,
-    //   color: MENU_COLORS.REPORTS,
-    //   title: MENU_LABELS.REPORTS,
-    //   label: MENU_LABELS.REPORTS,
-    //   url: '/reports',
-    // },
-
+    //planner services start
     {
-      id: 'ai-bot-and-analytics',
-      key: 'ai-bot-and-analytics',
-      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-      icon: <Workflow size={20} />,
+      id: 'planner',
+      key: 'planner',
+      permission: PERMISSIONS.WORK_PLANNER_SERVICES,
+      icon: <Calendar size={16} />,
+      color: MENU_COLORS.BILLING,
+      title: "Planner",
+      label: "Planner",
+      url: '',
+      subItems: [
+
+        {
+          id: 'planner-dashboard',
+          title: 'Dashboard',
+          icon: <Folder size={16} />,
+          url: '/planner/dashboard',
+          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER 
+        },
+        {
+          id: 'planner-projects',
+          title: 'Projects',
+          icon: <Folder size={16} />,
+          url: '/planner/projects',
+          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
+        },
+        {
+          id: 'planner-tasks',
+          title: 'Tasks',
+          icon: <Clock size={16} />,
+          url: '/planner/tasks',
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+        },
+        {
+          id: 'planner-calendar',
+          title: 'Calendar',
+          icon: <Calendar size={16} />,
+          url: '/planner/calendar',
+          permission: PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER 
+        },
+        { 
+          id: 'work-planner-orders', 
+          title: 'Orders Delivery', 
+          icon: <ReceiptText size={16} />, 
+          url: '/planner/orders-delivery', 
+          permission: PERMISSIONS.VIEW_ORDERS_DELIVERY_WORK_PLANNER 
+        },
+       
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+    //planner services end
+
+    //virtual agent start
+    {
+      id: 'virtual-agents',
+      key: 'virtual-agents',
+      permission: PERMISSIONS.VIRTUAL_AGENTS_SERVICES,
+      icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
-      title: "AI Virtual Agent",
-      label: "AI Virtual Agent",
+      title: "Virtual Agents",
+      label: "Virtual Agents",
       url: '',
       subItems: [
         {
-          id: 'ai-bot-trunk-profiles',
-          title: 'Trunk Profiles',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/trunk-profiles'
-        },
-        {
-          id: 'ai-bot-profile',
-          title: 'Voice Bot Profiles',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/profiles'
-        },
-        
-        {
-          id: 'ai-bot-campaigns',
-          title: 'Campaigns',
+          id: 'virtual-agents-outbound-agent',
+          title: 'Outbound Agent',
           icon: <User size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/campaigns'
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
+          url: '/agents/outbound-agent'
         },
         {
-          id: 'ai-bot-live-monitoring',
+          id: 'virtual-agents-inbound-agent',
+          title: 'Inbound Agent',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
+          url: '/agents/inbound-agent'
+        },
+        {
+          id: 'virtual-agents-agent-campaigns',
+          title: 'Agent Campaigns',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
+          url: '/agents/agent-campaigns'
+        },
+        {
+          id: 'virtual-agents-create-campaigns',
+          title: 'Create Campaign',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.CREATE_CAMPAIGN_AIML,
+          url: '/agents/create-campaign'
+        },
+        {
+          id: 'ai-agent-outbound-campaigns-pitch-deck',
+          title: 'Pitch Deck',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.VIEW_PITCH_DECK_AIML,
+          url: '/agents/pitch-deck'
+        },
+        {
+          id: 'virtual-agents-live-monitoring',
           title: 'Live Monitoring',
           icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/live-monitoring'
+          permission: PERMISSIONS.VIEW_LIVE_MONITORING_AIML,
+          url: '/agents/live-monitoring'
         },
         {
-          id: 'ai-bot-campaign-reports',
-          title: 'Campaign Reports',
+          id: 'virtual-agents-analytics',
+          title: 'Analytics',
           icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/campaign-reports'
-        }
-        
-      ]
-    },
-
-    {
-      id: 'gsm',
-      key: 'gsm',
-      permission: PERMISSIONS.GSM_SERVICES,
-      icon: <RadioTower size={20} />,
-      color: MENU_COLORS.SIM_GATEWAY,
-      title: MENU_LABELS.SIM_GATEWAY,
-      label: MENU_LABELS.SIM_GATEWAY,
-      url: '',
-      subItems: [
-        {
-          id: 'gsm-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.GSM_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_DASHBOARD,
-          url: '/gsm/dashboard'
+          permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
+          url: '/agents/analytics'
         },
         {
-          id: 'gsm-list',
-          title: "Devices List",
-          icon: <ClipboardList size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
-          url: '/gsm/list'
-        },
-        {
-          id: 'gsm-assign',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
-          icon: <ClipboardCheck size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
-          url: '/gsm/assign'
-        },
-        {
-          id: 'gsm-ports',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.PORTS,
-          icon: <Wifi size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_PORTS,
-          url: '/gsm/ports'
-        },
-        {
-          id: 'gsm-inbox',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX,
-          icon: <Inbox size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_INBOX,
-          url: '/gsm/inbox'
-        },
-        // {
-        //   id: 'gsm-sync',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.SYNC_GSM,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_GSM_SYNC,
-        //   url: '/gsm/sync'
-        // },
-        // {
-        //   id: 'gsm-company-po',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_PO,
-        //   icon: <List size={16} />,
-        //   permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING,
-        //   url: '/gsm/company/po'
-        // }
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-    {
-      id: 'tms',
-      key: 'tms',
-      permission: PERMISSIONS.TMS_SERVICES,
-      icon: <Workflow size={20} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: MENU_LABELS.AUTOMATION,
-      label: MENU_LABELS.AUTOMATION,
-      url: '',
-      subItems: [
-        // {
-        //   id: 'tms-dashboard',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
-        //   icon: <LayoutDashboard size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/dashboard'
-        // },
-        // {
-        //   id: 'tms-user-management',
-        //   title: 'Users',
-        //   icon: <Users size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/management/users'
-        // },
-        // {
-        //   id: 'tms-user-create',
-        //   title: 'Create User',
-        //   icon: <Users size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/profiling/user/create'
-        // },
-        // {
-        //   id: 'tms-audit-logs',
-        //   title: 'Audit Logs',
-        //   icon: <FileText size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/audit-logs'
-        // },
-        {
-          id: 'live-calls-campaigns-management',
-          title: 'Campaigns Management',
+          id: 'virtual-agents-usage-reports',
+          title: 'Usage Reports',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/live-calls/management/campaigns'
-        },
-        {
-          id: 'live-calls-agent-management',
-          title: 'Agent Management',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/live-calls/management/agents'
-        },
-        {
-          id: 'ai-chat-faqs-management',
-          title: 'AI Chat FAQs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-faqs'
-        },
-        {
-          id: 'ai-bot-faqs-management',
-          title: 'AI Bot FAQs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-bot-faqs'
+          permission: PERMISSIONS.VIEW_USAGE_REPORTS_AIML,
+          url: '/agents/usage-reports'
         }
       ]
-      .filter(item => !item.permission || hasPermission(item.permission))
     },
+    //virtual agent end
 
+
+    //netops services start
     {
-      id: 'netops',
-      key: 'netops',
+      id: 'pulse',
+      key: 'pulse',
       permission: PERMISSIONS.NETOPS_SERVICES,
-      icon: <LayoutDashboard size={20} />,
+      icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.NETOPS,
-      title: MENU_LABELS.NETOPS,
-      label: MENU_LABELS.NETOPS,
+      title: "Pulse",
+      label: "Pulse",
       url: '',
       subItems: [
         {
-          id: 'netops-dashboard',
+          id: 'pulse-dashboard',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DASHBOARD,
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
-          url: '/netops/dashboard'
+          url: '/pulse/dashboard'
         },
         {
-          id: 'netops-devices',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
-          icon: <MonitorSpeaker size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/devices'
-        },
-        {
-          id: 'netops-services',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
+          id: 'pulse-hosts',
+          title: 'Hosts',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
-          url: '/netops/services'
+          permission: PERMISSIONS.VIEW_HOSTS_NETOPS,
+          url: '/pulse/hosts'
         },
         {
-          id: 'netops-alerts',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
+          id: 'pulse-hosts-groups',
+          title: 'Hosts Groups',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_HOST_GROUPS_NETOPS,
+          url: '/pulse/host-groups'
+        },
+        {
+          id: 'pulse-hosts-alerts',
+          title: 'Alerts',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_ALERTS_NETOPS,
+          url: '/pulse/alerts'
+        },
+        {
+          id: 'pulse-templates',
+          title: 'Templates',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_TEMPLATES_NETOPS,
+          url: '/pulse/templates'
+        },
+        {
+          id: 'pulse-events',
+          title: 'Events',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_EVENTS_NETOPS,
+          url: '/pulse/events'
+        },
+        {
+          id: 'pulse-customers',
+          title: 'Customers',
           icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-          url: '/netops/alerts'
+          permission: PERMISSIONS.VIEW_CUSTOMERS_NETOPS,
+          url: '/pulse/customers'
         },
+
+
         {
-          id: 'netops-uptime-sla',
+          id: 'pulse-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
-          url: '/netops/uptime-sla'
+          url: '/pulse/uptime-sla'
         },
         {
-          id: 'netops-select-server',
-          title: 'Select Server',
+          id: 'pulse-select-server',
+          title: 'Server Insights',
           icon: <Server size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/select-server'
+          permission: PERMISSIONS.VIEW_SERVER_INSIGHTS_NETOPS,
+          url: '/pulse/server-insights'
         },
         {
-          id: 'netops-application-monitoring',
-          title: 'Application Monitoring',
-          icon: <Monitor size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/application-monitoring'
-        }
+          id: 'pulse-gateways',
+          title: 'Gateways',
+          icon: <Wifi size={16} />,
+          permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
+          url: '/pulse/gateways'
+        },
+        {
+          id: 'pulse-gateway-ports',
+          title: 'Gateway Ports',
+          icon: <Wifi size={16} />,
+          permission: PERMISSIONS.VIEW_GSM_PORTS,
+          url: '/pulse/gateway-ports'
+        },
+       
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //netops services end
 
-
-
-
-
-
-
-
-
+    //compliance services start
     {
-      id: 'ai-ml',
-      key: 'ai-ml',
-      permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <FileChartPie size={20} />,
-      color: MENU_COLORS.AI_INSIGHTS,
-      title: MENU_LABELS.AI_INSIGHTS,
-      label: MENU_LABELS.AI_INSIGHTS,
-      url: '',
-      subItems: [
-        {
-          id: 'ai-ml-analysis',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYSIS,
-          icon: <CassetteTape size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/ai-ml/analysis'
-        },
-        
-        {
-          id: 'call-ai-analysis',
-          title: 'Calls AI Analysis',
-          icon: <ChartNoAxesCombined size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: '/ai-ml/analyze-recordings'
-        },
-        {
-          id: 'ai-ml-translate',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TRANSLATE,
-          icon: <Languages size={16} />,
-          permission: PERMISSIONS.TRANSLATE_AIML,
-          url: '/ai-ml/translate'
-        },
-        // {
-        //   id: 'ai-ml-outbound-calls',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,
-        //   icon: <Phone size={16} />,
-        //   permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-        //   url: '/ai-ml/outbound-calls'
-        // }
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-    {
-      id: 'dncr',
-      key: 'dncr',
+      id: 'compliance',
+      key: 'compliance',
       permission: PERMISSIONS.DNCR_SERVICES,
-      icon: <Ban size={20} />,
+      icon: <Ban size={16} />,
       color: MENU_COLORS.DNCR,
       title: MENU_LABELS.COMPLIANCES,
       label: MENU_LABELS.COMPLIANCES,
       url: '',
       subItems: [
-        // {
-        //   id: 'dncr-check-number',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
-        //   icon: <PhoneCall size={16} />,
-        //   permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-        //   url: '/dncr/check-number'
-        // },
         {
-          id: 'dncr-api-number-check',
+          id: 'compliance-api-number-check',
           title: "API Number Check",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/api-number-check'
+          url: '/compliance/api-number-check'
         },
         {
-          id: 'dncr-cdr-records',
+          id: 'compliance-cdr-records',
           title: "CDR Records",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_CDR_DNCR,
-          url: '/dncr/cdr-records'
+          url: '/compliance/cdr-records'
         },
         {
           id: 'dncr-local-dnd-call-block',
           title: "Add Records",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
-          url: '/dncr/add-records'
+          url: '/compliance/add-records'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //compliance services end
 
+    //workforce services start
     {
-      id: 'accounts',
-      key: 'accounts',
-      permission: PERMISSIONS.ACCOUNTS_SERVICES,
-      icon: <CreditCard size={20} />,
-      color: MENU_COLORS.BILLING,
-      title: MENU_LABELS.BILLING,
-      label: MENU_LABELS.BILLING,
-      url: '',
-      subItems: [
-
-            { 
-              id: 'customer-dashboard', 
-              title: 'Dashboard', 
-              icon: <LayoutDashboard size={16} />, 
-              url: '/accounting/customer/dashboard', 
-              permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
-            },
-            { 
-              id: 'account-overview', 
-              title: 'Account Overview', 
-              icon: <Eye size={16} />, 
-              url: '/accounting/customer/account-overview', 
-              permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
-            },
-
-            { 
-              id: 'product-details', 
-              title: 'Subscriptions', 
-              icon: <ShoppingBag size={16} />, 
-              url: '/accounting/customer/product-details', 
-              permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
-            },
-            { 
-              id: 'billing-invoices', 
-              title: 'Invoices', 
-              icon: <DollarSign size={16} />, 
-              url: '/accounting/customer/invoices', 
-              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
-            },
-            { 
-              id: 'billing-history', 
-              title: 'Payment History', 
-              icon: <FileText size={16} />, 
-              url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
-            
-            // { 
-            //   id: 'payment-methods', 
-            //   title: 'Payment Methods', 
-            //   icon: <CreditCard size={16} />, 
-            //   url: '/accounting/customer/payment-methods', 
-            //   permission: PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING 
-            // },
-            
-
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-
-    {
-      id: 'work-planner',
-      key: 'work-planner',
-      permission: PERMISSIONS.WORK_PLANNER_SERVICES,
-      icon: <Calendar size={20} />,
-      color: MENU_COLORS.BILLING,
-      title: "Work Planner",
-      label: "Work Planner",
-      url: '',
-      subItems: [
-
-            { 
-              id: 'work-planner-recurring-reminders', 
-              title: 'Recurring Reminders', 
-              icon: <Bell size={16} />, 
-              url: '/work-planner/recurring-reminders', 
-              permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
-            },
-            { 
-              id: 'work-planner-todo-list', 
-              title: 'To Do List', 
-              icon: <Clock size={16} />, 
-              url: '/work-planner/todo', 
-              permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
-            },
-            {
-              id: 'work-planner-call-time',
-              title: 'Tasks List',
-              icon: <Clock size={16} />,
-              url: '/work-planner/tasks-list',
-              permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
-            },
-            {
-              id: 'work-planner-projects-dashboard',
-              title: 'Projects Dashboard',
-              icon: <Folder size={16} />,
-              url: '/work-planner/projects/dashboard',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            },
-            {
-              id: 'work-planner-projects',
-              title: 'Projects',
-              icon: <Folder size={16} />,
-              url: '/work-planner/projects',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            },
-           
-            {
-              id: 'work-planner-saved-views',
-              title: 'Saved Views',
-              icon: <Folder size={16} />,
-              url: '/work-planner/saved-views',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            },
-            {
-              id: 'work-planner-roles-settings',
-              title: 'Roles Settings',
-              icon: <Shield size={16} />,
-              url: '/work-planner/roles-settings',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            }
-            
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-
-    {
-      id: 'staff-management',
-      key: 'staff-management',
+      id: 'workforce',
+      key: 'workforce',
       permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
-      icon: <Users size={20} />,
+      icon: <Users size={16} />,
       color: MENU_COLORS.BILLING,
-      title: "Staff Management",
-      label: "Staff Management",
+      title: "Workforce",
+      label: "Workforce",
       url: '',
       subItems: [
-          { 
-            id: 'staff-management-employees-dashboard', 
-            title: 'Employees Dashboard', 
-            icon: <LayoutDashboard size={16} />, 
-            url: '/staff-management/employees/dashboard', 
-            permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
-          },
-          {
-            id: 'staff-management-employees',
-            title: 'Employees',
-            icon: <Users size={16} />,
-            url: '/staff-management/employees',
-            permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
-          },
-          
-          { 
-            id: 'staff-management-employees-onboarding', 
-            title: 'Employees Onboarding', 
-            icon: <UserPlus size={16} />, 
-            url: '/staff-management/employees/onboarding', 
-            permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
-          },
-          
-          { 
-            id: 'staff-management-employees-approval-request', 
-            title: 'Approval Request', 
-            icon: <CheckCheck size={16} />, 
-            url: '/staff-management/approval-request', 
-            permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
-          },
-          
-          { 
-            id: 'staff-management-employees-organizational-chart', 
-            title: 'Organizational Chart', 
-            icon: <Layers2 size={16} />, 
-            url: '/staff-management/organizational-chart', 
-            permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
-          },
-          
-      ]
-      .filter(item => !item.permission || hasPermission(item.permission))
+        { 
+          id: 'workforce-dashboard', 
+          title: 'Dashboard', 
+          icon: <LayoutDashboard size={16} />, 
+          url: '/workforce/dashboard', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-org-chart', 
+          title: 'Org Chart', 
+          icon: <Layers2 size={16} />, 
+          url: '/workforce/org-chart', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
+        },
+        {
+          id: 'workforce-employees',
+          title: 'Employees',
+          icon: <Users size={16} />,
+          url: '/workforce/employees',
+          permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
+        },
+        {
+          id: 'workforce-attendence',
+          title: 'Attendance',
+          icon: <Clock size={16} />,
+          url: '/workforce/attendance',
+          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-journey', 
+          title: 'Journey', 
+          icon: <UserPlus size={16} />, 
+          url: '/workforce/journey', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-approval-requests', 
+          title: 'Approval Requests', 
+          icon: <CheckCheck size={16} />, 
+          url: '/workforce/approval-requests', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
+        },
+      ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
-    
-    // {
-    //   id: 'tickets',
-    //   key: 'tickets',
-    //   permission: PERMISSIONS.TICKETS_SERVICES,
-    //   icon: <Ticket size={20} />,
-    //   color: MENU_COLORS.TICKETS,
-    //   title: MENU_LABELS.TICKETS,
-    //   label: MENU_LABELS.TICKETS,
-    //   url: '',
-    //   subItems: [
-    //     {
-    //       id: 'tickets-dashboard',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_DASHBOARD,
-    //       icon: <LayoutDashboard size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_DASHBOARD,
-    //       url: '/tickets/dashboard'
-    //     },
-    //     {
-    //       id: 'tickets-list',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKETS_LIST,
-    //       icon: <Ticket size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_LIST,
-    //       url: '/tickets/list'
-    //     },
-    //     {
-    //       id: 'tickets-status',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.STATUS,
-    //       icon: <List size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_STATUS,
-    //       url: '/tickets/statuses'
-    //     },
-    //     {
-    //       id: 'tickets-modules',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.MODULES,
-    //       icon: <Layers size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_MODULES,
-    //       url: '/tickets/modules'
-    //     },
-    //     {
-    //       id: 'tickets-module-categories',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_CATEGORIES,
-    //       icon: <Layers size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES,
-    //       url: '/tickets/modules/categories'
-    //     },
-    //     {
-    //       id: 'tickets-module-subcategories',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TICKET_MODULE_SUBCATEGORIES,
-    //       icon: <Layers size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES,
-    //       url: '/tickets/modules/sub-categories'
-    //     },
+    //workforce services end
 
-    //     {
-    //       id: 'tickets-types',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TYPES,
-    //       icon: <List size={16} />,
-    //       permission: PERMISSIONS.VIEW_TICKETS_TYPES,
-    //       url: '/tickets/types'
-    //     }
-    //   ].filter(item => !item.permission || hasPermission(item.permission))
-    // },
-
-    
-
-   
-
-   
-
-    // {
-    //   id: 'controlhub',
-    //   key: 'controlhub',
-    //   permission: PERMISSIONS.CONTROL_HUB_SERVICES,
-    //   icon: <Settings size={20} />,
-    //   color: MENU_COLORS.CONTROL_HUB,
-    //   title: MENU_LABELS.CONTROL_HUB,
-    //   label: MENU_LABELS.CONTROL_HUB,
-    //   url: '',
-    //   subItems: [
-    //     {
-    //       id: 'controlhub-users',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.USER_DIRECTORY,
-    //       icon: <Users size={16} />,
-    //       permission: PERMISSIONS.VIEW_USERS,
-    //       url: '/controlhub/users'
-    //     },
-    //     {
-    //       id: 'controlhub-teams',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.TEAMS,
-    //       icon: <Boxes size={16} />,
-    //       permission: PERMISSIONS.VIEW_TEAMS,
-    //       url: '/controlhub/teams'
-    //     },
-    //     {
-    //       id: 'controlhub-groups',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.GROUPS,
-    //       icon: <Group size={16} />,
-    //       permission: PERMISSIONS.VIEW_GROUPS,
-    //       url: '/controlhub/groups'
-    //     },
-    //     {
-    //       id: 'controlhub-ranks',
-    //       title: HEADER_CONSTANTS.SUBMENU_LABELS.RANKS,
-    //       icon: <Shield size={16} />,
-    //       permission: PERMISSIONS.VIEW_RANKS,
-    //       url: '/controlhub/ranks'
-    //     }
-        
-    //   ].filter(item => !item.permission || hasPermission(item.permission))
-    // },
-
+    //finance services start
     {
-      id: 'reports',
-      key: 'reports',
+      id: 'finance',
+      key: 'finance',
+      permission: PERMISSIONS.ACCOUNTS_SERVICES,
+      icon: <CreditCard size={16} />,
+      color: MENU_COLORS.BILLING,
+      title: 'Billing',
+      label: 'Billing',
+      url: '',
+      subItems: [
+        { 
+          id: 'finance-dashboard', 
+          title: 'Dashboard', 
+          icon: <LayoutDashboard size={16} />, 
+          url: '/billing/dashboard', 
+          permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
+        },
+        { 
+          id: 'finance-account-overview', 
+          title: 'Account Overview', 
+          icon: <Eye size={16} />, 
+          url: '/billing/account-overview', 
+          permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
+        },
+        { 
+          id: 'finance-subscriptions', 
+          title: 'Subscriptions', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/subscriptions', 
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+        },
+        { 
+          id: 'finance-order-invoicing', 
+          title: 'Order Invoicing', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/order-invoicing', 
+          permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
+        },
+        { 
+          id: 'finance-invoices', 
+          title: 'Invoices', 
+          icon: <DollarSign size={16} />, 
+          url: '/billing/invoices', 
+          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+        },
+        { 
+          id: 'finance-payment-history', 
+          title: 'Payment History', 
+          icon: <FileText size={16} />, 
+          url: '/billing/payment-history', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    }, 
+    //finance services end
+
+    //reports and audit services start
+    {
+      id: 'unified-reports',
+      key: 'unified-reports',
       permission: PERMISSIONS.REPORTS_SERVICES,
-      icon: <BarChart3 size={20} />,
+      icon: <BarChart3 size={16} />,
       color: MENU_COLORS.REPORTS,
-      title: MENU_LABELS.REPORTS,
-      label: MENU_LABELS.REPORTS,
+      title: "Unified Reports",
+      label: "Unified Reports",
       url: '',
       subItems: [
         {
@@ -927,53 +750,53 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'CRM Insights',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_REPORTS,
-          url: '/crm/reports'
+          url: '/reports/crm-insights'
         },
         {
           id: 'call-reports',
           title: 'Call Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
-          url: '/call-reports'
+          // url: '/call-reports'
+          url:'/reports/call-analytics'
+        },
+        {
+          id: 'ai-chat-usage-reports',
+          title: 'Chat Usage',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.CHAT_USAGE_REPORTS,
+          url: '/reports/chat-usage'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //reports and audit services end
 
+    //audit logs services start
+      {
+        id: 'audit-logs',
+        key: 'audit-logs',
+        permission: PERMISSIONS.AUDIT_LOGS_SERVICES,
+        icon: <History size={16} />,
+        color: MENU_COLORS.REPORTS,
+        title: 'Audit Logs',
+        label: 'Audit Logs',
+        url: '/audit-logs',
+    },
+    //audit logs services end
+    //settings services start
     {
       id: 'settings',
       key: 'settings',
-      permission: '',
-      icon: <Settings size={20} />,
-      color: '#0d6efd',
-      title: "Settings",
-      label: "Settings",
-      url: '/settings'
+      permission: PERMISSIONS.VIEW_SETTINGS,
+      icon: <Settings size={16} />,
+      color: MENU_COLORS.REPORTS,
+      title: 'Settings',
+      label: 'Settings',
+      url: '/main-settings',
     },
+    //settings services end
 
-    {
-      id: 'resources',
-      key: 'resources',
-      permission: '',
-      icon: <NotebookText size={20} />,
-      color: MENU_COLORS.RESOURCES,
-      title: MENU_LABELS.RESOURCES,
-      label: MENU_LABELS.RESOURCES,
-      url: '/help-center',
-    }
-
-
-  ].filter(item => !item.permission || hasPermission(item.permission));
-
-  const toggleModule = (moduleId: string) => {
-    setExpandedModules(prev => {
-      // If the module is already open, close it
-      if (prev.includes(moduleId)) {
-        return prev.filter(id => id !== moduleId);
-      }
-      // If opening a new module, close all others first (only one open at a time)
-      return [moduleId];
-    });
-  };
+  ].filter(item => ENABLED_MODULE_IDS.includes(item.id) && (!item.permission || hasPermission(item.permission)));
 
   const toggleSubModule = (subModuleId: string) => {
     setExpandedSubModules(prev => 
@@ -983,51 +806,109 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handleSubItemClick = (screenId: string) => {
-    // Navigation handled by Link component
+  const handleModuleClick = (module: MainMenuItem, ev?: React.MouseEvent<HTMLElement>) => {
+    if (module.url && module.url !== '') {
+      setActiveModule(null);
+      return;
+    }
+    if (module.subItems && module.subItems.length > 0) {
+      if (isSidebarExpanded && ev) {
+        // Expanded: open same flyout as hover, pinned next to clicked item
+        if (hoveredModuleId === module.id && isFlyoutPinned) {
+          setHoveredModuleId(null);
+          setHoveredItemRect(null);
+          setIsFlyoutPinned(false);
+        } else {
+          const rect = ev.currentTarget.getBoundingClientRect();
+          setHoveredModuleId(module.id);
+          setHoveredItemRect({ top: rect.top, height: rect.height });
+          setIsFlyoutPinned(true);
+        }
+        return;
+      }
+      setActiveModule(null);
+    }
   };
 
-  // Filter menu items based on search query
-  const filterMenuItems = (items: MainMenuItem[]): MainMenuItem[] => {
-    if (!searchQuery.trim()) return items;
-    
-    const query = searchQuery.toLowerCase();
-    return items.filter(item => {
-      const matchesTitle = item.title.toLowerCase().includes(query);
-      const matchesSubItems = item.subItems?.some(subItem => {
-        const matchesSubTitle = subItem.title.toLowerCase().includes(query);
-        const matchesNested = subItem.subItems?.some(nested => 
-          nested.title.toLowerCase().includes(query)
-        );
-        return matchesSubTitle || matchesNested;
-      });
-      return matchesTitle || matchesSubItems;
-    }).map(item => {
-      if (!item.subItems) return item;
-      
-      const filteredSubItems = item.subItems.filter(subItem => {
-        const matchesSubTitle = subItem.title.toLowerCase().includes(query);
-        const matchesNested = subItem.subItems?.some(nested => 
-          nested.title.toLowerCase().includes(query)
-        );
-        return matchesSubTitle || matchesNested;
-      });
-      
-      return { ...item, subItems: filteredSubItems.length > 0 ? filteredSubItems : item.subItems };
-    });
+  const handleCollapsedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (module.subItems && module.subItems.length > 0) {
+      const rect = ev.currentTarget.getBoundingClientRect();
+      setHoveredModuleId(module.id);
+      setHoveredItemRect({ top: rect.top, height: rect.height });
+    }
   };
 
-  // Automatically expand modules and sub-modules when route changes
+  const handleCollapsedItemMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
+
+  const handleExpandedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    // When hovering over a different item while one is pinned, show the hovered item's flyout
+    if (isFlyoutPinned && module.subItems && module.subItems.length > 0) {
+      const rect = ev.currentTarget.getBoundingClientRect();
+      setHoveredModuleId(module.id);
+      setHoveredItemRect({ top: rect.top, height: rect.height });
+    }
+  };
+
+  const handleExpandedItemMouseLeave = () => {
+    if (isFlyoutPinned) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        // When mouse leaves, stay on the current hovered item briefly before reverting
+        hoverTimeoutRef.current = null;
+      }, 50);
+    }
+  };
+
+  const handleFlyoutMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handleFlyoutMouseLeave = () => {
+    if (!isFlyoutPinned) {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+    }
+  };
+
   useEffect(() => {
-    // Only run when pathname actually changes (not on every render)
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
+
+  // Hide flyout when sidebar is collapsed
+  useEffect(() => {
+    if (!isSidebarExpanded && isFlyoutPinned) {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+      setIsFlyoutPinned(false);
+    }
+  }, [isSidebarExpanded, isFlyoutPinned]);
+
+  // Auto-detect active module based on current route
+  useEffect(() => {
     if (prevPathnameRef.current === router.pathname) {
       return;
     }
     
-    // Update the ref to the current pathname
     prevPathnameRef.current = router.pathname;
     
-    // Check if a sub-item or any of its nested children matches the current route
     const isSubItemActive = (subItem: SubMenuItem): boolean => {
       if (subItem.url && router.pathname === subItem.url) {
         return true;
@@ -1038,27 +919,25 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       return false;
     };
 
-    // Check if a module has any active child
     const hasActiveChild = (module: MainMenuItem): boolean => {
-      // First check if the module itself matches the route (for direct URLs)
       if (module.url && router.pathname === module.url) {
         return true;
       }
-      // Then check if any subItem matches
       if (!module.subItems || module.subItems.length === 0) {
         return false;
       }
       return module.subItems.some(subItem => isSubItemActive(subItem));
     };
 
-    const modulesToExpand: string[] = [];
     const subModulesToExpand: string[] = [];
+    let foundActiveModule: string | null = null;
 
     mainMenuItems.forEach(module => {
       if (hasActiveChild(module)) {
-        modulesToExpand.push(module.id);
+        if (module.subItems && module.subItems.length > 0) {
+          foundActiveModule = module.id;
+        }
         
-        // Also expand sub-modules that have active children
         if (module.subItems) {
           module.subItems.forEach(subItem => {
             if (isSubItemActive(subItem)) {
@@ -1069,34 +948,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       }
     });
 
-    // Update expanded modules - collapse all that don't match, expand only the matching one
-    setExpandedModules(prev => {
-      // If there's a module to expand, only keep that one
-      if (modulesToExpand.length > 0) {
-        const moduleToOpen = modulesToExpand[0];
-        // Only update if different from current state
-        if (prev.length === 1 && prev[0] === moduleToOpen) {
-          return prev; // No change needed
-        }
-        return [moduleToOpen];
-      } else {
-        // If no module matches, collapse all
-        return [];
-      }
-    });
-
-    // Update expanded sub-modules - only keep those that match
+    setActiveModule(foundActiveModule);
     setExpandedSubModules(prev => {
       if (subModulesToExpand.length > 0) {
         const newExpanded = Array.from(new Set(subModulesToExpand));
-        // Only update state if there's an actual change to prevent infinite loops
         const hasChange = newExpanded.length !== prev.length || 
                          !newExpanded.every(id => prev.includes(id));
         return hasChange ? newExpanded : prev;
-      } else {
-        // If no sub-modules match, collapse all
-        return [];
       }
+      return [];
     });
   }, [router.pathname, mainMenuItems]);
 
@@ -1107,50 +967,30 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .sidebar-container {
       position: fixed;
-      top: 76px;
+      top: 0;
       left: 0;
-      height: calc(100vh - 76px);
-      width: 280px;
-      background: #ffffff;
-      border-right: 1px solid #e8e8e8;
+      height: 100vh;
+      width: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
+      background: #00385d;
+      border: none;
       display: flex;
       flex-direction: column;
       z-index: 1000;
-      transition: transform 0.3s ease-in-out;
+      transition: width 0.3s ease-in-out;
+      /* box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1); */
     }
 
-    /* On desktop, hide sidebar only when sidebarOpen is false */
-    @media (min-width: 1200px) {
-      .sidebar-container.mobile-hidden {
-        transform: translateX(-100%);
-      }
-    }
-
-    /* On mobile, always hide by default */
     @media (max-width: 1199px) {
       .sidebar-container {
         transform: translateX(-100%);
         top: 0;
         height: 100vh;
         z-index: 1001;
+        width: 235px;
       }
       .sidebar-container:not(.mobile-hidden) {
         transform: translateX(0);
       }
-    }
-
-    .mobile-menu-btn {
-      display: none;
-      position: fixed;
-      top: 16px;
-      left: 16px;
-      z-index: 1050;
-      padding: 8px;
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .sidebar-backdrop {
@@ -1164,61 +1004,66 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       z-index: 999;
     }
 
-    /* Only show backdrop on mobile */
     @media (max-width: 1199px) {
       .sidebar-backdrop.show {
         display: block;
       }
-      .mobile-menu-btn {
-        display: block;
-      }
     }
 
-    .sidebar-search {
+    .sidebar-header {
       flex-shrink: 0;
-      padding: 16px 16px 0 16px;
+      padding: 15px 16px 6px 25px;
+      display: flex;
+      align-items: center;
+      justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
+      /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
     }
 
-    .search-wrapper {
-      position: relative;
+    .sidebar-logo {
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      opacity: ${isSidebarExpanded ? '1' : '0'};
+      transition: opacity 0.3s;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
-    .search-icon {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #999;
-      pointer-events: none;
-    }
-
-    .search-input {
-      width: 100%;
-      padding: 10px 16px 10px 40px;
-      background: #f5f5f5;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      font-size: 14px;
-      color: #333;
-      outline: none;
+    .expand-toggle-btn {
+     
+      border-radius: 6px;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
       transition: all 0.2s;
+      background: transparent;
+      border: none;
     }
 
-    .search-input:focus {
-      background: #efefef;
-      border-color: #e0e0e0;
+    .expand-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
-    .search-input::placeholder {
-      color: #999;
+    .sidebar-footer {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      border-top: 0px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: ${isSidebarExpanded ? 'flex-end' : 'center'};
     }
 
     .sidebar-menu {
       flex: 1;
       overflow-y: auto;
-      padding-bottom: 24px;
+      min-height: 0;
+      padding: 12px 8px;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
     .sidebar-menu::-webkit-scrollbar {
@@ -1230,120 +1075,324 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .sidebar-menu::-webkit-scrollbar-thumb {
-      background: #d1d5db;
+      background: rgba(255, 255, 255, 0.2);
       border-radius: 3px;
     }
 
     .sidebar-menu::-webkit-scrollbar-thumb:hover {
-      background: #9ca3af;
-    }
-
-    .sidebar-section {
-      margin-bottom: 8px;
-    }
-
-    .sidebar-section.system-section {
-      margin-top: auto;
-      padding-top: 16px;
-      border-top: 1px solid #e8e8e8;
-    }
-
-    .section-heading {
-      padding: 12px 16px 8px;
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #6b7280;
+      background: rgba(255, 255, 255, 0.3);
     }
 
     .menu-nav {
       list-style: none;
       margin: 0;
-      padding: 0 8px;
+      padding: 0;
     }
 
     .menu-item {
-      margin-bottom: 2px;
+      margin-bottom: 10px;
+      position: relative;
+    }
+
+    .menu-item-tooltip {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 12px;
+      padding: 8px 12px;
+      background: #1e3a8a;
+      color: white;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1002;
+      pointer-events: none;
+    }
+
+    .sidebar-container.collapsed .menu-item:hover .menu-item-tooltip {
+      display: block;
+    }
+
+    .sidebar-container.collapsed .menu-item .menu-item-tooltip {
+      animation: tooltipFade 0.15s ease;
+    }
+
+    @keyframes tooltipFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Submenu flyout - purple background, white text, 3px gap from sidebar */
+    .submenu-flyout {
+      position: fixed;
+      top: 0;
+      min-width: 200px;
+      max-width: 220px;
+      background: #00385d !important;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.12);
+      z-index: 1010;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-left: none;
+      animation: flyoutFade 0.15s ease;
+      padding: 6px 10px
+    }
+
+    @keyframes flyoutFade {
+      from { opacity: 0; transform: translateX(-4px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .submenu-flyout-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      /*background: rgba(0, 0, 0, 0.15);*/
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .submenu-flyout-content {
+      padding: 8px 0;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    .submenu-flyout-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.95);
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+      box-sizing: border-box;
+    }
+
+    .submenu-flyout-item:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .submenu-flyout-item.active {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-weight: 400;
+    }
+
+    .submenu-flyout-item .flyout-item-icon {
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-shrink: 0;
+      display:none !important;
+    }
+
+    .submenu-flyout-item.active .flyout-item-icon {
+      color: #fff;
+    }
+
+    .submenu-flyout-item-label {
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      cursor: default;
+    }
+
+    .submenu-flyout-item.separator {
+      padding: 0;
+      margin: 8px 0px;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.2);
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .submenu-flyout-item.separator:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .menu-item-button {
       width: 100%;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
+      justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
+      padding: ${isSidebarExpanded ? '12px 16px' : '12px'};
       background: transparent;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: all 0.2s;
       font-family: inherit;
       text-align: left;
       position: relative;
       text-decoration: none;
+      color: white;
+      gap: 9px;
     }
 
     .menu-item-button:hover {
-      background: #fafafa;
+      background: rgba(255, 255, 255, 0.15);
     }
 
     .menu-item-button.active {
-      background: #e3f2fd;
+      background: rgba(255, 255, 255, 0.2);
     }
 
-    .menu-item-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex: 1;
-    }
+
 
     .menu-item-icon {
-      color: #666;
+      color: #dfdbdb;
       display: flex;
       align-items: center;
+      flex-shrink: 0;
       transition: color 0.2s;
-    }
-
-    .menu-item-button.active .menu-item-icon {
-      color: #1976d2;
+      
     }
 
     .menu-item-text {
-      font-size: 12px;
-      font-weight: 500;
-      color: #333;
-    }
-
-    .menu-item-button.active .menu-item-text {
-      color: #1976d2;
+      font-size: 13px;
+      font-weight: 300;
+      color: white;
+      opacity: ${isSidebarExpanded ? '1' : '0'};
+      transition: opacity 0.3s;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
     .menu-item-chevron {
-      color: #999;
+      color: white;
+      display: ${isSidebarExpanded ? 'flex' : 'none'};
+      align-items: center;
+      margin-left: auto;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .menu-item-button:hover .menu-item-chevron {
+      opacity: 1;
+    }
+
+    /* Submenu Panel */
+    .submenu-panel {
+      position: fixed;
+      left: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
+      top: 0;
+      height: 100vh;
+      width: 235px;
+      background: white;
+      border-right: 1px solid #e5e7eb;
+      box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+      transform: translateX(${activeModule ? '0' : '-100%'});
+      transition: all 0.3s ease-in-out;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      display: none !important;
+
+    }
+
+    @media (max-width: 1199px) {
+      .submenu-panel {
+        left: 235px;
+        top: 0;
+        height: 100vh;
+      }
+    }
+
+    .submenu-header {
+      padding: 20px;
+      border-bottom: 1px solid #e5e7eb;
       display: flex;
       align-items: center;
-      transition: transform 0.2s;
+      justify-content: space-between;
+      background: #f9fafb;
     }
 
-    .menu-item-chevron.expanded {
-      transform: rotate(0deg);
+    .submenu-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
     }
 
-    .menu-item-chevron.collapsed {
-      transform: rotate(-90deg);
+    .submenu-close-btn {
+      background: transparent;
+      border: none;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      border-radius: 6px;
+      transition: all 0.2s;
     }
 
-    .submenu {
+    .submenu-close-btn:hover {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .submenu-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .submenu-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .submenu-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .submenu-content::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+    }
+
+    .submenu-content::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    .submenu-list {
+      list-style: none;
       margin: 0;
       padding: 0;
-      list-style: none;
     }
 
     .submenu-item {
-      margin-bottom: 0;
-      position: relative;
+      margin-bottom: 2px;
     }
 
     .submenu-item-button {
@@ -1351,46 +1400,46 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 6px 12px 6px 40px;
+      padding: 12px 16px;
       background: transparent;
       border: none;
       cursor: pointer;
       transition: all 0.15s;
       font-family: inherit;
       text-align: left;
-      position: relative;
       border-radius: 8px;
       text-decoration: none;
+      position: relative;
     }
 
     .submenu-item-button::before {
       content: '';
       position: absolute;
       left: 0;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      background: transparent;
-      border-radius: 0 4px 4px 0;
-      transition: background 0.15s;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 0;
+      width: 3px;
+      background: #2563eb;
+      border-radius: 0 3px 3px 0;
+      transition: height 0.2s;
     }
 
     .submenu-item-button:hover {
-      background: #fafafa;
+      background: #f3f4f6;
     }
 
     .submenu-item-button.active {
-      background: transparent;
-     
+      background: #eff6ff;
+      color: #2563eb;
     }
 
     .submenu-item-button.active::before {
-      background: #1976d2;
-      display: none;
+      height: 24px;
     }
 
     .submenu-item-icon {
-      color: #999;
+      color: #6b7280;
       display: flex;
       align-items: center;
       flex-shrink: 0;
@@ -1398,18 +1447,38 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .submenu-item-button.active .submenu-item-icon {
-      color: #1976d2;
+      color: #2563eb;
     }
 
     .submenu-item-text {
-      font-size: 12px;
-      color: #555;
-      font-weight: 400;
+      font-size: 14px;
+      color: #374151;
+      font-weight: 500;
+      flex: 1;
     }
 
     .submenu-item-button.active .submenu-item-text {
-      color: #1976d2;
-      font-weight: 500;
+      color: #2563eb;
+      font-weight: 600;
+    }
+
+    .submenu-item-chevron {
+      color: #9ca3af;
+      display: flex;
+      align-items: center;
+      transition: transform 0.2s;
+    }
+
+    .submenu-item-chevron.expanded {
+      transform: rotate(90deg);
+    }
+
+    .nested-submenu {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      margin-left: 28px;
+      margin-top: 4px;
     }
 
     .nested-sub-item {
@@ -1417,44 +1486,28 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px 10px 70px;
+      padding: 10px 16px;
       background: transparent;
       border: none;
       cursor: pointer;
       transition: all 0.15s;
       font-family: inherit;
       text-align: left;
-      position: relative;
       border-radius: 8px;
       text-decoration: none;
-    }
-
-    .nested-sub-item::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 4px;
-      background: transparent;
-      border-radius: 0 4px 4px 0;
-      transition: background 0.15s;
+      margin-bottom: 2px;
     }
 
     .nested-sub-item:hover {
-      background: #fafafa;
+      background: #f3f4f6;
     }
 
     .nested-sub-item.active {
-      background: #e3f2fd;
-    }
-
-    .nested-sub-item.active::before {
-      background: #1976d2;
+      background: #eff6ff;
     }
 
     .nested-sub-item-icon {
-      color: #999;
+      color: #9ca3af;
       display: flex;
       align-items: center;
       flex-shrink: 0;
@@ -1462,411 +1515,409 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .nested-sub-item.active .nested-sub-item-icon {
-      color: #1976d2;
+      color: #2563eb;
+    }
+
+    .nested-sub-item-text {
+      font-size: 13px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .nested-sub-item.active .nested-sub-item-text {
+      color: #2563eb;
+      font-weight: 600;
     }
 
     .sidebar-container a {
       text-decoration: none !important;
     }
+
+    .sidebar-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 8px 12px;
+    }
   `;
 
-
-  //const dashboardItems = filterMenuItems(mainMenuItems.slice(0, 2));
-  const dashboardItems = filterMenuItems(
+  const dashboardItems = mainMenuItems.filter(item => 
     hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE) 
-      ? mainMenuItems.slice(0, 2) 
-      : mainMenuItems.slice(0, 1)
+      ? item.id === 'dashboard' || item.id === 'dashboard-unified-workspace'
+      : item.id === 'dashboard'
   );
 
-  //const servicesItems = filterMenuItems(mainMenuItems.slice(1, -2));
-  const servicesItems = filterMenuItems(
-    hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE) 
-      ? mainMenuItems.slice(2, -2) 
-      : mainMenuItems.slice(1, -2)
+  const servicesItems = mainMenuItems.filter(item => 
+    item.id !== 'dashboard' && 
+    item.id !== 'dashboard-unified-workspace' && 
+    item.id !== 'settings' && 
+    item.id !== 'resources' &&
+    item.id !== 'unified-reports' &&
+    item.id !== 'audit-logs'
   );
 
-  const systemItems = filterMenuItems(mainMenuItems.slice(-2));
+  const systemItems = mainMenuItems.filter(item => 
+    item.id === 'settings' || item.id === 'resources' || item.id === 'unified-reports' || item.id === 'audit-logs'
+  );
+
+  const activeModuleData = mainMenuItems.find(m => m.id === activeModule);
 
   return (
     <>
       <style>{customStyles}</style>
 
-      {/* Mobile Menu Button */}
-      {/* <button
-        className="mobile-menu-btn"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-      >
-        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-      </button> */}
-
-      {/* Backdrop for mobile */}
+      {/* Backdrop for mobile and submenu */}
       <div
-        className={`sidebar-backdrop ${sidebarOpen ? 'show' : ''}`}
-        onClick={() => setSidebarOpen(false)}
+        className={`sidebar-backdrop ${(sidebarOpen || activeModule || isFlyoutPinned) ? 'show' : ''}`}
+        onClick={() => {
+          setSidebarOpen(false);
+          setActiveModule(null);
+          if (isFlyoutPinned) {
+            setHoveredModuleId(null);
+            setHoveredItemRect(null);
+            setIsFlyoutPinned(false);
+          }
+        }}
       />
 
-      {/* Sidebar */}
-      <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''}`}>
-        {/* Search */}
-        {/* <div className="sidebar-search">
-          <div className="search-wrapper">
-            <div className="search-icon">
-              <Search size={18} />
-            </div>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-          </div>
-        </div> */}
+      {/* Main Sidebar */}
+      <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''} ${!isSidebarExpanded ? 'collapsed' : ''}`}>
+        {/* Header */}
+        <div className="sidebar-header" style={{ display: 'none' }}>
+          {isSidebarExpanded && <div className="sidebar-logo menu-item-text">
+            {userCompanyName}
+
+            {/* {currentUserCompanyImageUrl ? (
+              <img
+                src={currentUserCompanyImageUrl}
+                alt="Company logo"
+                style={{
+                  maxWidth: 160,
+                  objectFit: "contain",
+                  
+                }}
+              />
+            ) : (
+              <img src={logodark.src} alt="logo" className="img-fluid" />
+            )} */}
+
+
+          </div>}
+        </div>
 
         {/* Menu Items */}
         <div className="sidebar-menu">
-          {/* Dashboard Section */}
-          <div className="sidebar-section">
-            <div className="section-heading">Dashboard</div>
-            <ul className="menu-nav">
-              {dashboardItems.map((module) => (
-                <li key={module.id} className="menu-item">
-                  {module.url !== '' ? (
-                    <Link href={(BASE_URL || '') + (module.url || '/')}>
-                      <button
-                        className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
+          <ul className="menu-nav">
+            {/* Dashboard Items */}
+            {dashboardItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
+                    <button
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
+                      onClick={() => {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
+                          setSidebarOpen(false);
+                        }
+                      }}
+                    >
+                      <div className="menu-item-icon">{module.icon}</div>
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
+                    )}
+                  </button>
+                )}
+              </li>
+            ))}
+
+            <div className="sidebar-divider"></div>
+
+            {/* Services Items */}
+            {servicesItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
+                    <button
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
+                      onClick={() => {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
+                          setSidebarOpen(false);
+                        }
+                      }}
+                    >
+                      <div className="menu-item-icon">{module.icon}</div>
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
+                    )}
+                  </button>
+                )}
+              </li>
+            ))}
+
+            <div className="sidebar-divider"></div>
+
+            {/* System Items */}
+            {systemItems.map((module) => (
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={module.subItems?.length ? (ev) => {
+                  if (isSidebarExpanded && isFlyoutPinned) {
+                    handleExpandedItemMouseEnter(module, ev);
+                  } else if (!isSidebarExpanded) {
+                    handleCollapsedItemMouseEnter(module, ev);
+                  }
+                } : undefined}
+                onMouseLeave={module.subItems?.length ? (isSidebarExpanded && isFlyoutPinned ? handleExpandedItemMouseLeave : handleCollapsedItemMouseLeave) : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
+                {module.url !== '' ? (
+                  <Link href={(BASE_URL || '') + (module.url || '/')}>
+                    <button
+                      type="button"
+                      title={!isSidebarExpanded ? module.title : undefined}
+                      className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
+                      onClick={() => {
+                        if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
+                          setSidebarOpen(false);
+                        }
+                      }}
+                    >
+                      <div className="menu-item-icon">{module.icon}</div>
+                      {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    </button>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    title={!isSidebarExpanded ? module.title : undefined}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
+                  >
+                    <div className="menu-item-icon">{module.icon}</div>
+                    {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
+                    {isSidebarExpanded && module.subItems && module.subItems.length > 0 && (
+                      <div className="menu-item-chevron">
+                        <ChevronRight size={18} />
+                      </div>
+                    )}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer with expand/collapse */}
+        <div className="sidebar-footer">
+          <button 
+            className="expand-toggle-btn"
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+          >
+            {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsed sidebar: hover flyout for sub-items (above main content) */}
+      {/* Submenu flyout: when collapsed on hover, when expanded on click (same style, above content) */}
+      {hoveredModuleId && hoveredItemRect && (() => {
+        const flyoutModule = mainMenuItems.find(m => m.id === hoveredModuleId);
+        if (!flyoutModule?.subItems?.length) return null;
+        return (
+          <div
+            className="submenu-flyout"
+            style={{
+              top: hoveredItemRect.top,
+              left: (isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED) + 3,
+            }}
+            onMouseEnter={handleFlyoutMouseEnter}
+            onMouseLeave={handleFlyoutMouseLeave}
+          >
+            <div className="submenu-flyout-header">{flyoutModule.title}</div>
+            <div className="submenu-flyout-content">
+              {flyoutModule.subItems.map((subItem: SubMenuItem) => {
+                // Handle separator
+                if (subItem.title === '---') {
+                  return <div key={subItem.id} className="submenu-flyout-item separator" />;
+                }
+                
+                return subItem.subItems && subItem.subItems.length > 0 ? (
+                  <div key={subItem.id}>
+                    <div className="submenu-flyout-item submenu-flyout-item-label">
+                      <span className="flyout-item-icon">{subItem.icon}</span>
+                      {subItem.title}
+                    </div>
+                    {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                      <Link
+                        key={nestedItem.id}
+                        href={(BASE_URL || '') + (nestedItem.url || '/')}
+                        className={`submenu-flyout-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
                         onClick={() => {
-                          if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                            setSidebarOpen(false);
-                          }
+                          setHoveredModuleId(null);
+                          setHoveredItemRect(null);
+                          setIsFlyoutPinned(false);
+                          if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
                         }}
                       >
-                        <div className="menu-item-content">
-                          <div className="menu-item-icon">
-                            {module.icon}
-                          </div>
-                          <span className="menu-item-text">{module.title}</span>
-                        </div>
-                      </button>
-                    </Link>
-                  ) : (
-                    <button
-                      className={`menu-item-button ${expandedModules.includes(module.id) ? 'active' : ''}`}
-                      onClick={() => toggleModule(module.id)}
-                    >
-                      <div className="menu-item-content">
-                        <div className="menu-item-icon">
-                          {module.icon}
-                        </div>
-                        <span className="menu-item-text">{module.title}</span>
-                      </div>
-                      {module.subItems && module.subItems.length > 0 && (
-                        <div className={`menu-item-chevron ${expandedModules.includes(module.id) ? 'expanded' : 'collapsed'}`}>
-                          <ChevronDown size={18} />
-                        </div>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Sub Items */}
-                  {expandedModules.includes(module.id) && module.subItems && module.subItems.length > 0 && (
-                    <ul className="submenu">
-                      {module.subItems.map((subItem: SubMenuItem) => (
-                        <li key={subItem.id} className="submenu-item">
-                          {subItem.subItems && subItem.subItems.length > 0 ? (
-                            <>
-                              <button
-                                className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? 'active' : ''}`}
-                                onClick={() => toggleSubModule(subItem.id)}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                                <div className={`menu-item-chevron ${expandedSubModules.includes(subItem.id) ? 'expanded' : 'collapsed'}`}>
-                                  <ChevronDown size={16} />
-                                </div>
-                              </button>
-                              {expandedSubModules.includes(subItem.id) && (
-                                <ul className="submenu">
-                                  {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                                    <li key={nestedItem.id} className="submenu-item">
-                                      <Link href={nestedItem.url || '/'}>
-                                        <button
-                                          className={`nested-sub-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
-                                          onClick={() => {
-                                            handleSubItemClick(nestedItem.id);
-                                            if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                              setSidebarOpen(false);
-                                            }
-                                          }}
-                                        >
-                                          <div className="nested-sub-item-icon">
-                                            {nestedItem.icon}
-                                          </div>
-                                          <span className="submenu-item-text">{nestedItem.title}</span>
-                                        </button>
-                                      </Link>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </>
-                          ) : (
-                            <Link href={subItem.url || '/'}>
-                              <button
-                                className={`submenu-item-button ${router.pathname === subItem.url ? 'active' : ''}`}
-                                onClick={() => {
-                                  if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                    setSidebarOpen(false);
-                                  }
-                                }}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                              </button>
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
+                        <span className="flyout-item-icon">{nestedItem.icon}</span>
+                        {nestedItem.title}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <Link
+                    key={subItem.id}
+                    href={(BASE_URL || '') + (subItem.url || '/')}
+                    className={`submenu-flyout-item ${router.pathname === subItem.url ? 'active' : ''}`}
+                    onClick={() => {
+                      setHoveredModuleId(null);
+                      setHoveredItemRect(null);
+                      setIsFlyoutPinned(false);
+                      if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
+                    }}
+                  >
+                    <span className="flyout-item-icon">{subItem.icon}</span>
+                    {subItem.title}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
+        );
+      })()}
 
-          {/* Services Section */}
-          <div className="sidebar-section">
-            <div className="section-heading">Services</div>
-            <ul className="menu-nav">
-              {servicesItems.map((module) => (
-                <li key={module.id} className="menu-item">
-                  {module.url !== '' ? (
-                    <Link href={(BASE_URL || '') + (module.url || '/')}>
-                      <button
-                        className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
-                        onClick={() => {
-                          if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                            setSidebarOpen(false);
-                          }
-                        }}
-                      >
-                        <div className="menu-item-content">
-                          <div className="menu-item-icon">
-                            {module.icon}
-                          </div>
-                          <span className="menu-item-text">{module.title}</span>
-                        </div>
-                      </button>
-                    </Link>
-                  ) : (
-                    <button
-                      className={`menu-item-button ${expandedModules.includes(module.id) ? 'active' : ''}`}
-                      onClick={() => toggleModule(module.id)}
-                    >
-                      <div className="menu-item-content">
-                        <div className="menu-item-icon">
-                          {module.icon}
-                        </div>
-                        <span className="menu-item-text">{module.title}</span>
-                      </div>
-                      {module.subItems && module.subItems.length > 0 && (
-                        <div className={`menu-item-chevron ${expandedModules.includes(module.id) ? 'expanded' : 'collapsed'}`}>
-                          <ChevronDown size={18} />
-                        </div>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Sub Items */}
-                  {expandedModules.includes(module.id) && module.subItems && module.subItems.length > 0 && (
-                    <ul className="submenu">
-                      {module.subItems.map((subItem: SubMenuItem) => (
-                        <li key={subItem.id} className="submenu-item">
-                          {subItem.subItems && subItem.subItems.length > 0 ? (
-                            <>
-                              <button
-                                className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? 'active' : ''}`}
-                                onClick={() => toggleSubModule(subItem.id)}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                                <div className={`menu-item-chevron ${expandedSubModules.includes(subItem.id) ? 'expanded' : 'collapsed'}`}>
-                                  <ChevronDown size={16} />
-                                </div>
-                              </button>
-                              {expandedSubModules.includes(subItem.id) && (
-                                <ul className="submenu">
-                                  {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                                    <li key={nestedItem.id} className="submenu-item">
-                                      <Link href={nestedItem.url || '/'}>
-                                        <button
-                                          className={`nested-sub-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
-                                          onClick={() => {
-                                            handleSubItemClick(nestedItem.id);
-                                            if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                              setSidebarOpen(false);
-                                            }
-                                          }}
-                                        >
-                                          <div className="nested-sub-item-icon">
-                                            {nestedItem.icon}
-                                          </div>
-                                          <span className="submenu-item-text">{nestedItem.title}</span>
-                                        </button>
-                                      </Link>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </>
-                          ) : (
-                            <Link href={subItem.url || '/'}>
-                              <button
-                                className={`submenu-item-button ${router.pathname === subItem.url ? 'active' : ''}`}
-                                onClick={() => {
-                                  if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                    setSidebarOpen(false);
-                                  }
-                                }}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                              </button>
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
+      {/* Submenu Panel */}
+      {activeModuleData && activeModuleData.subItems && (
+        <div className="submenu-panel">
+          <div className="submenu-header">
+            <div className="submenu-title">{activeModuleData.title}</div>
+            <button 
+              className="submenu-close-btn"
+              onClick={() => setActiveModule(null)}
+            >
+              <X size={20} />
+            </button>
           </div>
-
-          {/* System Section - Always at bottom */}
-          <div className="sidebar-section system-section">
-            <div className="section-heading">Admin & Support</div>
-            <ul className="menu-nav">
-              {systemItems.map((module) => (
-                <li key={module.id} className="menu-item">
-                  {module.url !== '' ? (
-                    <Link href={(BASE_URL || '') + (module.url || '/')}>
+          <div className="submenu-content">
+            <ul className="submenu-list">
+              {activeModuleData.subItems.map((subItem: SubMenuItem) => (
+                <li key={subItem.id} className="submenu-item">
+                  {subItem.subItems && subItem.subItems.length > 0 ? (
+                    <>
                       <button
-                        className={`menu-item-button ${router.pathname === module.url ? 'active' : ''}`}
+                        className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? 'active' : ''}`}
+                        onClick={() => toggleSubModule(subItem.id)}
+                      >
+                        <div className="submenu-item-icon">{subItem.icon}</div>
+                        <span className="submenu-item-text">{subItem.title}</span>
+                        <div className={`submenu-item-chevron ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
+                          <ChevronRight size={16} />
+                        </div>
+                      </button>
+                      {expandedSubModules.includes(subItem.id) && (
+                        <ul className="nested-submenu">
+                          {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                            <li key={nestedItem.id}>
+                              <Link href={(BASE_URL || '') + (nestedItem.url || '/')}>
+                                <button
+                                  className={`nested-sub-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
+                                  onClick={() => {
+                                    if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
+                                      setSidebarOpen(false);
+                                      setActiveModule(null);
+                                    }
+                                  }}
+                                >
+                                  <div className="nested-sub-item-icon">{nestedItem.icon}</div>
+                                  <span className="nested-sub-item-text">{nestedItem.title}</span>
+                                </button>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <Link href={(BASE_URL || '') + (subItem.url || '/')}>
+                      <button
+                        className={`submenu-item-button ${router.pathname === subItem.url ? 'active' : ''}`}
                         onClick={() => {
                           if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
                             setSidebarOpen(false);
+                            setActiveModule(null);
                           }
                         }}
                       >
-                        <div className="menu-item-content">
-                          <div className="menu-item-icon">
-                            {module.icon}
-                          </div>
-                          <span className="menu-item-text">{module.title}</span>
-                        </div>
+                        <div className="submenu-item-icon">{subItem.icon}</div>
+                        <span className="submenu-item-text">{subItem.title}</span>
                       </button>
                     </Link>
-                  ) : (
-                    <button
-                      className={`menu-item-button ${expandedModules.includes(module.id) ? 'active' : ''}`}
-                      onClick={() => toggleModule(module.id)}
-                    >
-                      <div className="menu-item-content">
-                        <div className="menu-item-icon">
-                          {module.icon}
-                        </div>
-                        <span className="menu-item-text">{module.title}</span>
-                      </div>
-                      {module.subItems && module.subItems.length > 0 && (
-                        <div className={`menu-item-chevron ${expandedModules.includes(module.id) ? 'expanded' : 'collapsed'}`}>
-                          <ChevronDown size={18} />
-                        </div>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Sub Items */}
-                  {expandedModules.includes(module.id) && module.subItems && module.subItems.length > 0 && (
-                    <ul className="submenu">
-                      {module.subItems.map((subItem: SubMenuItem) => (
-                        <li key={subItem.id} className="submenu-item">
-                          {subItem.subItems && subItem.subItems.length > 0 ? (
-                            <>
-                              <button
-                                className={`submenu-item-button ${expandedSubModules.includes(subItem.id) ? 'active' : ''}`}
-                                onClick={() => toggleSubModule(subItem.id)}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                                <div className={`menu-item-chevron ${expandedSubModules.includes(subItem.id) ? 'expanded' : 'collapsed'}`}>
-                                  <ChevronDown size={16} />
-                                </div>
-                              </button>
-                              {expandedSubModules.includes(subItem.id) && (
-                                <ul className="submenu">
-                                  {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                                    <li key={nestedItem.id} className="submenu-item">
-                                      <Link href={nestedItem.url || '/'}>
-                                        <button
-                                          className={`nested-sub-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
-                                          onClick={() => {
-                                            handleSubItemClick(nestedItem.id);
-                                            if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                              setSidebarOpen(false);
-                                            }
-                                          }}
-                                        >
-                                          <div className="nested-sub-item-icon">
-                                            {nestedItem.icon}
-                                          </div>
-                                          <span className="submenu-item-text">{nestedItem.title}</span>
-                                        </button>
-                                      </Link>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </>
-                          ) : (
-                            <Link href={subItem.url || '/'}>
-                              <button
-                                className={`submenu-item-button ${router.pathname === subItem.url ? 'active' : ''}`}
-                                onClick={() => {
-                                  if (globalThis.window !== undefined && globalThis.window.innerWidth < 1200) {
-                                    setSidebarOpen(false);
-                                  }
-                                }}
-                              >
-                                <div className="submenu-item-icon">
-                                  {subItem.icon}
-                                </div>
-                                <span className="submenu-item-text">{subItem.title}</span>
-                              </button>
-                            </Link>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
                   )}
                 </li>
               ))}
             </ul>
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 };
 
+export { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED };
 export default ApplicationCustomerSidebar;

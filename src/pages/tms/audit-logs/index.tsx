@@ -17,10 +17,10 @@ import { toast } from "react-toastify";
 import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import AuditLogDetail from "./Details";
 
-import { getAuditLogs } from "@utils/tms/List";
+import { GetTmsAuditLogs } from "@utils/tms/List";
 import AuditLogsFilters from "@components/filters/AuditLogsFilters";
 import { AuditLog } from "@models/tms/AuditLog";
 
@@ -154,7 +154,7 @@ const TmsAuditLogs = () => {
   const fetchData = useCallback(
       
       async (page = 1, perPage = 15, search = "") => {
-        return await getAuditLogs({ page, perPage, search: search || currentFilters?.search || "", filters: currentFilters });
+        return await GetTmsAuditLogs({ page, perPage, search: search || currentFilters?.search || "", filters: currentFilters });
       },
       [memoizedFilters,currentFilters]
     );

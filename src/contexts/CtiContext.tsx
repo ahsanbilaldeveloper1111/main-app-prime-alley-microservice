@@ -24,6 +24,7 @@ const CALL_STATES_TIMESTAMP_KEY = "cti_call_states_timestamp";
 interface CtiContextType {
   // Connection state
   isInitialized: boolean;
+  isReconnecting: boolean;
   error: string | null;
   userAddress: string;
   
@@ -317,7 +318,11 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     const latestEvent = ctiStomp.eventLog[ctiStomp.eventLog.length - 1];
     if (!latestEvent || !latestEvent.parties || latestEvent.parties.length === 0) return;
     
-    const eventData = latestEvent.parties[0];
+    // For multi-party (e.g. transfer) events, prefer the CONNECTED/active leg so transfer hold uses the right party.
+    const activeStatuses = ['CONNECTED', 'ANSWERED', 'RETRIEVED', 'RINGING', 'ON_HOLD'];
+    const eventData =
+      latestEvent.parties.find((p: any) => p.callStatus && activeStatuses.includes(p.callStatus)) ||
+      latestEvent.parties[0];
     const { callId, callingAddress, calledAddress, callStatus, callingDeviceName, callingDeviceType } = eventData;
     
     if (!callId || !callingAddress || !calledAddress) return;
@@ -649,10 +654,10 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceType = callingDeviceType || deviceInfo.callingDeviceType;
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
-    
+    const calledAddress = params.calledAddress?.replaceAll(" ", "");
     return await makeCallAPI({
       callingAddress: callingAddress!,
-      calledAddress: params.calledAddress,
+      calledAddress: calledAddress,
       callingDeviceType: callingDeviceType!,
       callingDeviceName: callingDeviceName!
     });
@@ -884,7 +889,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     let transferInitiatorAddress = params.transferInitiatorAddress;
     let transferInitiatorDeviceType = params.transferInitiatorDeviceType;
     let transferInitiatorDeviceName = params.transferInitiatorDeviceName;
-    
+
     if (!transferInitiatorAddress || !transferInitiatorDeviceType || !transferInitiatorDeviceName) {
       const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
       if (!deviceInfo) {
@@ -897,7 +902,49 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorDeviceType = transferInitiatorDeviceType || deviceInfo.callingDeviceType;
       transferInitiatorDeviceName = transferInitiatorDeviceName || deviceInfo.callingDeviceName;
     }
+
+    // Before transfer: put the active call on hold. Hold payload must use the logged-in user as controller
+    // so it's correct whether 531 or 532 is the user: callingAddress = current user, calledAddress = other party.
+    const initiator = transferInitiatorAddress!;
+    const controllerAddress = ctiStomp.userAddress;
+    const controllerDevice = getCallingDeviceInfo(controllerAddress, ctiStomp.dnsMap);
+    if (!controllerDevice) {
+      return {
+        success: false,
+        error: 'No device information for current user. Cannot put call on hold for transfer.',
+      };
+    }
+
+    console.log('activeCalls 1234', activeCalls);
     
+
+    const callEntry = Array.from(activeCalls.values()).find((c) => c.callId === params.callId);
+    
+
+    if (!callEntry?.callingAddress || !callEntry?.calledAddress) {
+      return { success: false, error: "Missing calling/called addresses for this call." };
+    }
+    
+    const holdResult = await holdCallAPI({
+      callId: params.callId,
+      
+      // ✅ preserve original direction from the call itself (never derive from controller)
+      callingAddress: callEntry.callingAddress ,
+      calledAddress: callEntry.calledAddress ,
+      
+      // ✅ keep device info aligned with the calling side of the call direction
+      callingDeviceType: callEntry?.callingDeviceType || '',
+      callingDeviceName: callEntry?.callingDeviceName || '',
+      
+      // ✅ controller = logged-in user performing the action
+      controllerAddress: controllerAddress,
+      controllerDeviceName: controllerDevice.callingDeviceName,
+      controllerDeviceType: controllerDevice.callingDeviceType,
+      });
+    if (!holdResult.success) {
+      return holdResult;
+    }
+
     return await transferCallsAPI({
       callId: params.callId,
       transferInitiatorAddress: transferInitiatorAddress!,
@@ -905,9 +952,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorDeviceName: transferInitiatorDeviceName!,
       transferAddress: params.transferAddress,
       targetAddress: params.targetAddress,
-      mode: params.mode
+      mode: "CONSULT",
     });
-  }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
+  }, [ctiStomp.userAddress, ctiStomp.dnsMap, activeCalls]);
   
   // Device helper functions
   const getCallingDeviceInfoHelper = useCallback(() => {
@@ -1130,6 +1177,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   const value = useMemo<CtiContextType>(() => ({
     // Connection state
     isInitialized: ctiStomp.isInitialized,
+    isReconnecting: ctiStomp.isReconnecting,
     error: ctiStomp.error,
     userAddress: ctiStomp.userAddress,
     

@@ -95,7 +95,7 @@ class UnifiedOpService {
         });
     }
     async updateUserInfo(data: any): Promise<ApiResponse<any>> {
-        return await axiosInstance.post(`tms/unified-op/update-user-info/${data.user_id}`, data).then((response) => {
+        return await axiosInstance.post(`tms/unified-op/update-user-info`, data).then((response) => {
             return response.data as ApiResponse<any>;
         }).catch((error) => {
             throw handleApiError(error);

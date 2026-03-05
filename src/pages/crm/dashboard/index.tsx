@@ -48,7 +48,7 @@ import {
   Legend,
 } from "recharts";
 
-
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { ListGroup, Form } from 'react-bootstrap';
 import {
   Users,
@@ -447,7 +447,7 @@ const CrmDashboard = () => {
         </Row>
 
         {/* Top Stats */}
-        <Row className="g-3 mb-4">
+        {/* <Row className="g-3 mb-4">
           <Col xxl={2}  xl={4} lg={4} md={4} sm={6}>
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <Card.Body>
@@ -456,7 +456,7 @@ const CrmDashboard = () => {
                     <Users size={20} color="#0EA5E9" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Prospects</p>
                   </div>
                 </div>
@@ -471,7 +471,7 @@ const CrmDashboard = () => {
                     <UserPlus size={20} color="#3B82F6" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads</p>
                   </div>
                 </div>
@@ -486,7 +486,7 @@ const CrmDashboard = () => {
                     <DollarSign size={20} color="#F59E0B" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals</p>
                   </div>
                 </div>
@@ -501,7 +501,7 @@ const CrmDashboard = () => {
                     <ShoppingCart size={20} color="#F97316" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Orders</p>
                   </div>
                 </div>
@@ -538,12 +538,62 @@ const CrmDashboard = () => {
               </Card.Body>
             </Card>
           </Col>
-        </Row>
+        </Row> */}
+
+<div className="mb-4">
+          <StatsCards
+            gridMinWidth="180px"
+            data={[
+              {
+                title: 'Prospects',
+                value: formatNumber(dashboardData?.counts?.crm_data || 0, true),
+                icon: Users,
+                iconColor: '#0EA5E9',
+                iconBgColor: '#E0F2FE',
+              },
+              {
+                title: 'Leads',
+                value: formatNumber(dashboardData?.counts?.leads || 0, true),
+                icon: UserPlus,
+                iconColor: '#3B82F6',
+                iconBgColor: '#DBEAFE',
+              },
+              {
+                title: 'Deals',
+                value: formatNumber(dashboardData?.counts?.deals || 0, true),
+                icon: DollarSign,
+                iconColor: '#F59E0B',
+                iconBgColor: '#FEF3C7',
+              },
+              {
+                title: 'Orders',
+                value: formatNumber(dashboardData?.counts?.orders || 0, true),
+                icon: ShoppingCart,
+                iconColor: '#F97316',
+                iconBgColor: '#FED7AA',
+              },
+              {
+                title: 'Leads to Deals Conversion',
+                value: `${(dashboardData?.conversion_ratios?.lead_to_deal ?? 0).toFixed(2)}%`,
+                icon: TrendingUp,
+                iconColor: '#0EA5E9',
+                iconBgColor: '#E0F2FE',
+              },
+              {
+                title: 'Deals to Orders Conversion',
+                value: `${(dashboardData?.conversion_ratios?.deal_to_order ?? 0).toFixed(2)}%`,
+                icon: TrendingUp,
+                iconColor: '#10B981',
+                iconBgColor: '#D1FAE5',
+              },
+            ]}
+          />
+        </div>
 
         {/* Main Content */}
         <Row className="g-4">
           {/* Left Column */}
-          <Col xxl={4}  xl={6} lg={6} md={6} sm={12}>
+          <Col xxl={4} xl={6} lg={12} md={12}>
             {/* Leads Funnel */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
@@ -554,7 +604,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Prospects</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(prospectsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(prospectsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#E6EEF9', borderRadius: '8px' }}>
@@ -568,7 +618,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Leads</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(leadsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(leadsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#ECFDF5', borderRadius: '8px' }}>
@@ -582,7 +632,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Deals</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(dealsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(dealsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFFAEB', borderRadius: '8px' }}>
@@ -596,7 +646,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Orders</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(ordersCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(ordersCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFF7ED', borderRadius: '8px' }}>
@@ -723,7 +773,7 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Middle Column */}
-          <Col xxl={4}  xl={6} lg={6} md={6} sm={12}>
+          <Col xxl={4} xl={6} lg={12} md={12}>
             {/* Orders Revenue */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
@@ -850,7 +900,7 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Right Column */}
-          <Col xxl={4}  xl={12} lg={12} md={12} sm={12}>
+          <Col xxl={4} xl={12} lg={12} md={12}>
             {/* Campaign Performance */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
               <Card.Body style={{ padding: '20px' }}>

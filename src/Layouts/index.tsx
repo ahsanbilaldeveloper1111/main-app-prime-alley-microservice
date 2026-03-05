@@ -1,35 +1,55 @@
 import React, { ReactNode, useMemo, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
-import ApplicationSidebar from './Moduler/AppSidebar';
-
-import ApplicationCustomerSidebar from './Moduler/AppCustomerSidebar';
-
-import { useSession } from "next-auth/react";
+import ApplicationCustomerSidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Moduler/AppCustomerSidebar';
+import { useSession, signOut } from "next-auth/react";
+import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 import { useNotifications, NotificationItem } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import ProfileSidebar from '@components/profile-sidebar';
 import { useDialerModal } from '../contexts/DialerModalContext';
+import NotificationsSidebar from '@components/Notificationssidebar';
+import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
+import { getCurrentUserCompanyImage } from "@utils/company";
+import { useAuth } from '../hooks/useAuth';
 
-import CompanyLogo2 from "@assets/images/Prime3.png";
 import { 
-	Bell, ChevronLeft, ChevronRight, Users,
+	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
   Link,
   Phone,
   Search,
   X,
   PhoneCall,
-  User
+  User,
+  HelpCircle,
+  Settings,
+  Eye,
+  ExternalLink,
+  LogOut,
+  Shield,
+  BookOpen,
+  GraduationCap,
+  Briefcase,
+  FileText,
+  CreditCard,
+  Sparkles,
+  MessageCircle,
+  Plus,
+  Ticket,
+  MonitorCheck,
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
-import { toast } from 'react-toastify';
+import { getSearchableRoutes, canAccessRoute } from '../config/permissions';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
+import CreateLeadModal from '@components/CreateLeadModal';
+import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
+import { createCompany } from '@utils/crm';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -41,6 +61,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
 	const { data: session, status } = useSession();
+  const { logout } = useAuth();
 	const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
   const { 
@@ -61,15 +82,93 @@ const Layout = ({ children }: LayoutProps) => {
 	const { hasPermission } = usePermissions();
 	const [isDialing, setIsDialing] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 	const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
+	const [showUserDropdown, setShowUserDropdown] = useState(false);
+	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
 	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
 	const [dialedNumber, setDialedNumber] = useState('');
 	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
 	const [availableDevices, setAvailableDevices] = useState<any[]>([]);
 	const [pendingDialedNumber, setPendingDialedNumber] = useState('');
+	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+	const headerLogoUrlRef = useRef<string | null>(null);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+	const searchWrapperRef = useRef<HTMLDivElement>(null);
+	const searchableRoutes = useMemo(() => getSearchableRoutes(), []);
+	const searchSuggestions = useMemo(() => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return [];
+		const userPerms = session?.user?.permissions;
+		return searchableRoutes.filter(
+			(r) =>
+				(r.path.toLowerCase().includes(q) || r.label.toLowerCase().includes(q)) &&
+				canAccessRoute(userPerms, r.path)
+		).slice(0, 10);
+	}, [searchQuery, searchableRoutes, session?.user?.permissions]);
+	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
+  const [showBreezeAssistant, setShowBreezeAssistant] = useState(false);
+  const [breezeMaximized, setBreezeMaximized] = useState(false);
 
-	// Format time ago helper
+  // Allow any page/component to open the global AI Assistant (Breeze) sidebar
+  // by dispatching: window.dispatchEvent(new CustomEvent("breeze-assistant:open"))
+  useEffect(() => {
+    const w = globalThis.window;
+    if (!w) return;
+    const handler = () => {
+      setShowBreezeAssistant(true);
+      setBreezeMaximized(false);
+    };
+    w.addEventListener("breeze-assistant:open", handler as EventListener);
+    return () => {
+      w.removeEventListener(
+        "breeze-assistant:open",
+        handler as EventListener,
+      );
+    };
+  }, []);
+  
+	useEffect(() => {
+		let cancelled = false;
+		getCurrentUserCompanyImage()
+			.then((blob) => {
+				if (cancelled) return;
+				if (blob && blob.size > 0) {
+					// const url = URL.createObjectURL(blob);
+					// headerLogoUrlRef.current = url; //
+					setHeaderLogoUrl('');
+				} else {
+					setHeaderLogoUrl(null);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) setHeaderLogoUrl(null);
+			});
+		return () => {
+			cancelled = true;
+			const url = headerLogoUrlRef.current;
+			if (url) {
+				URL.revokeObjectURL(url);
+				headerLogoUrlRef.current = null;
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		const handleClickOutside = (e: MouseEvent) => {
+			if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+				setShowSearchSuggestions(false);
+				setSearchQuery('');
+			}
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, []);
+
 	const formatTimeAgo = (date: Date) => {
 		try {
 			const now = new Date();
@@ -88,78 +187,48 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	};
 
-	// Create dummy notifications for testing
 	const getDummyNotifications = (): NotificationItem[] => {
 		const now = new Date();
 		const twoMinutesAgo = new Date(now.getTime() - 2 * 60000);
 		const oneHourAgo = new Date(now.getTime() - 60 * 60000);
 		const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60000);
-		const yesterday = new Date(now.getTime() - 24 * 60 * 60000);
-		const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60000);
 
 		return [
 			{
 				id: 'dummy-1',
-				title: 'Keefe Bond added new tags to 💪 Design system',
-				body: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				description: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				module: 'web design',
+				title: 'New deal created',
+				body: "A new deal has been added to your pipeline.",
+				description: "A new deal has been added to your pipeline.",
+				module: 'CRM',
 				timestamp: twoMinutesAgo,
 				read: false,
 				icon: undefined,
 			},
 			{
 				id: 'dummy-2',
-				title: 'Message',
-				body: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				description: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
+				title: 'Meeting reminder',
+				body: "You have a meeting in 30 minutes.",
+				description: "You have a meeting in 30 minutes.",
 				timestamp: oneHourAgo,
 				read: false,
 			},
 			{
 				id: 'dummy-3',
-				title: 'Challenge invitation',
-				body: '<strong>Jonny aber</strong> invites to join the challenge',
-				description: '<strong>Jonny aber</strong> invites to join the challenge',
+				title: 'Task completed',
+				body: 'Your task has been marked as complete.',
+				description: 'Your task has been marked as complete.',
 				timestamp: twelveHoursAgo,
-				read: false,
-			},
-			{
-				id: 'dummy-4',
-				title: 'Forms',
-				body: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				description: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				timestamp: yesterday,
-				read: true,
-			},
-			{
-				id: 'dummy-5',
-				title: 'Keefe Bond added new tags to 💪 Design system',
-				body: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				description: "Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				module: 'Dashboard',
-				timestamp: yesterday,
-				read: true,
-			},
-			{
-				id: 'dummy-6',
-				title: 'Security',
-				body: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				description: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s.",
-				timestamp: twoDaysAgo,
 				read: true,
 			},
 		];
 	};
 
-	// Group notifications by date
 	const groupNotificationsByDate = () => {
 		const now = new Date();
 		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 		const yesterday = new Date(today);
 		yesterday.setDate(yesterday.getDate() - 1);
 
-		// Merge real notifications with dummy notifications
 		const allNotifications = [...notifications, ...getDummyNotifications()];
 
 		const groups: { [key: string]: NotificationItem[] } = {
@@ -182,57 +251,50 @@ const Layout = ({ children }: LayoutProps) => {
 		return groups;
 	};
 
-	// Calculate total unread count including dummy notifications
-	const totalUnreadCount = unreadCount + getDummyNotifications().filter(n => !n.read).length;
+	const totalUnreadCount = unreadCount;
 
-	const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInName, setLoggedInName] = useState('');
+  const [loggedInCompanyName, setLoggedInCompanyName] = useState('');
+  
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
 	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
 	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
-
-  const [showProfileSidebar, setShowProfileSidebar] = useState(false);
 
 	useEffect(() => {
 		if (status !=="loading" && session) {
 		  if (typeof window !== "undefined") {
 		    setLoggedInName(session.user.name || '');
+		    setLoggedInCompanyName(session.user.company_name || '');
 		    setLoggedInUserUsername(session.user.username || '');
 		    setLoggedInUserRole(session.user.role || '');
 		    setLoggedInUserProfilePicture(session.user?.profile_picture || '');
 		  }
 		}
-	    }, [ status, session]);
+	}, [ status, session]);
 
-	// Get profile image URL, only if valid (not null, undefined, or empty string)
 	const profileImageUrl = loggedInUserProfilePicture 
 		? (getStorageImageUrl(loggedInUserProfilePicture) || null)
 		: null;
 
-	// Calculate dialer popup position when it opens
 	useEffect(() => {
 		if (isDialerOpen && dialerButtonRef.current) {
 			const buttonRect = dialerButtonRef.current.getBoundingClientRect();
-			const popupWidth = Math.min(625, window.innerWidth - 40); // maxWidth with margin
-			const popupHeight = 400; // estimated height
+			const popupWidth = Math.min(625, window.innerWidth - 40);
+			const popupHeight = 400;
 			const spacing = 10;
 			
-			// Calculate right position (distance from right edge)
 			let right = window.innerWidth - buttonRect.right;
 			
-			// If popup would go off-screen to the left, align it to the right edge with margin
 			if (buttonRect.right - popupWidth < 20) {
-				right = 20; // 20px from right edge
+				right = 20;
 			}
 			
-			// Calculate top position
 			let top = buttonRect.bottom + spacing;
 			
-			// If popup would go off-screen to the bottom, position it above the button
 			if (top + popupHeight > window.innerHeight - 20) {
 				top = buttonRect.top - popupHeight - spacing;
-				// If still off-screen, position at top with margin
 				if (top < 90) {
-					top = 90; // Below header
+					top = 90;
 				}
 			}
 			
@@ -240,14 +302,11 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	}, [isDialerOpen]);
 
-	// Format phone number for display
 	const formatPhoneNumber = (number: string): string => {
-		// If it's an E.164 number (starts with +), return as-is
 		if (number.startsWith("+")) {
 			return number;
 		}
 		
-		// Format as (XXX) XXX-XXXX if it's a 10-digit number
 		const digits = number.replaceAll(/\D/g, "");
 		if (digits.length === 10) {
 			return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -255,23 +314,19 @@ const Layout = ({ children }: LayoutProps) => {
 		return number;
 	};
 
-	// Get active call
 	const activeCall = useMemo(() => {
 		const call = Array.from(activeCalls.values())
 			.filter((call) => {
-				// Only show calls where the user is involved (callingAddress or calledAddress matches userAddress)
 				const involvesUser = userAddress && (
 					call.callingAddress === userAddress || 
 					call.calledAddress === userAddress
 				);
 				
-				// Also filter by status
 				const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(call.status);
 				
 				return involvesUser && hasValidStatus;
 			})
 			.sort((a, b) => {
-				// Prioritize connected calls, then ringing, then dialing
 				const priority = { connected: 3, ringing: 2, dialing: 1, onHold: 0 };
 				return (priority[b.status as keyof typeof priority] || 0) - (priority[a.status as keyof typeof priority] || 0);
 			})[0];
@@ -279,7 +334,6 @@ const Layout = ({ children }: LayoutProps) => {
 		return call || null;
 	}, [activeCalls, userAddress]);
 
-	// Get user extension data for the active call number
 	const activeCallUserData = useMemo(() => {
 		if (!activeCall || !activeCall.number || !getUserDataExtensions) {
 			return null;
@@ -291,7 +345,6 @@ const Layout = ({ children }: LayoutProps) => {
 			const dnString = String(callNumber);
 			const dnNumber = Number(callNumber);
 			
-			// Try different DN formats to match the key
 			const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
 			
 			return data;
@@ -301,7 +354,6 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	}, [activeCall, getUserDataExtensions]);
 
-	// Get user name from extension data
 	const activeCallUserName = useMemo(() => {
 		if (!activeCallUserData) {
 			return activeCall?.number || "Unknown";
@@ -309,7 +361,6 @@ const Layout = ({ children }: LayoutProps) => {
 		return activeCallUserData.name || activeCallUserData.user_name || activeCall?.number || "Unknown";
 	}, [activeCallUserData, activeCall]);
 
-	// Check if user device is registered/online
 	const isDeviceRegistered = useMemo(() => {
 		if (!userAddress || !dnsMap || !dnsMap[userAddress]) {
 			return false;
@@ -320,11 +371,9 @@ const Layout = ({ children }: LayoutProps) => {
 			return false;
 		}
 		
-		// Check if any device is registered
 		return userDevices.some((device: any) => device.terminalState === 'REGISTERED');
 	}, [userAddress, dnsMap]);
 
-	// Get incoming call user data
 	const incomingCallUserData = useMemo(() => {
 		if (!incomingCall || !incomingCall.callingAddress || !getUserDataExtensions) {
 			return null;
@@ -344,7 +393,6 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	}, [incomingCall, getUserDataExtensions]);
 
-	// Get incoming call user name
 	const incomingCallUserName = useMemo(() => {
 		if (!incomingCallUserData) {
 			return incomingCall?.callingAddress || "Unknown";
@@ -352,7 +400,6 @@ const Layout = ({ children }: LayoutProps) => {
 		return incomingCallUserData.name || incomingCallUserData.user_name || incomingCall?.callingAddress || "Unknown";
 	}, [incomingCallUserData, incomingCall]);
 
-	// Get incoming call user image URL
 	const incomingCallUserImageUrl = useMemo(() => {
 		if (!incomingCallUserData) {
 			return UserDummyImage.src;
@@ -366,55 +413,38 @@ const Layout = ({ children }: LayoutProps) => {
 		return UserDummyImage.src;
 	}, [incomingCallUserData]);
 
-	// Get called address user data (the extension receiving the call)
-	const calledAddressUserData = useMemo(() => {
-		if (!incomingCall || !incomingCall.calledAddress || !getUserDataExtensions) {
-			return null;
+	// Close incoming call popup when the call is answered/connected (e.g. from Jabber or another device)
+	useEffect(() => {
+		if (!showIncomingCallModal || !incomingCall) return;
+		const calls = Array.from(activeCalls.values());
+		const answeredMatch = calls.find((call: any) => {
+			const sameCall = call.callId === incomingCall.callId ||
+				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress);
+			const notRinging = call.status && call.status !== "ringing";
+			return sameCall && notRinging;
+		});
+		if (answeredMatch) {
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
 		}
-		
-		try {
-			const userDataExtensions = getUserDataExtensions() || {};
-			const callNumber = incomingCall.calledAddress;
-			const dnString = String(callNumber);
-			const dnNumber = Number(callNumber);
-			
-			const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
-			return data;
-		} catch (error) {
-			console.error(`[Layout] Error getting extension data for called address ${incomingCall.calledAddress}:`, error);
-			return null;
-		}
-	}, [incomingCall, getUserDataExtensions]);
+	}, [showIncomingCallModal, incomingCall, activeCalls, setShowIncomingCallModal, setIncomingCall]);
 
-	// Get called address user name
-	const calledAddressUserName = useMemo(() => {
-		if (!calledAddressUserData) {
-			return incomingCall?.calledAddress || "Unknown";
-		}
-		return calledAddressUserData.name || calledAddressUserData.user_name || incomingCall?.calledAddress || "Unknown";
-	}, [calledAddressUserData, incomingCall]);
-
-	// Handle attend call
 	const handleAttendCall = async () => {
 		if (!hasPermission("dial-call-cti")) {
-			//toast.error("You do not have permission to answer calls");
 			return;
 		}
 
 		if (!incomingCall) {
-			//toast.error("No incoming call to attend");
 			return;
 		}
 
 		const userDeviceInfo = dnsMap?.[userAddress || ''];
 		if (!userDeviceInfo || !userDeviceInfo.devices) {
-			//toast.error("No device information available");
 			return;
 		}
 
 		const userDevices = Object.values(userDeviceInfo.devices);
 		if (userDevices.length === 0) {
-			//toast.error("No devices available");
 			return;
 		}
 
@@ -443,18 +473,14 @@ const Layout = ({ children }: LayoutProps) => {
 			if (result.success) {
 				setShowIncomingCallModal(false);
 				setIncomingCall(null);
-				//toast.success("Call attended successfully");
-			} else {
-				//toast.error(result.error || "Failed to attend call");
 			}
 		} catch (error) {
-			//toast.error("Failed to attend call");
+			// Silent
 		} finally {
 			setIsDialing(false);
 		}
 	};
 
-	// Handle reject call
 	const handleRejectCall = async () => {
 		if (!incomingCall) {
 			setShowIncomingCallModal(false);
@@ -463,18 +489,15 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 
 		try {
-			// Check if there's an active call with matching callId (like GlobalFloatingCallBar does)
 			const matchingActiveCall = Array.from(activeCalls.values()).find((call: any) => 
 				call.callId === incomingCall.callId ||
 				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
 			);
 
-			// Get device information for rejecting the call
 			const userDeviceInfo = dnsMap?.[userAddress || ''];
 			if (userDeviceInfo && userDeviceInfo.devices) {
 				const userDevices = Object.values(userDeviceInfo.devices);
 				if (userDevices.length > 0) {
-					// Find controller device first
 					let controllerDevice: any = null;
 					if (incomingCall.controllerDeviceName) {
 						controllerDevice = userDevices.find((device: any) => 
@@ -486,12 +509,9 @@ const Layout = ({ children }: LayoutProps) => {
 						controllerDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
 					}
 
-					// Get calling device info from active call (if available) or use default
-					// This matches GlobalFloatingCallBar which uses activeCall.callingDeviceName
 					const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
 					const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
 
-					// Reject the call through CTI - match GlobalFloatingCallBar format exactly
 					if (controllerDevice && incomingCall.callId) {
 						await endCall({
 							callId: incomingCall.callId,
@@ -502,66 +522,49 @@ const Layout = ({ children }: LayoutProps) => {
 							controllerAddress: userAddress || '',
 							controllerDeviceName: controllerDevice.deviceName || '',
 							controllerDeviceType: controllerDevice.deviceType || ''
-						} as any).catch(() => {
-							// Silently fail if call already ended or rejected
-						});
+						} as any).catch(() => {});
 					}
 				}
 			}
 		} catch (error) {
 			console.error("Unable to reject call");
 		} finally {
-			// Close the modal and clear the incoming call state
 			setShowIncomingCallModal(false);
 			setIncomingCall(null);
-			//toast.info("Call rejected");
 		}
 	};
 
-	// Dialer handlers
 	const handleNumberClick = (num: string) => {
 		setDialedNumber(prev => prev + num);
 	};
 
 	const handleDial = async (numberToDial: string = dialedNumber) => {
 		if (!numberToDial.trim()) {
-			//toast.error("Please enter a number to dial");
 			return;
 		}
 
-		// Check if user has multiple devices
 		const userDevices = getAllUserDevices();
 		if (!userDevices) {
-			//toast.error("No calling device information available");
 			return;
 		}
 
-		console.log("User devices found:", userDevices.length, userDevices);
-
-		// If user has multiple devices, show device selection modal
 		if (userDevices.length > 1) {
-			console.log("Multiple devices detected, showing device selection modal");
 			setAvailableDevices(userDevices);
 			setPendingDialedNumber(numberToDial);
 			setShowDeviceSelectionModal(true);
 			return;
 		}
 
-		// If only one device, proceed with dialing using dialNumber
 		setIsDialing(true);
 		try {
-			// Use dialNumber - it handles device selection, number cleaning, and validation automatically
 			const result = await dialNumber(numberToDial);
 
 			if (result.success) {
-				//toast.success(`Calling ${numberToDial}...`);
 				setDialedNumber("");
 				closeDialer();
-			} else {
-				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			//toast.error("Failed to make call");
+			// Silent
 		} finally {
 			setIsDialing(false);
 		}
@@ -574,7 +577,6 @@ const Layout = ({ children }: LayoutProps) => {
 			callingDeviceName: device.deviceName,
 		};
 
-		// Store the selected device info in localStorage for consistent use
 		const callerInfo = {
 			callingAddress: userAddress,
 			callingDeviceName: device.deviceName,
@@ -590,7 +592,6 @@ const Layout = ({ children }: LayoutProps) => {
 		const numberToDial = pendingDialedNumber;
 		setPendingDialedNumber("");
 
-		// Proceed with dialing using selected device
 		setIsDialing(true);
 		try {
 			const result = await makeCall({
@@ -601,14 +602,11 @@ const Layout = ({ children }: LayoutProps) => {
 			});
 
 			if (result.success) {
-				//toast.success(`Calling ${numberToDial}...`);
 				setDialedNumber("");
 				closeDialer();
-			} else {
-				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			//toast.error("Failed to make call");
+			// Silent
 		} finally {
 			setIsDialing(false);
 		}
@@ -629,26 +627,480 @@ const Layout = ({ children }: LayoutProps) => {
 		{ num: '#' }
 	];
 
-
-
 	return (
 		<>
-		
-
 		<style>{`
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
         }
-	    .header-logo{
-		width: 180px;
-		height: auto;
-	    }
+        
+        /* CRM Prime-style top bar */
+        .app-topbar-merged {
+          background: #00385d !important;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+          height: 48px !important;
+          padding: 0 16px !important;
+        }
+        
+        /* Search bar styling */
+        .crm-prime-search-wrapper {
+          position: relative;
+          width: 100%;
+          max-width: 525px;
+        }
+        
+        .crm-prime-search-input {
+          width: 100%;
+          height: 34px;
+          padding: 6px 36px 6px 14px;
+          background:rgb(2, 68, 112);
+          border: 1px solid #958c8c;
+          border-radius: 20px;
+          color: #fff;
+          font-size: 14px;
+          transition: background 0.2s, border-color 0.2s;
+        }
+        
+        .crm-prime-search-input::placeholder {
+          color: #fff;
+        }
+        
+        .crm-prime-search-input:hover {
+          background: rgb(1, 83, 138);
+        }
+        
+        .crm-prime-search-input:focus {
+          outline: none;
+          background: rgb(1, 83, 138);
+          border-color: #fff;
+          color: #fff;
+        }
+        
+        .crm-prime-search-icon {
+          position: absolute;
+          right: 14px !important;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #fff;
+          pointer-events: none;
+        }
+        
+        .crm-prime-create-btn {
+			position: absolute;
+			right: -37px;
+			top: 2px;
+			
+			width: 30px;
+			height: 30px;
+			border: 1px solid #c7c7c7;
+			border-radius: 50%;
+			background: transparent;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: #fff;
+			cursor: pointer;
+			transition: all 0.2s;
+			padding: 0;
+        }
+        
+        .crm-prime-create-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: #fff;
+          color: #fff;
+        }
+        
+        .create-dropdown-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: -180px;
+          background: white;
+          border: 1px solid #dfe3e8;
+          border-radius: 3px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          z-index: 1050;
+          min-width: 180px;
+        }
+        
+        .create-dropdown-item {
+          display: flex;
+          align-items: center;
+          padding: 10px 16px;
+          color: #000000;
+          font-size: 14px;
+          font-weight: 500;
+          text-decoration: none;
+          transition: background 0.1s;
+          cursor: pointer;
+          border: none;
+          background: transparent;
+          width: 100%;
+          text-align: left;
+        }
+        
+        .create-dropdown-item:hover {
+          background: #f5f8fa;
+        }
+        
+        /* Top bar icons */
+        .crm-prime-topbar-icon {
+          background: transparent;
+          border: none;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.8);
+          cursor: pointer;
+          border-radius: 3px;
+          transition: all 0.15s;
+          position: relative;
+          padding: 0;
+        }
+        
+        .crm-prime-topbar-icon:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #fff;
+        }
+        
+        .crm-prime-topbar-icon:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        
+        .crm-prime-topbar-icon.has-badge::after {
+          content: attr(data-badge);
+			position: absolute;
+			top: 0px;
+			right: -1px;
+			background: red;
+			color: white;
+			font-size: 10px;
+			font-weight: 600;
+			padding: 2px 4px;
+			border-radius: 8px;
+			min-width: 16px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			line-height: 1;
+			border: none !important;
+        }
+        
+        /* User menu button */
+        .crm-prime-user-menu {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 8px;
+          border-radius: 3px;
+          cursor: pointer;
+          transition: background 0.15s;
+          background: transparent;
+          border: none;
+          color: rgba(255, 255, 255, 0.95);
+        }
+        
+        .crm-prime-user-menu:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .crm-prime-user-avatar {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 600;
+          font-size: 12px;
+          overflow: hidden;
+        }
+        
+        .crm-prime-user-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .crm-prime-user-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        
+        .crm-prime-user-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: rgba(255, 255, 255, 0.95);
+          line-height: 1.2;
+        }
+        
+        /* User dropdown menu - compact design */
+        .user-dropdown-menu {
+          position: absolute;
+          top: 100%;
+          right: -16px;
+          margin-top: 4px;
+          width: 290px;
+          background: white;
+          border: 1px solid #dfe3e8;
+          border-radius: 3px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          z-index: 1050;
+          max-height: calc(100vh - 60px);
+          overflow-y: auto;
+        }
+        
+        .user-dropdown-header {
+          padding: 16px 16px 12px;
+          border-bottom: 1px solid #cccccc;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        
+        .user-dropdown-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: #e3f2fd;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        
+        .user-dropdown-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .user-dropdown-header-text {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        
+        .user-dropdown-name {
+          font-size: 16px;
+          font-weight: 600;
+          color: #141414;
+          line-height: 1.3;
+        }
+        
+        .user-dropdown-email {
+          font-size:14px !important;
+            color:#141414;
+            font-weight:100;
+          line-height: 1.3;
+        }
+        
+        .user-dropdown-link {
+          color: #006162 !important;
+font-size:14px;
+font-weight:600;
+          text-decoration: none;
+          display: inline-block;
+          margin-top: 4px;
+          text-decoration: underline;
+        }
+        
+        .user-dropdown-link:hover {
+          color: #007a8f;
+          border-bottom-color: #007a8f;
+        }
+        
+        .user-dropdown-section {
+          padding: 0 0 5px 0;
+          border-bottom: 1px solid #cccccc;
+        }
+        
+        .user-dropdown-section:last-child {
+          border-bottom: none;
+        }
+        
+        .user-dropdown-item {
+          display: flex;
+          align-items: center;
+          /*gap: 8px;*/
+          padding: 8px 16px;
+          color: #000000;
+          font-size: 14px;
+          text-decoration: none;
+          transition: background 0.1s;
+          cursor: pointer;
+          border: none;
+          background: transparent;
+          width: 100%;
+          text-align: left;
+          line-height: 1.7;
+		  font-weight: 600;
+        }
+        
+        .user-dropdown-item:hover {
+          background: #f5f8fa;
+        }
+        
+        .user-dropdown-item-icon {
+          width: 14px;
+          height: 14px;
+          color: #666666;
+          flex-shrink: 0;
+        }
+        
+        .user-dropdown-item-text {
+          flex: 1;
+        }
+        
+        .user-dropdown-item-badge {
+         background: #00823a;
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 10px;
+        }
+        
+        .user-dropdown-section-label {
+          padding: 10px 16px 6px;
+          font-size: 14px;
+          font-weight: 600;
+          color: #8a8a8a !important;
+          text-transform: capitalize;
+        }
+        
+        .user-dropdown-account-info {
+          padding: 8px 16px;
+        }
+        
+        .user-dropdown-account-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #000000;
+          margin-bottom: 2px;
+          line-height: 1.3;
+        }
+        
+        .user-dropdown-account-id {
+          font-size: 11px;
+          color: #666666;
+          line-height: 1.3;
+        }
+        
+        .user-dropdown-credits {
+          display: block;
+          padding: 8px 16px;
+        }
+        .user-dropdown-credits-head {
+         display: flex;
+  flex-direction: column;   /* 👈 This makes content go to next line */
+  align-items: flex-start;
+        }
+        
+        .user-dropdown-credits-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        
+        .user-dropdown-credits-text {
+          font-size: 13px;
+          color: #33475b;
+          font-weight: 500;
+        }
+        
+        .user-dropdown-credits-count {
+          font-size: 11px;
+          color: #666666;
+          margin-top: -3px;
+        }
+        
+        .user-dropdown-view-only {
+          /*display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          background: #f5f8fa;
+          border: 1px solid #dfe3e8;
+          border-radius: 3px;
+          margin: 12px 16px;
+          font-size: 12px;
+          color: #33475b;
+          font-weight: 500;*/
+
+		  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  margin: 12px 16px;
+  font-size: 10px;
+  color: #000;
+  font-weight: 700;
+  width: anchor-size;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: #ccc;
+  width: 97px;
+
+  border-radius: 15px;
+        }
+        
+        .user-dropdown-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          border-top: 1px solid #f0f3f5;
+        }
+        
+        .user-dropdown-footer-link {
+          color: #006162 !important;
+			font-size: 12px;
+			font-weight: 500;
+			text-decoration: none;
+			border-bottom: 1px solid #006162;
+			cursor: pointer;
+        }
+        
+        .user-dropdown-footer-link:hover {
+          color: #007a8f;
+          border-bottom-color: #007a8f;
+        }
+        
+        @media (max-width: 991px) {
+          .app-topbar-merged { 
+            left: 0 !important; 
+            width: 100% !important; 
+          }
+          .app-content-area { 
+            margin-left: 0 !important; 
+          }
+          .crm-prime-search-wrapper {
+            max-width: 220px;
+          }
+          .crm-prime-user-info {
+            display: none;
+          }
+        }
 
         @media (min-width: 992px) {
           .main-content-wrapper.sidebar-open {
-            margin-left: 280px !important;
+            margin-left: 0 !important;
           }
-          
           .main-content-wrapper.sidebar-closed {
             margin-left: 0 !important;
           }
@@ -662,9 +1114,9 @@ const Layout = ({ children }: LayoutProps) => {
         }
       `}</style>
 
-<div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: '#f8f9fa' }}>
+<div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: '#f0f0f0' }}>
 
- {/* Sidebar Toggle Button - Fixed Position */}
+ {/* Sidebar Toggle Button (mobile) */}
  <Button
           variant="primary"
           className="position-fixed d-lg-none"
@@ -687,512 +1139,484 @@ const Layout = ({ children }: LayoutProps) => {
           {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </Button>
 
-        {/* Top Navigation */}
-        <nav className="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top shadow-sm">
-        <div className="container-fluid">
-          <div className="d-flex align-items-center gap-2">
-            <Button 
-              variant="link" 
-              className="text-dark d-none d-lg-block p-2" 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ marginLeft: '-10px' }}
-            >
-              {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
-            </Button>
-            <a className="navbar-brand fw-bold text-primary mb-0" href="#">
-			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
-          </div>
+        {/* Top bar */}
+        <nav
+          className="navbar navbar-expand-lg app-topbar-merged"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
+            width: `calc(100% - ${isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED}px)`,
+            zIndex: 999,
+            transition: 'left 0.3s ease-in-out, width 0.3s ease-in-out',
+          }}
+        >
+        <div className="container-fluid p-0" style={{ height: '48px' }}>
+          <div className="d-flex align-items-center h-100 w-100">
+            {/* Search bar */}
+            <div ref={searchWrapperRef} className="crm-prime-search-wrapper" style={{ position: 'relative' }}>
+              <Search className="crm-prime-search-icon" size={14} style={{ right: '40px' }} />
+              <input
+                type="text"
+                className="crm-prime-search-input"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSearchSuggestions(true);
+                }}
+                onFocus={() => searchQuery.trim() && setShowSearchSuggestions(true)}
+                style={{ paddingRight: '68px' }}
+              />
+              {showSearchSuggestions && searchQuery.trim() && searchSuggestions.length > 0 && (
+                <div
+                  className="create-dropdown-menu"
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: 4,
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                  }}
+                >
+                  {searchSuggestions.map((r) => (
+                    <button
+                      key={r.path}
+                      type="button"
+                      className="create-dropdown-item"
+                      onClick={() => {
+                        if (canAccessRoute(session?.user?.permissions, r.path)) {
+                          router.push(r.path);
+                          setSearchQuery('');
+                          setShowSearchSuggestions(false);
+                        }
+                      }}
+                    >
+                      <span>{r.label}</span>
+                      <span className="text-muted small ms-1">{r.path}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Create Button */}
+              <div >
+                <button
+                  className="crm-prime-create-btn"
+                  onClick={() => setShowCreateDropdown(!showCreateDropdown)}
+                  title="Create new"
+                >
+                  <Plus size={14} />
+                </button>
+                
+                {/* Create Dropdown */}
+                {showCreateDropdown && (
+                  <>
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1040,
+                      }}
+                      onClick={() => setShowCreateDropdown(false)}
+                    />
+                    <div className="create-dropdown-menu">
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateLeadModal(true);
+                        }}>
+                        Lead
+                      </button>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateCompanySidebar(true);
+                        }}>
+                        Company
+                      </button>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          router.push('/crm/inbox');
+                        }}>
+                        Inbox
+                      </button>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          router.push('/help-center/my-tickets/new');
+                        }}>
+                        Ticket
+                      </button>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Task handler */
+                          router.push('/planner/tasks');
+                        }}>
+                        Task
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
-          
-          
-
-          
-
-          {/* <GlobalFloatingCallBar /> */}
-
-
-	    
-
-          <div className="ms-auto d-flex align-items-center gap-5">
-
-
-
-
-            <div className="d-flex align-items-center justify-content-end">
+            {/* Icons and user menu */}
+            <div className="ms-auto d-flex align-items-center" style={{ gap: '10px' }}>
               <GlobalFloatingCallBar />
 
-              {/* Call Button - Opens Dialer Modal */}
-            {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
-              <>
-              {/* User Online/Offline Status */}
-              {/* <div className="d-flex align-items-center" style={{ marginRight: '10px' }}>
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: isDeviceRegistered ? '#22c55e' : '#ef4444',
-                  marginRight: '6px',
-                  flexShrink: 0
-                }} />
-                <span style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: isDeviceRegistered ? '#22c55e' : '#ef4444'
-                }}>
-                  {isDeviceRegistered ? 'Device Online' : 'Device Offline'}
-                </span>
-              </div> */}
-		  
-		  <Button
-                ref={dialerButtonRef}
-                variant="link" 
-                size="sm" 
-                className="text-dark position-relative pointer-cursor" 
-                style={{ cursor: 'pointer', padding: '0.5rem',marginRight: '10px' }}
-                disabled={!isInitialized}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (isInitialized) {
-                    openDialer();
-                  }
-                }}
-                title="Open Dialer"
-              >
-                <i className="material-icons-two-tone" style={{ 
-                  cursor: 'pointer', 
-                  fontSize: '1.5rem', 
-                  backgroundColor: '#1976d2', 
-                  pointerEvents: 'none',
-                  
-                }}>dialpad</i>  
-		   
-              </Button>
-		  </>
-            )}
-
-
-{session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
-            <Dropdown 
-              show={showNotificationDropdown} 
-              onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}
-              align="end"
-            >
-              <Dropdown.Toggle 
-                as={Button} 
-                variant="link" 
-                size="sm" 
-                className="text-dark position-relative pc-head-link dropdown-toggle arrow-none me-0"
-                style={{ border: 'none', padding: '0.5rem' }}
-              >
-                <Bell size={20} />
-                {totalUnreadCount > 0 && (
-                  <Badge 
-                    bg="success" 
-                    pill 
-                    className="position-absolute pc-h-badge" 
-                    style={{ 
-                      top: '0', 
-                      right: '0', 
-                      fontSize: '0.65rem',
-                     // transform: 'translate(25%, -25%)',
-                      minWidth: '18px',
-                      height: '18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 4px'
-                    }}
-                  >
-                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                  </Badge>
-                )}
-              </Dropdown.Toggle>
-
-              <Dropdown.Menu className="dropdown-notification pc-h-dropdown" style={{ width: '350px', maxWidth: '90vw', overflowX: 'hidden' }}>
-                <div className="dropdown-header d-flex align-items-center justify-content-between p-3 border-bottom">
-                  <h5 className="m-0">Notifications</h5>
-                  <ul className="list-inline ms-auto mb-0">
-                    <li className="list-inline-item">
-                      <Button 
-                        variant="link" 
-                        className="avtar avtar-s btn-link-hover-primary p-0"
-                        style={{ minWidth: 'auto', padding: '0.25rem' }}
-                      >
-                        <Link size={18} />
-                      </Button>
-                    </li>
-                  </ul>
-                </div>
-
-                <div 
-                  className="dropdown-body text-wrap header-notification-scroll position-relative p-0" 
-                  style={{ maxHeight: 'calc(100vh - 235px)', overflowY: 'auto', overflowX: 'hidden' }}
+              {/* Dialer Button */}
+              {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+                <button
+                  ref={dialerButtonRef}
+                  className="crm-prime-topbar-icon"
+                  disabled={!isInitialized}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isInitialized) {
+                      openDialer();
+                    }
+                  }}
+                  title="Open Dialer"
                 >
-                  {(() => {
-                        const grouped = groupNotificationsByDate();
-                        const allNotifications = [
-                          ...grouped.today,
-                          ...grouped.yesterday,
-                          ...grouped.older
-                        ].slice(0, 10); // Show max 10 notifications
+                  <Phone size={14} />
+                </button>
+              )}
 
-                        if (allNotifications.length === 0) {
-                          return (
-                            <div className="p-4 text-center text-muted">
-                              <p className="mb-0">No notifications</p>
+                {/* Dialer Button */}
+              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                <button
+                  className="crm-prime-topbar-icon"
+                  onClick={(e) => {
+                    router.push('/communications/wallboards-live');
+                  }}
+                  title="Wallboards (Live)"
+                >
+                  <MonitorCheck size={14} />
+                </button>
+              )}
+
+              
+{/* Notifications - opens sidebar */}
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
+<button
+                className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
+                data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                onClick={() => setShowNotificationsSidebar(true)}
+                title="Notifications"
+              >
+                <Bell size={14} />
+                  </button>
+              )}
+ {/* Help Icon */}
+
+ {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                <button className="crm-prime-topbar-icon" title="Help"
+                onClick={() => router.push('/help-center')}
+                >
+                <HelpCircle size={18} />
+                  </button>
+              )}
+
+                {/* Settings Icon */}
+              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                <button className="crm-prime-topbar-icon" title="Settings"
+                onClick={() => router.push('/main-settings')}
+                >
+                <Settings size={18} />
+                  </button>
+              )}
+              {/* Divider */}
+              <div style={{ 
+                width: '1px', 
+                height: '28px', 
+                background: 'rgba(255, 255, 255, 0.2)',
+                margin: '0 4px'
+              }} />
+
+              {/* Assistant Icon */}
+                {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
+                {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
+              <button 
+                className="crm-prime-topbar-icon" 
+                title="AI Assistant" 
+                style={{ width: 'auto', padding: '0 12px', gap: '6px' }}
+                onClick={() => setShowBreezeAssistant(!showBreezeAssistant)}
+              >
+                <Sparkles size={18} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>AI Assistant</span>
+                  </button>
+              )}
+
+              {/* Divider */}
+              <div style={{ 
+                width: '1px', 
+                height: '28px', 
+                background: 'rgba(255, 255, 255, 0.2)',
+                margin: '0 4px'
+              }} />
+
+             
+
+            
+
+              {/* User Menu with Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="crm-prime-user-menu"
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                >
+                  <div className="crm-prime-user-avatar">
+                    {headerLogoUrl ? (
+                      <img src={headerLogoUrl} alt={loggedInCompanyName || ''} />
+                    ) : (
+                      loggedInCompanyName?.charAt(0)?.toUpperCase() || <User size={14} />
+                    )}
+                  </div>
+                  <div className="crm-prime-user-info">
+                    <div>
+                      <div className="crm-prime-user-name">{loggedInCompanyName || ''}</div>
+                    </div>
+                    <ChevronDown size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+                  </div>
+                </button>
+
+                {/* User Dropdown Menu */}
+                {showUserDropdown && (
+                  <>
+                    {/* Backdrop to close dropdown */}
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1040,
+                      }}
+                      onClick={() => setShowUserDropdown(false)}
+                    />
+                    
+                    <div className="user-dropdown-menu">
+                      {/* Header */}
+                      <div className="user-dropdown-header">
+                        <div className="user-dropdown-avatar">
+                          {profileImageUrl ? (
+                            <img src={profileImageUrl} alt={loggedInName || ''} />
+                          ) : (
+                            <div style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              fontSize: '16px',
+                              fontWeight: 600,
+                              color: '#006162'
+                            }}>
+                              {loggedInName?.charAt(0)?.toUpperCase() || 'H'}
                             </div>
-                          );
-                        }
+                          )}
+                          </div>
+                          
+                        <div className="user-dropdown-header-text">
+                          <div className="user-dropdown-name">
+                            {loggedInName || ''}
+                          </div>
+                          <div className="user-dropdown-email">
+                            {session?.user?.email}
+                          </div>
+                          <a href="/profile" className="user-dropdown-link">
+                            Profile & Preferences
+                          </a>
+                        </div>
+                      </div>
 
-                        return (
-                          <ul className="list-group list-group-flush" style={{ overflowX: 'hidden' }}>
-                            {allNotifications.map((notification, index) => {
-                          const showDateLabel = index === 0 || 
-                            (index > 0 && grouped.today.includes(notification) && !grouped.today.includes(allNotifications[index - 1])) ||
-                            (index > 0 && grouped.yesterday.includes(notification) && !grouped.yesterday.includes(allNotifications[index - 1]));
+                      {/* View Only Badge */}
+                      {/* <div className="user-dropdown-view-only">
+                        <Eye size={14} style={{ color: '#000000' }} />
+                        <span>View Only</span>
+                      </div> */}
 
-                          const dateLabel = grouped.today.includes(notification) ? 'Today' :
-                                           grouped.yesterday.includes(notification) ? 'Yesterday' : null;
+                      {/* Request edit access */}
+                      {/* <div className="user-dropdown-section">
+                        <button className="user-dropdown-item">
+                          <span className="user-dropdown-item-text">Request edit access</span>
+                        </button>
+                      </div> */}
 
-                          return (
-                            <li 
-                              key={notification.id} 
-                              className={`list-group-item ${notification.read ? '' : 'bg-light'}`}
-                              style={{ overflowX: 'hidden', wordWrap: 'break-word' }}
-                            >
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                style={{ cursor: 'pointer' }}
-                                onClick={() => {
-                                  if (notification.read === false && !notification.id.startsWith('dummy-')) {
-                                    markAsRead(notification.id);
-                                  }
-                                  if (notification.url) {
-                                    router.push(notification.url);
-                                  }
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    if (notification.read === false && !notification.id.startsWith('dummy-')) {
-                                      markAsRead(notification.id);
-                                    }
-                                    if (notification.url) {
-                                      router.push(notification.url);
-                                    }
-                                  }
-                                }}
-                              >
-                                {showDateLabel && dateLabel && (
-                                  <p className="text-span text-muted mb-2 fw-semibold" style={{ fontSize: '0.75rem' }}>
-                                    {dateLabel}
-                                  </p>
-                                )}
-                                <div className="d-flex">
-                                <div className="flex-shrink-0">
-                                  {notification.icon ? (
-                                    <img 
-                                      src={notification.icon} 
-                                      alt="notification" 
-                                      className="user-avtar avtar avtar-s rounded-circle"
-                                      style={{ width: '40px', height: '40px', objectFit: 'cover' }}
-                                    />
-                                  ) : (
-                                    <div className={`avtar avtar-s bg-light-${notification.module ? 'primary' : 'info'}`}>
-                                      <Bell size={18} />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-grow-1 ms-3" style={{ minWidth: 0, overflow: 'hidden' }}>
-                                  <div className="d-flex">
-                                    <div className="flex-grow-1 me-3 position-relative" style={{ minWidth: 0 }}>
-                                      <h6 className="mb-0 text-truncate" style={{ fontSize: '0.875rem' }}>
-                                        {notification.title}
-                                      </h6>
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                      <span className="text-sm text-muted" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                                        {formatTimeAgo(notification.timestamp)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <p className="position-relative mt-1 mb-2" style={{ fontSize: '0.8125rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                                    <span className="d-block" style={{ wordBreak: 'break-word' }}>
-                                      {notification.description || notification.body}
-                                    </span>
-                                  </p>
-                                  {notification.module && (
-                                    <span className="badge bg-light-primary border border-primary me-1 mt-1" style={{ fontSize: '0.7rem' }}>
-                                      {notification.module}
-                                    </span>
-                                  )}
-                                </div>
-                                </div>
-                              </div>
-                            </li>
-                            );
-                          })}
-                          </ul>
-                        );
-                      })()}
-                </div>
+                      {/* Theme */}
+                      {/* <div className="user-dropdown-section">
+                        <div className="user-dropdown-section-label">Theme</div>
+                        <button className="user-dropdown-item">
+                          <span className="user-dropdown-item-text">Switch to the classic theme</span>
+                        </button>
+                        <button className="user-dropdown-item">
+                          <MessageCircle className="user-dropdown-item-icon" size={14} />
+                          <span className="user-dropdown-item-text">Give theme feedback</span>
+                        </button>
+                      </div> */}
 
-                <div className="dropdown-footer p-3 border-top">
-                  <div className="row g-3">
-                    <div className="col-6">
-                      <div className="d-grid">
-                        <Button 
-                          variant="primary" 
-                          size="sm"
+                      {/* Account */}
+                      <div className="user-dropdown-section">
+                        <div className="user-dropdown-section-label">Account</div>
+                        <div className="user-dropdown-account-info">
+                          <div className="user-dropdown-account-name">{session?.user?.company_name}</div>
+                          <div className="user-dropdown-account-id">{session?.user?.company_identifier}</div>
+                        </div>
+                      </div>
+
+                      {/* Links */}
+                      <div className="user-dropdown-section">
+                        
+                          {session?.user?.permissions?.includes('tickets-tickets') && (
+                            <button className="user-dropdown-item" onClick={() => router.push('/tickets/list')}>
+                              {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
+                              <span className="user-dropdown-item-text">Raise a ticket</span>
+                            </button>
+                          )}
+                          
+                          
+                        <button className="user-dropdown-item">
+                          {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Pricing & Features</span>
+                          <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
+                          </button>
+                          
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/billing/dashboard')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Account & Billing</span>
+                        </button>
+                        )}
+
+                          
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Tasks</span>
+                        </button>
+                        )}
+
+<button className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Calendar</span>
+                        </button>
+
+
+
+
+                          
+                        <button className="user-dropdown-item user-dropdown-credits-head">
+                         
+                            <span className="user-dropdown-item-text">CRM Prime Credits</span>
+                            
+                          
+                          <div className="user-dropdown-credits-count">1500 of 1500 credits available</div>
+                        </button>
+                        <button className="user-dropdown-item">
+                          {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Product Updates</span>
+                        </button>
+                        
+                        <button className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Settings</span>
+                        </button>
+                      </div>
+
+                      {/* Footer with Sign out and Privacy */}
+                      <div className="user-dropdown-footer">
+                        <a
+                        //   type="button"
+                          className="user-dropdown-footer-link"
                           onClick={() => {
-                            // Archive all functionality can be added here
-                            markAllAsRead();
+                            setShowUserDropdown(false);
+                            logout();
                           }}
                         >
-                          Archive all
-                        </Button>
+                          Sign out
+                        </a>
+                        <a href="#" className="user-dropdown-footer-link">
+                          Privacy policy
+                        </a>
                       </div>
                     </div>
-                    <div className="col-6">
-                      <div className="d-grid">
-                        <Button 
-                          variant="outline-secondary" 
-                          size="sm"
-                          onClick={markAllAsRead}
-                        >
-                          Mark all as read
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Dropdown.Menu>
-            </Dropdown>
-            )}
-
-            <div 
-              className="d-flex align-items-center gap-2" 
-              onClick={() => setShowProfileSidebar(!showProfileSidebar)}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="bg-primary bg-opacity-10 rounded-circle p-2" style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {profileImageUrl ? (
-                  <img 
-                    src={profileImageUrl} 
-                    alt={loggedInName || ''} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                  />
-                ) : (
-                  <Users size={20} className="text-primary" />
+                  </>
                 )}
               </div>
-              <div className="d-none d-md-block">
-                <small className="d-block fw-semibold">{loggedInName}</small>
-                <small className="text-muted">
-                  {loggedInUserRole ? (
-                      <span>{loggedInUserRole}</span>
-                    ) : (
-                      <span>{loggedInUserUsername}</span>
-                    )}
-                </small>
-              </div>
-              
             </div>
-            </div>
-
-
-
-
-        
           </div>
         </div>
       </nav>
 
-			{/* Incoming Call Modal - Fixed Position Overlay */}
+			{/* Incoming Call Modal */}
 			{showIncomingCallModal && incomingCall && (
 				<div
-					className="bg-white rounded-4 shadow"
+					className="bg-white rounded shadow"
 					style={{
 						position: "fixed",
-						top: "90px",
+						top: "60px",
 						right: "20px",
 						zIndex: 1050,
-						maxWidth: "650px",
+						maxWidth: "400px",
 						width: "auto",
-						padding: "1rem 1.25rem",
-						boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+						padding: "1rem",
+						boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
 					}}
 				>
-					<div className="d-flex align-items-center justify-content-between">
-						{/* Left - Avatar and Info */}
-						<div className="d-flex align-items-center gap-3">
-							<div
-								className="position-relative"
+					<div className="d-flex align-items-center gap-3">
+						<div style={{ width: "48px", height: "48px", minWidth: "48px" }}>
+							<img
+								src={incomingCallUserImageUrl}
+								alt={incomingCallUserName}
+								className="rounded-circle"
 								style={{
-									width: "4rem",
-									height: "4rem",
-									minWidth: "4rem",
+									width: "100%",
+									height: "100%",
+									objectFit: "cover",
 								}}
-							>
-								{incomingCallUserImageUrl && incomingCallUserImageUrl !== UserDummyImage.src ? (
-									<img
-										src={incomingCallUserImageUrl}
-										alt={incomingCallUserName}
-										className="rounded-circle"
-										style={{
-											width: "100%",
-											height: "100%",
-											objectFit: "cover",
-											border: "2px solid #e5e7eb",
-										}}
-										onError={(e) => {
-											e.currentTarget.src = UserDummyImage.src;
-										}}
-									/>
-								) : (
-									<img
-										src={UserDummyImage.src}
-										alt={incomingCallUserName}
-										className="rounded-circle"
-										style={{
-											width: "100%",
-											height: "100%",
-											objectFit: "cover",
-											border: "2px solid #e5e7eb",
-										}}
-									/>
-								)}
+								onError={(e) => {
+									e.currentTarget.src = UserDummyImage.src;
+								}}
+							/>
+						</div>
+						<div className="flex-grow-1">
+							<h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600 }}>
+								{incomingCallUserName}
+							</h6>
+							<div style={{ fontSize: '13px', color: '#6c757d' }}>
+								{formatPhoneNumber(incomingCall.callingAddress)}
 							</div>
-							<div>
-								{incomingCallUserData && (
-									<h3
-										style={{
-											fontSize: "1rem",
-											fontWeight: "600",
-											color: "#334155",
-											marginBottom: "0.25rem",
-										}}
-									>
-										{incomingCallUserName}
-									</h3>
-								)}
-								
-								<div
-									style={{
-										fontSize: "1rem",
-										color: "#94a3b8",
-										marginBottom: "0.25rem",
-									}}
-								>
-									{incomingCall?.callingAddress ? formatPhoneNumber(incomingCall.callingAddress) : "Unknown"}
-								</div>
-								{/* <div
-									style={{
-										fontSize: "0.875rem",
-										color: "#64748b",
-										marginBottom: "0rem",
-									}}
-								>
-									{formatPhoneNumber(incomingCall.callingAddress)}
-								</div> */}
-								
-								<div
-									className="d-flex align-items-center gap-2"
-									style={{ fontSize: "0.875rem", marginTop: "0.25rem" }}
-								>
-									<span className="text-success" style={{ fontWeight: "500" }}>
-										Incoming call
-									</span>
-									<span
-										className="bg-success rounded-circle"
-										style={{ width: "0.375rem", height: "0.375rem" }}
-									></span>
-									<span style={{ color: "#94a3b8" }}>Ringing...</span>
-								</div>
+							<div style={{ fontSize: '12px', color: '#22c55e', marginTop: '4px' }}>
+								Incoming call...
 							</div>
 						</div>
-
-						{/* Right - Controls */}
-						<div className="d-flex flex-column gap-3">
-							{/* Bottom Row - Decline and Answer Buttons */}
-							<div className="d-flex align-items-center gap-2">
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										handleRejectCall();
-									}}
-									disabled={false}
-									className="btn rounded-pill d-flex align-items-center gap-2"
-									style={{
-										padding: "0.33rem 1em",
-										backgroundColor: "white",
-										border: "2px solid #f87171",
-										color: "#ef4444",
-										fontWeight: "500",
-										fontSize: "1rem",
-										cursor: isDialing ? "not-allowed" : "pointer",
-										opacity: isDialing ? 0.5 : 1,
-									}}
-									onMouseEnter={(e) => {
-										if (!isDialing)
-											e.currentTarget.style.backgroundColor = "#fef2f2";
-									}}
-									onMouseLeave={(e) => {
-										if (!isDialing)
-											e.currentTarget.style.backgroundColor = "white";
-									}}
-								>
-									<i
-										className="material-icons-two-tone"
-										style={{ fontSize: "1rem", color: "#ef4444" }}
-									>
-										call_end
-									</i>
-									Decline
-								</button>
-								<button
-									onClick={handleAttendCall}
-									disabled={isDialing || !hasPermission("dial-call-cti")}
-									className="btn rounded-pill d-flex align-items-center gap-2"
-									style={{
-										padding: "0.33rem 1em",
-										fontWeight: "500",
-										fontSize: "1rem",
-										color: "white",
-										backgroundColor: "#22c55e",
-										border: "none",
-										cursor: isDialing ? "not-allowed" : "pointer",
-										opacity: isDialing ? 0.5 : 1,
-									}}
-									onMouseEnter={(e) => {
-										if (!isDialing && !e.currentTarget.disabled)
-											e.currentTarget.style.backgroundColor = "#16a34a";
-									}}
-									onMouseLeave={(e) => {
-										if (!isDialing && !e.currentTarget.disabled)
-											e.currentTarget.style.backgroundColor = "#22c55e";
-									}}
-								>
-									<i
-										className="material-icons-two-tone"
-										style={{ fontSize: "1rem", color: "#fff" }}
-									>
-										call
-									</i>
-									{isDialing ? "Answering..." : "Answer"}
-								</button>
-							</div>
+						<div className="d-flex gap-2">
+							<button
+								onClick={handleRejectCall}
+								className="btn btn-sm btn-outline-danger rounded-circle"
+								style={{ width: '36px', height: '36px', padding: 0 }}
+							>
+								<X size={18} />
+							</button>
+							<button
+								onClick={handleAttendCall}
+								disabled={isDialing}
+								className="btn btn-sm btn-success rounded-circle"
+								style={{ width: '36px', height: '36px', padding: 0 }}
+							>
+								<Phone size={18} />
+							</button>
 						</div>
 					</div>
 				</div>
 			)}
 
-			{/* Dialer Popup - Positioned near dialer icon */}
+			{/* Dialer Popup */}
 			{isDialerOpen && (
 				<>
-					{/* Overlay to close on click outside */}
 					<div
 						style={{
 							position: 'fixed',
@@ -1208,310 +1632,85 @@ const Layout = ({ children }: LayoutProps) => {
 							setDialedNumber("");
 						}}
 					/>
-					{/* Dialer Popup */}
 					<div
-						className="bg-white rounded-4 shadow"
+						className="bg-white rounded shadow"
 						style={{
 							position: 'fixed',
 							top: `${dialerPosition.top}px`,
 							right: `${dialerPosition.right}px`,
 							zIndex: 1050,
 							width: 'calc(100vw - 40px)',
-							maxWidth: '22rem',
-							padding: '1.25rem',
-							boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+							maxWidth: '320px',
+							padding: '1rem',
 						}}
 						onClick={(e) => e.stopPropagation()}
 					>
-						{/* Header */}
 						<div className="d-flex align-items-center justify-content-between mb-3">
-							<div>
-								{/* <User 
-									size={20}
-									
-								/>
-								<span>
-									{loggedInName}
-								</span> */}
-							</div>
-							<div>
-							{isDeviceRegistered ? (
-								<span className="badge" style={{ 
-									padding: '0.375rem 1rem', 
-									fontSize: '0.875rem', 
-									fontWeight: '500', 
-									borderRadius: '50rem', 
-									backgroundColor: '#22c55e',
-									color: '#fff'
-								}}>
-									Online
-								</span>
-							) : (
-								<span className="badge" style={{ 
-									padding: '0.375rem 1rem', 
-									fontSize: '0.875rem', 
-									fontWeight: '500', 
-									borderRadius: '50rem', 
-									backgroundColor: '#ef4444',
-									color: '#fff'
-								}}>
-									Offline
-								</span>
-							)}
-							</div>
+							<h6 className="mb-0" style={{ fontSize: '14px', fontWeight: 600 }}>Dialer</h6>
+							<span className={`badge ${isDeviceRegistered ? 'bg-success' : 'bg-danger'}`} style={{ fontSize: '11px' }}>
+								{isDeviceRegistered ? 'Online' : 'Offline'}
+							</span>
 						</div>
 
-						{/* Active Call Info - Show at top if exists */}
-						{/* {activeCall && (
-							<div
-								className="mb-3"
-								style={{
-									backgroundColor: "#f0f9ff",
-									borderRadius: "0.75rem",
-									padding: "0.75rem 1rem",
-									border: "1px solid #bae6fd",
-								}}
-							>
-								<div className="d-flex justify-content-between align-items-center">
-									<div style={{ fontSize: "0.875rem", color: "#334155", fontWeight: 500 }}>
-										<i className="material-icons-two-tone me-1" style={{ fontSize: "1rem", verticalAlign: "middle", color: "#4FC3F8" }}>
-											call
-										</i>
-										{activeCallUserName}
-									</div>
-									<div className="d-flex align-items-center gap-2">
-										{activeCall.status === "connected" && activeCall.duration !== undefined && (
-											<span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-												{formatDuration(activeCall.duration)}
-											</span>
-										)}
-										<span
-											className="badge"
-											style={{
-												backgroundColor:
-													activeCall.status === "connected"
-														? "#22c55e"
-														: activeCall.status === "ringing"
-														? "#F4C22B"
-														: "#4FC3F8",
-												color: "#fff",
-												fontSize: "0.625rem",
-												padding: "0.25rem 0.5rem",
-												borderRadius: "0.5rem",
-												fontWeight: 600,
-											}}
-										>
-											{activeCall.status}
-										</span>
-									</div>
-								</div>
-							</div>
-						)} */}
-
-						{/* Number Input Section */}
 						<div className="mb-3">
-							<div className="position-relative">
-								<Search className="position-absolute" style={{ left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} size={20} />
-								<input
-									type="text"
-									value={dialedNumber}
-									onChange={(e) => {
-										let value = e.target.value;
-										
-										// Allow + only at the beginning
-										if (value.startsWith("+")) {
-											// Allow + followed by digits only
-											const afterPlus = value.slice(1).replaceAll(/\D/g, "");
-											value = "+" + afterPlus;
-											// E.164 format: + followed by up to 15 digits
-											if (afterPlus.length <= 15) {
-												setDialedNumber(value);
-											}
-										} else {
-											// For extensions or numbers without +, allow digits only
-											const digitsOnly = value.replaceAll(/\D/g, "");
-											// Allow up to 15 digits for regular numbers, or shorter for extensions
-											if (digitsOnly.length <= 15) {
-												setDialedNumber(digitsOnly);
-											}
+							<input
+								type="text"
+								value={dialedNumber}
+								onChange={(e) => {
+									let value = e.target.value;
+									if (value.startsWith("+")) {
+										const afterPlus = value.slice(1).replaceAll(/\D/g, "");
+										value = "+" + afterPlus;
+										if (afterPlus.length <= 15) {
+											setDialedNumber(value);
 										}
-									}}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" && dialedNumber.trim()) {
-											handleDial();
+									} else {
+										const digitsOnly = value.replaceAll(/\D/g, "");
+										if (digitsOnly.length <= 15) {
+											setDialedNumber(digitsOnly);
 										}
-									}}
-                  disabled={ !isDeviceRegistered}
-									placeholder="Search name or type number"
-									className="form-control"
-									autoFocus
-									style={{
-										paddingLeft: '3rem',
-										paddingRight: '1rem',
-										paddingTop: '0.875rem',
-										paddingBottom: '0.875rem',
-										backgroundColor: '#f8fafc',
-										border: '1px solid #e2e8f0',
-										borderRadius: '0.75rem',
-										fontSize: '1rem',
-										fontWeight: 500,
-										color: '#334155'
-									}}
-								/>
-							</div>
-							{/* {dialedNumber && (
-								<div
-									style={{
-										fontSize: "0.875rem",
-										color: "#94a3b8",
-										textAlign: "center",
-										marginTop: "0.5rem",
-										fontWeight: 500,
-									}}
-								>
-									{formatPhoneNumber(dialedNumber)}
-								</div>
-							)} */}
+									}
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && dialedNumber.trim()) {
+										handleDial();
+									}
+								}}
+								disabled={!isDeviceRegistered}
+								placeholder="Enter number"
+								className="form-control"
+								autoFocus
+							/>
 						</div>
 
-						{/* Quick Extension Buttons - Compact grid */}
-						{/* {getAvailableExtensions && getAvailableExtensions().length > 0 && (
-							<div className="mb-3">
-								<div
-									style={{
-										fontSize: "0.75rem",
-										fontWeight: 600,
-										color: "#94a3b8",
-										textTransform: "uppercase",
-										letterSpacing: "0.5px",
-										marginBottom: "0.75rem",
-									}}
-								>
-									Quick Dial
-								</div>
-								<div
-									className="row g-2"
-									style={{ maxHeight: "200px", overflowY: "auto", padding: "0" }}
-								>
-									{getAvailableExtensions()
-										.slice(0, 12)
-										.map((ext) => (
-											<div key={ext} className="col-4">
-												<button
-													type="button"
-													onClick={() => {
-														setDialedNumber(ext);
-													}}
-													className="btn w-100"
-													style={{
-														height: "3.5rem",
-														backgroundColor: "#f8fafc",
-														border: "1px solid #e2e8f0",
-														borderRadius: "0.75rem",
-														display: "flex",
-														flexDirection: "column",
-														alignItems: "center",
-														justifyContent: "center",
-														transition: "all 0.2s",
-														fontSize: "1.5rem",
-														fontWeight: 600,
-														color: "#475569",
-													}}
-													onMouseEnter={(e) => {
-														e.currentTarget.style.backgroundColor = "#f1f5f9";
-													}}
-													onMouseLeave={(e) => {
-														e.currentTarget.style.backgroundColor = "#f8fafc";
-													}}
-												>
-													{ext}
-												</button>
-											</div>
-										))}
-								</div>
-							</div>
-						)} */}
-
-						{/* Dialpad Grid */}
 						<div className="mb-3">
 							<div className="row g-2">
 								{dialpadButtons.map((btn) => (
 									<div key={btn.num} className="col-4">
 										<button
 											onClick={() => handleNumberClick(btn.num)}
-											className="btn w-100"
-                      disabled={ !isDeviceRegistered}
-											style={{
-												height: '3.5rem',
-												backgroundColor: '#f8fafc',
-												border: '1px solid #e2e8f0',
-												borderRadius: '0.75rem',
-												display: 'flex',
-												flexDirection: 'column',
-												alignItems: 'center',
-												justifyContent: 'center',
-												transition: 'all 0.2s'
-											}}
-											onMouseEnter={(e) => {
-												e.currentTarget.style.backgroundColor = '#f1f5f9';
-											}}
-											onMouseLeave={(e) => {
-												e.currentTarget.style.backgroundColor = '#f8fafc';
-											}}
+											className="btn btn-outline-secondary w-100"
+											disabled={!isDeviceRegistered}
+											style={{ height: '48px', fontSize: '18px', fontWeight: 600 }}
 										>
-											<span style={{ fontSize: '1.5rem', fontWeight: '600', color: '#475569' }}>{btn.num}</span>
+											{btn.num}
 										</button>
 									</div>
 								))}
 							</div>
 						</div>
 
-						{/* Call Button */}
 						<button
 							onClick={() => handleDial()}
 							disabled={!dialedNumber.trim() || isDialing || !isDeviceRegistered}
-							className="btn w-100 d-flex align-items-center justify-content-center gap-3 rounded-4"
-							style={{
-								padding: "1rem",
-								fontSize: "1.125rem",
-								fontWeight: 600,
-								background: "linear-gradient(135deg, #2374d4, #4facfe)",
-								border: "none",
-								color: "white",
-								cursor: (!dialedNumber.trim() || isDialing || !isDeviceRegistered) ? "not-allowed" : "pointer",
-								opacity: (!dialedNumber.trim() || isDialing || !isDeviceRegistered) ? 0.6 : 1
-							}}
-							onMouseEnter={(e) => {
-								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.background = "linear-gradient(135deg, rgb(15 83 164), rgb(79, 172, 254))";
-								}
-							}}
-							onMouseLeave={(e) => {
-								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.background = "linear-gradient(135deg, #2374d4, #4facfe)";
-								}
-							}}
-							title={!isDeviceRegistered ? "Device is not registered. Please register your device to make calls." : ""}
+							className="btn btn-primary w-100"
 						>
-							{isDialing ? (
-								<>
-									<span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
-									Dialing...
-								</>
-							) : (
-								<>
-									<i className="material-icons-two-tone" style={{ fontSize: "1.5rem", color: "#fff" ,backgroundColor: '#fff'}}>
-										call
-									</i>
-									Call
-								</>
-							)}
+							{isDialing ? "Dialing..." : "Call"}
 						</button>
 					</div>
 				</>
 			)}
 
-			{/* Device Selection Modal */}
 			<DeviceSelectionModal
 				show={showDeviceSelectionModal}
 				onHide={() => {
@@ -1524,40 +1723,106 @@ const Layout = ({ children }: LayoutProps) => {
 				extensionNumber={userAddress || ""}
 			/>
 		
-		<div className="d-flex flex-grow-1" style={{ position: 'relative', marginTop:'85px' }}>
-
-          
+		<div
+          className="d-flex flex-grow-1 app-content-area"
+          style={{
+            position: 'relative',
+            marginTop: '48px',
+            marginLeft: isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
+            transition: 'margin-left 0.3s ease-in-out',
+          }}
+        >
             <ApplicationCustomerSidebar
               sidebarOpen={sidebarOpen}
               setSidebarOpen={setSidebarOpen}
+              isSidebarExpanded={isSidebarExpanded}
+              setSidebarExpanded={setIsSidebarExpanded}
             />
-         
 
-				<div className={`flex-grow-1 p-4 main-content-wrapper ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} style={{ 
+				{/* <div className="flex-grow-1 p-3 main-content-wrapper" style={{ 
 				overflowY: 'auto',
-				width: '100%'
+				// width: showBreezeAssistant ? 'calc(100% - 400px)' : '100%',
+        width: showBreezeAssistant && !breezeMaximized ? 'calc(100% - 400px)' : '100%',
+				transition: 'width 0.3s ease-in-out',
+        display: showBreezeAssistant && breezeMaximized ? 'none' : 'block',
 				}}>
-				<div className={"pc-content "}>
+				<div className="pc-content">
 					{children}
 				</div>
-			</div>
+			</div> */}
 
-			
+
+<div
+  className="flex-grow-1 p-3 main-content-wrapper"
+  style={{
+    overflowY: 'auto',
+    width: showBreezeAssistant
+      ? breezeMaximized
+        ? '0%'          // ← collapse to 0 when maximized
+        : 'calc(100% - 400px)'
+      : '100%',
+    overflow: breezeMaximized ? 'hidden' : 'auto',
+    transition: 'width 0.3s ease-in-out'
+  }}
+>
+  <div className="pc-content">
+    {children}
+  </div>
+</div>
+      
+
+			{/* Breeze AI Assistant Sidebar */}
+			{showBreezeAssistant && (
+				// <BreezeAssistantSidebar
+				// 	isOpen={showBreezeAssistant}
+				// 	onClose={() => setShowBreezeAssistant(false)}
+				// 	onMaximize={() => {
+				// 		console.log('Maximize Breeze Assistant');
+				// 	}}
+				// 	width="400px"
+				// 	onSendMessage={async (message: string) => {
+				// 		await new Promise(resolve => setTimeout(resolve, 1000));
+				// 		return "I'm here to help! This is a demo response. You can customize the message handling by implementing the onSendMessage callback.";
+				// 	}}
+				// />
+<BreezeAssistantSidebar
+       isOpen={showBreezeAssistant}
+       onClose={() => { setShowBreezeAssistant(false); setBreezeMaximized(false); }}
+       isMaximized={breezeMaximized}
+       onMaximizeChange={(v) => setBreezeMaximized(v)}
+       width={breezeMaximized ? '100%' : '400px'}
+    />
+			)}
 		</div>
-		
-				{/* Profile Sidebar */}
-        <ProfileSidebar 
-        isOpen={showProfileSidebar} 
-        onClose={() => setShowProfileSidebar(false)} 
-      />
-
 
 		<Footer />
 		</div>
-				
+
+    	{/* Notifications Sidebar */}
+		<NotificationsSidebar
+			isOpen={showNotificationsSidebar}
+			onClose={() => setShowNotificationsSidebar(false)}
+		/>
+
+		{/* Create Lead Sidebar (from header Create dropdown) */}
+		<CreateLeadModal
+			show={showCreateLeadModal}
+			onHide={() => setShowCreateLeadModal(false)}
+			onSuccess={() => setShowCreateLeadModal(false)}
+		/>
+
+		{/* Create Company Sidebar (from header Create dropdown) */}
+		{showCreateCompanySidebar && (
+			<CreateCompanySidebar
+				onClose={() => setShowCreateCompanySidebar(false)}
+				onSave={async (data: CompanyFormPayload) => {
+					await createCompany(data);
+					setShowCreateCompanySidebar(false);
+				}}
+			/>
+		)}
 		</>
 	);
 };
 
 export default Layout;
-

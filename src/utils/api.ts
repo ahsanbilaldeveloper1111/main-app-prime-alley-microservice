@@ -1,11 +1,14 @@
 import axios from 'axios';
 import { getCurrentAccessToken, isTokenExpired } from './tokenUtils';
 import { clearAllLocalStorage } from './localStorageUtils';
+import { clearSessionCookiesClient } from './cookieUtils';
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
+import tokenService from './tokenService';
 
-// Create axios instance with default configuration
+// Same pattern as axios.ts: all requests go through Next.js proxy to avoid 431 (large cookies never sent to backend)
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || '',
+  baseURL: '/api',
   timeout: 1000000,
   headers: {
     'Content-Type': 'application/json',
@@ -20,87 +23,7 @@ apiClient.interceptors.request.use(
     const token = getCurrentAccessToken();
     
     if (token) {
-      // Check the stored expiry timestamp first (more reliable than JWT parsing)
-      if (typeof window !== 'undefined') {
-        const expiresAt = sessionStorage.getItem('accessTokenExpires');
-        if (expiresAt) {
-          const expiryTime = Number.parseInt(expiresAt, 10);
-          const now = Date.now();
-          const timeUntilExpiry = expiryTime - now;
-          
-          // Only refresh if token is actually expired or expiring within 2 minutes
-          // Since tokens last 15 minutes, we refresh when 2 minutes remain
-          const REFRESH_THRESHOLD = 2 * 60 * 1000; // 2 minutes before expiry
-          
-          if (timeUntilExpiry > REFRESH_THRESHOLD) {
-            // Token is still valid for more than 2 minutes, use it
-            config.headers.Authorization = `Bearer ${token}`;
-            return config;
-          }
-          
-          // Token is expired or expiring within 2 minutes, refresh it
-          if (timeUntilExpiry <= 0 || timeUntilExpiry <= REFRESH_THRESHOLD) {
-            try {
-              const newToken = await authAPI.refreshToken();
-              if (newToken) {
-                config.headers.Authorization = `Bearer ${newToken}`;
-              }
-            } catch (refreshError) {
-              console.error('Failed to refresh token:', refreshError);
-              // Clear tokens and redirect to login
-              if (typeof window !== 'undefined') {
-                sessionStorage.clear();
-                clearAllLocalStorage();
-                // Properly clear NextAuth session to prevent refresh loops
-                signOut({ 
-                  callbackUrl: '/auth/signin',
-                  redirect: false // We'll redirect manually
-                }).then(() => {
-                  window.location.href = '/auth/signin';
-                }).catch(() => {
-                  // If signOut fails, still redirect
-                  window.location.href = '/auth/signin';
-                });
-              }
-            }
-            return config;
-          }
-        }
-      }
-      
-      // Fallback: Check token expiry using JWT parsing (if expiry timestamp not available)
-      // Use 2 minutes buffer since tokens last 15 minutes
-      const shouldRefresh = isTokenExpired(token, 2); // 2 minutes buffer
-      
-      if (shouldRefresh) {
-        // Token is expired or expiring soon, refresh it
-        try {
-          const newToken = await authAPI.refreshToken();
-          if (newToken) {
-            config.headers.Authorization = `Bearer ${newToken}`;
-          }
-        } catch (refreshError) {
-          console.error('Failed to refresh token:', refreshError);
-          // Clear tokens and redirect to login
-          if (typeof window !== 'undefined') {
-            sessionStorage.clear();
-            clearAllLocalStorage();
-            // Properly clear NextAuth session to prevent refresh loops
-            signOut({ 
-              callbackUrl: '/auth/signin',
-              redirect: false // We'll redirect manually
-            }).then(() => {
-              window.location.href = '/auth/signin';
-            }).catch(() => {
-              // If signOut fails, still redirect
-              window.location.href = '/auth/signin';
-            });
-          }
-        }
-      } else {
-        // Token is valid, use it
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
     return config;
@@ -121,13 +44,11 @@ apiClient.interceptors.response.use(
     // Handle 401 errors (token expired)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      //console.log('Received 401, attempting to refresh token...');
 
       try {
         // Try to refresh the token
-        const newToken = await authAPI.refreshToken();
+        const newToken = await tokenService.forceRefresh();
         if (newToken) {
-          //console.log('Token refreshed successfully, retrying request...');
           // Retry the original request with new token
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
@@ -136,17 +57,19 @@ apiClient.interceptors.response.use(
         console.error('Token refresh failed:', refreshError);
         // Refresh failed, redirect to login
         if (typeof window !== 'undefined') {
+          // Best-effort: clear server-side NextAuth session payload before wiping cookies
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
           sessionStorage.clear();
           clearAllLocalStorage();
-          // Properly clear NextAuth session to prevent refresh loops
-          signOut({ 
-            callbackUrl: '/auth/signin',
-            redirect: false // We'll redirect manually
+          clearSessionCookiesClient(true);
+          const callbackUrl = getLogoutCallbackUrl();
+          signOut({
+            callbackUrl,
+            redirect: false,
           }).then(() => {
-            window.location.href = '/auth/signin';
+            window.location.href = callbackUrl;
           }).catch(() => {
-            // If signOut fails, still redirect
-            window.location.href = '/auth/signin';
+            window.location.href = callbackUrl;
           });
         }
       }
@@ -177,10 +100,16 @@ export const authAPI = {
 
   // Logout function
   logout: async () => {
-    //console.log('Logging out...');
     try {
-      sessionStorage.clear();
-      clearAllLocalStorage();
+      // Clear server-side NextAuth session payload + cookies
+      await apiClient.post(
+        '/auth/logout',
+        {},
+        {
+          withCredentials: true,
+          timeout: 10000,
+        }
+      );
     } catch (error) {
       console.error('Logout API call failed:', error);
       // Continue with logout even if API call fails
@@ -279,17 +208,19 @@ export const authAPI = {
       console.error('Token refresh failed:', error);
       // If refresh fails, clear tokens and redirect to login
       if (typeof window !== 'undefined') {
+        // Best-effort: clear server-side NextAuth session payload before wiping cookies
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         sessionStorage.clear();
         clearAllLocalStorage();
-        // Properly clear NextAuth session to prevent refresh loops
-        signOut({ 
-          callbackUrl: '/auth/signin',
-          redirect: false // We'll redirect manually
+        clearSessionCookiesClient(true);
+        const callbackUrl = getLogoutCallbackUrl();
+        signOut({
+          callbackUrl,
+          redirect: false,
         }).then(() => {
-          window.location.href = '/auth/signin';
+          window.location.href = callbackUrl;
         }).catch(() => {
-          // If signOut fails, still redirect
-          window.location.href = '/auth/signin';
+          window.location.href = callbackUrl;
         });
       }
       throw error;

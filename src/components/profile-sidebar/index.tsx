@@ -21,9 +21,11 @@ import {
 } from 'lucide-react';
 
 import { useSession, signOut } from "next-auth/react";
+import { getLogoutCallbackUrl } from '../../utils/logoutRedirect';
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
 import ResetPasswordModal from '@components/ResetPasswordModal';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ProfileSidebarProps {
   isOpen?: boolean;
@@ -40,6 +42,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
   const router = useRouter();
 	const { data: session, status } = useSession();
+  const { logout } = useAuth();
 
   const [loggedInName, setLoggedInName] = useState('');
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
@@ -568,6 +571,27 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   </div>
                 </button>
               </li>
+
+
+{session?.user?.permissions?.includes('set-company-image-users') && (
+              <li className="profile-menu-item">
+                <button className="profile-menu-button"
+                  onClick={() => {
+                    router.push('/company');
+                    onClose?.();
+                  }}
+                >
+                  <div className="profile-menu-content">
+                      <div className="profile-menu-icon">
+                        <Settings size={20} />
+                    </div>
+                    <span className="profile-menu-text">Company Logo</span>
+                  </div>
+                </button>
+              </li>
+              )}
+
+              
             </div>
 
             {/* Section 5 */}
@@ -587,7 +611,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 <button className="profile-menu-button"
                   onClick={() => {
                     onClose?.();
-                    signOut({ callbackUrl: '/auth/signin',redirect: true });
+                    logout();
                   }}
                 >
                   <div className="profile-menu-content">

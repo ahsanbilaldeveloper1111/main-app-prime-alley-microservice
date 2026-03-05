@@ -1,12 +1,12 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useRef } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
+import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -30,6 +30,9 @@ import "nprogress/nprogress.css";
 import PageLoader from '@components/PageLoader';
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from 'lucide-react';
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+
 import { motion } from 'framer-motion';
 
 
@@ -112,6 +115,56 @@ const CallDashboard = () => {
         totalAvgDuration: 0,
         totalAvgCost: 0,
     });
+    const statsCardsData = [
+      {
+          title: 'Total Calls',
+          value: generalStats.totalCalls,
+          icon: Phone,
+          iconColor: '#3B82F6',
+          iconBgColor: '#DBEAFE',
+          subtitle: 'Total calls in the system',
+      },
+      {
+          title: 'Inbound',
+          value: generalStats.totalInbound,
+          icon: PhoneIncoming,
+          iconColor: '#10B981',
+          iconBgColor: '#D1FAE5',
+          subtitle: 'Inbound calls in the system',
+      },
+      {
+          title: 'Outbound',
+          value: generalStats.totalOutbound,
+          icon: PhoneOutgoing,
+          iconColor: '#0EA5E9',
+          iconBgColor: '#E0F2FE',
+          subtitle: 'Outbound calls in the system',
+      },
+      {
+          title: 'Missed Incoming',
+          value: generalStats.totalMissedIncoming,
+          icon: PhoneMissed,
+          iconColor: '#F59E0B',
+          iconBgColor: '#FEF3C7',
+          subtitle: 'Missed incoming calls in the system',
+      },
+      {
+          title: 'Missed Outgoing',
+          value: generalStats.totalMissedOutgoing,
+          icon: PhoneOff,
+          iconColor: '#EF4444',
+          iconBgColor: '#FEE2E2',
+          subtitle: 'Missed outgoing calls in the system',
+      },
+      {
+        title: 'Missed Outgoing',
+        value: generalStats.totalMissedOutgoing,
+        icon: PhoneOff,
+        iconColor: '#EF4444',
+        iconBgColor: '#FEE2E2',
+        subtitle: 'Missed outgoing calls in the system',
+    }
+  ];
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -213,13 +266,26 @@ const CallDashboard = () => {
 
     const [startDateTime, setStartDateTime] = useState<string>('');
     const [endDateTime, setEndDateTime] = useState<string>('');
+    const [pendingDateStart, setPendingDateStart] = useState<string>('');
+    const [pendingDateEnd, setPendingDateEnd] = useState<string>('');
 
     useEffect(() => {
         fetchGeneralStats();
     }, []);
-    const fetchGeneralStats = async () => {
+
+    useEffect(() => {
+        if (currentFilters.start_datetime) {
+            setPendingDateStart(moment.utc(currentFilters.start_datetime).local().format('YYYY-MM-DD'));
+        }
+        if (currentFilters.end_datetime) {
+            setPendingDateEnd(moment.utc(currentFilters.end_datetime).local().format('YYYY-MM-DD'));
+        }
+    }, [currentFilters.start_datetime, currentFilters.end_datetime]);
+
+    const fetchGeneralStats = async (overrideFilters?: typeof currentFilters) => {
+      const filtersToUse = overrideFilters ?? currentFilters;
       setShowPageLoader(true);
-      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_LOGS }, 
+      const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: filtersToUse,reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_LOGS }, 
         'call-logs/generalStats').finally(() => {
           setShowPageLoader(false);
         });
@@ -566,8 +632,9 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     useEffect(() => {
       fetchExtensionStats();
   }, []);
-  const fetchExtensionStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsExtension',moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByExtension');
+  const fetchExtensionStats = async (overrideFilters?: typeof currentFilters) => {
+    const filtersToUse = overrideFilters ?? currentFilters;
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: filtersToUse,reportType: 'statsExtension',moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByExtension');
     if(response?.dataList?.length > 0){
       setExtensionData(response?.dataList);
     } else {
@@ -580,8 +647,9 @@ const [ExtensionChart, setExtensionChart] = React.useState({
     fetchTrendByCountryStats();
   }, []);
 
-  const fetchTrendByCountryStats = async () => {
-    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: currentFilters,reportType: 'statsCountry', moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByCountry');
+  const fetchTrendByCountryStats = async (overrideFilters?: typeof currentFilters) => {
+    const filtersToUse = overrideFilters ?? currentFilters;
+    const response = await ListCallLogs({ page:  page, perPage: perPage, search: "", filters: filtersToUse,reportType: 'statsCountry', moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/statsByCountry');
     if(response?.dataList?.length > 0){
       setTrendByCountryData(response?.dataList);
     }
@@ -668,15 +736,56 @@ const [ExtensionChart, setExtensionChart] = React.useState({
         }
     };
 
-    const refreshData = async () => {
+    const formatDateRangeToUtc = (startLocal: string, endLocal: string): { start_datetime: string; end_datetime: string } => {
+      let startMoment;
+      if (startLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        const dateTimeStr = startLocal + ':00';
+        const [datePart, timePart] = dateTimeStr.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute, second] = timePart.split(':').map(Number);
+        startMoment = moment([year, month - 1, day, hour, minute, second]);
+      } else {
+        startMoment = moment(startLocal || undefined).startOf('day');
+      }
+      let endMoment;
+      if (endLocal?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        const timePart = endLocal.split('T')[1];
+        const seconds = timePart === '23:59' ? '59' : '00';
+        const dateTimeStr = endLocal + ':' + seconds;
+        const [datePart, timePartFull] = dateTimeStr.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute, second] = timePartFull.split(':').map(Number);
+        endMoment = moment([year, month - 1, day, hour, minute, second]);
+      } else {
+        endMoment = moment(endLocal || undefined).endOf('day');
+      }
+      return {
+        start_datetime: startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+        end_datetime: endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+      };
+    };
+
+    const refreshData = async (overrideFilters?: typeof currentFilters) => {
       setLoading(true);
       NProgress.start();
-      await fetchGeneralStats();
-      await fetchExtensionStats();
-      await fetchTrendByCountryStats();
-      setLoading(false);  
+      const filtersToUse = overrideFilters ?? currentFilters;
+      await fetchGeneralStats(filtersToUse);
+      await fetchExtensionStats(filtersToUse);
+      await fetchTrendByCountryStats(filtersToUse);
+      if (overrideFilters) {
+        setCurrentFilters(overrideFilters);
+        setStartDateTime(overrideFilters.start_datetime);
+        setEndDateTime(overrideFilters.end_datetime);
+      }
+      setLoading(false);
       NProgress.done();
-    }
+    };
+
+    const handleApplyDateRange = useCallback(() => {
+      const formatted = formatDateRangeToUtc(pendingDateStart, pendingDateEnd);
+      refreshData(formatted);
+    }, [pendingDateStart, pendingDateEnd]);
+
 
    
 
@@ -715,10 +824,40 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                     <div className="d-flex align-items-center gap-2">
                           {showDateRange && (
                             <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
+                              {/* <p className="mb-0 d-flex align-items-center gap-2 flex-wrap">
+                                Date Range:{' '}
+                                <span className="status-badge primary">{startDateTime ? moment.utc(startDateTime).local().format('DD MMM YYYY hh:mm:ss A') : ''}</span>
+                                {' '}to{' '}
+                                <span className="status-badge primary">{endDateTime ? moment.utc(endDateTime).local().format('DD MMM YYYY hh:mm:ss A') : ''}</span>
+                              </p> */}
+                              Date Range:{' '}
+                              <span className="status-badge primary">
+                                <Form.Control
+                                  type="date"
+                                  value={pendingDateStart}
+                                  onChange={(e) => setPendingDateStart(e.target.value)}
+                                  className="border-0 bg-transparent p-0 text-inherit"
+                                  style={{ fontSize: 'inherit', minWidth: '130px', cursor: 'pointer' }}
+                                  aria-label="From date"
+                                  title="From date"
+                                />
+                              </span>
+                              {' '}to{' '}
+                              <span className="status-badge primary">
+                                <Form.Control
+                                  type="date"
+                                  value={pendingDateEnd}
+                                  onChange={(e) => setPendingDateEnd(e.target.value)}
+                                  className="border-0 bg-transparent p-0 text-inherit"
+                                  style={{ fontSize: 'inherit', minWidth: '130px', cursor: 'pointer' }}
+                                  aria-label="To date"
+                                  title="To date"
+                                />
+                              </span>
+                              <Button size="sm" variant="primary" onClick={handleApplyDateRange} disabled={loading}>
+                                Apply
+                              </Button>
+                              <i className="material-icons-two-tone" style={{ cursor: 'pointer' }} onClick={() => refreshData()} title="Refresh">refresh</i>
                             </>
                           )}
                         </div>
@@ -738,10 +877,12 @@ const [ExtensionChart, setExtensionChart] = React.useState({
 
 
 
-            <PageSummaryGrid 
+            {/* <PageSummaryGrid 
               cards={summaryCards} 
-            />
-
+            /> */}
+             <div className="mb-4">
+              <StatsCards data={statsCardsData} gridMinWidth="180px" />
+            </div>
             <Row>
                 {showCountryChart && (
                 <Col md={4}>

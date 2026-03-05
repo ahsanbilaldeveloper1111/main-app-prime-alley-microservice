@@ -46,10 +46,11 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
+import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
 import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig, BarChart3, Ticket } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
-import Select from "react-select";
+import Select from "@components/AppSelect";
 import { useRouter } from "next/router";
 import {
   PieChart,
@@ -956,6 +957,7 @@ const TicketList = () => {
     File[]
   >([]);
   const [selectedTicketExistingImages, setSelectedTicketExistingImages] = useState<string[]>([]);
+  const [editExistingImageUrls, setEditExistingImageUrls] = useState<(string | null)[]>([]);
   const [selectedTicketTags, setSelectedTicketTags] = useState<string[]>([]);
   const [showEditTicketModal, setShowEditTicketModal] =
     useState<boolean>(false);
@@ -1082,6 +1084,28 @@ const TicketList = () => {
     session?.user?.permissions,
   ]);
 
+  // Resolve existing image paths to data URLs for the edit modal (same as reference [id] page)
+  useEffect(() => {
+    if (!showEditTicketModal || selectedTicketExistingImages.length === 0) {
+      setEditExistingImageUrls([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(selectedTicketExistingImages.map((path) => loadImage(path)))
+      .then((results) => {
+        if (!cancelled) {
+          setEditExistingImageUrls(results.map((r) => r ?? null));
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading edit modal images:", err);
+        if (!cancelled) setEditExistingImageUrls(selectedTicketExistingImages.map(() => null));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showEditTicketModal, selectedTicketExistingImages]);
+
   const handleDeleteTicket = useCallback((props: any) => {
     setSelectedTicket(props.id);
     setSelectedTicketTitle(props.title);
@@ -1207,34 +1231,43 @@ const TicketList = () => {
   ];
   
   const handleSubmitCreateTicket = useCallback(async () => {
+    if (creatingTicket) return;
+    setCreatingTicket(true);
     console.log("=== COMPONENT DEBUG ===");
     console.log("newTicketImages count:", newTicketImages.length);
     if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
       toast.error("Please enter a ticket title (Min: 5 chars)");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketType) {
       toast.error("Please select a ticket type");
+      setCreatingTicket(false);
       return;
     }
-    if (newTicketDescription.length < 50 ) {
+    if ((newTicketDescription || "").replace(/<[^>]*>/g, "").length < 50) {
       toast.error("Ticket description must be at least 50 characters");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketStatus) {
       toast.error("Please select a ticket status");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketModule) {
       toast.error("Please select a ticket module");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketSubmodule) {
       toast.error("Please select a ticket primary issue");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketPriority) {
       toast.error("Please select a ticket priority");
+      setCreatingTicket(false);
       return;
     }
 
@@ -1276,10 +1309,12 @@ const TicketList = () => {
           toast.error(
             `Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`
           );
+          setCreatingTicket(false);
           return;
         }
         if (image.size > maxSize) {
           toast.error(`Attachment ${i + 1} size must be less than 5MB`);
+          setCreatingTicket(false);
           return;
         }
       }
@@ -1303,7 +1338,6 @@ const TicketList = () => {
         console.log(`Image ${index + 1} size:`, image.size);
       });
     }
-    setCreatingTicket(true);
     console.log(
       "FormData created type:",
       typeof formData,
@@ -1339,6 +1373,7 @@ const TicketList = () => {
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
   }, [
+    creatingTicket,
     newTicketTitle,
     newTicketDescription,
     newTicketType,
@@ -1415,8 +1450,7 @@ const TicketList = () => {
     []
   );
   const handleNewTicketDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-      setNewTicketDescription(e.target.value),
+    (html: string) => setNewTicketDescription(html),
     []
   );
   const handleEditTicketTitleChange = useCallback(
@@ -1425,8 +1459,7 @@ const TicketList = () => {
     []
   );
   const handleEditTicketDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-      setSelectedTicketDescription(e.target.value),
+    (html: string) => setSelectedTicketDescription(html),
     []
   );
 
@@ -2071,18 +2104,17 @@ const TicketList = () => {
 
             <div className="form-group mb-3">
               <label htmlFor="editTicketDescription">Ticket Description</label>
-              <textarea
-                className="form-control"
-                id="editTicketDescription"
-                value={selectedTicketDescription || ""}
-                onChange={handleEditTicketDescriptionChange}
-                placeholder="Ticket Description (Min: 50 chars)"
-                rows={4}
-               
-              ></textarea>
+              <div className="border rounded" style={{ minHeight: '150px' }}>
+                <RichTextEditor
+                  value={selectedTicketDescription || ""}
+                  onChange={(html) => handleEditTicketDescriptionChange(html)}
+                  placeholder="Ticket Description (Min: 50 chars)"
+                  minHeight="150px"
+                />
+              </div>
               <div className="d-flex justify-content-between mt-1">
                 <small className="text-muted">
-                  {selectedTicketDescription?.length || 0} characters
+                  {(selectedTicketDescription || "").replace(/<[^>]*>/g, "").length} characters
                 </small>
               </div>
             </div>
@@ -2340,9 +2372,24 @@ const TicketList = () => {
                         key={index}
                         className="d-flex align-items-center justify-content-between border rounded p-2"
                       >
-                        <small className="text-muted">
+                        {/* <small className="text-muted">
                           {imgPath}
-                        </small>
+                        </small> */}
+                        {editExistingImageUrls[index] ? (
+                          <img
+                            src={editExistingImageUrls[index] ?? ''}
+                            alt="Ticket image"
+                            className="img-fluid"
+                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div
+                            className="d-flex align-items-center justify-content-center bg-light rounded"
+                            style={{ width: '50px', height: '50px', fontSize: '0.75rem', color: '#6c757d' }}
+                          >
+                            Loading…
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="btn btn-sm btn-danger"
@@ -2599,26 +2646,25 @@ const TicketList = () => {
                 <Info size={14} />
               </span>
               </label>
-              <textarea
-                className="form-control"
-                id="newTicketDescription"
-                value={newTicketDescription}
-                onChange={handleNewTicketDescriptionChange}
-                placeholder="Ticket Description (Min: 50 chars)"
-                rows={4}
-               
-              ></textarea>
+              <div className="border rounded" style={{ minHeight: '150px' }}>
+                <RichTextEditor
+                  value={newTicketDescription}
+                  onChange={(html) => handleNewTicketDescriptionChange(html)}
+                  placeholder="Ticket Description (Min: 50 chars)"
+                  minHeight="150px"
+                />
+              </div>
               <div className="d-flex justify-content-between mt-1">
                 <div
                   className={`text-muted ${
-                    newTicketDescription.length < 50 ? "text-danger" : ""
+                    (newTicketDescription || "").replace(/<[^>]*>/g, "").length < 50 ? "text-danger" : ""
                   }`}
                 >
-                  <Form.Text className={newTicketDescription.length < 50 ? 'text-warning fw-semibold' : 'text-success fw-semibold'}>
-                        {newTicketDescription.length < 50 ? (
+                  <Form.Text className={(newTicketDescription || "").replace(/<[^>]*>/g, "").length < 50 ? 'text-warning fw-semibold' : 'text-success fw-semibold'}>
+                        {(newTicketDescription || "").replace(/<[^>]*>/g, "").length < 50 ? (
                           <>
                             <AlertCircle size={14} className="me-1" />
-                            Minimum 50 characters required ({50 - newTicketDescription.length} more needed)
+                            Minimum 50 characters required ({50 - (newTicketDescription || "").replace(/<[^>]*>/g, "").length} more needed)
                           </>
                         ) : (
                           <>
@@ -2974,6 +3020,7 @@ const TicketList = () => {
         onCancel={closeCreateTicketModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitDisabled={creatingTicket}
       />
 
 <Modal

@@ -1,7 +1,10 @@
 import axios from "axios";
+import * as Sentry from "@sentry/nextjs";
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
+import { clearSessionCookiesClient } from './cookieUtils';
 
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -111,6 +114,10 @@ axiosInstance.interceptors.response.use(
 
     if (error.response) {
       if (error.response.status === 401 && !originalRequest._retry) {
+        if (typeof window !== 'undefined' && (window as any).__authLogoutInProgress) {
+          return Promise.reject(error);
+        }
+
         originalRequest._retry = true;
         
         try {
@@ -124,13 +131,18 @@ axiosInstance.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return axiosInstance(originalRequest);
           } else {
-            // Token refresh failed, but don't immediately clear session
-            // Let the user continue with their current session
-            //console.log('Token refresh failed, but keeping session active');
-            // Logout user
-            signOut();
+            // Token refresh failed - clear cookies and session, then sign out
             if (typeof window !== 'undefined') {
+              (window as any).__authLogoutInProgress = true;
+              // Best-effort: clear server-side NextAuth session payload before wiping cookies
+              fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+              clearSessionCookiesClient(true);
               sessionStorage.clear();
+              const callbackUrl = getLogoutCallbackUrl();
+              // Await signOut so NextAuth cookie is cleared before redirect (prevents signin/dashboard loop)
+              signOut({ callbackUrl, redirect: false }).then(() => {
+                window.location.replace(callbackUrl);
+              });
             }
             return Promise.reject(error);
           }
@@ -146,7 +158,26 @@ axiosInstance.interceptors.response.use(
         toast.error('Forbidden');
       } else if (error.response.status === 429) {
         toast.error('Too many requests. Please try again in a few moments.');
+      } else {
+        // Send unhandled API errors to Sentry (not 401, 403, 429)
+        Sentry.captureException(error, {
+          extra: {
+            url: originalRequest?.url,
+            method: originalRequest?.method,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+          },
+        });
       }
+    } else {
+      // Network error, timeout, or no response - send to Sentry
+      Sentry.captureException(error, {
+        extra: {
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          message: error.message,
+        },
+      });
     }
     return Promise.reject(error);
   }

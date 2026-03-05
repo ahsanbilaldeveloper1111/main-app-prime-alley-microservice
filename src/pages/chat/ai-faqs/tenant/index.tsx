@@ -15,6 +15,8 @@ import {
   FAQItem,
   CreateTenantFAQPayload,
 } from "@utils/chat";
+import { GetCompanies } from "@utils/users";
+import Select from "react-select";
 import { Column } from "@components/CustomDataTable";
 import {
   Button,
@@ -25,7 +27,7 @@ import {
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { Edit, Trash2, Plus, X, ArrowLeft } from "lucide-react";
+import { Edit, Trash2, Plus, X, ArrowLeft, Filter } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import GenericListPage from "@components/GenericListPage";
@@ -34,10 +36,26 @@ import { useRouter } from 'next/router'
 
 
 
+/** Company/tenant option from GetCompanies */
+interface CompanyOption {
+  identifier: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 const AIChatFAQsTenant = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
+
+  // Tenant/company selection (identifier used as value and in payload)
+  const [tenantId, setTenantId] = useState<string>("");
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+
+  // Filter: company dropdown + apply. By default no tenant applied so we don't fetch FAQs.
+  const [selectedCompanyForFilter, setSelectedCompanyForFilter] = useState<string>("");
+  const [filterTenantId, setFilterTenantId] = useState<string>("");
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -53,13 +71,33 @@ const AIChatFAQsTenant = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
 
-  // Get tenant_id from session
+  // Selected tenant for Add / Update / Delete: modal choice, applied filter, or dropdown selection
   const getTenantId = (): string => {
-    if (session?.user) {
-      return (session.user as any).tenant_id || "tenant_123";
+    if (tenantId?.trim()) return tenantId.trim();
+    if (filterTenantId?.trim()) return filterTenantId.trim();
+    if (selectedCompanyForFilter?.trim()) return selectedCompanyForFilter.trim();
+    if (session?.user && (session.user as any).tenant_id) {
+      return (session.user as any).tenant_id;
     }
-    return "tenant_123"; // Fallback
+    return "";
   };
+
+  // Load companies for tenant select
+  React.useEffect(() => {
+    let mounted = true;
+    setCompaniesLoading(true);
+    GetCompanies()
+      .then((data) => {
+        if (mounted && Array.isArray(data)) {
+          setCompanies(data as CompanyOption[]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (mounted) setCompaniesLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
 
 
   // Columns for table
@@ -136,12 +174,13 @@ const AIChatFAQsTenant = () => {
     []
   );
 
-  // Handle edit FAQ
+  // Handle edit FAQ (use selected tenant from filter for update)
   const handleEditFAQ = (faq: FAQData) => {
     setSelectedFAQ(faq);
     setFaqItems([{ question: faq.question, answer: faq.answer }]);
     setHaveFiles(false);
     setSelectedFiles([]);
+    setTenantId(filterTenantId || selectedCompanyForFilter || tenantId || "");
     setShowEditModal(true);
   };
 
@@ -200,8 +239,12 @@ const AIChatFAQsTenant = () => {
     }
 
     try {
-      const tenantId = getTenantId();
-      
+      const tenantForPayload = getTenantId();
+      if (!tenantForPayload) {
+        toast.error("Please select a tenant (company) first");
+        return;
+      }
+
       // Convert FAQ items to JSON string
       const faqsJson = JSON.stringify(validFAQs);
 
@@ -210,7 +253,7 @@ const AIChatFAQsTenant = () => {
       const filePaths: string[] = selectedFiles.map((file) => file.name);
 
       const payload: CreateTenantFAQPayload = {
-        tenant_id: tenantId,
+        tenant_id: tenantForPayload,
         faqs: faqsJson,
         have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
         files: filePaths.length > 0 ? filePaths : undefined,
@@ -235,13 +278,17 @@ const AIChatFAQsTenant = () => {
     }
   };
 
-  // Confirm delete
+  // Confirm delete (uses selected tenant from filter dropdown)
   const handleConfirmDelete = async () => {
     if (!selectedFAQ?.id) return;
-
+    const tenantForDelete = getTenantId();
+    if (!tenantForDelete) {
+      toast.error("Please select a tenant (company) first");
+      return;
+    }
     try {
       await deleteTenantFAQ({
-        tenant_id: getTenantId(),
+        tenant_id: tenantForDelete,
         faq_id: selectedFAQ.id,
       });
 
@@ -254,33 +301,31 @@ const AIChatFAQsTenant = () => {
     }
   };
 
-  // Fetch data for GenericListPage
+  // Fetch data only when a company is applied via Filter (by default don't fetch)
   const fetchData = useCallback(
     async (page = 1, perPage = 15, search = "") => {
+      if (!filterTenantId?.trim()) {
+        return {
+          data: [],
+          total: 0,
+          page: 1,
+          per_page: perPage,
+          last_page: 1,
+        };
+      }
       try {
-        const allFAQs = await getTenantFAQs();
-        
-        // Client-side filtering and pagination
-        let filtered = allFAQs;
-        
-        if (search) {
-          filtered = allFAQs.filter(
-            (faq) =>
-              faq.question.toLowerCase().includes(search.toLowerCase()) ||
-              faq.answer.toLowerCase().includes(search.toLowerCase())
-          );
-        }
+        const allFAQs = await getTenantFAQs(filterTenantId.trim(), search || undefined);
 
         const start = (page - 1) * perPage;
         const end = start + perPage;
-        const paginated = filtered.slice(start, end);
+        const paginated = allFAQs.slice(start, end);
 
         return {
           data: paginated,
-          total: filtered.length,
+          total: allFAQs.length,
           page,
           per_page: perPage,
-          last_page: Math.ceil(filtered.length / perPage),
+          last_page: Math.ceil(allFAQs.length / perPage),
         };
       } catch (error) {
         console.error("Error fetching FAQs:", error);
@@ -293,16 +338,34 @@ const AIChatFAQsTenant = () => {
         };
       }
     },
-    []
+    [filterTenantId]
   );
+
+  const handleApplyFilter = () => {
+    if (!selectedCompanyForFilter?.trim()) {
+      toast.info("Please select a company first");
+      return;
+    }
+    setFilterTenantId(selectedCompanyForFilter.trim());
+    setRefreshKey((k) => k + 1);
+  };
+
+  // Stable filters object so GenericListPage doesn't refetch when modal form state changes (typing)
+  const stableFilters = useMemo(() => ({}), []);
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Tenant FAQs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
 
-      <PageHeader title="Tenant FAQs" showSearch={false} buttons={
+      <PageHeader title="" showSearch={false} buttons={
         <>
-        <Button variant="primary" onClick={() => setShowAddModal(true)}>
+        <Button
+          variant="primary"
+          onClick={() => {
+            setTenantId(filterTenantId || selectedCompanyForFilter || "");
+            setShowAddModal(true);
+          }}
+        >
           <Plus size={16} className="me-2" />
           Add FAQs
         </Button>
@@ -313,13 +376,42 @@ const AIChatFAQsTenant = () => {
         </>
       }/>
 
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div style={{ minWidth: "220px" }}>
+          <Select
+            isLoading={companiesLoading}
+            options={companies.map((c) => ({
+              value: c.identifier,
+              label: (c.name ?? c.identifier) as string,
+            }))}
+            value={
+              selectedCompanyForFilter
+                ? {
+                    value: selectedCompanyForFilter,
+                    label:
+                      (companies.find((c) => c.identifier === selectedCompanyForFilter)?.name ??
+                        selectedCompanyForFilter) as string,
+                  }
+                : null
+            }
+            onChange={(opt) => setSelectedCompanyForFilter(opt?.value ?? "")}
+            placeholder="Select company..."
+            isClearable
+          />
+        </div>
+        <Button variant="primary" onClick={handleApplyFilter}>
+          <Filter size={16} className="me-2" />
+          Filter
+        </Button>
+      </div>
+
       <GenericListPage
         columns={columns}
         fetchData={fetchData}
         title="Tenant FAQs"
         searchPlaceholder="Search FAQs..."
         defaultPageSize={15}
-        filters={{}}
+        filters={stableFilters}
         refreshKey={refreshKey}
         search={true}
         tableStyle="table-style-2"
@@ -356,6 +448,31 @@ const AIChatFAQsTenant = () => {
                   Add FAQ
                 </Button>
               </div>
+
+              <Form.Group className="mb-4">
+                <Form.Label>Tenant</Form.Label>
+                <Select
+                  isLoading={companiesLoading}
+                  options={companies.map((c) => ({
+                    value: c.identifier,
+                    label: (c.name ?? c.identifier) as string,
+                  }))}
+                  value={
+                    tenantId
+                      ? {
+                          value: tenantId,
+                          label:
+                            (companies.find((c) => c.identifier === tenantId)?.name ?? tenantId) as string,
+                        }
+                      : null
+                  }
+                  onChange={(opt) => {
+                    if (opt) setTenantId(opt.value);
+                  }}
+                  placeholder="Select tenant..."
+                  isClearable={false}
+                />
+              </Form.Group>
 
               {faqItems.map((item, index) => (
                 <Card key={index} className="mb-3">
@@ -406,7 +523,7 @@ const AIChatFAQsTenant = () => {
             </div>
 
             {/* Files Section */}
-            <div className="mb-3">
+            {/* <div className="mb-3">
               <Form.Check
                 type="checkbox"
                 label="Have Files"
@@ -419,7 +536,7 @@ const AIChatFAQsTenant = () => {
                   }
                 }}
               />
-            </div>
+            </div> */}
 
             {haveFiles && (
               <div className="mb-3">
@@ -535,7 +652,7 @@ const AIChatFAQsTenant = () => {
             </div>
 
             {/* Files Section */}
-            <div className="mb-3">
+            {/* <div className="mb-3">
               <Form.Check
                 type="checkbox"
                 label="Have Files"
@@ -548,7 +665,7 @@ const AIChatFAQsTenant = () => {
                   }
                 }}
               />
-            </div>
+            </div> */}
 
             {haveFiles && (
               <div className="mb-3">

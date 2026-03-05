@@ -1,0 +1,116 @@
+// =======================================
+//   Settings page – sidebar & search
+//   (main-settings style: Account Defaults, Audit Log, etc.)
+// =======================================
+
+.settings-sidebar {
+  width: 255px;
+  min-width: 255px;
+  background: #ffffff;
+  border-right: 1px solid #e8e8e8;
+  padding: 21px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+}
+
+.settings-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  width: 100%;
+  text-align: left;
+  font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  color: #141414;
+  line-height: 24px;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover {
+    background: #f5f5f5;
+  }
+
+  &.active {
+    background: whitesmoke;
+    border-left-color: #141414;
+    font-weight: 400;
+  }
+
+  &.search-match {
+    background: #f0f7ff;
+  }
+
+  .filter-icon {
+    color: inherit;
+    flex-shrink: 0;
+  }
+}
+
+.settings-sidebar-badge {
+  background: #7b5cf5;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+}
+
+.settings-sidebar-group-heading {
+  font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #141414;
+  line-height: 20px;
+  padding: 12px 20px 6px;
+  margin-bottom: 0;
+}
+
+.settings-search-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.settings-search-suggestion-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  color: #141414;
+  transition: background 0.1s;
+
+  &:hover {
+    background: #f0f7ff;
+  }
+
+  .suggestion-section {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+  }
+}

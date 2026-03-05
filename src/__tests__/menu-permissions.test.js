@@ -62,7 +62,7 @@ const menuItems = [
     submenuItems: [
       { key: 'crm-dashboard', label: 'Dashboard', permission: 'dashboard-crm', href: '/crm/dashboard' },
       { key: 'crm-campaigns', label: 'Campaigns', permission: 'view-crm-campaigns', href: '/crm/campaigns' },
-      { key: 'crm-data', label: 'Data Management', permission: 'view-crm-data-management', href: '/crm/data' },
+      { key: 'crm-data', label: 'Data Management', permission: 'view-crm-data-management', href: '/crm/prospects' },
       { key: 'crm-leads', label: 'Leads', permission: 'view-crm-leads', href: '/crm/leads' },
       { key: 'crm-opportunities', label: 'Opportunities', permission: 'view-crm-opportunities', href: '/crm/opportunities' },
       { key: 'crm-stages', label: 'Stages', permission: 'view-crm-stages', href: '/crm/stages' },
@@ -196,11 +196,11 @@ const menuItems = [
     isMain: false,
     url: '',
     submenuItems: [
-      { key: 'netops-dashboard', label: 'Dashboard', permission: 'dashboard-netops', href: '/netops/dashboard' },
-      { key: 'netops-devices', label: 'Devices', permission: 'devices-netops', href: '/netops/devices' },
-      { key: 'netops-services', label: 'Services', permission: 'services-netops', href: '/netops/services' },
-      { key: 'netops-alerts', label: 'Alerts', permission: 'alerts-netops', href: '/netops/alerts' },
-      { key: 'netops-uptime-sla', label: 'Uptime & SLA Monitoring', permission: 'monitoring-netops', href: '/netops/uptime-sla' }
+      { key: 'pulse-dashboard', label: 'Dashboard', permission: 'dashboard-netops', href: '/pulse/dashboard' },
+      { key: 'pulse-devices', label: 'Devices', permission: 'devices-netops', href: '/pulse/devices' },
+      { key: 'pulse-services', label: 'Services', permission: 'services-netops', href: '/pulse/services' },
+      { key: 'pulse-alerts', label: 'Alerts', permission: 'alerts-netops', href: '/pulse/alerts' },
+      { key: 'pulse-uptime-sla', label: 'Uptime & SLA Monitoring', permission: 'monitoring-netops', href: '/pulse/uptime-sla' }
     ]
   },
   {

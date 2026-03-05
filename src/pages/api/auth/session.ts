@@ -37,7 +37,21 @@ const getCacheKey = (req: NextApiRequest): string => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'GET') {
+  // Ensure we always return JSON so NextAuth client never gets HTML (avoids CLIENT_FETCH_ERROR)
+  const sendJson = (status: number, body: object) => {
+    try {
+      res.status(status).json(body);
+    } catch (e) {
+      res.setHeader('Content-Type', 'application/json').status(status).end(JSON.stringify(body));
+    }
+  };
+
+  try {
+    if (req.method !== 'GET') {
+      sendJson(405, { message: 'Method not allowed' });
+      return;
+    }
+
     // Clean up stale cache entries periodically
     cleanupCache();
 
@@ -51,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // If there's a recent pending request (within 2 seconds), wait for it
       try {
         const result = await pendingRequest.promise;
-        return res.status(200).json(result);
+        return sendJson(200, result);
       } catch (error) {
         // If the pending request failed, continue with new request
         global.sessionRequestCache!.delete(cacheKey);
@@ -108,19 +122,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Remove from cache after successful completion
       global.sessionRequestCache!.delete(cacheKey);
       
-      return res.status(200).json(result);
+      return sendJson(200, result);
     } catch (error: any) {
       // Remove from cache on error
       global.sessionRequestCache!.delete(cacheKey);
       
-      if (error.message === 'Not authenticated') {
-        return res.status(401).json({ message: 'Not authenticated' });
+      if (error?.message === 'Not authenticated') {
+        return sendJson(401, { message: 'Not authenticated' });
       }
       
       console.error('Session API error:', error);
-      return res.status(500).json({ message: 'Internal server error' });
+      return sendJson(500, { message: 'Internal server error' });
     }
+  } catch (unexpectedError: any) {
+    // Top-level catch: never send HTML; NextAuth expects JSON
+    console.error('Session API unexpected error:', unexpectedError);
+    sendJson(500, { message: 'Internal server error' });
   }
-
-  return res.status(405).json({ message: 'Method not allowed' });
 }

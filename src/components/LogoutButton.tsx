@@ -1,7 +1,7 @@
 'use client';
 
-import { signOut } from 'next-auth/react';
 import { Button } from 'react-bootstrap';
+import { useAuth } from '../hooks/useAuth';
 
 interface LogoutButtonProps {
   variant?: string;
@@ -14,18 +14,13 @@ export default function LogoutButton({
   size = 'sm',
   className = ''
 }: LogoutButtonProps) {
-  const handleLogout = () => {
-    signOut({ 
-      callbackUrl: '/auth/signin',
-      redirect: true
-    });
-  };
+  const { logout } = useAuth();
 
   return (
     <Button 
       variant={variant} 
       size={size} 
-      onClick={handleLogout}
+      onClick={logout}
       className={className}
     >
       Sign Out

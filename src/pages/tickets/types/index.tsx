@@ -19,6 +19,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import FormModal from "@pages/partial/FormModal";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import { GlobalDateTimeFormat } from "@utils/Helper";
 
 const TicketTypes = () => {
   const { data: session, status } = useSession();
@@ -82,7 +83,7 @@ const TicketTypes = () => {
         sortable: true,
         cell: (props: any) => (
           <span className="text-muted">
-            {moment(props.created_at).format("DD/MM/YYYY")}
+            {moment(props.created_at).format(GlobalDateTimeFormat)}
           </span>
         ),
       },
@@ -273,8 +274,8 @@ const TicketTypes = () => {
 
 
       <PageHeader
-        title="Ticket Types"
-        description="Manage ticket types and their properties"
+        title=""
+        description=""
         showSearch={false}
         buttons={
           <>
