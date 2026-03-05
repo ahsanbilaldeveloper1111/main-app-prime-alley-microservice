@@ -414,9 +414,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
           // Extract source from CRM data
           const source =
-            crmDataRecord.data?.source ||
+            (crmDataRecord as any).source_file ||
             crmDataRecord.data?.lead_source ||
             crmDataRecord.data?.source_type ||
+            crmDataRecord.data?.source ||
             "File Upload";
 
           // Extract user_extension from CRM data
@@ -441,7 +442,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               crmDataRecord.data?.company_name ||
               crmDataRecord.data?.company ||
               "",
-            company_domain: crmDataRecord.data?.company_domain || "",
+            company_domain: (crmDataRecord as any)?.company_domain || "",
             company_contact:
               crmDataRecord.data?.company_contact ||
               crmDataRecord.data?.contact ||
@@ -613,16 +614,13 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         if (crmDataIdNum && crmData.length > 0) {
           const found = crmData.find((d) => d.id === crmDataIdNum);
           if (found) setSelectedCrmData(found);
-          else {
-            try {
-              const record = await getCrmDataById(crmDataIdNum);
-              setSelectedCrmData(record);
-            } catch {
-              setSelectedCrmData(null);
-            }
-          }
         } else {
-          setSelectedCrmData(null);
+          try {
+            const record = await getCrmDataById(crmDataIdNum as number);
+            setSelectedCrmData(record);
+          } catch {
+            setSelectedCrmData(null);
+          }
         }
         setEditFetching(false);
       })

@@ -2561,7 +2561,7 @@ const CrmDeals = () => {
       },
       {
         key: "owner",
-        label: "Owner",
+        label: "Created By",
         sortable: true,
         type: "text",
         emptyValue: "-",

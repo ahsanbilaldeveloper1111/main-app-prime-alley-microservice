@@ -660,7 +660,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     //     "--",
     // },
     {
-      label: "Contact owner",
+      label: "Owner",
       value: (() => {
         const ownerId = prospect?.data?.user_extension;
         if (ownerId == null) return "--";

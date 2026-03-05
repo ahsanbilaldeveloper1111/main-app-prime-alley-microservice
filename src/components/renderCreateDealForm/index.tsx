@@ -889,9 +889,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 />
               </div>
 
-              {/* Assigned to */}
+              {/* Owner */}
               <div style={fieldWrap}>
-                {fieldLabel("Assigned to", true)}
+                {fieldLabel("Owner", true)}
                 <Form.Select
                   value={dealForm.assigned_to || ""}
                   onChange={(e) =>

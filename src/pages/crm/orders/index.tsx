@@ -2107,7 +2107,7 @@ const CrmOrders = () => {
       },
       {
         key: "assignedUser",
-        label: "Assigned To",
+        label: "Owner",
         sortable: true,
         type: "text",
         emptyValue: "-",
@@ -2571,7 +2571,7 @@ const CrmOrders = () => {
                     </Col>
                     <Col md={4}>
                       <Form.Label className="small fw-bold mb-2">
-                        Assigned To
+                        Owner
                       </Form.Label>
                       <Select
                         options={extensions.map((ext: any) => ({
@@ -3550,7 +3550,7 @@ const CrmOrders = () => {
         filters={[
           {
             id: "assignedTo",
-            label: "Assigned To",
+            label: "Owner",
             type: "select" as const,
             value: ordersFilters.assignedTo
               ? (() => {
@@ -5325,7 +5325,7 @@ const CrmOrders = () => {
                                         marginBottom: "6px",
                                       }}
                                     >
-                                      Assigned To
+                                      Owner
                                     </div>
                                     <div
                                       style={{
@@ -5596,7 +5596,7 @@ const CrmOrders = () => {
                                         marginBottom: "6px",
                                       }}
                                     >
-                                      Assigned To
+                                      Owner
                                     </div>
                                     <div
                                       style={{
@@ -6073,7 +6073,7 @@ const CrmOrders = () => {
                                       marginBottom: "6px",
                                     }}
                                   >
-                                    Assigned To
+                                    Owner
                                   </div>
                                   <div
                                     style={{

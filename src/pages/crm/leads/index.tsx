@@ -3008,7 +3008,7 @@ const CrmLeads = () => {
       },
       {
         key: "assignedUser",
-        label: "Assigned To",
+        label: "Owner",
         sortable: true,
         type: "text",
       },
