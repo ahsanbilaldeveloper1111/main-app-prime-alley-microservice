@@ -7428,17 +7428,78 @@ const CrmCompanyManagement = () => {
                         },
                       ],
               },
-            ];
-            if (structuredSectionFields.length > 0) {
-              sections.push({
-                id: "enrichment-structured",
-                title: "Enrichment (structured data)",
-                icon: Layers,
+              {
+                id: "recent-activities",
+                title: "Recent activities",
+                icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                fields: structuredSectionFields,
-              });
-            }
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this order.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => console.log("Log activity"),
+                  },
+                },
+              },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
+                icon: PhoneIcon,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () => {
+                      const phone =
+                        selectedCompany?.phone ||
+                        selectedCompany?.rawData?.phone
+                      if (phone) {
+                        handleCallClick(selectedCompany);
+                      }
+                    },
+                  },
+                },
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
+                  },
+                },
+              },
+            ];
+            // if (structuredSectionFields.length > 0) {
+            //   sections.push({
+            //     id: "enrichment-structured",
+            //     title: "Enrichment (structured data)",
+            //     icon: Layers,
+            //     collapsible: true,
+            //     defaultExpanded: true,
+            //     fields: structuredSectionFields,
+            //   });
+            // }
 
             return (
               <GenericSidebar

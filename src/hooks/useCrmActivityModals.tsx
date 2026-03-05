@@ -142,13 +142,17 @@ export function useCrmActivityModals({
       try {
         await createMeeting({
           name: meetingData.title.trim(),
-          meeting_type: "Video",
+          meeting_type: meetingData.location?.trim() ?? "Video",
           meeting_date,
           meeting_time,
           record_type: recordType as "prospect" | "lead" | "deal" | "order",
           record_id: recordId,
           extensions,
           tenant_id: tenantId,
+          status: "scheduled",
+          ...(meetingData.location?.trim()
+            ? { meeting_outcome: meetingData.location.trim() }
+            : {}),
           extension_user: extension,
           start_date_time,
           end_date_time,
@@ -365,8 +369,8 @@ export function useCrmActivityModals({
       <MeetingModal
         isOpen={showMeetingModal}
         onClose={() => setShowMeetingModal(false)}
-        hostEmail={userEmail}
-        hostName={userName}
+        hostEmail={session?.user?.email ?? userEmail}
+        hostName={session?.user?.name ?? userName}
         attendeeEmail={recordEmail}
         attendeeName={recordName}
         recordType={recordType}

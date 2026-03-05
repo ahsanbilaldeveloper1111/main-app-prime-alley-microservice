@@ -126,6 +126,7 @@ import {
   AlertCircle,
   Handshake,
   Info,
+  Phone as PhoneIcon,
 } from "lucide-react";
 import {
   PieChart,
@@ -780,6 +781,21 @@ const CrmOrders = () => {
       }
     },
     [currentFilters],
+  );
+
+  // initiate call
+  const handleCallClick = useCallback(
+    async (order: any) => {
+      const phone = order?.phone || order?.rawData?.phone || relatedLead?.phone;
+      if (!phone) {
+        toast.error("No phone number available for this order");
+        return;
+      }
+      // Handle call logic here - similar to leads page
+      // This might integrate with CTI or open a phone dialer
+      console.log("Calling:", phone);
+    },
+    [relatedLead],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -3269,6 +3285,52 @@ const CrmOrders = () => {
                   action: {
                     label: "Log activity",
                     onClick: () => console.log("Log activity"),
+                  },
+                },
+              },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
+                icon: PhoneIcon,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () => {
+                      const phone =
+                        selectedOrder?.phone ||
+                        selectedOrder?.rawData?.phone ||
+                        relatedLead?.phone;
+                      if (phone) {
+                        handleCallClick(selectedOrder);
+                      }
+                    },
+                  },
+                },
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
                   },
                 },
               },
