@@ -49,6 +49,7 @@ import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 const { PERMISSIONS } = HEADER_CONSTANTS;
+import {useSession} from 'next-auth/react'
 
 // ─── Tab Definitions ──────────────────────────────────────────────────────────
 type Tab = {
@@ -2661,6 +2662,9 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
   activeTab: routeActiveTab,
   onTabChange,
 }) => {
+
+  const { data: session } = useSession();
+
   const [activeGeneralTab, setActiveGeneralTab] = useState<"profile" | "tasks">("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2670,12 +2674,17 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
   }, [routeActiveTab, activeGeneralTab])
 
   // Profile state
-  const [firstName, setFirstName] = useState("Rizwan");
-  const [lastName, setLastName] = useState("Haider");
-  const [language, setLanguage] = useState("English");
-  const [dateFormat, setDateFormat] = useState("United Kingdom");
-  const [phoneCountry, setPhoneCountry] = useState("GB");
-  const [phoneNumber, setPhoneNumber] = useState("+44 783 150 5446");
+  const [userName, setUserName] = useState("");
+  useEffect(() => {
+    if (session?.user?.name) setUserName(session?.user?.name);
+   
+  }, [session?.user?.name]);
+
+
+  const [language, setLanguage] = useState("");
+  const [dateFormat, setDateFormat] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   // Tasks state
   const [dueDate, setDueDate] = useState("In 3 business days");
@@ -2879,7 +2888,7 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
   });
 
   const getInitials = () =>
-    `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    `${userName.charAt(0)}`.toUpperCase();
 
   const renderProfile = () => (
     <div>
@@ -2919,27 +2928,17 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* First name */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>First name</label>
+        <label style={s.label}>Name</label>
         <input
           style={s.input}
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
           onFocus={(e) => (e.currentTarget.style.borderColor = "#006162")}
           onBlur={(e) => (e.currentTarget.style.borderColor = "#d0d0d0")}
         />
       </div>
 
-      {/* Last name */}
-      <div style={s.fieldGroup}>
-        <label style={s.label}>Last name</label>
-        <input
-          style={s.input}
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "#006162")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "#d0d0d0")}
-        />
-      </div>
+      
 
       {/* Language */}
       <div style={s.fieldGroup}>
