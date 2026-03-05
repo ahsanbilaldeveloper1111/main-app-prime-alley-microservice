@@ -80,6 +80,21 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showHostDropdown, setShowHostDropdown] = useState(false);
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
+  const userTimezoneLabel = useMemo(() => {
+    try {
+      if (typeof Intl === 'undefined') return 'Local timezone';
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const now = new Date();
+      const offsetMinutes = -now.getTimezoneOffset();
+      const sign = offsetMinutes >= 0 ? '+' : '-';
+      const abs = Math.abs(offsetMinutes);
+      const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+      const mins = String(abs % 60).padStart(2, '0');
+      return `UTC ${sign}${hours}:${mins} ${tz}`;
+    } catch {
+      return 'Local timezone';
+    }
+  }, []);
   
   const titleInputRef = useRef<HTMLInputElement>(null);
   const startDateInputRef = useRef<HTMLInputElement>(null);
@@ -1231,7 +1246,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  UTC +05:00 Almaty, Aqtau, Aqtobe, Ashgabat
+                  {userTimezoneLabel}
                   <ChevronDown size={14} />
                 </button>
               </div>
