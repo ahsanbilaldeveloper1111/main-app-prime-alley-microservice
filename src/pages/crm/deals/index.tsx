@@ -2523,16 +2523,6 @@ const CrmDeals = () => {
         emptyValue: "",
       },
       {
-        key: "dealType",
-        label: "Deal Type",
-        sortable: true,
-        type: "badge",
-        badge: {
-          getVariant: () => "primary",
-        },
-        emptyValue: "-",
-      },
-      {
         key: "value",
         label: "Value",
         sortable: true,
