@@ -74,7 +74,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
             <Col md={12}>
               <div className="mt-2">
                 {/* Conditional rendering based on page */}
-                {(currentPage === 'settings' || (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname.includes('/settings'))) ? (
+                {(currentPage === 'main-settings/users-teams/user-directory' || (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname.includes('/main-settings/users-teams/user-directory'))) ? (
                   <div className="canvasDisplay">
                      {rowData && (
                       <div className="data-item">

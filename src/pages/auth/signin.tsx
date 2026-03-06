@@ -10,6 +10,7 @@ import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
 import PageLoader from "@components/PageLoader";
 import logodark from "@assets/images/Prime3.png";
+import tokenService from "@utils/tokenService";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({
@@ -20,7 +21,7 @@ const Signin = () => {
   const [error, setError] = useState("");
   const [sessionLoading, setSessionLoading] = useState(true);
   const router = useRouter();
-  const { callbackUrl } = router.query;
+  const { callbackUrl, reason } = router.query;
   const [showPassword, setShowPassword] = useState(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const statusRef = useRef<string>("loading");
@@ -36,6 +37,13 @@ const Signin = () => {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  // Show message when redirected after server lost session (e.g. deploy/restart)
+  useEffect(() => {
+    if (router.isReady && reason === 'session_expired') {
+      toast.info('Session expired. Please sign in again.', { toastId: 'session-expired' });
+    }
+  }, [router.isReady, reason]);
 
   // Detect and sync autofilled values after page load
   useEffect(() => {
@@ -304,10 +312,28 @@ const Signin = () => {
         typeof window !== "undefined" &&
         window.sessionStorage?.getItem("accessToken");
       if (!hasAppTokens) {
-        // Best-effort: clear server-side NextAuth session payload store, then sign out
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
-        // Stale NextAuth session without app tokens – clear it and show sign-in form
-        signOut({ redirect: false });
+        // Server has session (cookie) but storage is empty (e.g. new tab). Try to sync from session first.
+        (async () => {
+          try {
+            await tokenService.initializeFromSession(session);
+            const hasTokensAfterSync =
+              typeof window !== "undefined" &&
+              window.sessionStorage?.getItem("accessToken");
+            // Only redirect if we have tokens AND they're still valid (avoids loop when server has expired tokens)
+            if (hasTokensAfterSync && tokenService.isAuthenticated()) {
+              const redirectUrl = callbackUrl
+                ? decodeURIComponent(callbackUrl as string)
+                : "/dashboard";
+              router.push(redirectUrl);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          // Could not sync or tokens expired – clear stale server session and show sign-in form
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+          signOut({ redirect: false });
+        })();
         return;
       }
       // User is already logged in with valid app session, redirect them

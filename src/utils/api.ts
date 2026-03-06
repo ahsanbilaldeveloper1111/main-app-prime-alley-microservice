@@ -209,6 +209,7 @@ export const authAPI = {
       // If refresh fails, clear tokens and redirect to login
       if (typeof window !== 'undefined') {
         // Best-effort: clear server-side NextAuth session payload before wiping cookies
+        console.log("yyyyyyyyyyyy");
         fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
         sessionStorage.clear();
         clearAllLocalStorage();

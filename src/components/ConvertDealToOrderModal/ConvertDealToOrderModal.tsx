@@ -98,6 +98,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
   const [formData, setFormData] = useState({
     customer_name: "",
     customer_email: "",
+    company_name: "",
+    company_email: "",
+    company_domain: "",
     customer_phone: "",
     customer_phone_country_code: "",
     customer_address: "",
@@ -198,6 +201,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
         ...prev,
         customer_name: decisionMaker.name || dealData.company_name || "",
         customer_email: decisionMaker.email || dealData.decision_maker_email || "",
+        company_name: dealAny.company?.name || "",
+        company_email: dealAny.company?.email || "",
+        company_domain: dealAny.company?.domain || "",
         customer_phone: phoneNumber,
         customer_phone_country_code: phoneCountryCode,
         customer_address: dealAny.customer_address ?? dealAny.company_address ?? "",
@@ -350,8 +356,8 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
   const validateForm = (): boolean => {
     const dataForValidation = { ...formData, contract_document: contractDocument };
     const requiredFields = [
-      { field: "customer_name" as const, name: "Company Name" },
-      { field: "customer_email" as const, name: "Company Email", type: ValidationType.EMAIL },
+      { field: "company_name" as const, name: "Company Name" },
+      { field: "company_email" as const, name: "Company Email", type: ValidationType.EMAIL },
       { field: "customer_phone" as const, name: "Company Phone" },
       { field: "order_date" as const, name: "Order Date" },
       { field: "order_stage_id" as const, name: "Stage" },
@@ -390,6 +396,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
       const payload = new FormData();
       payload.append("customer_name", formData.customer_name);
       payload.append("customer_email", formData.customer_email);
+      payload.append("company_name", formData.company_name);
+      payload.append("company_email", formData.company_email);
+      payload.append("company_domain", formData.company_domain || "");
       payload.append("customer_phone", formattedPhone);
       payload.append("customer_address", formData.customer_address || "");
       payload.append("order_date", formData.order_date);
@@ -425,6 +434,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
     setFormData({
       customer_name: "",
       customer_email: "",
+      company_name: "",
+      company_email: "",
+      company_domain: "",
       customer_phone: "",
       customer_phone_country_code: "",
       customer_address: "",
@@ -579,9 +591,9 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 {fieldLabel("Company Name", true)}
                 <input
                   type="text"
-                  value={formData.customer_name}
+                  value={formData.company_name}
                   onChange={(e) =>
-                    setFormData({ ...formData, customer_name: e.target.value })
+                    setFormData({ ...formData, company_name: e.target.value })
                   }
                   style={inputStyle}
                   onFocus={focusStyle}
@@ -593,14 +605,28 @@ const ConvertDealToOrderModal: React.FC<ConvertDealToOrderModalProps> = ({
                 {fieldLabel("Company Email", true)}
                 <input
                   type="email"
-                  value={formData.customer_email}
+                  value={formData.company_email}
                   onChange={(e) =>
-                    setFormData({ ...formData, customer_email: e.target.value })
+                    setFormData({ ...formData, company_email: e.target.value })
                   }
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
                   placeholder="company@example.com"
+                />
+              </div>
+              <div style={fieldWrap}>
+                {fieldLabel("Company Domain")}
+                <input
+                  type="text"
+                  value={formData.company_domain}
+                  onChange={(e) =>
+                    setFormData({ ...formData, company_domain: e.target.value })
+                  }
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="example.com"
                 />
               </div>
               <div style={fieldWrap}>

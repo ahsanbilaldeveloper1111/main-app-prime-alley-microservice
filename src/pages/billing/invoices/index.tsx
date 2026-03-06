@@ -20,10 +20,12 @@ const STATUS_PENDING = 'pending';
 
 import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import Layout from "@layout/index";
-import GenericTable, { TableColumn, TableAction as GenericTableAction } from "@components/GenericTable";
+import GenericTable, { TableColumn, TableAction as GenericTableAction, FilterPill } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
-import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import {
   getInvoices,
   getInvoice,
@@ -66,7 +68,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
-import { Divide, DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter } from "lucide-react";
+import { Divide, DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter, Plus } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
@@ -1472,6 +1474,8 @@ const InvoiceList = () => {
   const [selectedInvoiceSidebar, setSelectedInvoiceSidebar] = useState<InvoiceData | null>(null);
   const [showInvoiceSidebar, setShowInvoiceSidebar] = useState(false);
   const invoiceRequestIdRef = React.useRef(0);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [totalAllInvoices, setTotalAllInvoices] = useState(0);
 
   const loadInvoices = useCallback(async () => {
     invoiceRequestIdRef.current += 1;
@@ -1491,6 +1495,10 @@ const InvoiceList = () => {
       setInvoiceList(data);
       setTotalRecords(total);
       setPagination((prev) => ({ ...prev, totalRows: total }));
+      // Keep total all invoices when no status filter is applied
+      if (!memoizedFilters.status) {
+        setTotalAllInvoices(total);
+      }
       if (response?.summary) setSummary(response.summary);
     } catch (error) {
       if (currentRequestId !== invoiceRequestIdRef.current) return;
@@ -2409,27 +2417,195 @@ const InvoiceList = () => {
     }
   }, []);
 
+  // Filter pills for invoices
+  const invoiceFilterPills = React.useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "status",
+        label: "Status",
+        type: "select",
+        options: [
+          { value: "", label: "All Status" },
+          { value: STATUS_DRAFT, label: "Draft" },
+          { value: STATUS_SENT, label: "Sent" },
+          { value: STATUS_PAID, label: "Paid" },
+          { value: STATUS_PENDING, label: "Pending" },
+          { value: STATUS_OVERDUE, label: "Overdue" },
+          { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
+          { value: STATUS_CANCELLED, label: "Cancelled" },
+          { value: STATUS_FAILED, label: "Failed" },
+          { value: STATUS_REFUNDED, label: "Refunded" },
+        ],
+        value: currentFilters.status || "",
+        onChange: (value: string) => {
+          setCurrentFilters((prev) => {
+            if (value) {
+              return { ...prev, status: value };
+            } else {
+              const { status, ...rest } = prev;
+              return rest;
+            }
+          });
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((prev) => prev + 1);
+        },
+      },
+      {
+        id: "invoice_date",
+        label: "Invoice Date",
+        type: "date",
+        value: currentFilters.invoice_date_from || "",
+        onChange: (value: string) => {
+          setCurrentFilters((prev) => {
+            if (value) {
+              return { ...prev, invoice_date_from: value };
+            } else {
+              const { invoice_date_from, ...rest } = prev;
+              return rest;
+            }
+          });
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((prev) => prev + 1);
+        },
+      },
+    ],
+    [currentFilters]
+  );
+
+  // Stats cards for invoices
+  const invoiceStatsCards: StatsCardData[] = React.useMemo(
+    () => [
+      {
+        title: "Total Invoices",
+        value: totalRecords,
+        icon: Receipt,
+        iconColor: "#6366F1",
+        iconBgColor: "#EEF2FF",
+      },
+      {
+        title: "Paid",
+        value: summary?.paid_count ?? 0,
+        icon: CheckCircle,
+        iconColor: "#10B981",
+        iconBgColor: "#D1FAE5",
+      },
+      {
+        title: "Pending",
+        value: summary?.pending_count ?? 0,
+        icon: Clock,
+        iconColor: "#F59E0B",
+        iconBgColor: "#FEF3C7",
+      },
+      {
+        title: "Overdue",
+        value: summary?.overdue_count ?? 0,
+        icon: AlertCircle,
+        iconColor: "#EF4444",
+        iconBgColor: "#FEE2E2",
+      },
+    ],
+    [summary, totalRecords]
+  );
+
+  // Render Create Invoice Button
+  const renderCreateInvoiceButton = () => (
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "18px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      <button
+        onClick={() => {
+          // window.location.href = "/billing/create-invoice";
+        }}
+        style={{
+          padding: "9px 13px",
+          backgroundColor: "#000000",
+          color: "#ffffff",
+          border: "none",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontWeight: "500",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "#1a1a1a";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "#000000";
+        }}
+      >
+        <Plus size={16} />
+        Create Invoice
+      </button>
+    </div>
+  );
+
+  // Handle preview button click
+  const handlePreviewClick = useCallback((invoice: InvoiceData) => {
+    openInvoiceSidebar(invoice);
+  }, [openInvoiceSidebar]);
+
+  // Toolbar configuration
+  const invoicesToolbarConfig = useCrmToolbarConfig({
+    entity: "invoices" as any,
+    searchValue: invoiceSearch,
+    searchPlaceholder: "Search invoices...",
+    onSearchChange: setInvoiceSearch,
+    onSearch: () => {
+      setCurrentFilters((prev) => ({ ...prev, search: invoiceSearch }));
+      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      setRefreshKey((prev) => prev + 1);
+    },
+    currentFilters,
+    handleFiltersChange: (filters: any) => setCurrentFilters(filters),
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    activeTab: "all",
+    onTabChange: () => {},
+    tabs: [
+      {
+        id: "all",
+        label: "All Invoices",
+        count: totalAllInvoices,
+        removable: false,
+      },
+    ],
+    onTabAdd: () => {},
+    onTabRemove: () => {},
+    tabsDropdownLabel: "Invoices",
+    onFiltersClick: handleOpenFiltersSidebar,
+    onExportClick: () => {},
+    onEditColumnsClick: () => {},
+    showImport: false,
+    onImportClick: () => {},
+    currentTableView: "table",
+    onTableViewChange: () => {},
+    extensions: [],
+    onPaginationReset: () => setPagination((prev) => ({ ...prev, currentPage: 1 })),
+    rightActions: renderCreateInvoiceButton(),
+  });
+
 
 
 
   return (
     <React.Fragment>
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0">
-              <li className="breadcrumb-item">
-                <a href="/dashboard" className="text-decoration-none">
-                  Accounting
-                </a>
-              </li>
-              <li className="breadcrumb-item active fw-bold" aria-current="page">
-                Invoices
-              </li>
-            </ol>
-          </nav>
-        </div>
-        <div className="d-flex flex-wrap gap-2 align-items-center">
+      <BreadcrumbItem
+        mainTitle="Billing"
+        mainLink="/billing/dashboard"
+        subTitle="Invoices"
+      />
+
+      <div className="container-fluid">
+        <div className="mb-3 d-flex align-items-center gap-2">
           <Form.Select
             size="sm"
             style={{ width: '220px' }}
@@ -2443,104 +2619,7 @@ const InvoiceList = () => {
               </option>
             ))}
           </Form.Select>
-          <Button
-            variant={showFilterTabs ? "secondary" : "outline-secondary"}
-            onClick={() => setShowFilterTabs(!showFilterTabs)}
-          >
-            <Layers size={16} className="me-2" />
-            {showFilterTabs ? "Hide Tabs" : "Show Tabs"}
-          </Button>
-          <Button
-            variant="outline-secondary"
-            onClick={handleOpenFiltersSidebar}
-          >
-            <Filter size={16} className="me-2" />
-            Filters
-          </Button>
         </div>
-      </div>
-
-        {/* Filter Tabs & Search (styled like customer-billing-history via filter-bar-* classes) */}
-        {showFilterTabs && (
-        <Card className="filter-bar-card">
-          <Card.Body className="filter-bar-body">
-            <div className="filter-bar-tabs">
-              <Button
-                variant={activeStatusTab === null ? "primary" : "outline-secondary"}
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab(null);
-                  setCurrentFilters((prev) => {
-                    const { status, ...rest } = prev;
-                    return rest;
-                  });
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <Receipt size={16} />
-                All
-              </Button>
-              <Button
-                variant={activeStatusTab === "paid" ? "primary" : "outline-secondary"}
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("paid");
-                  setCurrentFilters((prev) => ({ ...prev, status: "paid" }));
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <CheckCircle size={16} />
-                Paid
-              </Button>
-              <Button
-                variant={activeStatusTab === "pending" ? "primary" : "outline-secondary"}
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("pending");
-                  setCurrentFilters((prev) => ({ ...prev, status: "pending" }));
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <Clock size={16} />
-                Pending
-              </Button>
-              <Button
-                variant={activeStatusTab === "overdue" ? "primary" : "outline-secondary"}
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("overdue");
-                  setCurrentFilters((prev) => ({ ...prev, status: "overdue" }));
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <AlertCircle size={16} />
-                Overdue
-              </Button>
-              <Button
-                variant={activeStatusTab === "cancelled" ? "primary" : "outline-secondary"}
-                className="filter-bar-tab"
-                onClick={() => {
-                  setActiveStatusTab("cancelled");
-                  setCurrentFilters((prev) => ({ ...prev, status: "cancelled" }));
-                  setRefreshKey((prev) => prev + 1);
-                }}
-              >
-                <Ban size={16} />
-                Cancelled
-              </Button>
-            </div>
-            {/* <div className="filter-bar-actions">
-              <Form.Control
-                type="search"
-                placeholder="Search invoices..."
-                onChange={(e) =>
-                  setCurrentFilters({ ...currentFilters, search: e.target.value })
-                }
-              />
-            </div> */}
-          </Card.Body>
-        </Card>
-        )}
 
       <GenericTable<InvoiceData>
         data={invoiceList}
@@ -2567,12 +2646,24 @@ const InvoiceList = () => {
         hover={true}
         uniqueKey="id"
         onRowClick={(row) => openInvoiceSidebar(row)}
+        onPreviewClick={(row) => handlePreviewClick(row)}
+        showToolbar={true}
+        toolbar={{
+          ...invoicesToolbarConfig,
+          showFilterPills: true,
+          filterPills: invoiceFilterPills,
+          showMoreFiltersButton: true,
+          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+        }}
+        statsCards={invoiceStatsCards}
+        fixedHeight={true}
+        maxHeight="calc(100vh - 345px)"
       />
+      </div>
 
       <GenericSidebar
         isOpen={showInvoiceSidebar}
         onClose={closeInvoiceSidebar}
-        moduleSlug={ModuleSlug.BILLING}
         title={selectedInvoiceSidebar ? `Invoice #${selectedInvoiceSidebar.invoice_number}` : "Invoice Details"}
         subtitle={selectedInvoiceSidebar?.company?.name ?? ""}
         metadata={selectedInvoiceSidebar?.due_date ? `Due: ${moment(selectedInvoiceSidebar.due_date).format("DD-MMM-YYYY")}` : undefined}

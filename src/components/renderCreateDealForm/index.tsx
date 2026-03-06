@@ -337,6 +337,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
   // Revisions (edit mode only)
   const [editEstimates, setEditEstimates] = useState<any[]>([]);
+  const [selectedRevisionId, setSelectedRevisionId] = useState<number | null>(
+    null,
+  );
   const [showAddRevisionModal, setShowAddRevisionModal] = useState(false);
   const [editEditingRevisionIndex, setEditEditingRevisionIndex] = useState<
     number | null
@@ -571,6 +574,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
             ),
           }));
           setEditEstimates(sortedEstimates);
+          setSelectedRevisionId(sortedEstimates[0]?.id ?? null);
         } catch (error) {
           console.error("Failed to fetch deal:", error);
           toast.error("Failed to load deal data");
@@ -611,32 +615,54 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
   // Line items
   const addLineItem = () => {
-    if (!lineItemInput) return;
-    const discountTotal = lineItemDiscount ?? 0;
+    // If a product has been selected via the old dropdown inputs, reuse that logic
+    if (lineItemInput) {
+      const discountTotal = lineItemDiscount ?? 0;
+      setDealForm((prev) => ({
+        ...prev,
+        lineItems: [
+          ...prev.lineItems,
+          {
+            id: Date.now(),
+            name: lineItemInput,
+            quantity: lineItemQty || 1,
+            tax: lineItemTax ?? 0,
+            discount: discountTotal,
+            product_id: lineItemProductId,
+            unit_price: lineItemUnitPrice,
+            standard_discount_percentage: Math.floor(discountTotal / 2),
+            special_discount_percentage:
+              discountTotal - Math.floor(discountTotal / 2),
+          },
+        ],
+      }));
+      setLineItemInput("");
+      setLineItemProductId(undefined);
+      setLineItemUnitPrice(0);
+      setLineItemQty(0);
+      setLineItemTax(0);
+      setLineItemDiscount(0);
+      return;
+    }
+
+    // Otherwise, add a new blank line item with the same shape as items added earlier
     setDealForm((prev) => ({
       ...prev,
       lineItems: [
         ...prev.lineItems,
         {
           id: Date.now(),
-          name: lineItemInput,
-          quantity: lineItemQty || 1,
-          tax: lineItemTax ?? 0,
-          discount: discountTotal,
-          product_id: lineItemProductId,
-          unit_price: lineItemUnitPrice,
-          standard_discount_percentage: Math.floor(discountTotal / 2),
-          special_discount_percentage:
-            discountTotal - Math.floor(discountTotal / 2),
+          name: "",
+          quantity: 1,
+          tax: 0,
+          discount: 0,
+          product_id: undefined,
+          unit_price: 0,
+          standard_discount_percentage: 0,
+          special_discount_percentage: 0,
         },
       ],
     }));
-    setLineItemInput("");
-    setLineItemProductId(undefined);
-    setLineItemUnitPrice(0);
-    setLineItemQty(0);
-    setLineItemTax(0);
-    setLineItemDiscount(0);
   };
 
   // Append line items from a selected revision (adds prefilled rows; does not replace)
@@ -680,18 +706,25 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
     );
     setDealForm((prev) => ({
       ...prev,
-      lineItems: [...prev.lineItems, ...lineItemsFromRevision],
+      // Replace existing line items with those from the selected revision
+      lineItems: lineItemsFromRevision,
     }));
+    setSelectedRevisionId(estimate.id);
   };
+
+  // Only line items with a non-empty name are sent when saving revision
+  const filledLineItems = dealForm.lineItems.filter(
+    (li) => (li.name || "").trim() !== "",
+  );
 
   // Save current line items as a new revision (same API as Add Revision modal)
   const saveRevisionFromLineItems = async () => {
-    if (!dealId || dealForm.lineItems.length === 0) return;
+    if (!dealId || filledLineItems.length === 0) return;
     setSavingRevision(true);
     try {
       const payload = {
         deal_id: dealId,
-        estimation_chart: dealForm.lineItems.map((item) => {
+        estimation_chart: filledLineItems.map((item) => {
           const stdPct =
             item.standard_discount_percentage ??
             Math.floor((item.discount ?? 0) / 2);
@@ -1650,11 +1683,26 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                       <Dropdown.Toggle
                         variant="outline-secondary"
                         style={{
-                          ...dropdownToggleStyle(false),
-                          color: "#a0aec0",
+                          ...dropdownToggleStyle(
+                            !!editEstimates.find(
+                              (e: any) => e.id === selectedRevisionId,
+                            ),
+                          ),
+                          color: editEstimates.some(
+                            (e: any) => e.id === selectedRevisionId,
+                          )
+                            ? "#141414"
+                            : "#a0aec0",
                         }}
                       >
-                        Select a previous version
+                        {(() => {
+                          const selected = editEstimates.find(
+                            (e: any) => e.id === selectedRevisionId,
+                          );
+                          return selected
+                            ? `Version ${selected.version || selected.id} – ${selected.created_at ? moment(selected.created_at).format(GlobalDateTimeFormat) : ""} (${selected.estimation_chart?.length || 0} items)`
+                            : "Select a previous version";
+                        })()}
                       </Dropdown.Toggle>
                       <Dropdown.Menu style={{ width: "100%" }}>
                         {editEstimates.map((estimate: any) => (
@@ -1736,18 +1784,24 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                       marginBottom: "8px",
                     }}
                   >
-                    <div
-                      style={{
-                        padding: "10px 12px",
-                        border: "1px solid #eaf0f6",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        color: "#141414",
-                        backgroundColor: "#f7fafc",
-                      }}
-                    >
-                      {item.name}
-                    </div>
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) =>
+                        setDealForm((prev) => ({
+                          ...prev,
+                          lineItems: prev.lineItems.map((li) =>
+                            li.id === item.id
+                              ? { ...li, name: e.target.value }
+                              : li,
+                          ),
+                        }))
+                      }
+                      placeholder="Item name"
+                      style={{ ...inputStyle }}
+                      onFocus={focusStyle}
+                      onBlur={blurStyle}
+                    />
                     <input
                       type="number"
                       min={1}
@@ -1814,127 +1868,33 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                   </div>
                 ))}
 
-                {/* Add new line item row */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 70px 70px 70px auto",
-                    gap: "8px",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <Dropdown>
-                      <Dropdown.Toggle
-                        variant="outline-secondary"
-                        data-test-id="lineitem-input"
-                        disabled={loadingLineItemProducts}
-                        style={{
-                          ...dropdownToggleStyle(!!lineItemInput),
-                          color: lineItemInput ? "#141414" : "#a0aec0",
-                        }}
-                      >
-                        {loadingLineItemProducts
-                          ? "Loading products..."
-                          : lineItemInput || "Add a line item"}
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu style={{ width: "100%" }}>
-                        {lineItemProducts.length === 0 &&
-                        !loadingLineItemProducts ? (
-                          <Dropdown.Item disabled>
-                            No products available
-                          </Dropdown.Item>
-                        ) : (
-                          lineItemProducts.map((p) => (
-                            <Dropdown.Item
-                              key={p.id}
-                              onClick={() => {
-                                setLineItemInput(p.name);
-                                setLineItemProductId(p.id);
-                                setLineItemUnitPrice(
-                                  Number((p as any).price) || 0,
-                                );
-                              }}
-                            >
-                              {p.name} – {dealForm.currency}{" "}
-                              {(p as any).price || "0"}
-                            </Dropdown.Item>
-                          ))
-                        )}
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={lineItemQty || ""}
-                    placeholder="0"
-                    onChange={(e) =>
-                      setLineItemQty(
-                        Number(e.target.value) ? Number(e.target.value) : 0,
-                      )
-                    }
-                    style={{ ...inputStyle, width: "70px" }}
-                    onFocus={focusStyle}
-                    onBlur={blurStyle}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={lineItemTax || ""}
-                    placeholder="0"
-                    onChange={(e) =>
-                      setLineItemTax(Number(e.target.value) || 0)
-                    }
-                    style={{ ...inputStyle, width: "70px" }}
-                    onFocus={focusStyle}
-                    onBlur={blurStyle}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.01}
-                    value={lineItemDiscount || ""}
-                    placeholder="0"
-                    onChange={(e) =>
-                      setLineItemDiscount(Number(e.target.value) || 0)
-                    }
-                    style={{ ...inputStyle, width: "70px" }}
-                    onFocus={focusStyle}
-                    onBlur={blurStyle}
-                  />
-                  <button
-                    onClick={addLineItem}
-                    disabled={!lineItemInput}
+                {/* Add extra field + Save revision (edit mode only) */}
+                {isEditMode && Boolean(dealId) && (
+                  <div
                     style={{
-                      background: lineItemInput ? "#0091ae" : "#cbd5e0",
-                      border: "none",
-                      borderRadius: "4px",
-                      padding: "10px",
-                      cursor: lineItemInput ? "pointer" : "not-allowed",
-                      color: "#fff",
+                      marginTop: "16px",
                       display: "flex",
                       alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <Plus size={16} />
-                  </button>
-                </div>
-
-                {/* Save revision button (edit mode only): save current line items as new revision */}
-                {isEditMode && Boolean(dealId) && (
-                  <div style={{ marginTop: "16px" }}>
                     <Button
                       variant="primary"
                       disabled={
-                        dealForm.lineItems.length === 0 || savingRevision
+                        filledLineItems.length === 0 || savingRevision
                       }
                       onClick={saveRevisionFromLineItems}
                     >
                       {savingRevision ? "Saving..." : "Save revision"}
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      type="button"
+                      onClick={addLineItem}
+                    >
+                      <Plus size={16} className="me-1" />
+                      Add extra field
                     </Button>
                   </div>
                 )}

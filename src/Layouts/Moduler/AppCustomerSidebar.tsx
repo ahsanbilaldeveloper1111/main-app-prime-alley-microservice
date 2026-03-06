@@ -182,7 +182,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'workforce',
     'unified-reports',
     'audit-logs',
-    'settings',
+    // 'settings',
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -716,6 +716,27 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/billing/order-invoicing', 
           permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
         },
+        
+        { 
+          id: 'finance-payment-history', 
+          title: 'Payment History', 
+          icon: <FileText size={16} />, 
+          url: '/billing/payment-history', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+        {
+          id: 'finance-separator-1',
+          title: '---',
+          icon: null,
+          url: ''
+        },
+        { 
+          id: 'finance-quotes', 
+          title: 'Quotes', 
+          icon: <Scroll size={16} />, 
+          url: '/billing/quotes', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
         { 
           id: 'finance-invoices', 
           title: 'Invoices', 
@@ -724,10 +745,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
-          id: 'finance-payment-history', 
-          title: 'Payment History', 
-          icon: <FileText size={16} />, 
-          url: '/billing/payment-history', 
+          id: 'finance-products', 
+          title: 'Products', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/products', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))

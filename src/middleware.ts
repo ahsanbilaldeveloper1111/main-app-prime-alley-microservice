@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Get required permissions for this route
+    // Get required permissions for this route (for 404 when path has no permission config)
     const requiredPermissions = getRequiredPermissions(path);
 
     // Check if it's a protected route
@@ -41,40 +41,21 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // Edge-safe decode (Web Crypto only; Node crypto not available in middleware)
+    // Edge-safe decode: cookie only has sessionId, exp, iat, id (no permissions to avoid 431)
     const token = await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
         decode: edgeJwtDecode,
     });
-    console.log("token",token);
 
     if (!token) {
-        // Redirect to login
-        console.log('Redirecting to login');
         return NextResponse.redirect(
             new URL('/auth/signin', request.url)
         );
     }
 
-    // Check if user has all required permissions
-    // If requiredPermissions is empty or only contains empty string, bypass permission check
-    console.log('requiredPermissions',requiredPermissions);
-    if (requiredPermissions.length === 0 || (requiredPermissions?.length === 0 || requiredPermissions[requiredPermissions.length - 1] === '')) {
-        console.log('No required permissions, bypassing permission check');
-        return NextResponse.next();
-    }
-
-    const userPermissions = token.permissions as string[] || [];
-    const hasAllPermissions = requiredPermissions.every(permission => 
-        userPermissions.includes(permission)
-    );
-
-    if (!hasAllPermissions) {
-        // Redirect to access-denied without query params
-        return NextResponse.rewrite(new URL('/access-denied', request.url));
-    }
-
+    // Permission checks are done in Layout/pages via getServerSession + canAccessRoute
+    // (full session with permissions comes from store when session is requested)
     return NextResponse.next();
 }
 

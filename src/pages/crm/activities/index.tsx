@@ -44,6 +44,7 @@ import {
   Calendar,
   PlusCircle,
   TrendingUp,
+  History,
 } from "lucide-react";
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/ticketsnew.scss";
@@ -62,7 +63,7 @@ import GenericTable, {
   TabConfig,
   FilterPill,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
@@ -124,6 +125,7 @@ const HistoryPage = () => {
     useState(false);
   const [selectedActivityRecord, setSelectedActivityRecord] =
     useState<any>(null);
+    console.log("selectedActivityRecord", selectedActivityRecord);
   const [activitySearch, setActivitySearch] = useState("");
   const [allActivityRecords, setAllActivityRecords] = useState<
     ActivityRecord[]
@@ -145,6 +147,7 @@ const HistoryPage = () => {
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [showAddTabModal, setShowAddTabModal] = useState(false);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
+  
   const defaultSelectedColumns = [
     "customer",
     "agent",
@@ -682,408 +685,17 @@ const HistoryPage = () => {
           mainLink="/crm/dashboard"
           subTitle="Activity Management"
         />
-        {/* Generic Sidebar for Activity Details */}
-        <GenericSidebar
-          isOpen={showActivitySidebar}
-          onClose={() => setShowActivitySidebar(false)}
-          moduleSlug={ModuleSlug.CRM_HISTORY}
-          title={selectedActivityRecord?.customer || "Activity Details"}
-          subtitle={`Assigned to ${selectedActivityRecord?.agent || "N/A"}`}
-          avatar={{
-            name: selectedActivityRecord?.agent || "",
-            useIcon: true,
+        {/* Main flex container: content + sidebar (same layout as prospects) */}
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            height: "calc(100vh)",
+            overflow: "hidden",
           }}
-          width="420px"
-          tabs={[
-            {
-              id: "timeline",
-              label: "Timeline & Progress",
-              sections: [
-                {
-                  id: "stage-progress",
-                  title: "Stage Progress",
-                  icon: TrendingUp,
-                  customContent: loadingHistory ? (
-                    <div className="text-center py-4">
-                      <Spinner
-                        animation="border"
-                        variant="primary"
-                        size="sm"
-                        role="status"
-                      >
-                        <span className="visually-hidden">
-                          Loading stages...
-                        </span>
-                      </Spinner>
-                    </div>
-                  ) : recordStages.length > 0 ? (
-                    <div
-                      className="position-relative"
-                      style={{ padding: "32px 0" }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          left: "10%",
-                          right: "10%",
-                          height: "4px",
-                          backgroundColor: "#e3e8ef",
-                          borderRadius: "4px",
-                          transform: "translateY(-50%)",
-                          zIndex: 0,
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          left: "10%",
-                          width:
-                            currentStageIndex > 0
-                              ? `${(currentStageIndex / 3) * 80}%`
-                              : "0%",
-                          height: "4px",
-                          background:
-                            "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
-                          borderRadius: "4px",
-                          transform: "translateY(-50%)",
-                          zIndex: 0,
-                          transition: "width 0.5s ease",
-                        }}
-                      />
-                      <div
-                        className="d-flex justify-content-between align-items-center position-relative"
-                        style={{ zIndex: 1 }}
-                      >
-                        {[
-                          {
-                            name: "Prospect",
-                            icon: <Users size={20} />,
-                            color: "#9c27b0",
-                          },
-                          {
-                            name: "Lead",
-                            icon: <Target size={20} />,
-                            color: "#2196f3",
-                          },
-                          {
-                            name: "Deal",
-                            icon: <TrendingUp size={20} />,
-                            color: "#ff9800",
-                          },
-                          {
-                            name: "Order",
-                            icon: <ShoppingBag size={20} />,
-                            color: "#4caf50",
-                          },
-                        ].map((stage, idx) => {
-                          const isCompleted = idx < currentStageIndex;
-                          const isCurrent = idx === currentStageIndex;
-                          return (
-                            <div
-                              key={stage.name}
-                              className="d-flex flex-column align-items-center"
-                              style={{ flex: 1 }}
-                            >
-                              <div
-                                className="rounded-circle d-flex align-items-center justify-content-center mb-2"
-                                style={{
-                                  width: isCurrent ? 64 : 52,
-                                  height: isCurrent ? 64 : 52,
-                                  background: isCurrent
-                                    ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
-                                    : isCompleted
-                                      ? stage.color
-                                      : "#e3e8ef",
-                                  color:
-                                    isCurrent || isCompleted
-                                      ? "#fff"
-                                      : "#9ca3af",
-                                  transition: "all 0.3s ease",
-                                  boxShadow: isCurrent
-                                    ? `0 8px 24px ${stage.color}66`
-                                    : isCompleted
-                                      ? `0 4px 12px ${stage.color}44`
-                                      : "none",
-                                }}
-                              >
-                                {isCompleted && !isCurrent ? (
-                                  <CheckCircle size={24} strokeWidth={3} />
-                                ) : (
-                                  stage.icon
-                                )}
-                              </div>
-                              <span
-                                className="fw-semibold text-center"
-                                style={{
-                                  fontSize: isCurrent ? 15 : 13,
-                                  color: isCurrent
-                                    ? stage.color
-                                    : isCompleted
-                                      ? "#374151"
-                                      : "#9ca3af",
-                                }}
-                              >
-                                {stage.name}
-                              </span>
-                              {isCurrent && (
-                                <Badge
-                                  className="mt-1"
-                                  style={{
-                                    backgroundColor: `${stage.color}22`,
-                                    color: stage.color,
-                                    fontSize: 11,
-                                    padding: "4px 10px",
-                                  }}
-                                >
-                                  CURRENT
-                                </Badge>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted">
-                      <TrendingUp size={48} className="mb-3 opacity-50" />
-                      <div>No stage information available</div>
-                    </div>
-                  ),
-                },
-                {
-                  id: "activity-timeline",
-                  title: "Activity Timeline",
-                  icon: Clock,
-                  customContent: loadingHistory ? (
-                    <div className="text-center py-4">
-                      <Spinner
-                        animation="border"
-                        variant="primary"
-                        size="sm"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </Spinner>
-                    </div>
-                  ) : historyChain.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <Clock size={48} className="mb-3 opacity-50" />
-                      <div>No activity history available</div>
-                    </div>
-                  ) : (
-                    <div
-                      className="position-relative"
-                      style={{ paddingLeft: "56px" }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          left: "30px",
-                          top: 0,
-                          bottom: "20px",
-                          width: "3px",
-                          background:
-                            "linear-gradient(180deg, #667eea 0%, #764ba2 100%)",
-                          borderRadius: "3px",
-                          opacity: 0.2,
-                        }}
-                      />
-                      {historyChain.map((record, index) => {
-                        const dateObj = new Date(record.created_at);
-                        const dateStr = dateObj.toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        });
-                        const timeStr = dateObj.toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        });
-                        const userExtension =
-                          record.user_extension_done_by ||
-                          record.user_extension;
-                        const userName = userExtension
-                          ? extensions.find(
-                              (ext: any) =>
-                                ext?.id == userExtension ||
-                                ext?.extension == userExtension,
-                            )?.display_name ||
-                            extensions.find(
-                              (ext: any) =>
-                                ext?.id == userExtension ||
-                                ext?.extension == userExtension,
-                            )?.name ||
-                            userExtension
-                          : "System";
-                        const cleanUserName = userName
-                          .replace(/\s*\([^)]*\)\s*$/, "")
-                          .trim();
-                        const getIconForEvent = (
-                          event: string,
-                          action: string | null,
-                        ) => {
-                          if (event === "created")
-                            return {
-                              icon: <PlusCircle size={20} />,
-                              bg: "linear-gradient(135deg, #30cfd0 0%, #330867 100%)",
-                            };
-                          if (
-                            action?.toLowerCase().includes("stage") ||
-                            event?.toLowerCase().includes("stage")
-                          )
-                            return {
-                              icon: <ArrowRight size={20} />,
-                              bg: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-                            };
-                          if (
-                            action?.toLowerCase().includes("call") ||
-                            event?.toLowerCase().includes("call")
-                          )
-                            return {
-                              icon: <Phone size={20} />,
-                              bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            };
-                          if (
-                            action?.toLowerCase().includes("email") ||
-                            event?.toLowerCase().includes("email")
-                          )
-                            return {
-                              icon: <Mail size={20} />,
-                              bg: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-                            };
-                          return {
-                            icon: <FileText size={20} />,
-                            bg: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-                          };
-                        };
-                        const iconData = getIconForEvent(
-                          record.event,
-                          record.action,
-                        );
-                        return (
-                          <div
-                            key={index}
-                            className="position-relative mb-4 pb-3"
-                          >
-                            <div
-                              className="rounded-circle d-flex align-items-center justify-content-center position-absolute"
-                              style={{
-                                width: 60,
-                                height: 60,
-                                left: -56,
-                                top: 0,
-                                background: iconData.bg,
-                                border: "4px solid #fff",
-                                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                                color: "#fff",
-                              }}
-                            >
-                              {iconData.icon}
-                            </div>
-                            <Card
-                              className="border-0"
-                              style={{
-                                backgroundColor: "#fff",
-                                borderLeft: "3px solid #667eea22",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                              }}
-                            >
-                              <Card.Body className="p-3">
-                                <div className="d-flex align-items-center justify-content-between mb-2">
-                                  <div className="d-flex align-items-center gap-2">
-                                    <Badge
-                                      bg="light"
-                                      text="dark"
-                                      style={{ fontSize: "12px" }}
-                                    >
-                                      <Calendar size={12} className="me-1" />
-                                      {record.created_at_human || dateStr}
-                                    </Badge>
-                                    <Badge
-                                      bg="light"
-                                      text="muted"
-                                      style={{ fontSize: "12px" }}
-                                    >
-                                      <Clock size={12} className="me-1" />
-                                      {timeStr}
-                                    </Badge>
-                                  </div>
-                                  <Badge
-                                    bg="light"
-                                    text="muted"
-                                    style={{ fontSize: "11px" }}
-                                  >
-                                    <Users size={11} className="me-1" />
-                                    {cleanUserName}
-                                  </Badge>
-                                </div>
-                                <p
-                                  className="mb-0 fw-medium text-dark"
-                                  style={{ fontSize: "15px" }}
-                                >
-                                  {record.description ||
-                                    record.action_display ||
-                                    "Activity recorded"}
-                                </p>
-                              </Card.Body>
-                            </Card>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ),
-                },
-              ],
-            },
-            {
-              id: "info",
-              label: "Information",
-              sections: [
-                {
-                  id: "customer-info",
-                  title: "Customer Info",
-                  icon: Users,
-                  fields: [
-                    {
-                      label: "Name",
-                      value:
-                        crmData?.name ||
-                        selectedActivityRecord?.customer ||
-                        "N/A",
-                    },
-                    {
-                      label: "Phone",
-                      value: crmData?.phone || "N/A",
-                      icon: Phone,
-                    },
-                  ],
-                },
-                {
-                  id: "agent-info",
-                  title: "Agent Info",
-                  icon: Users,
-                  fields: [
-                    {
-                      label: "Agent Name",
-                      value: selectedActivityRecord?.agent || "N/A",
-                    },
-                  ],
-                },
-              ],
-            },
-          ]}
-          actions={[
-            {
-              label: "Close",
-              onClick: () => setShowActivitySidebar(false),
-              variant: "outline-secondary",
-            },
-          ]}
-        />
-
+        >
+          {/* Main content area - table and modals */}
+          <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
         {/* Activities Table */}
         <GenericTable
           data={filteredActivityRecords}
@@ -1128,7 +740,7 @@ const HistoryPage = () => {
           hover={true}
           striped={false}
           fixedHeight={true}
-          maxHeight="calc(100vh - 380px)"
+          maxHeight="calc(100vh - 345px)"
           showToolbar={true}
           toolbar={{
             showTabs: true,
@@ -2353,6 +1965,287 @@ const HistoryPage = () => {
             fetchHistoryData(1);
           }}
         />
+        </div>
+        {/* Activity detail sidebar - opens on the right, table stays visible on left */}
+        {showActivitySidebar && (
+          <GenericSidebar
+            isOpen={showActivitySidebar}
+            onClose={() => setShowActivitySidebar(false)}
+            title={selectedActivityRecord?.customer || "Activity Details"}
+            subtitle={`Assigned to ${selectedActivityRecord?.agent || "N/A"}`}
+            avatar={{
+              initials: getInitials(
+                selectedActivityRecord?.customer || "NA",
+              ),
+              name: selectedActivityRecord?.customer || "NA",
+              gradient: getRandomColor(
+                selectedActivityRecord?.customer || "",
+              ),
+            }}
+            recordType="activity"
+            recordId={
+              selectedActivityRecord?.record_id != null
+                ? Number(selectedActivityRecord.record_id)
+                : selectedActivityRecord?.id != null
+                  ? Number(selectedActivityRecord.id)
+                  : undefined
+            }
+            activityEntityType={
+              selectedActivityRecord?.type
+                ? (String(selectedActivityRecord.type).toLowerCase() as
+                    | "prospect"
+                    | "lead"
+                    | "deal"
+                    | "order")
+                : undefined
+            }
+            resolveUserLabel={(extensionOrId) => {
+              const ext = extensions.find(
+                (e: any) =>
+                  e?.id == extensionOrId || e?.extension == extensionOrId,
+              );
+              return (
+                (ext?.display_name || ext?.name || extensionOrId)?.replace(
+                  /\s*\([^)]*\)\s*$/,
+                  "",
+                )?.trim() || String(extensionOrId)
+              );
+            }}
+            sections={[
+              {
+                id: "stage-progress",
+                title: "Stage Progress",
+                icon: TrendingUp,
+                collapsible: true,
+                defaultExpanded: true,
+                customContent: loadingHistory ? (
+                  <div className="text-center py-4">
+                    <Spinner
+                      animation="border"
+                      variant="primary"
+                      size="sm"
+                      role="status"
+                    >
+                      <span className="visually-hidden">
+                        Loading stages...
+                      </span>
+                    </Spinner>
+                  </div>
+                ) : recordStages.length > 0 ? (
+                  <div
+                    className="position-relative"
+                    style={{ padding: "32px 0" }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "10%",
+                        right: "10%",
+                        height: "4px",
+                        backgroundColor: "#e3e8ef",
+                        borderRadius: "4px",
+                        transform: "translateY(-50%)",
+                        zIndex: 0,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "10%",
+                        width:
+                          currentStageIndex > 0
+                            ? `${(currentStageIndex / 3) * 80}%`
+                            : "0%",
+                        height: "4px",
+                        background:
+                          "linear-gradient(90deg, #667eea 0%, #764ba2 100%)",
+                        borderRadius: "4px",
+                        transform: "translateY(-50%)",
+                        zIndex: 0,
+                        transition: "width 0.5s ease",
+                      }}
+                    />
+                    <div
+                      className="d-flex justify-content-between align-items-center position-relative"
+                      style={{ zIndex: 1 }}
+                    >
+                      {[
+                        {
+                          name: "Prospect",
+                          icon: <Users size={20} />,
+                          color: "#9c27b0",
+                        },
+                        {
+                          name: "Lead",
+                          icon: <Target size={20} />,
+                          color: "#2196f3",
+                        },
+                        {
+                          name: "Deal",
+                          icon: <TrendingUp size={20} />,
+                          color: "#ff9800",
+                        },
+                        {
+                          name: "Order",
+                          icon: <ShoppingBag size={20} />,
+                          color: "#4caf50",
+                        },
+                      ].map((stage, idx) => {
+                        const isCompleted = idx < currentStageIndex;
+                        const isCurrent = idx === currentStageIndex;
+                        return (
+                          <div
+                            key={stage.name}
+                            className="d-flex flex-column align-items-center"
+                            style={{ flex: 1 }}
+                          >
+                            <div
+                              className="rounded-circle d-flex align-items-center justify-content-center mb-2"
+                              style={{
+                                width: isCurrent ? 64 : 52,
+                                height: isCurrent ? 64 : 52,
+                                background: isCurrent
+                                  ? `linear-gradient(135deg, ${stage.color} 0%, ${stage.color}dd 100%)`
+                                  : isCompleted
+                                    ? stage.color
+                                    : "#e3e8ef",
+                                color:
+                                  isCurrent || isCompleted
+                                    ? "#fff"
+                                    : "#9ca3af",
+                                transition: "all 0.3s ease",
+                                boxShadow: isCurrent
+                                  ? `0 8px 24px ${stage.color}66`
+                                  : isCompleted
+                                    ? `0 4px 12px ${stage.color}44`
+                                    : "none",
+                              }}
+                            >
+                              {isCompleted && !isCurrent ? (
+                                <CheckCircle size={24} strokeWidth={3} />
+                              ) : (
+                                stage.icon
+                              )}
+                            </div>
+                            <span
+                              className="fw-semibold text-center"
+                              style={{
+                                fontSize: isCurrent ? 15 : 13,
+                                color: isCurrent
+                                  ? stage.color
+                                  : isCompleted
+                                    ? "#374151"
+                                    : "#9ca3af",
+                              }}
+                            >
+                              {stage.name}
+                            </span>
+                            {isCurrent && (
+                              <Badge
+                                className="mt-1"
+                                style={{
+                                  backgroundColor: `${stage.color}22`,
+                                  color: stage.color,
+                                  fontSize: 11,
+                                  padding: "4px 10px",
+                                }}
+                              >
+                                CURRENT
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted">
+                    <TrendingUp size={48} className="mb-3 opacity-50" />
+                    <div>No stage information available</div>
+                  </div>
+                ),
+              },
+              {
+                id: "recent-activities",
+                title: "Recent activities",
+                icon: History,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this record.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => {
+                      const recordId =
+                        selectedActivityRecord?.record_id ||
+                        selectedActivityRecord?.id;
+                      const type = String(
+                        selectedActivityRecord?.type || "",
+                      ).toLowerCase();
+                      if (!recordId) return;
+                      setShowActivitySidebar(false);
+                      if (type === "prospect")
+                        router.push(
+                          `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                        );
+                      else if (type === "lead")
+                        router.push(
+                          `/crm/leads/leads-detailpage?id=${recordId}&section=activities`,
+                        );
+                      else if (type === "deal")
+                        router.push(
+                          `/crm/deals/deals-detailpage?id=${recordId}&section=activities`,
+                        );
+                      else if (type === "order")
+                        router.push(
+                          `/crm/orders/${recordId}/order-detailpage?section=activities`,
+                        );
+                    },
+                  },
+                },
+              },
+              {
+                id: "customer-info",
+                title: "Customer Info",
+                icon: Users,
+                collapsible: true,
+                defaultExpanded: true,
+                fields: [
+                  {
+                    label: "Name",
+                    value:
+                      crmData?.name ||
+                      selectedActivityRecord?.customer ||
+                      "N/A",
+                  },
+                  {
+                    label: "Phone",
+                    value: crmData?.phone || "N/A",
+                    type: "phone",
+                  },
+                ],
+              },
+              {
+                id: "agent-info",
+                title: "Agent Info",
+                icon: Users,
+                collapsible: true,
+                defaultExpanded: true,
+                fields: [
+                  {
+                    label: "Agent Name",
+                    value: selectedActivityRecord?.agent || "N/A",
+                  },
+                ],
+              },
+            ]}
+          />
+        )}  
+        </div>
       </div>
     </ProtectedRoute>
   );

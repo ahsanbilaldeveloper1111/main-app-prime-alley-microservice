@@ -556,6 +556,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 </button>
               </li>
               )}
+
+{session?.user?.permissions?.includes('view-settings-users') && (
               <li className="profile-menu-item">
                 <button className="profile-menu-button"
                   onClick={() => {
@@ -570,7 +572,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     <span className="profile-menu-text">Settings</span>
                   </div>
                 </button>
-              </li>
+                </li>
+              )}
 
 
 {session?.user?.permissions?.includes('set-company-image-users') && (
