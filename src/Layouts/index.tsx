@@ -88,6 +88,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
+	const sessionExpiredRedirectRef = useRef(false);
 	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
 	const [dialedNumber, setDialedNumber] = useState('');
 	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
@@ -131,6 +132,20 @@ const Layout = ({ children }: LayoutProps) => {
       );
     };
   }, []);
+
+  // If session exists but permissions are empty, server likely lost session (e.g. after deploy/restart). Redirect to signin instead of showing "Access denied".
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user) return;
+    if (router.pathname.startsWith('/auth/') || router.pathname === '/access-denied') return;
+    const perms = session.user.permissions ?? [];
+    if (perms.length > 0) return;
+    if (sessionExpiredRedirectRef.current) return;
+    sessionExpiredRedirectRef.current = true;
+    const callbackUrl = encodeURIComponent(router.asPath);
+    signOut({ redirect: false }).then(() => {
+      router.replace(`/auth/signin?reason=session_expired&callbackUrl=${callbackUrl}`);
+    });
+  }, [status, session?.user?.permissions, router.pathname, router.asPath]);
 
   // Permission check: session has permissions from store (not cookie). Redirect to access-denied if user lacks required perms for this route.
   useEffect(() => {

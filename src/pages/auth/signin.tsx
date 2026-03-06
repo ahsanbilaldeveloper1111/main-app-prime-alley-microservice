@@ -21,7 +21,7 @@ const Signin = () => {
   const [error, setError] = useState("");
   const [sessionLoading, setSessionLoading] = useState(true);
   const router = useRouter();
-  const { callbackUrl } = router.query;
+  const { callbackUrl, reason } = router.query;
   const [showPassword, setShowPassword] = useState(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const statusRef = useRef<string>("loading");
@@ -37,6 +37,13 @@ const Signin = () => {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  // Show message when redirected after server lost session (e.g. deploy/restart)
+  useEffect(() => {
+    if (router.isReady && reason === 'session_expired') {
+      toast.info('Session expired. Please sign in again.', { toastId: 'session-expired' });
+    }
+  }, [router.isReady, reason]);
 
   // Detect and sync autofilled values after page load
   useEffect(() => {
