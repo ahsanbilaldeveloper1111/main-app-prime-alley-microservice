@@ -323,6 +323,7 @@ const WorkPlannerProjectsDashboard = () => {
                 Board View
               </Button> */}
 
+                {!selectedProject || hierarchyLoading && (
 <button
   style={{
     cursor: "pointer",
@@ -363,6 +364,9 @@ const WorkPlannerProjectsDashboard = () => {
   <Plus size={18} />
   <span>Create Task</span>
 </button>
+                )}
+
+                {!selectedProject || hierarchyLoading && (
 
 <button
   style={{
@@ -398,7 +402,8 @@ const WorkPlannerProjectsDashboard = () => {
 >
   <LayoutGrid size={18} />
   <span>Board View</span>
-</button>
+                  </button>
+                )}
               
             
             </div>

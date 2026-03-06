@@ -182,7 +182,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'workforce',
     'unified-reports',
     'audit-logs',
-    'settings',
+    // 'settings',
   ];
 
   const mainMenuItems: MainMenuItem[] = [

@@ -1444,7 +1444,7 @@ font-weight:600;
                             {loggedInName || ''}
                           </div>
                           <div className="user-dropdown-email">
-                            {session?.user?.email}
+                            {session?.user?.role || ''}
                           </div>
                           <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences

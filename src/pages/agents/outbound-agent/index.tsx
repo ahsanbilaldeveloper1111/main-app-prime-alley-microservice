@@ -171,7 +171,7 @@ const AIMLProfiles = () => {
   };
 
   const handleEditBot = (bot: Bot) => {
-    router.push(`/ai-ml/profiles/voicebot-edit?id=${bot.id}`);
+    router.push(`/agents/outbound-agent/voicebot-edit?id=${bot.id}`);
   };
 
   const handleDeleteBot = (bot: Bot) => {
@@ -229,7 +229,7 @@ const AIMLProfiles = () => {
         showSearch={false}
         buttons={
           <button
-      onClick={() => router.push('/ai-ml/profiles/voicebot-create')}
+      onClick={() => router.push('/agents/outbound-agent/voicebot-create')}
       style={{
         width: '100%',
         display: 'flex',
