@@ -1812,7 +1812,7 @@ export default function useCtiStomp(
         if (readyState === EventSource.CLOSED) {
           console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
           setIsInitialized(false);
-          setError("SSE connection closed");
+          //setError("SSE connection closed");
 
           // Reconnect with retry logic and exponential backoff
           if (!isReconnectingRef.current) {
@@ -2755,7 +2755,7 @@ export default function useCtiStomp(
             if (readyState === EventSource.CLOSED) {
               console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
               setIsInitialized(false);
-              setError("SSE connection closed");
+              //setError("SSE connection closed");
 
               // Reconnect with retry logic and exponential backoff
               if (!isReconnectingRef.current && attemptReconnectionRef.current) {
