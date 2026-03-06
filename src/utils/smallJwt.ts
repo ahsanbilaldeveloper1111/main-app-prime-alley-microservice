@@ -19,8 +19,9 @@ export interface SmallPayload {
   sessionId: string;
   exp: number;
   iat: number;
-  /** Included so Edge middleware can verify without store lookup (store is Node-only) */
+  /** Included so Edge middleware can verify session without store lookup (store is Node-only) */
   id?: string;
+  /** Not included in cookie to avoid 431; permissions live in server-side store only */
   permissions?: string[];
 }
 

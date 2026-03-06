@@ -195,14 +195,13 @@ export const authOptions: NextAuthOptions = {
       const exp = (typeof token.exp === 'number' ? token.exp : now + maxAge);
       jwtPayloadStore.set(sessionId, token as Record<string, unknown>);
       const secretStr = typeof secret === 'string' ? secret : (secret as Buffer).toString('binary');
-      // Include id + permissions in cookie so Edge middleware can verify without store lookup
+      // Cookie stays small (sessionId, exp, iat, id only) to avoid 431; permissions live in store only
       return signSmallPayload(
         {
           sessionId,
           exp,
           iat: typeof token.iat === 'number' ? token.iat : now,
           id: typeof token.id === 'string' ? token.id : undefined,
-          permissions: Array.isArray(token.permissions) ? token.permissions : undefined,
         },
         secretStr
       );

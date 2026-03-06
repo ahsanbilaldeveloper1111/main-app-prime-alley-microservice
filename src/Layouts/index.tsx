@@ -42,7 +42,7 @@ import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
-import { getSearchableRoutes, canAccessRoute } from '../config/permissions';
+import { getSearchableRoutes, canAccessRoute, getRequiredPermissions } from '../config/permissions';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
@@ -131,7 +131,19 @@ const Layout = ({ children }: LayoutProps) => {
       );
     };
   }, []);
-  
+
+  // Permission check: session has permissions from store (not cookie). Redirect to access-denied if user lacks required perms for this route.
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user || router.pathname === '/access-denied') return;
+    const pathname = router.asPath.split('?')[0] || router.pathname;
+    const required = getRequiredPermissions(pathname).filter(Boolean);
+    if (required.length === 0) return;
+    const userPerms = session.user.permissions ?? [];
+    if (!canAccessRoute(userPerms, pathname)) {
+      router.replace('/access-denied');
+    }
+  }, [router.pathname, router.asPath, status, session?.user?.permissions]);
+
 	useEffect(() => {
 		let cancelled = false;
 		getCurrentUserCompanyImage()
@@ -261,16 +273,23 @@ const Layout = ({ children }: LayoutProps) => {
 	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
 
 	useEffect(() => {
-		if (status !=="loading" && session) {
+		if (status !== "loading" && session?.user) {
 		  if (typeof window !== "undefined") {
-		    setLoggedInName(session.user.name || '');
-		    setLoggedInCompanyName(session.user.company_name || '');
-		    setLoggedInUserUsername(session.user.username || '');
-		    setLoggedInUserRole(session.user.role || '');
-		    setLoggedInUserProfilePicture(session.user?.profile_picture || '');
+		    setLoggedInName(session.user.name ?? '');
+		    setLoggedInCompanyName(session.user.company_name ?? '');
+		    setLoggedInUserUsername(session.user.username ?? '');
+		    setLoggedInUserRole(session.user.role ?? '');
+		    setLoggedInUserProfilePicture(session.user.profile_picture ?? '');
 		  }
 		}
-	}, [ status, session]);
+	}, [
+	  status,
+	  session?.user?.name,
+	  session?.user?.company_name,
+	  session?.user?.username,
+	  session?.user?.role,
+	  session?.user?.profile_picture,
+	]);
 
 	const profileImageUrl = loggedInUserProfilePicture 
 		? (getStorageImageUrl(loggedInUserProfilePicture) || null)
