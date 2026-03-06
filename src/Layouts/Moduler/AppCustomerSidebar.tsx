@@ -716,13 +716,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/billing/order-invoicing', 
           permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
         },
-        { 
-          id: 'finance-invoices', 
-          title: 'Invoices', 
-          icon: <DollarSign size={16} />, 
-          url: '/billing/invoices', 
-          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
-        },
+        
         { 
           id: 'finance-payment-history', 
           title: 'Payment History', 
@@ -742,6 +736,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <Scroll size={16} />, 
           url: '/billing/quotes', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+        { 
+          id: 'finance-invoices', 
+          title: 'Invoices', 
+          icon: <DollarSign size={16} />, 
+          url: '/billing/invoices', 
+          permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
           id: 'finance-products', 
