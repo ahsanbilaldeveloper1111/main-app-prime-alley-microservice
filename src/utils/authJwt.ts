@@ -1,10 +1,10 @@
 /**
  * Custom JWT decode for NextAuth (Option A: small cookie).
- * Used by [...nextauth].ts and by middleware getToken() so the same decode logic is applied.
+ * Used when resolving session (getServerSession, session callback). Cookie only has
+ * sessionId, exp, iat, id; full token (including permissions) is loaded from jwtPayloadStore.
  *
- * Edge middleware cannot access the Node in-memory jwtPayloadStore, so when store lookup
- * fails we return a minimal token from the cookie payload (id + permissions) so middleware
- * can allow the request and avoid redirect loops after login.
+ * When store lookup fails (e.g. Edge), we return a minimal token (id, no permissions);
+ * middleware only checks presence of valid session, not permissions.
  */
 
 import type { JWT } from 'next-auth/jwt';
@@ -29,11 +29,11 @@ export async function customJwtDecode(params: {
   if (full) return full as JWT;
 
   // Store empty (e.g. middleware runs in Edge, store is Node-only): return minimal token
-  // from cookie so middleware has id + permissions and allows the request (fixes login loop)
+  // so middleware can allow the request; permissions are not in cookie (avoid 431)
   return {
     sub: payload.id,
     id: payload.id,
-    permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+    permissions: [],
     exp: payload.exp,
     iat: payload.iat,
   } as JWT;

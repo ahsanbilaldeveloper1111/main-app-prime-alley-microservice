@@ -8,7 +8,7 @@ import type { JWT } from 'next-auth/jwt';
 
 const PAYLOAD_SEP = '.';
 
-/** Minimal payload shape (must match smallJwt.ts SmallPayload). */
+/** Minimal payload shape (must match smallJwt.ts SmallPayload). Permissions not in cookie. */
 interface EdgePayload {
   sessionId: string;
   exp: number;
@@ -68,8 +68,8 @@ async function verifySmallPayloadEdge(token: string, secret: string): Promise<Ed
 }
 
 /**
- * Decode for Edge middleware. Does not use session store; returns minimal token from cookie.
- * Pass to getToken({ decode: edgeJwtDecode }) in middleware.
+ * Decode for Edge middleware. Cookie has no permissions (avoids 431). Returns minimal token;
+ * permission checks are done in Layout/pages via session from store.
  */
 export async function edgeJwtDecode(params: {
   token?: string;
@@ -85,7 +85,7 @@ export async function edgeJwtDecode(params: {
   return {
     sub: payload.id,
     id: payload.id,
-    permissions: Array.isArray(payload.permissions) ? payload.permissions : [],
+    permissions: [],
     exp: payload.exp,
     iat: payload.iat,
   } as JWT;

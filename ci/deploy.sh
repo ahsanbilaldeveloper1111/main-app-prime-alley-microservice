@@ -60,25 +60,27 @@ echo "→ Stopping service"
 sudo systemctl stop "$SERVICE_NAME" || true
 
 # ---------- npm handling ----------
-if [[ "$ENV_NAME" == "stage" ]]; then
-  if [[ "${STAGE_RUN_NPM:-0}" == "1" ]]; then
-    echo "→ Stage: STAGE_RUN_NPM=1, installing dependencies (internet must be enabled)"
-    if [[ -f package-lock.json ]]; then
-      npm ci --no-audit --no-fund
-    else
-      npm install --no-audit --no-fund
-    fi
-  else
-    echo "→ Stage: STAGE_RUN_NPM=0, skipping npm install/ci"
-  fi
-else
-  echo "→ Dev: installing dependencies"
-  if [[ -f package-lock.json ]]; then
-    npm ci --no-audit --no-fund
-  else
-    npm install --no-audit --no-fund
-  fi
-fi
+# if [[ "$ENV_NAME" == "stage" ]]; then
+#   if [[ "${STAGE_RUN_NPM:-0}" == "1" ]]; then
+#     echo "→ Stage: STAGE_RUN_NPM=1, installing dependencies (internet must be enabled)"
+#     if [[ -f package-lock.json ]]; then
+#       npm ci --no-audit --no-fund
+#     else
+#       npm install --no-audit --no-fund
+#     fi
+#   else
+#     echo "→ Stage: STAGE_RUN_NPM=0, skipping npm install/ci"
+#   fi
+# else
+#   echo "→ Dev: installing dependencies"
+#   if [[ -f package-lock.json ]]; then
+#     npm ci --no-audit --no-fund
+#   else
+#     npm install --no-audit --no-fund
+#   fi
+# fi
+
+npm install
 
 echo "→ Building app"
 npm run build
