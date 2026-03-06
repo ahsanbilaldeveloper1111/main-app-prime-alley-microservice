@@ -7518,6 +7518,8 @@ const CrmCompanyManagement = () => {
                   id: selectedCompany?.id || selectedCompany?.rawData?.id,
                   type: RECORD_TYPES.COMPANY,
                 }}
+                recordType="company"
+                recordId={selectedCompany?.id || selectedCompany?.rawData?.id}
                 recordLink={{
                   label: "View record",
                   onClick: () => {
@@ -7529,6 +7531,7 @@ const CrmCompanyManagement = () => {
                     setShowCompanySidebar(false);
                   },
                 }}
+                onNoteCreate={handleNoteCreate}
                 actionsDropdown={{
                   label: "Actions",
                   items: [
@@ -7545,7 +7548,6 @@ const CrmCompanyManagement = () => {
                     },
                   ],
                 }}
-                quickActions={companyQuickActions}
                 sections={sections}
               />
             );

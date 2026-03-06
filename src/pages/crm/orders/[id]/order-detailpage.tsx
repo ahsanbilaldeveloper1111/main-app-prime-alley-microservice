@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import Layout from "@layout/index";
 import { useRouter } from 'next/router';
+import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
+import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
+import CrmProfileSection from "@components/CrmProfileSection";
 import { getOrder, getDeal, getLead } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
@@ -293,256 +296,6 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { label: 'Company Name', value: orderData?.customer_name || 'N/A' },
     { label: 'Order Owner', value: extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.display_name || extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.name || orderData?.assigned_to || 'N/A' },
   ];
-
-  const renderIntelligenceTab = () => {
-    return (
-      <div>
-        <div style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '20px',
-          marginBottom: '20px',
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '20px',
-            marginBottom: '16px',
-          }}>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Order Stage
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.stage?.name || 'N/A'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Related Company
-              </div>
-              <a
-                href="#"
-                style={{
-                  fontSize: '14px',
-                  color: '#006162',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                {orderData?.customer_name || 'N/A'}
-              </a>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Order Value
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.final_amount || orderData?.total_amount 
-                  ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
-                  : 'N/A'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Approval Status
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.order_approval_status || 'N/A'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Fulfillment Status
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.fulfillment_status || 'N/A'}
-              </div>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Payment Status
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.payment_status || 'N/A'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '20px',
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '5px',
-            padding: '20px',
-          }}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Industry
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.industry || 'N/A'}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Company description
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {orderData?.company_description || 'N/A'}
-              </div>
-            </div>
-          </div>
-
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '5px',
-            padding: '20px',
-          }}>
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: '0 0 16px 0',
-            }}>
-              Order Information
-            </h3>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Order Owner
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                {extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.display_name || extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.name || orderData?.assigned_to || 'N/A'}
-              </div>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '20px',
-              marginBottom: '20px',
-            }}>
-              <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
-                  Approval Status
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
-                  {orderData?.order_approval_status || 'N/A'}
-                </div>
-              </div>
-              <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
-                  Currency
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
-                  {orderData?.currency || 'AED'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -1526,56 +1279,67 @@ const OrderRecordPage: NextPageWithLayout = () => {
                 borderRadius: '10px',
                 marginBottom: '20px',
               }}>
-                <div style={{
-                  padding: '16px 20px',
-                  borderBottom: '1px solid #eaf0f6',
-                }}>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    margin: 0,
-                  }}>
-                    Order profile
-                  </h3>
-                </div>
-
-                <div style={{ padding: '20px' }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '20px',
-                  }}>
-                    {[
-                      { label: 'Order Number', value: orderData?.order_number || `Order #${id}` || 'N/A' },
-                      { label: 'Company Name', value: orderData?.customer_name || 'N/A' },
-                      { label: 'Order Value', value: orderData?.final_amount || orderData?.total_amount 
-                        ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
-                        : 'N/A' },
-                      { label: 'Stage', value: orderData?.stage?.name || 'N/A' },
-                      { label: 'Order Status', value: orderData?.status || 'N/A' },
-                      { label: 'Order Date', value: orderData?.order_date ? formatDateForTable(orderData.order_date) : 'N/A' },
-                      { label: 'Expected Delivery', value: orderData?.expected_delivery_date ? formatDateForTable(orderData.expected_delivery_date) : 'N/A' },
-                      { label: 'Order Owner', value: extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.display_name || extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.name || orderData?.assigned_to || 'N/A' },
-                    ].map((field, index) => (
-                      <div key={index}>
-                        <div style={{
-                          fontSize: '13px',
-                          color: '#666666',
-                          marginBottom: '4px',
-                        }}>
-                          {field.label}
-                        </div>
-                        <div style={{
-                          fontSize: '14px',
-                          color: '#141414',
-                        }}>
-                          {field.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <CrmProfileSection
+                  title="Order profile"
+                  fields={[
+                    {
+                      label: "Company name",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.official_company_name ??
+                        (relatedDeal as any)?.company?.name ??
+                        orderData?.customer_name ??
+                        "--",
+                    },
+                    {
+                      label: "Street address",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.headquarters?.address ??
+                        (relatedDeal as any)?.company?.address ??
+                        (orderData as any)?.billing_address ??
+                        (orderData as any)?.shipping_address ??
+                        "--",
+                    },
+                    {
+                      label: "City",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.headquarters?.city ??
+                        (relatedDeal as any)?.company?.city ??
+                        (orderData as any)?.billing_city ??
+                        (orderData as any)?.city ??
+                        "--",
+                    },
+                    {
+                      label: "Postal code",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.headquarters?.postal_code ??
+                        (orderData as any)?.postal_code ??
+                        (orderData as any)?.billing_postal_code ??
+                        "--",
+                    },
+                    {
+                      label: "State/Region",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.headquarters?.state ??
+                        (orderData as any)?.state ??
+                        (orderData as any)?.billing_state ??
+                        "--",
+                    },
+                    {
+                      label: "Email",
+                      value:
+                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
+                          ?.emails?.[0]?.email ??
+                        orderData?.customer_email ??
+                        "--",
+                      link: true,
+                    },
+                  ]}
+                />
               </div>
             </>
           )}
@@ -1692,7 +1456,14 @@ const OrderRecordPage: NextPageWithLayout = () => {
             </div>
           )}
 
-          {activeTab === 'intelligence' && renderIntelligenceTab()}
+          {activeTab === 'intelligence' && (
+            <CrmIntelligenceTab
+              company={(relatedDeal as any)?.company ?? null}
+              relatedCompany={orderData?.customer_name ?? relatedDeal?.company_name ?? '—'}
+              industryName={(relatedDeal as any)?.industries?.[0]?.name ?? null}
+              industryDescription={(relatedDeal as any)?.industries?.[0]?.description ?? null}
+            />
+          )}
         </div>
       </div>
     );
@@ -1884,160 +1655,35 @@ const OrderRecordPage: NextPageWithLayout = () => {
               </div>
             )}
 
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '10px',
-              marginBottom: '12px',
-              overflow: 'hidden',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-              border: '1px solid #cccccc',
-            }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 20px 0',
-                  cursor: 'pointer',
-                  backgroundColor: '#ffffff',
-                }}
-                onClick={() => toggleSection('companies')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: '#141414',
-                      transform: collapsedSections.has('companies') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    margin: 0,
-                    lineHeight: '1.2',
-                  }}>
-                    Companies ({orderData?.customer_name ? 1 : 0})
-                  </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#141414',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    padding: '6px',
-                    borderRadius: '3px',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f8fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                </button>
-              </div>
-
-              {!collapsedSections.has('companies') && (
-                <div style={{ padding: '20px' }}>
-                  {orderData?.customer_name ? (
-                    <>
-                      <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '8px',
-                        }}>
-                          <a
-                            href="#"
-                            style={{
-                              fontSize: '14px',
-                              color: '#006162',
-                              textDecoration: 'none',
-                              fontWeight: '500',
-                            }}
-                          >
-                            {orderData.customer_name}
-                          </a>
-                          <span style={{
-                            padding: '2px 8px',
-                            backgroundColor: '#e6f3ff',
-                            color: '#006162',
-                            borderRadius: '3px',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                          }}>
-                            Primary
-                          </span>
-                        </div>
-                        {orderData?.customer_email && (
-                          <p style={{
-                            fontSize: '13px',
-                            color: '#666666',
-                            margin: '4px 0',
-                          }}>
-                            Email: {orderData.customer_email}
-                          </p>
-                        )}
-                        {orderData?.customer_phone && (
-                          <p style={{
-                            fontSize: '13px',
-                            color: '#666666',
-                            margin: '4px 0',
-                          }}>
-                            Phone: {orderData.customer_phone}
-                          </p>
-                        )}
-                      </div>
-                      <a
-                        href="#"
-                        style={{
-                          fontSize: '12px',
-                          color: '#141414',
-                          textDecoration: 'none',
-                          fontWeight: '300',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          border: '1px solid #cccccc',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                        }}
-                      >
-                        View all associated Companies
-                        <ExternalLink size={12} />
-                      </a>
-                    </>
-                  ) : (
-                    <div style={{
-                      padding: '32px 20px',
-                      textAlign: 'center',
-                    }}>
-                      <Building2 size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#718096',
-                        margin: 0,
-                        lineHeight: '1.6',
-                      }}>
-                        No companies associated
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {(() => {
+              const company = (relatedDeal as any)?.company ?? null;
+              const struct = company?.enrichment_data?.structured_data ?? null;
+              const companyName =
+                struct?.official_company_name ??
+                company?.name ??
+                orderData?.customer_name ??
+                null;
+              const primaryPhone =
+                struct?.phones?.[0]?.number ??
+                company?.phone ??
+                orderData?.customer_phone ??
+                null;
+              const phones =
+                struct?.phones?.map((p: any) => ({
+                  number: p?.number ?? "",
+                  type: p?.type ?? null,
+                })) ?? undefined;
+              return (
+                <CrmAssociatedCompaniesCard
+                  sectionId="companies"
+                  collapsedSections={collapsedSections}
+                  toggleSection={toggleSection}
+                  companyName={companyName}
+                  primaryPhone={primaryPhone}
+                  phones={phones}
+                />
+              );
+            })()}
 
             {relatedLead && (
               <div style={{

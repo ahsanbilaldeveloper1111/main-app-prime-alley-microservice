@@ -337,6 +337,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
   };
 
   // Tabs

@@ -54,11 +54,13 @@ import {
   getLead,
   getDeal,
   getOrder,
+  getHistoryChain,
   type CrmNoteItem,
   type CrmDataItem,
   type LeadData,
   type DealData,
   type OrderData,
+  type HistoryChainRecord,
 } from "@utils/crm";
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
@@ -204,8 +206,10 @@ export interface GenericSidebarProps {
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
 
-  recordType?: "prospect" | "lead" | "deal" | "order";
+  recordType?: "prospect" | "lead" | "deal" | "order" | "company" | "activity";
   recordId?: number;
+  /** When recordType is "activity", the underlying entity type for fetching history chain (e.g. "lead", "deal"). */
+  activityEntityType?: "prospect" | "lead" | "deal" | "order";
 
   /** Resolve user extension/id to display name (e.g. for Owner / contact_owner). When provided, prospect sidebar uses it for the Owner field. */
   resolveUserLabel?: (extensionOrId: string) => string;
@@ -4793,6 +4797,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   contextPayload,
   recordType,
   recordId,
+  activityEntityType,
   resolveUserLabel,
   onNoteCreate,
   onEmailSend,
@@ -4943,6 +4948,35 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       .catch(() => setOrderData(null))
       .finally(() => setOrderLoading(false));
   }, [isOpen, recordType, recordId]);
+
+  // Fetched history chain when sidebar is opened for an activity (recordType "activity") – for Recent activities timeline
+  const [activityHistoryChain, setActivityHistoryChain] = useState<
+    HistoryChainRecord[] | null
+  >(null);
+  const [activityHistoryChainLoading, setActivityHistoryChainLoading] =
+    useState(false);
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      recordType !== "activity" ||
+      recordId == null ||
+      !activityEntityType
+    ) {
+      setActivityHistoryChain(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setActivityHistoryChain(null);
+      return;
+    }
+    setActivityHistoryChainLoading(true);
+    getHistoryChain(activityEntityType, id)
+      .then((data) => setActivityHistoryChain(data ?? null))
+      .catch(() => setActivityHistoryChain(null))
+      .finally(() => setActivityHistoryChainLoading(false));
+  }, [isOpen, recordType, recordId, activityEntityType]);
 
   // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
   const recordSummary: RecordSummaryDisplay | undefined =
@@ -5102,6 +5136,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     ) {
       return;
     }
+
+    //skip for activity
+    if (recordType === "activity") return;
     const rType = recordType as "prospect" | "lead" | "deal" | "order";
     setSidebarNotesLoading(true);
     getCrmNotes(rType, Number(recordId))
@@ -5200,10 +5237,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const handleNoteSave = async (note: string, createTask: boolean, taskDueDate?: string, attachments?: File[]) => {
     const text = note.trim();
     if (!text) return;
-    if (recordType && recordId != null) {
+    const crmRecordType =
+      recordType === "activity" ? activityEntityType : recordType;
+    if (crmRecordType && recordId != null) {
       try {
         await createCrmNote({
-          record_type: recordType,
+          record_type: crmRecordType as "prospect" | "lead" | "deal" | "order",
           record_id: Number(recordId),
           text,
           ...(attachments && attachments.length > 0 && { attachments }),
@@ -5212,8 +5251,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         toast.success("Note created successfully");
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
-        const rType = recordType as "prospect" | "lead" | "deal" | "order";
-        getCrmNotes(rType, Number(recordId))
+        getCrmNotes(
+          crmRecordType as "prospect" | "lead" | "deal" | "order",
+          Number(recordId),
+        )
           .then((res) => setSidebarNotesList(res?.data ?? []))
           .catch(() => {});
       } catch {
@@ -5884,6 +5925,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           detailPath: (id: number) =>
             `/crm/orders/${id}/order-detailpage?section=activities`,
         };
+      case "activity":
+        return {
+          loading: activityHistoryChainLoading,
+          data:
+            activityHistoryChain != null
+              ? ({ audit_trail: activityHistoryChain } as Record<
+                  string,
+                  unknown
+                >)
+              : null,
+          detailPath: (id: number) => {
+            const entityType = activityEntityType ?? "lead";
+            if (entityType === "prospect")
+              return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
+            if (entityType === "lead")
+              return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
+            if (entityType === "deal")
+              return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
+            return `/crm/orders/${id}/order-detailpage?section=activities`;
+          },
+        };
       default:
         return null;
     }
@@ -5897,6 +5959,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     dealData,
     orderLoading,
     orderData,
+    activityHistoryChainLoading,
+    activityHistoryChain,
+    activityEntityType,
   ]);
 
   // Format a value from prospect data.data for display
@@ -6601,8 +6666,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     resolveUserLabel,
                   );
                   if (auditTrail.length > 0) {
-                    const displayTrail = auditTrail.slice(0, 5);
-                    const hasMore = auditTrail.length > 5;
+                    const isActivityRecordType = recordType === "activity";
+                    const displayTrail = isActivityRecordType
+                      ? auditTrail
+                      : auditTrail.slice(0, 5);
+                    const hasMore =
+                      !isActivityRecordType && auditTrail.length > 5;
                     return (
                       <div
                         style={{
@@ -6676,7 +6745,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                             );
                           })}
                         </div>
-                        {recordId != null && hasMore && (
+                      {recordId != null && hasMore && (
                           <button
                             onClick={() =>
                               router.push(

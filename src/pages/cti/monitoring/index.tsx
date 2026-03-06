@@ -837,7 +837,7 @@ const CtiMonitoring = () => {
               <Row className='campaign-performance'>
 
                 <Col md={12} className='mb-3 text-center'>
-                  <h3 className="card-title">Campaign Performance</h3>
+                  <h3 className="card-title">CRM Performance</h3>
                   <p className="text-muted">
                     {currentCampaign.name}
                   </p>
