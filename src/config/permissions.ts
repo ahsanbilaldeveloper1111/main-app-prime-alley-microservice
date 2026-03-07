@@ -280,6 +280,8 @@ export const routePermissions: RoutePermission[] = [
     },
     //virtual agents services end
 
+    
+
     //netops services start
     {
         path: '/pulse',
@@ -611,12 +613,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    
-
-    
-    
-
-
 
     //gsm services start
     {
@@ -657,12 +653,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
     
-
-    
-
-    
-    
-
     //tms services start
     {
         path: '/tms',
@@ -748,6 +738,30 @@ export const routePermissions: RoutePermission[] = [
 
         ]
     },
+
+    // voicebot inbound (platform) – companies, bots, calls
+    {
+        path: '/voicebot/inbound',
+        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        children: [
+            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/calls', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+        ]
+    },
+
+    {
+        path: '/voicebot/outbound',
+        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        children: [
+            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+        ]
+    },
+    //voicebot services end
 
     
 ];

@@ -1397,10 +1397,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           setRefreshKey((prev) => prev + 1);
         }}
         onReset={() => {
-          const resetCurrent: Record<string, any> = {
-            start_date: (currentFilters as any)?.start_date ?? defaultFilters.current.start_date,
-            end_date: (currentFilters as any)?.end_date ?? defaultFilters.current.end_date,
-          };
+          const freshDefaults = getDefaultFilters();
+          const resetCurrent: Record<string, any> = { ...freshDefaults.current };
           setCurrentFilters(resetCurrent);
           setSearchValue('');
           handleFiltersChange(resetCurrent);

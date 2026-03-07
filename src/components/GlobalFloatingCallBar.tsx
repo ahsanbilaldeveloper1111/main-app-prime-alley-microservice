@@ -14,26 +14,15 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 
 
-type CallBarPosition = "bottom" | "top" | "left" | "right";
-
 // Add styles for the floating call bar
 const floatingBarStyles = `
   .global-floating-call-bar {
     animation: slideUp 0.3s ease-out;
     user-select: none;
     list-style: none;
-    top: 15px !important;
-    left: auto !important;
-    right: 15rem !important;
-    width:auto !important;
-    
-    box-shadow: none !important;
-
-    @media (max-width: 480px) {
-      right: 0rem !important;
-    }
+    /* Position is controlled by inline styles from getPositionStyles() so drag-snap is respected */
+    box-shadow:0px 2px 5px #c7c0c0 !important;
   }
-  
   .global-floating-call-bar * {
     list-style: none;
   }
@@ -45,6 +34,11 @@ const floatingBarStyles = `
   .global-floating-call-bar.dragging {
     cursor: grabbing !important;
     opacity: 0.9;
+    /* Allow inline/CSS variable position to take effect during drag */
+    top: var(--bar-drag-top, 15px) !important;
+    left: var(--bar-drag-left, auto) !important;
+    right: var(--bar-drag-right, 15rem) !important;
+    width: auto !important;
   }
   
   @keyframes slideUp {
@@ -137,26 +131,35 @@ const GlobalFloatingCallBar: React.FC = () => {
   const [showIncomingCallModal, setShowIncomingCallModal] = useState(false);
   const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Drag and position state
-  const [position, setPosition] = useState<CallBarPosition>("top");
+  // Drag and position state – free (x,y) position; null = use default top-right
+  const [barPosition, setBarPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const dragHandleRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const lastDragPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Load saved position from localStorage
+  // Load saved position from localStorage (free x,y or legacy edge key)
   useEffect(() => {
-    const savedPosition = localStorage.getItem("callBarPosition") as CallBarPosition;
-    if (savedPosition && ["bottom", "top", "left", "right"].includes(savedPosition)) {
-      setPosition(savedPosition);
+    try {
+      const saved = localStorage.getItem("callBarPosition");
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { x?: number; y?: number } | string;
+      if (parsed && typeof parsed === "object" && typeof parsed.x === "number" && typeof parsed.y === "number") {
+        setBarPosition({ x: parsed.x, y: parsed.y });
+      }
+    } catch {
+      // ignore invalid JSON or legacy "top"/"bottom" etc.
     }
   }, []);
 
   // Save position to localStorage
   useEffect(() => {
-    localStorage.setItem("callBarPosition", position);
-  }, [position]);
+    if (barPosition) {
+      localStorage.setItem("callBarPosition", JSON.stringify(barPosition));
+    }
+  }, [barPosition]);
 
   // Helper function to get initials from user name (first letter of first name, second letter of last name)
   const getInitialsFromName = useCallback((name: string): string => {
@@ -241,6 +244,9 @@ const GlobalFloatingCallBar: React.FC = () => {
     return number;
   }, []);
 
+  // Keep ref in sync for use inside global mouseup (avoids stale closure)
+  isDraggingRef.current = isDragging;
+
   // Handle drag start
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     // Don't start drag if clicking on buttons
@@ -250,94 +256,47 @@ const GlobalFloatingCallBar: React.FC = () => {
     }
     
     if (!barRef.current) return;
-    
+
     const rect = barRef.current.getBoundingClientRect();
+    // Use stored position when available to avoid jump when switching from right:15rem to left/top
+    const initial = barPosition
+      ? { x: barPosition.x, y: barPosition.y }
+      : { x: Math.round(rect.left), y: Math.round(rect.top) };
+    isDraggingRef.current = true;
+    lastDragPositionRef.current = initial;
     setIsDragging(true);
     setDragStart({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX - initial.x,
+      y: e.clientY - initial.y,
     });
+    setDragPosition(initial);
     e.preventDefault();
     e.stopPropagation();
-  }, []);
+  }, [barPosition]);
 
-  // Handle drag end and determine new position
+  // Handle drag end – use last displayed drag position to avoid jump (getBoundingClientRect can differ)
   const handleDragEnd = useCallback(() => {
-    if (!isDragging || !barRef.current) return;
-    
+    if (!isDraggingRef.current || !barRef.current) return;
+    isDraggingRef.current = false;
+
     const barRect = barRef.current.getBoundingClientRect();
-    const windowWidth = globalThis.innerWidth;
-    const windowHeight = globalThis.innerHeight;
-    
-    // Check if bar is completely outside viewport
-    if (
-      barRect.right < 0 ||
-      barRect.left > windowWidth ||
-      barRect.bottom < 0 ||
-      barRect.top > windowHeight
-    ) {
-      setDragPosition(null);
-      setIsDragging(false);
-      setPosition("top");
-      return;
-    }
-    
-    // Calculate which edge is closest based on current bar position
-    const centerX = barRect.left + barRect.width / 2;
-    const centerY = barRect.top + barRect.height / 2;
-    
-    const distToTop = centerY;
-    const distToBottom = windowHeight - centerY;
-    const distToLeft = centerX;
-    const distToRight = windowWidth - centerX;
-    
-    const minDist = Math.min(distToTop, distToBottom, distToLeft, distToRight);
-    
-    let newPosition: CallBarPosition = "bottom";
-      if (minDist === distToTop) {
-        newPosition = "top";
-      } else if (minDist === distToBottom) {
-        newPosition = "bottom";
-      } else if (minDist === distToLeft) {
-        newPosition = "left";
-      } else if (minDist === distToRight) {
-        newPosition = "right";
-      }
-      
-      // Default to top if dragged outside
-      if (newPosition === "bottom" && barRect.top < 0) {
-        newPosition = "top";
-      }
-    
-    // Clear drag position and update position state - React will handle the styling
     setDragPosition(null);
     setIsDragging(false);
-    setPosition(newPosition);
-  }, [isDragging]);
+    const saved = lastDragPositionRef.current ?? { x: barRect.left, y: barRect.top };
+    lastDragPositionRef.current = null;
+    setBarPosition(saved);
+  }, []);
 
   // Handle mouse move during drag
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      // Calculate new position maintaining the offset from where drag started
       const newLeft = e.clientX - dragStart.x;
       const newTop = e.clientY - dragStart.y;
-      
-      // Get bar dimensions for constraints
-      const barWidth = barRef.current?.getBoundingClientRect().width || 400;
-      const barHeight = barRef.current?.getBoundingClientRect().height || 60;
-      
-      // Constrain to viewport with some padding
-      const padding = 10;
-      const maxLeft = globalThis.innerWidth - barWidth - padding;
-      const maxTop = globalThis.innerHeight - barHeight - padding;
-      
-      const constrainedLeft = Math.max(padding, Math.min(newLeft, maxLeft));
-      const constrainedTop = Math.max(padding, Math.min(newTop, maxTop));
-      
-      // Update drag position state - React will handle styling
-      setDragPosition({ x: constrainedLeft, y: constrainedTop });
+      const pos = { x: newLeft, y: newTop };
+      lastDragPositionRef.current = pos;
+      setDragPosition(pos);
     };
 
     const handleMouseUp = () => {
@@ -355,7 +314,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     };
   }, [isDragging, dragStart, handleDragEnd]);
 
-  // Get position styles based on current position or drag position
+  // Get position styles – free (x,y) when set or dragging, else default top-right
   const getPositionStyles = useCallback((): React.CSSProperties => {
     const baseStyles: React.CSSProperties = {
       position: "fixed",
@@ -363,99 +322,47 @@ const GlobalFloatingCallBar: React.FC = () => {
       backgroundColor: "#fff",
       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
       display: "flex",
+      flexDirection: "row",
       alignItems: "center",
       transition: isDragging ? "none" : "all 0.3s ease",
-      cursor: isDragging ? "grabbing" : "default",
+      cursor: isDragging ? "grabbing" : "grab",
       border: "none",
       visibility: "visible",
       opacity: 1,
-      
-      left: "0",
-      right: "0",
-      width: "100%",
+      borderRadius: "1.5rem",
+      padding: "0.5rem 1rem",
+      gap: "1rem",
+      minWidth: "320px",
+      maxWidth: "625px",
+      width: "auto",
     };
 
-    // If dragging, use drag position but preserve original layout
     if (isDragging && dragPosition) {
-      const wasVertical = position === "left" || position === "right";
-      
       baseStyles.left = `${dragPosition.x}px`;
       baseStyles.top = `${dragPosition.y}px`;
       baseStyles.right = "auto";
       baseStyles.bottom = "auto";
       baseStyles.transform = "none";
-      
-      // Preserve the original flex direction based on position before drag
-      if (wasVertical) {
-        baseStyles.flexDirection = "column";
-        baseStyles.borderRadius = "1.5rem";
-        baseStyles.padding = "1rem 0.75rem";
-        baseStyles.gap = "0.5rem";
-        baseStyles.minWidth = "70px";
-        baseStyles.maxWidth = "85px";
-      } else {
-        baseStyles.flexDirection = "row";
-        baseStyles.borderRadius = "1.5rem";
-        baseStyles.padding = "0.5rem 1rem";
-        baseStyles.gap = "0.5rem";
-        baseStyles.minWidth = "320px";
-        baseStyles.maxWidth = "625px";
-        baseStyles.width = "auto";
-      }
-      
       return baseStyles;
     }
 
-    // Otherwise, use position state
-    const isVertical = position === "left" || position === "right";
-    
-    baseStyles.borderRadius = "1.5rem";
-    baseStyles.padding = "0.5rem 1rem";
-    baseStyles.gap = "1rem";
-    baseStyles.top = "0px !important";
-    if (isVertical) {
-      baseStyles.flexDirection = "column";
-      baseStyles.minWidth = "70px";
-      baseStyles.maxWidth = "85px";
-      if (position === "left") {
-        baseStyles.left = "20px";
-        baseStyles.top = "50%";
-        baseStyles.transform = "translateY(-50%)";
-        baseStyles.right = "auto";
-        baseStyles.bottom = "auto";
-        baseStyles.top = "0px !important";
-      } else {
-        baseStyles.right = "20px";
-        baseStyles.top = "50%";
-        baseStyles.transform = "translateY(-50%)";
-        baseStyles.left = "auto";
-        baseStyles.bottom = "auto";
-        baseStyles.top = "0px !important";
-      }
-    } else {
-      baseStyles.flexDirection = "row";
-      baseStyles.minWidth = "320px";
-      baseStyles.top = "0px !important";
-      //baseStyles.maxWidth = "450px";
-      baseStyles.width = "auto";
-      if (position === "bottom") {
-        baseStyles.bottom = "20px";
-        baseStyles.left = "50%";
-        //baseStyles.transform = "translateX(-50%)";
-        baseStyles.top = "auto";
-        baseStyles.right = "auto";
-      } else {
-        baseStyles.top = "0";
-        baseStyles.left = "0";
-        baseStyles.right = "0";
-        baseStyles.width = "100%";
-        baseStyles.transform = "none";
-        baseStyles.bottom = "auto";
-      }
+    if (barPosition) {
+      baseStyles.left = `${barPosition.x}px`;
+      baseStyles.top = `${barPosition.y}px`;
+      baseStyles.right = "auto";
+      baseStyles.bottom = "auto";
+      baseStyles.transform = "none";
+      return baseStyles;
     }
 
+    // Default: top-right (no saved position)
+    baseStyles.top = "15px";
+    baseStyles.right = "15rem";
+    baseStyles.left = "auto";
+    baseStyles.bottom = "auto";
+    baseStyles.transform = "none";
     return baseStyles;
-  }, [position, isDragging, dragPosition]);
+  }, [barPosition, isDragging, dragPosition]);
 
   // Helper function to get controller device info based on call and user role
   const getControllerDeviceInfo = useCallback((call: typeof activeCall) => {
@@ -1387,7 +1294,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     //toast.info("Call rejected");
   };
 
-  const isVertical = position === "left" || position === "right";
+  const isVertical = false; // Bar is always horizontal (free-position drag)
   
   // Get initials: if user_name is available, use first letter of first name and second letter of last name
   // Otherwise use extension number
@@ -1434,26 +1341,20 @@ const GlobalFloatingCallBar: React.FC = () => {
         <div
           ref={barRef}
           className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
-          style={getPositionStyles()}
+          style={{
+            ...getPositionStyles(),
+            ...(isDragging && dragPosition
+              ? {
+                  "--bar-drag-left": `${dragPosition.x}px`,
+                  "--bar-drag-top": `${dragPosition.y}px`,
+                  "--bar-drag-right": "auto",
+                }
+              : {}),
+          }}
+          onMouseDown={handleDragStart}
+          role="presentation"
+          title="Drag to move"
         >
-          {/* Drag Handle - disabled for now */}
-          {/* <div
-            ref={dragHandleRef}
-            className="call-bar-drag-handle"
-            onMouseDown={handleDragStart}
-            style={{
-              position: "absolute",
-              ...(isVertical
-                ? { top: "6px", left: "50%", transform: "translateX(-50%)", width: "40px", height: "4px" }
-                : { left: "6px", top: "50%", transform: "translateY(-50%)", width: "4px", height: "40px" }),
-              backgroundColor: "rgba(0, 0, 0, 0.1)",
-              borderRadius: "2px",
-              cursor: "grab",
-              zIndex: 10,
-            }}
-            title="Drag to reposition"
-          /> */}
-
           {/* Contact Info Section */}
           <div
             style={{

@@ -1,5 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import { GetMinifiedUsers } from "./users";
 
 const PREFIX = "/staff-management";
 
@@ -1206,13 +1207,11 @@ export const getMainAppUsers = async (
   params?: { department_id?: number }
 ): Promise<unknown[]> => {
   try {
-    const response = await axiosInstance.get<ApiResponse<unknown[]>>(
-      `${PREFIX}/main-app/${companyUuid}/users`,
-      { params }
-    );
-    return extractData(response);
+   const users = await GetMinifiedUsers({ department_id: params?.department_id });
+   return users ?? [];
   } catch (error: unknown) {
     handleApiError(error, "Failed to fetch users");
+    return [];
   }
 };
 

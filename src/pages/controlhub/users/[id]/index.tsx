@@ -77,10 +77,10 @@ const UserView = () => {
             try {
                 // Fetch all user-specific data in parallel
                 //userPermissionsData, parentUsersData
-                const [userData, customFieldsData] = await Promise.all([
+                const [userData] = await Promise.all([
                     getUserById(id as string),
                     //getUserPermissions(id as string),
-                    GetCustomFields(id as string),
+                    //GetCustomFields(id as string),
                     //getParentUsers()
                 ]);
 
@@ -100,9 +100,9 @@ const UserView = () => {
                 // }
 
                 // Set custom fields
-                if (customFieldsData) {
-                    setCustomFields(customFieldsData);
-                }
+                // if (customFieldsData) {
+                //     setCustomFields(customFieldsData);
+                // }
 
                 // Set parent users
                 // if (parentUsersData) {
@@ -309,7 +309,7 @@ const UserView = () => {
                             </Tab>
                         )} */}
 
-                        {session?.user?.is_admin && (session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('update-custom-field-users')) && (
+                        {/* {session?.user?.is_admin && (session?.user?.permissions?.includes('custom-field-users') || session?.user?.permissions?.includes('add-custom-field-users') || session?.user?.permissions?.includes('edit-custom-field-users') || session?.user?.permissions?.includes('delete-custom-field-users') || session?.user?.permissions?.includes('update-custom-field-users')) && (
                             <Tab eventKey="custom-fields-users" title="Custom Fields">
                                 <CustomFieldsTab
                                     customFields={customFields}
@@ -319,7 +319,7 @@ const UserView = () => {
                                     onSuccess={handleSuccess}
                                 />
                             </Tab>
-                        )}
+                        )} */}
                         
                         {session?.user?.is_admin && (session?.user?.permissions?.includes('update-calling-access-users')) && (
                             <Tab eventKey="calling-access" title="Calling Access">
