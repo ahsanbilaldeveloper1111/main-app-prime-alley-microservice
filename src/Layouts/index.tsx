@@ -1519,7 +1519,7 @@ font-weight:600;
                           </button>
                           
                           {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
-                        <button className="user-dropdown-item" onClick={() => router.push('/billing/dashboard')}>
+                        <button className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
                         </button>

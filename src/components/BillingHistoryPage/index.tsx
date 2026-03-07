@@ -18,7 +18,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: "16px 24px",
     backgroundColor: "#f5f5f5",
-    flexWrap: "wrap" as const,
+    // flexWrap: "wrap" as const,
   },
   searchWrapper: {
     position: "relative" as const,
@@ -27,7 +27,7 @@ const s: Record<string, React.CSSProperties> = {
   searchInput: {
     backgroundColor: "rgb(255, 255, 255)",
     border: "1px solid rgb(138, 138, 138)",
-    borderRadius: 4,
+    borderRadius: 20,
     color: "rgb(20, 20, 20)",
     display: "block",
     fontFamily: font,
@@ -65,8 +65,8 @@ const s: Record<string, React.CSSProperties> = {
     borderStyle: "solid",
     borderColor: "#ccc",
     verticalAlign: "middle",
-    paddingBlock: 10,
-    paddingInline: 12,
+    // paddingBlock: 10,
+    // paddingInline: 12,
     fontFamily: font,
     fontSize: 14,
     fontWeight: 600,
@@ -217,8 +217,8 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
       <button
         style={{
           ...s.filterBtn,
-          backgroundColor: selected.length > 0 ? "#f0fafa" : "#fff",
-          borderColor: selected.length > 0 ? "rgb(0,97,98)" : "#ccc",
+        //   backgroundColor: selected.length > 0 ? "transparent" : "transparent",
+          borderColor: selected.length > 0 ? "transparent" : "transparent",
           color: selected.length > 0 ? "rgb(0,97,98)" : "#141414",
         }}
         onClick={() => setOpen(!open)}
@@ -456,8 +456,8 @@ export default function BillingHistoryPage() {
         <InvoiceCard
           id="720886618"
           product="Starter Customer Platform"
-          amount="£97.20"
-          balance="£0.00"
+          amount="AED 97.20"
+          balance="AED 0.00"
         />
 
         <PaymentCard
@@ -466,13 +466,13 @@ export default function BillingHistoryPage() {
           invoiceRef="720886618"
           cardLast4="5478"
           cardHolder="RIZWAN HAIDER"
-          amount="£97.20"
+          amount="AED 97.20"
         />
 
         <OrderCard
           id="22970930"
           product="Starter Customer Platform"
-          amount="£97.20"
+          amount="AED 97.20"
         />
       </div>
     </div>
