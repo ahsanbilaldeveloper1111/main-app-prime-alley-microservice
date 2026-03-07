@@ -170,7 +170,7 @@ const ModernSidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) 
           border-right: 1px solid #e8e8e8;
           display: flex;
           flex-direction: column;
-          z-index: 99 !important;
+          z-index: 9999 !important;
           transition: transform 0.3s ease-in-out;
         }
 
@@ -469,7 +469,7 @@ const ModernSidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) 
           }
 
           .sidebar-container {
-            z-index: 99;
+            z-index: 9999;
           }
         }
       `}</style>

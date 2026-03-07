@@ -1075,7 +1075,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       border: none;
       display: flex;
       flex-direction: column;
-      z-index: 99;
+      z-index: 9999;
       transition: width 0.3s ease-in-out;
       /* box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1); */
     }
