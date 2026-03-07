@@ -528,6 +528,7 @@ const RequestCategories = () => {
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Description</th>
+                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Tracking</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
                   <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
                 </tr>
@@ -572,6 +573,9 @@ const RequestCategories = () => {
                           ? String(cat.description).slice(0, 50) + (String(cat.description).length > 50 ? "…" : "")
                           : "—"}
                       </td>
+                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
+                        {cat.tracking_enabled ? "Enabled" : "Disabled"}
+                      </td>
                       <td style={{ padding: "16px" }}>
                         <span
                           style={{
@@ -606,7 +610,8 @@ const RequestCategories = () => {
                           }}
                         >
                           <Pencil size={14} />
-                        </button>
+                            </button>
+                            
                         <button
                           type="button"
                           onClick={(e) => {
@@ -625,8 +630,9 @@ const RequestCategories = () => {
                           }}
                         >
                           <FolderTree size={14} />
-                        </button>
-                        <button
+                            </button>
+                            {/* no need to show fields for parent , it will be in sub-categories */}
+                        {/* <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -644,7 +650,7 @@ const RequestCategories = () => {
                           }}
                         >
                           <List size={14} />
-                        </button>
+                        </button> */}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -855,39 +861,40 @@ const RequestCategories = () => {
                   />
                 </Form.Group>
               </div>
+             
+             
+              {categoryForm.parent_id != null && categoryForm.parent_id !== 0 && (
               <div className="col-12">
                 <div className="d-flex align-items-center justify-content-between mb-2">
                   <Form.Label className="mb-0 fw-semibold">
-                    Approval workflow (level & order){categoryForm.parent_id != null && categoryForm.parent_id !== 0 ? " *" : " (optional)"}
+                    Approval workflow (level & order) *
                   </Form.Label>
-                  <Button
-                    type="button"
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => {
-                      const levels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
-                      const nextLevel = levels.length + 1;
-                      setCategoryForm((f) => ({
-                        ...f,
-                        workflow_levels: [...levels, { level: nextLevel, name: `Level ${nextLevel}`, assignees: [] }],
-                      }));
-                    }}
-                  >
-                    <Plus size={14} className="me-1" />
-                    Add level
-                  </Button>
+
+                    {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels?.length ?? 0) > 0
+                      && (
+                        <Button
+                          type="button"
+                          variant="outline-primary"
+                          size="sm"
+                          onClick={() => {
+                            const levels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
+                            const nextLevel = levels.length + 1;
+                            setCategoryForm((f) => ({
+                              ...f,
+                              workflow_levels: [...levels, { level: nextLevel, name: `Level ${nextLevel}`, assignees: [] }],
+                            }));
+                          }}
+                        >
+                          <Plus size={14} className="me-1" />
+                          Add level
+                        </Button>
+                      )}
                 </div>
-                <Form.Text className="text-muted d-block mb-2">
-                  {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-                    ? "Required for sub-categories. Add at least one level and assign approvers."
-                    : "Optional for main (parent) categories. Add levels if you want approval workflow; child categories can define their own."}
-                </Form.Text>
+               
                 {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels?.length ?? 0) === 0 ? (
                   <div className="border rounded p-3 bg-light text-center text-muted">
                     <p className="mb-2 small">
-                      {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-                        ? "At least one approval level with an assignee is required for sub-categories."
-                        : "No workflow levels. You can add levels and assign approvers, or save as-is."}
+                      At least one approval level with an assignee is required for sub-categories.
                     </p>
                     <Button
                       type="button"
@@ -901,7 +908,7 @@ const RequestCategories = () => {
                       }}
                     >
                       <Plus size={14} className="me-1" />
-                      {categoryForm.parent_id != null && categoryForm.parent_id !== 0 ? "Add level (required)" : "Add level (optional)"}
+                      Add level (required)
                     </Button>
                   </div>
                 ) : (
@@ -1008,6 +1015,8 @@ const RequestCategories = () => {
                   </div>
                 )}
               </div>
+              )}
+
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label>Tracking</Form.Label>
@@ -1105,7 +1114,8 @@ const RequestCategories = () => {
                 <thead>
                   <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
+                        <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
+                        <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Tracking</th>
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
                     <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
                   </tr>
@@ -1120,6 +1130,7 @@ const RequestCategories = () => {
                     >
                       <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.name ?? "—"}</td>
                       <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.code ?? "—"}</td>
+                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.tracking_enabled ? "Enabled" : "Disabled"}</td>
                       <td style={{ padding: "12px" }}>
                         <span
                           style={{

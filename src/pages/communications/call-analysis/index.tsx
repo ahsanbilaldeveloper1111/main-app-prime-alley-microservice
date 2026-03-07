@@ -942,12 +942,11 @@ const AnalyzeRecordings = () => {
                     handleFiltersChange(appliedFilters);
                 }}
                 onReset={() => {
-                    // Preserve current date filters, clear all other filters
-                    // Only include date filters to avoid counting empty filters
                     const resetFilters: Record<string, any> = {
-                        start_datetime: (appliedFilters as any)?.start_datetime || moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
-                        end_datetime: (appliedFilters as any)?.end_datetime || moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
+                        start_datetime: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
+                        end_datetime: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
                     };
+                    setSearchValue('');
                     setAppliedFilters(resetFilters);
                     handleFiltersChange(resetFilters);
                 }}

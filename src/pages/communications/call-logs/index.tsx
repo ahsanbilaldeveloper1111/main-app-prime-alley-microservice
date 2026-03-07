@@ -619,13 +619,16 @@ const CallLogs = () => {
                     setRefreshKey((prev) => prev + 1);
                 }}
                 onReset={() => {
+                    const freshDefaults = getDefaultFilters();
                     const resetPending: Record<string, any> = {
-                        start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                        end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
+                        ...pendingFilters,
+                        start_datetime: freshDefaults.pending.start_datetime,
+                        end_datetime: freshDefaults.pending.end_datetime,
                     };
                     const resetCurrent: Record<string, any> = {
-                        start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                        end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
+                        ...currentFilters,
+                        start_datetime: freshDefaults.current.start_datetime,
+                        end_datetime: freshDefaults.current.end_datetime,
                     };
                     setPendingFilters(resetPending);
                     setCurrentFilters(resetCurrent);
