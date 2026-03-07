@@ -81,11 +81,11 @@ const historicalData = [
 
 // ── Feature table rows ─────────────────────────────────────────────────────────
 const features = [
-  { name: "Closing Agent", tags: [{ label: "BETA", color: "#fff", bg: "#7c3aed" }], credits: "--", status: "not" },
-  { name: "Customer Agent", tags: [{ label: "START FREE ACCESS", color: "#fff", bg: "#00897b" }], credits: "0", status: "consuming" },
-  { name: "Data Agent", tags: [{ label: "BETA", color: "#fff", bg: "#7c3aed" }], credits: "0", status: "consuming" },
+  { name: "Call Transcription", tags: [{ label: "BETA", color: "#fff", bg: "#7c3aed" }], credits: "--", status: "not" },
+  { name: "AI Analysis", tags: [{ label: "START FREE ACCESS", color: "#fff", bg: "#00897b" }], credits: "0", status: "consuming" },
+  { name: "Data Enrichment", tags: [{ label: "BETA", color: "#fff", bg: "#7c3aed" }], credits: "0", status: "consuming" },
   { name: "Intent", tags: [], credits: "10", status: "consuming" },
-  { name: "Workflows Breeze Actions", tags: [], credits: "0", status: "consuming" },
+  { name: "Workflows Actions", tags: [], credits: "0", status: "consuming" },
 ];
 
 // ── Custom tooltip ─────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ const CustomBarTooltip = ({ active, payload }: any) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function UsageLimitsPage() {
-  const [activeSection, setActiveSection] = useState("Prime Alley Credits");
+  const [activeSection, setActiveSection] = useState("Credits");
   const [showUnbilled, setShowUnbilled] = useState(true);
   const [featureFilter, setFeatureFilter] = useState("All features");
   const [searchQuery, setSearchQuery] = useState("");
@@ -129,7 +129,7 @@ export default function UsageLimitsPage() {
 
           {/* ── Your Prime Alley Credits ── */}
           <div style={s.card}>
-            <h1 style={s.h1}>Your Prime Alley Credits</h1>
+            <h1 style={s.h1}>Your Credits</h1>
             <div style={{ display: "flex", gap: 40, alignItems: "flex-start" }}>
               {/* Left */}
               <div style={{ minWidth: 180 }}>
@@ -144,11 +144,11 @@ export default function UsageLimitsPage() {
               {/* Right */}
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 13, color: "#141414", margin: "0 0 8px 0", lineHeight: "20px" }}>
-                  Prime Alley Credits are a simple, flexible way to pay for what you use. Credits works across all usage-based features.
+                   Credits are a simple, flexible way to pay for what you use. Credits works across all usage-based features.
                 </p>
                 <a style={s.link}><span>Learn more</span><ExternalLink size={11} /></a>
                 <p style={{ fontSize: 13, color: "#141414", margin: "10px 0 6px 0" }}>
-                  Prime Alley Credits are managed by users with billing permissions or super admin access.
+                  Credits are managed by users with billing permissions or super admin access.
                 </p>
                 <a style={s.link}><span>Manage user permissions</span><ExternalLink size={11} /></a>
               </div>

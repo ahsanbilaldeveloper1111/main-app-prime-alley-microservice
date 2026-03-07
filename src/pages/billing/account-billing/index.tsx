@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, ReactElement } from "react";
 import {
   BarChart3,
   CreditCard,
@@ -10,9 +10,14 @@ import {
   Settings,
   UserPlus,
 } from "lucide-react";
+import Layout from "@layout/index";
 import SubscriptionsPage from "@components/SubscriptionPage";
 import UsageLimitsPage from "@components/UsageLimitsPage";
 import BillingHistoryPage from "@components/BillingHistoryPage";
+import TransactionsPage from "@components/TransactionPage";
+import DocumentsPage from "@components/DocumentPage";
+import PaymentMethodsPage from "@components/PaymentMethodsPage";
+import CompanyInfoPage from "@components/CompanyInfoPage";
 const styles: Record<string, React.CSSProperties> = {
   body: {
     fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
@@ -52,6 +57,8 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     cursor: "pointer",
     border: "none",
+    borderBottom: "2px solid transparent",
+    outline: "none",
     background: "none",
     fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
     transition: "color 150ms ease-out",
@@ -219,21 +226,21 @@ const commonActions = [
 ];
 
 const starterIncludes = [
-  "Marketing Hub Starter (Includes 1,000 Marketing Contacts)",
-  "Sales Hub Starter",
-  "Service Hub Starter",
-  "Content Hub Starter",
-  "Data Hub Starter",
+  "Smart CRM ",
+  "Call Logs & Recordings",
+  "Planner",
+  "Pulse",
+  "Workforce",
   "1 Core Seat",
 ];
 
 const billingHelpLinks = [
-  ["How do I cancel my Prime Alley subscription?", "Understand marketing contacts billing"],
+  ["How do I cancel this subscription?", "Understand marketing contacts billing"],
   ["Billing and payment FAQs", "How do I update my payment method?"],
   ["Where do I find my subscription and service limits?", "View or download your invoices and receipts"],
 ];
 
-export default function AccountBilling() {
+const AccountBilling = () => {
   const [activeTab, setActiveTab] = useState("Overview");
 
   return (
@@ -246,9 +253,11 @@ export default function AccountBilling() {
             {tabs.map((tab) => (
               <button
                 key={tab}
+                type="button"
                 style={{
                   ...styles.tab,
-                  ...(activeTab === tab ? styles.activeTab : {}),
+                  borderBottom: activeTab === tab ? "2px solid #141414" : "2px solid transparent",
+                  fontWeight: activeTab === tab ? 700 : 500,
                 }}
                 onClick={() => setActiveTab(tab)}
               >
@@ -268,6 +277,14 @@ export default function AccountBilling() {
           <UsageLimitsPage />
         ) : activeTab === "Billing History" ? (
           <BillingHistoryPage />
+        ) : activeTab === "Transactions" ? (
+          <TransactionsPage />
+        ) : activeTab === "Documents" ? (
+          <DocumentsPage />
+        ) : activeTab === "Payment Methods" ? (
+          <PaymentMethodsPage />
+        ) : activeTab === "Company Info" ? (
+          <CompanyInfoPage />
         ) : (
           <>
         {/* Company Info Card */}
@@ -291,16 +308,16 @@ export default function AccountBilling() {
               <h2 style={styles.companyHeading}>Prime Alley Technology</h2>
               <div style={{ margin: 0, display: "flex", flexDirection: "row" as const, justifyContent: "space-between", marginTop: 16, gap: 24 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={styles.label}>Hub ID</div>
+                  <div style={styles.label}>Tenant ID</div>
                   <div style={styles.value}>147764492</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={styles.label}>Billing Frequency</div>
-                  <div style={styles.value}>Annually</div>
+                  <div style={styles.value}>Monthly</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={styles.label}>Subscription Term</div>
-                  <div style={styles.value}>11 Feb 2026 to 10 Feb 2027</div>
+                  <div style={styles.value}>1st Mar 2026 to 31st Mar 2026</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={styles.label}>Primary Contact</div>
@@ -332,7 +349,7 @@ export default function AccountBilling() {
             <div style={styles.cardPadding}>
               <h2 style={styles.sectionHeading}>Your Next Payment</h2>
               <p style={{ margin: "0 0 16px 0", fontSize: 18, color: "#141414" }}>
-                A total of <strong>£162.00*</strong> will be charged on <strong>11 Feb 2027</strong>.
+                A total of <strong>AED 3,162.00*</strong> will be charged on <strong>1st April 2026</strong>.
               </p>
               <p style={{ margin: "0 0 16px 0", fontSize: 12, color: "#666", lineHeight: "18px" }}>
                 *Includes estimated sales tax or VAT, based on your main company address. Excludes any recent credits to your account. Your recurring fees may increase based on your usage.
@@ -340,7 +357,7 @@ export default function AccountBilling() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 <div>
                   <div style={{ ...styles.label, marginBottom: 4 }}>Billing period</div>
-                  <div style={{ fontSize: 14, color: "#141414" }}>11 Feb 2027 – 10 Feb 2028</div>
+                  <div style={{ fontSize: 14, color: "#141414" }}>1st April 2026 – 30th April 2026</div>
                 </div>
                 <div>
                   <div style={{ ...styles.label, marginBottom: 4 }}>Payment method</div>
@@ -358,7 +375,7 @@ export default function AccountBilling() {
               </div>
               <div style={{ marginBottom: 16 }}>
                 <div style={{ ...styles.label, marginBottom: 4 }}><strong style={{ color: "#141414", fontSize: 14 }}>Products &amp; Add-ons</strong></div>
-                <div style={{ fontSize: 14 }}>Starter Customer Platform</div>
+                <div style={{ fontSize: 14 }}>Pro Plan</div>
               </div>
               <div>
                 <div style={{ ...styles.value, marginBottom: 4 }}>Need help?</div>
@@ -395,7 +412,7 @@ export default function AccountBilling() {
           <div style={{ ...styles.card, marginBlockEnd: 0 }}>
             <div style={styles.cardPadding}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h2 style={{ ...styles.sectionHeading, margin: 0 }}>Prime Alley Credits</h2>
+                <h2 style={{ ...styles.sectionHeading, margin: 0 }}>My Credits</h2>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button style={styles.btnDark}>Add credits</button>
                   <button style={styles.btnLight}>Manage usage</button>
@@ -416,8 +433,8 @@ export default function AccountBilling() {
                 Usage will be paused if you reach your credit limit
               </div>
               <p style={{ fontSize: 13, margin: 0 }}>
-                Explore features that use Prime Alley Credits in{" "}
-                <a style={styles.link}>Breeze Agents Marketplace</a>
+                Explore features that use Credits in{" "}
+                <a style={styles.link}> Agents Marketplace</a>
               </p>
             </div>
           </div>
@@ -466,7 +483,7 @@ export default function AccountBilling() {
                 alignItems: "center",
                 gap: 6,
               }}>
-                <span>CORE SEATS (STARTER)</span>
+                <span>CORE SEATS (PRO)</span>
                 <Info size={14} strokeWidth={2} />
               </div>
               <div style={{ fontSize: 28, fontWeight: 300, lineHeight: 1 }}>1/2,501</div>
@@ -493,7 +510,7 @@ export default function AccountBilling() {
             {/* Starter Customer Platform */}
             <div style={{ borderBottom: "1px solid #e5e5e5", paddingBottom: 24, marginBottom: 24 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <h3 style={styles.subHeading}>Starter Customer Platform</h3>
+                <h3 style={styles.subHeading}>Pro Plan</h3>
                 <button style={styles.btnLight}>View pricing</button>
               </div>
               <div style={{ marginTop: 12, paddingLeft: 8 }}>
@@ -512,7 +529,7 @@ export default function AccountBilling() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <h3 style={styles.subHeading}>Commerce Professional Bundle Trial</h3>
+                    <h3 style={styles.subHeading}>Virtual Agents Trial</h3>
                     <span style={{
                       background: "#ff5c35", color: "#fff", fontSize: 11, fontWeight: 600,
                       padding: "3px 8px", borderRadius: 12, whiteSpace: "nowrap" as const,
@@ -524,7 +541,7 @@ export default function AccountBilling() {
                   <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
                     Data hosting location:{" "}
                     <a style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <span>European Union</span>
+                      <span>Gulf Region</span>
                       <ExternalLink size={13} strokeWidth={2} />
                     </a>
                   </p>
@@ -535,8 +552,8 @@ export default function AccountBilling() {
 
             {/* Total Prime Alley Credits */}
             <div>
-              <h3 style={styles.subHeading}>Total Prime Alley Credits</h3>
-              <p style={{ fontSize: 14, color: "#141414", margin: "6px 0 0 0" }}>500 Included Prime Alley Credits</p>
+              <h3 style={styles.subHeading}>Total Credits</h3>
+              <p style={{ fontSize: 14, color: "#141414", margin: "6px 0 0 0" }}>500 Included Credits</p>
             </div>
           </div>
         </div>
@@ -592,3 +609,7 @@ export default function AccountBilling() {
     </div>
   );
 }
+AccountBilling.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+export default AccountBilling;
