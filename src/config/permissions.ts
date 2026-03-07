@@ -250,6 +250,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
             { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
+            { path: '/account-overview-new',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
             { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
             { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
@@ -278,6 +279,8 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
     //virtual agents services end
+
+    
 
     //netops services start
     {
@@ -610,12 +613,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
 
-    
-
-    
-    
-
-
 
     //gsm services start
     {
@@ -656,12 +653,6 @@ export const routePermissions: RoutePermission[] = [
         ]
     },
     
-
-    
-
-    
-    
-
     //tms services start
     {
         path: '/tms',
@@ -747,6 +738,30 @@ export const routePermissions: RoutePermission[] = [
 
         ]
     },
+
+    // voicebot inbound (platform) – companies, bots, calls
+    {
+        path: '/voicebot/inbound',
+        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        children: [
+            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/calls', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+        ]
+    },
+
+    {
+        path: '/voicebot/outbound',
+        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        children: [
+            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+        ]
+    },
+    //voicebot services end
 
     
 ];

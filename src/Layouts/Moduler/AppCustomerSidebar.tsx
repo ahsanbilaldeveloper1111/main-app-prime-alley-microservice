@@ -61,7 +61,8 @@ import {
   Map,
   ChevronRight,
   ChevronLeft,
-  House
+  House,
+  Building2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -183,6 +184,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'unified-reports',
     'audit-logs',
     // 'settings',
+    //'voicebot-platform'
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -488,6 +490,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     },
     //virtual agent end
 
+   
 
     //netops services start
     {
@@ -755,6 +758,79 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }, 
     //finance services end
 
+    // voicebot inbound (platform) start
+    {
+      id: 'voicebot-platform',
+      key: 'voicebot-platform',
+      permission: PERMISSIONS.ACCOUNTS_SERVICES,
+      icon: <PhoneCall size={16} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: 'Voicebot Platform',
+      label: 'Voicebot Platform',
+      url: '',
+      subItems: [
+       
+        {
+          id: 'voicebot-inbound-overview',
+          title: 'Inbound Overview',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound'
+        },
+        {
+          id: 'voicebot-inbound-companies',
+          title: 'Inbound Companies',
+          icon: <Building2 size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/companies'
+        },
+        {
+          id: 'voicebot-inbound-bots',
+          title: 'Inbound Bots',
+          icon: <Bot size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/bots'
+        },
+        {
+          id: 'voicebot-inbound-calls',
+          title: 'Inbound Calls',
+          icon: <Phone size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/calls'
+        },
+
+        {
+          id: 'voicebot-inbound-separator',
+          title: '---',
+          icon: null,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: ''
+        },
+        {
+          id: 'voicebot-outbound-overview',
+          title: 'Outbound Overview',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound'
+        },
+        {
+          id: 'voicebot-outbound-trunks',
+          title: 'Outbound Trunks',
+          icon: <Phone size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/trunks'
+        },
+        {
+          id: 'voicebot-outbound-voicebots',
+          title: 'Outbound Voice Bots',
+          icon: <Bot size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/voicebots'
+        },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+    // voicebot inbound end
+
     //reports and audit services start
     {
       id: 'unified-reports',
@@ -816,6 +892,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '/main-settings',
     },
     //settings services end
+
+
+     
 
   ].filter(item => ENABLED_MODULE_IDS.includes(item.id) && (!item.permission || hasPermission(item.permission)));
 
@@ -996,7 +1075,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       border: none;
       display: flex;
       flex-direction: column;
-      z-index: 1000;
+      z-index: 99;
       transition: width 0.3s ease-in-out;
       /* box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1); */
     }

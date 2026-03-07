@@ -1085,7 +1085,7 @@ const LiveCallDashboard = () => {
 
   return (
     <div className="live-calls-wrapper">
-      {isReconnecting && (
+      {/* {isReconnecting && (
         <div
           className="alert alert-warning mb-0 rounded-0 d-flex align-items-center justify-content-center gap-2"
           style={{ fontSize: '0.875rem' }}
@@ -1095,7 +1095,7 @@ const LiveCallDashboard = () => {
           <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
           Reconnecting to server...
         </div>
-      )}
+      )} */}
       <style dangerouslySetInnerHTML={{ __html: CUSTOM_STYLES }} />
       <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader && !isReconnecting} />
 

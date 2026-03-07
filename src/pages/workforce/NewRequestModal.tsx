@@ -295,25 +295,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               <Form.Text className="text-muted">Optional, must be on or after start date</Form.Text>
             </Form.Group>
           </div>
-          <Form.Group className="mb-3">
-            <Form.Label>Attachments</Form.Label>
-            <Form.Control
-              type="file"
-              multiple
-              onChange={(e) => {
-                const files = (e.target as HTMLInputElement).files;
-                setForm((f) => ({
-                  ...f,
-                  attachments: files ? Array.from(files) : [],
-                }));
-              }}
-            />
-            {form.attachments.length > 0 && (
-              <Form.Text className="d-block mt-1 text-muted">
-                {form.attachments.length} file(s) selected: {form.attachments.map((f) => f.name).join(", ")}
-              </Form.Text>
-            )}
-          </Form.Group>
+         
           {displayFieldsCategoryId != null &&
             (isLoadingDisplayFields || displayFields.length > 0) && (
             <Form.Group className="mb-3">

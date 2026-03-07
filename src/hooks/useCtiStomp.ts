@@ -1373,7 +1373,7 @@ export default function useCtiStomp(
         isReconnectingRef.current = false;
         setIsReconnecting(false);
         reconnectionAttemptsRef.current = 0;
-        setError(`Failed to reconnect after ${maxAttempts} attempts. Please refresh the page.`);
+       // setError(`Failed to reconnect after ${maxAttempts} attempts. Please refresh the page.`);
         return;
       }
 
@@ -1625,7 +1625,8 @@ export default function useCtiStomp(
           if (freshToken) {
             await connectViaSSE(freshToken.token, freshToken.userAddress, true);
           } else {
-            setError("Failed to get fresh token for reconnection");
+            console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
+            //setError("Failed to get fresh token for reconnection");
           }
         }, 9000000); // 2.5hour
       };
@@ -1672,7 +1673,8 @@ export default function useCtiStomp(
                   }
                 }
               } catch (err) {
-                setError("Failed to process initial state");
+                console.error(`[${currentInstanceId}] ❌ Failed to process initial state`);
+                //setError("Failed to process initial state");
               }
               break;
 
@@ -1693,7 +1695,8 @@ export default function useCtiStomp(
                   return updated;
                 });
               } catch (err) {
-                setError("Failed to process update");
+                console.error(`[${currentInstanceId}] ❌ Failed to process update`);
+                //setError("Failed to process update");
               }
               break;
 
@@ -1706,7 +1709,8 @@ export default function useCtiStomp(
                   scheduleRefreshAfterCallEndRef.current?.();
                 }
               } catch (err) {
-                setError("Failed to process call event");
+                console.error(`[${currentInstanceId}] ❌ Failed to process call event`);
+                //setError("Failed to process call event");
               }
               break;
 
@@ -2781,7 +2785,8 @@ export default function useCtiStomp(
           console.error(`[${currentInstanceId}] Error getting token:`, error);
           isConnectingRef.current = false;
           isGettingTokenRef.current = false; // Reset token flag
-          setError("Failed to get token");
+          console.error(`[${currentInstanceId}] ❌ Failed to get token`);
+          //setError("Failed to get token");
         });
     }
     // Re-run when auth state changes so we connect only when authenticated

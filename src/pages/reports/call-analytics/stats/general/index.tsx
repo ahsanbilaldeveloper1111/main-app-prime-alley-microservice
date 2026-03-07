@@ -375,19 +375,13 @@ const CallStatsDepartment = () => {
                 // fetchCallLogs will be triggered by refreshKey change
               }}
               onReset={() => {
-                // Preserve current date filters, clear all other filters
-                const resetPendingFilters: Record<string, any> = {
-                  start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime
-                };
-                const resetCurrentFilters: Record<string, any> = {
-                  start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime
-                };
-                setPendingFilters(resetPendingFilters);
-                setCurrentFilters(resetCurrentFilters);
-                currentFiltersRef.current = resetCurrentFilters;
-                handleFiltersChange(resetPendingFilters);
+                const freshDefaults = getDefaultFilters();
+                const resetPending = { ...freshDefaults.pending };
+                const resetCurrent = { ...freshDefaults.current };
+                setPendingFilters(resetPending);
+                setCurrentFilters(resetCurrent);
+                currentFiltersRef.current = resetCurrent;
+                handleFiltersChange(resetPending);
               }}
               filterContent={
                 <>
