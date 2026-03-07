@@ -184,7 +184,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'unified-reports',
     'audit-logs',
     // 'settings',
-    'voicebot-platform'
+    //'voicebot-platform'
   ];
 
   const mainMenuItems: MainMenuItem[] = [
