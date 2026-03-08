@@ -1,6 +1,6 @@
-import { useState } from "react";
+import React, { ReactElement, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
-
+import Layout from "@layout/index";
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
@@ -12,13 +12,29 @@ const s: Record<string, React.CSSProperties> = {
     minHeight: "100vh",
     padding: "0 0 40px 0",
   },
+  container: {
+    width: "100%",
+    maxWidth: "1376px",
+    margin: "0 auto",
+    padding: "0 24px",
+    boxSizing: "border-box" as const,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: 300,
+    fontFamily: font,
+    color: "rgb(20, 20, 20)",
+    margin: "0 0 20px 0",
+    lineHeight: "29px",
+    paddingTop: 24,
+  },
   topBar: {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    padding: "16px 24px",
-    backgroundColor: "#f5f5f5",
-    // flexWrap: "wrap" as const,
+    paddingTop: 16,
+    paddingBottom: 16,
+    flexWrap: "wrap" as const,
   },
   searchWrapper: {
     position: "relative" as const,
@@ -65,8 +81,6 @@ const s: Record<string, React.CSSProperties> = {
     borderStyle: "solid",
     borderColor: "#ccc",
     verticalAlign: "middle",
-    // paddingBlock: 10,
-    // paddingInline: 12,
     fontFamily: font,
     fontSize: 14,
     fontWeight: 600,
@@ -76,11 +90,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 6,
     height: 40,
-  },
-  content: {
-    padding: "8px 24px",
-    maxWidth: "calc(1376px)",
-    margin: "0 auto",
+    paddingInline: 12,
   },
   dateLabel: {
     fontSize: 14,
@@ -217,7 +227,6 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
       <button
         style={{
           ...s.filterBtn,
-        //   backgroundColor: selected.length > 0 ? "transparent" : "transparent",
           borderColor: selected.length > 0 ? "transparent" : "transparent",
           color: selected.length > 0 ? "rgb(0,97,98)" : "#141414",
         }}
@@ -414,7 +423,7 @@ function OrderCard({ id, product, amount }: {
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
-export default function BillingHistoryPage() {
+const PaymentsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filters = [
@@ -429,28 +438,30 @@ export default function BillingHistoryPage() {
 
   return (
     <div style={s.page}>
-      {/* Top bar: search + filters */}
-      <div style={s.topBar}>
-        {/* Search */}
-        <div style={s.searchWrapper}>
-          <Search size={16} color="#888" style={s.searchIcon} />
-          <input
-            style={s.searchInput}
-            type="text"
-            placeholder="Search Billing History"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+      <div style={s.container}>
+
+        {/* Page heading */}
+        <h1 style={s.heading}>Payment History</h1>
+
+        {/* Top bar: search + filters */}
+        <div style={s.topBar}>
+          <div style={s.searchWrapper}>
+            <Search size={16} color="#888" style={s.searchIcon} />
+            <input
+              style={s.searchInput}
+              type="text"
+              placeholder="Search Billing History"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {filters.map(f => (
+            <FilterDropdown key={f.label} label={f.label} options={f.options} />
+          ))}
         </div>
 
-        {/* Filter dropdowns */}
-        {filters.map(f => (
-          <FilterDropdown key={f.label} label={f.label} options={f.options} />
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={s.content}>
+        {/* Cards */}
         <div style={s.dateLabel}>11 Feb 2026</div>
 
         <InvoiceCard
@@ -474,7 +485,14 @@ export default function BillingHistoryPage() {
           product="Starter Customer Platform"
           amount="AED 97.20"
         />
+
       </div>
     </div>
   );
-}
+};
+
+PaymentsPage.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default PaymentsPage;

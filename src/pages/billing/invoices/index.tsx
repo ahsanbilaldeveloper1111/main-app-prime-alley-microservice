@@ -26,6 +26,7 @@ import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSide
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useRouter } from "next/router";
 import {
   getInvoices,
   getInvoice,
@@ -787,7 +788,7 @@ const DirectCardPaymentForm: React.FC<{
 
 const InvoiceList = () => {
   const { data: session, status } = useSession();
-
+  const router = useRouter();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
@@ -2522,6 +2523,7 @@ const InvoiceList = () => {
       <button
         onClick={() => {
           // window.location.href = "/billing/create-invoice";
+          router.push('/billing/create-invoice');
         }}
         style={{
           padding: "9px 13px",
