@@ -37,6 +37,7 @@ import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
+import InvoiceCreationPage from "@pages/billing/create-invoice";
 import {
   FiUpload,
   FiDatabase,
@@ -3924,7 +3925,8 @@ const CrmQuotesManagement = () => {
         <button
           onClick={() => {
             //setShowAddContactsDropdown(!showAddContactsDropdown);
-            setShowCreateQuoteSidebar(true);
+            // setShowCreateQuoteSidebar(true);
+            router.push('/billing/create-invoice');
           }}
           style={{
             padding: "9px 13px",

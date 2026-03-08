@@ -868,7 +868,7 @@ const Layout = ({ children }: LayoutProps) => {
         
         .crm-prime-user-name {
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 100;
           color: rgba(255, 255, 255, 0.95);
           line-height: 1.2;
         }
@@ -1379,7 +1379,7 @@ font-weight:600;
                 onClick={() => setShowBreezeAssistant(!showBreezeAssistant)}
               >
                 <Sparkles size={18} />
-                <span style={{ fontSize: '13px', fontWeight: 500 }}>AI Assistant</span>
+                <span style={{ fontSize: '13px', fontWeight: 100 }}>AI Assistant</span>
                   </button>
               )}
 

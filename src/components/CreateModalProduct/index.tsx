@@ -145,7 +145,7 @@ export default function CreateProductModal({ onClose, onCreate, onCreateAndAddAn
     <div style={{
       position: "fixed",
       inset: 0,
-      zIndex: 1000,
+      zIndex: 99999,
       backgroundColor: "#f0f0f0",
       display: "flex",
       flexDirection: "column",
