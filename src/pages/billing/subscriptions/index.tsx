@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from "react";
 import Layout from "@layout/index";
+import { useRouter } from "next/router";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from "react";
@@ -23,12 +24,12 @@ import { getMinifiedCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
-import { Filter, Package, FileText, Calendar } from "lucide-react";
+import { Package, FileText, Calendar, Plus } from "lucide-react";
 
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
-import GenericSidebar from "@components/GenericSidebar";
-import { ModuleSlug } from "@utils/Helper";
+import GenericSidebar from "@components/GenericSidebarNew";
+import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 
 interface Product {
   id: number;
@@ -43,7 +44,7 @@ interface Product {
 
 const ProductDetails = () => {
   const { data: session } = useSession();
-
+  const router = useRouter();
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
@@ -64,13 +65,22 @@ const ProductDetails = () => {
   }, []);
     
 
+  const [subscriptionSearch, setSubscriptionSearch] = useState("");
+  const [totalAllSubscriptions, setTotalAllSubscriptions] = useState(0);
+
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
     status?: string;
     billing_cycle?: string;
+    renewal_end_date_from?: string;
+    renewal_end_date_to?: string;
   }>({});
+
+  const handleFiltersChange = useCallback((filters: any) => {
+    setCurrentFilters(filters);
+  }, []);
 
   const [dataList, setDataList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,6 +90,12 @@ const ProductDetails = () => {
     rowsPerPage: 15,
     totalRows: 0,
   });
+
+  // Sync search bar value → currentFilters so fetch re-runs
+  useEffect(() => {
+    setCurrentFilters((prev) => ({ ...prev, search: subscriptionSearch || undefined }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [subscriptionSearch]);
 
   const requestIdRef = useRef(0);
 
@@ -111,6 +127,7 @@ const ProductDetails = () => {
       const total = response?.meta?.total ?? response?.recordsTotal ?? response?.recordsFiltered ?? 0;
       setDataList(list);
       setTotalRecords(total);
+      setTotalAllSubscriptions(total);
       setPagination((prev) => ({ ...prev, totalRows: total }));
     } catch (error) {
       if (currentRequestId !== requestIdRef.current) return;
@@ -251,7 +268,171 @@ const ProductDetails = () => {
     setSelectedProductView(null);
   }, []);
 
-  
+  // Preview button on row hover – opens the same sidebar
+  const handlePreviewClick = useCallback((row: any) => {
+    handleViewProduct(row);
+  }, [handleViewProduct]);
+
+  // Filter pills: Status + Next Billing Date
+  const subscriptionFilterPills = useMemo<FilterPill[]>(() => [
+    {
+      id: "status",
+      label: "Status",
+      showDropdown: true,
+      active: !!currentFilters.status,
+      activeLabel: currentFilters.status ?? undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => { const { status, ...rest } = prev; return rest; });
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+        setRefreshKey((k) => k + 1);
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 200 }}>
+          {["Active", "Trial", "Inactive", "Suspended"].map((s) => (
+            <div
+              key={s}
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                background: currentFilters.status === s ? "#f0f0f0" : "transparent",
+                borderRadius: "4px",
+              }}
+              onClick={() => {
+                setCurrentFilters((prev) => ({ ...prev, status: s }));
+                setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                setRefreshKey((k) => k + 1);
+              }}
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "renewal_end_date",
+      label: "Next Billing Date",
+      showDropdown: true,
+      active: !!currentFilters.renewal_end_date_from,
+      activeLabel: currentFilters.renewal_end_date_from
+        ? moment(currentFilters.renewal_end_date_from).format("MMM D, YYYY")
+        : undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => {
+          const { renewal_end_date_from, renewal_end_date_to, ...rest } = prev;
+          return rest;
+        });
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+        setRefreshKey((k) => k + 1);
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 220, padding: "4px 0" }}>
+          <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>From</div>
+          <input
+            type="date"
+            value={currentFilters.renewal_end_date_from ?? ""}
+            style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4, marginBottom: 8 }}
+            onChange={(e) => {
+              setCurrentFilters((prev) => ({ ...prev, renewal_end_date_from: e.target.value || undefined }));
+              setPagination((prev) => ({ ...prev, currentPage: 1 }));
+              setRefreshKey((k) => k + 1);
+            }}
+          />
+          <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>To</div>
+          <input
+            type="date"
+            value={currentFilters.renewal_end_date_to ?? ""}
+            style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4 }}
+            onChange={(e) => {
+              setCurrentFilters((prev) => ({ ...prev, renewal_end_date_to: e.target.value || undefined }));
+              setPagination((prev) => ({ ...prev, currentPage: 1 }));
+              setRefreshKey((k) => k + 1);
+            }}
+          />
+        </div>
+      ),
+    },
+  ], [currentFilters]);
+
+  // Add Subscription button
+  const renderAddSubscriptionButton = () => (
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "18px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      <button
+        type="button"
+        style={{
+          padding: "9px 13px",
+          backgroundColor: "#000000",
+          color: "#ffffff",
+          border: "none",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontWeight: "500",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#1a1a1a"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#000000"; }}
+        onClick={() => {
+          // Navigate to add subscription page or open a modal
+          // window.location.href = "/billing/create-invoice";
+          router.push('/billing/create-invoice');
+        }}
+      >
+        <Plus size={16} />
+        Add Subscription
+      </button>
+    </div>
+  );
+
+  // Toolbar config following the same pattern as customer-invoices
+  const subscriptionsToolbarConfig = useCrmToolbarConfig({
+    entity: "invoices" as any,
+    searchValue: subscriptionSearch,
+    searchPlaceholder: "Search subscriptions...",
+    onSearchChange: setSubscriptionSearch,
+    onSearch: () => {
+      setCurrentFilters((prev) => ({ ...prev, search: subscriptionSearch || undefined }));
+      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      setRefreshKey((prev) => prev + 1);
+    },
+    currentFilters,
+    handleFiltersChange,
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    activeTab: "all",
+    onTabChange: () => {},
+    tabs: [
+      {
+        id: "all",
+        label: "All Subscriptions",
+        count: totalAllSubscriptions,
+        removable: false,
+      },
+    ],
+    onTabAdd: () => {},
+    onTabRemove: () => {},
+    tabsDropdownLabel: "Subscriptions",
+    onFiltersClick: handleOpenFiltersSidebar,
+    onExportClick: () => {},
+    onEditColumnsClick: () => {},
+    showImport: false,
+    onImportClick: () => {},
+    currentTableView: "table",
+    onTableViewChange: () => {},
+    extensions: [],
+    onPaginationReset: () => setPagination((prev) => ({ ...prev, currentPage: 1 })),
+    rightActions: renderAddSubscriptionButton(),
+  });
 
   const filterFields: FilterField[] = useMemo(
     () => [
@@ -302,66 +483,32 @@ const ProductDetails = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
+      <BreadcrumbItem mainTitle="Billing" mainLink="/billing/dashboard" subTitle="Subscriptions" />
 
-      {/* <PageHeader
-        title="Subscriptions"
-        description="Manage your recurring services & renewals."
-        showSearch={false}
-        buttons={
-          <>
-            <Button
-              variant="outline-secondary"
-              onClick={handleOpenFiltersSidebar}
+      {/* Main flex container for content and sidebar — same pattern as prospects.tsx */}
+      <div style={{ display: "flex", gap: "0", height: "calc(100vh)", overflow: "hidden" }}>
+        {/* Main content area */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+
+          {/* Company selector above the table */}
+          <div className="mb-3 d-flex align-items-center gap-2">
+            <Form.Select
+              size="sm"
+              style={{ width: "220px" }}
+              value={String(selectedCompanyId)}
+              onChange={(e) =>
+                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+              }
             >
-              <Filter size={16} className="me-2" />
-              Filters
-            </Button>
-          </>
-        }
-      /> */}
+              <option value="">All companies</option>
+              {companyOptions.map((c: { id: string | number; name?: string }) => (
+                <option key={c.id} value={c.id}>
+                  {c.name ?? c.id}
+                </option>
+              ))}
+            </Form.Select>
+          </div>
 
-<div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-          <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0">
-              <li className="breadcrumb-item">
-                <a href="/dashboard" className="text-decoration-none">
-                  Accounting
-                </a>
-              </li>
-              <li className="breadcrumb-item active fw-bold" aria-current="page">
-                Subscriptions
-              </li>
-            </ol>
-          </nav>
-        </div>
-
-        <div className="d-flex flex-wrap gap-2 align-items-center">
-          <Form.Select
-            size="sm"
-            style={{ width: "220px" }}
-            value={String(selectedCompanyId)}
-            onChange={(e) =>
-              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-            }
-          >
-            <option value="">All companies</option>
-            {companyOptions.map((c: { id: string | number; name?: string }) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.id}
-              </option>
-            ))}
-          </Form.Select>
-          <Button
-            variant="outline-secondary"
-            onClick={handleOpenFiltersSidebar}
-          >
-            <Filter size={16} className="me-2" />
-            Filters
-          </Button>
-        </div>
-      </div>
       <GenericTable
         data={dataList}
         columns={tableColumns}
@@ -385,8 +532,19 @@ const ProductDetails = () => {
         hover={true}
         uniqueKey="id"
         onRowClick={(row) => handleViewProduct(row)}
+        onPreviewClick={(row) => handlePreviewClick(row)}
         customizableColumns={true}
         columnStorageKey="customer-product-details-columns"
+        fixedHeight={true}
+        maxHeight="calc(100vh - 345px)"
+        showToolbar={true}
+        toolbar={{
+          ...subscriptionsToolbarConfig,
+          showFilterPills: true,
+          filterPills: subscriptionFilterPills,
+          showMoreFiltersButton: true,
+          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+        }}
       />
 
       <GenericFilterSidebar
@@ -403,23 +561,22 @@ const ProductDetails = () => {
         }}
         onReset={() => {
           setCurrentFilters({});
+          setSubscriptionSearch("");
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((k) => k + 1);
         }}
       />
+        </div>{/* End main content area */}
 
-      <GenericSidebar
+        {/* Subscription Detail Sidebar — sibling of main content, same pattern as prospects.tsx */}
+        {showProductSidebar && (
+        <div style={{ borderLeft: "1px solid #e2e8f0" }}>
+        <GenericSidebar
         isOpen={showProductSidebar}
         onClose={handleCloseProductSidebar}
-        moduleSlug={ModuleSlug.BILLING}
         title={selectedProductView?.product?.name ?? "Subscription Details"}
         subtitle={
           selectedProductView?.product?.is_active ? "Active" : "Suspended"
-        }
-        metadata={
-          selectedProductView?.product?.id
-            ? `Product ID: #${selectedProductView.product.id}`
-            : undefined
         }
         avatar={{
           initials: getInitials(
@@ -430,12 +587,13 @@ const ProductDetails = () => {
             selectedProductView?.product?.name ?? ""
           ),
         }}
-        width="400px"
         sections={[
           {
             id: "subscription-info",
             title: "Subscription Information",
             icon: Package,
+            collapsible: true,
+            defaultExpanded: true,
             fields: [
               {
                 label: "Subscription Name",
@@ -488,6 +646,8 @@ const ProductDetails = () => {
             id: "product-details",
             title: "Product Details",
             icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
             fields: [
               {
                 label: "Category",
@@ -509,6 +669,9 @@ const ProductDetails = () => {
           },
         ]}
       />
+        </div>
+        )}
+      </div>
     </React.Fragment>
   );
 };

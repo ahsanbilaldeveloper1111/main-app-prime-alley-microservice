@@ -256,6 +256,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
             { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
             { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
+            { path: '/create-invoice', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            { path: '/payments', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
            
         ]
         

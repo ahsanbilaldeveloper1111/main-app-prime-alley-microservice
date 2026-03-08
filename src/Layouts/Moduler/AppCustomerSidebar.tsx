@@ -691,48 +691,77 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: 'Billing',
       url: '',
       subItems: [
-        { 
-          id: 'finance-dashboard', 
-          title: 'Dashboard', 
-          icon: <LayoutDashboard size={16} />, 
-          url: '/billing/dashboard', 
-          permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
-        },
+        // { 
+        //   id: 'finance-dashboard', 
+        //   title: 'Dashboard', 
+        //   icon: <LayoutDashboard size={16} />, 
+        //   url: '/billing/dashboard', 
+        //   permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
+        // },
+        // { 
+        //   id: 'finance-account-overview', 
+        //   title: 'Account Overview', 
+        //   icon: <Eye size={16} />, 
+        //   url: '/billing/account-overview', 
+        //   permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
+        // },
+        // { 
+        //   id: 'finance-subscriptions', 
+        //   title: 'Subscriptions', 
+        //   icon: <ShoppingBag size={16} />, 
+        //   url: '/billing/subscriptions', 
+        //   permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+        // },
+        // { 
+        //   id: 'finance-order-invoicing', 
+        //   title: 'Order Invoicing', 
+        //   icon: <ShoppingBag size={16} />, 
+        //   url: '/billing/order-invoicing', 
+        //   permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
+        // },
+        
+        // { 
+        //   id: 'finance-payment-history', 
+        //   title: 'Payment History', 
+        //   icon: <FileText size={16} />, 
+        //   url: '/billing/payment-history', 
+        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        // },
+        // {
+        //   id: 'finance-separator-1',
+        //   title: '---',
+        //   icon: null,
+        //   url: ''
+        // },
+        // { 
+        //   id: 'finance-quotes', 
+        //   title: 'Quotes', 
+        //   icon: <Scroll size={16} />, 
+        //   url: '/billing/quotes', 
+        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        // },
+        // { 
+        //   id: 'finance-invoices', 
+        //   title: 'Invoices', 
+        //   icon: <DollarSign size={16} />, 
+        //   url: '/billing/invoices', 
+        //   permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+        // },
+        // { 
+        //   id: 'finance-products', 
+        //   title: 'Products', 
+        //   icon: <ShoppingBag size={16} />, 
+        //   url: '/billing/products', 
+        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        // },
         { 
           id: 'finance-account-overview', 
-          title: 'Account Overview', 
+          title: 'Overview', 
           icon: <Eye size={16} />, 
           url: '/billing/account-overview', 
           permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
-        { 
-          id: 'finance-subscriptions', 
-          title: 'Subscriptions', 
-          icon: <ShoppingBag size={16} />, 
-          url: '/billing/subscriptions', 
-          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
-        },
-        { 
-          id: 'finance-order-invoicing', 
-          title: 'Order Invoicing', 
-          icon: <ShoppingBag size={16} />, 
-          url: '/billing/order-invoicing', 
-          permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
-        },
         
-        { 
-          id: 'finance-payment-history', 
-          title: 'Payment History', 
-          icon: <FileText size={16} />, 
-          url: '/billing/payment-history', 
-          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
-        },
-        {
-          id: 'finance-separator-1',
-          title: '---',
-          icon: null,
-          url: ''
-        },
         { 
           id: 'finance-quotes', 
           title: 'Quotes', 
@@ -740,6 +769,23 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/billing/quotes', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
+        
+        { 
+          id: 'finance-products', 
+          title: 'Products', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/products', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+        
+        { 
+          id: 'finance-subscriptions', 
+          title: 'Subscription', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/subscriptions', 
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+        },
+        
         { 
           id: 'finance-invoices', 
           title: 'Invoices', 
@@ -747,11 +793,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/billing/invoices', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
+        
         { 
-          id: 'finance-products', 
-          title: 'Products', 
-          icon: <ShoppingBag size={16} />, 
-          url: '/billing/products', 
+          id: 'finance-payments', 
+          title: 'Payments', 
+          icon: <FileText size={16} />, 
+          url: '/billing/payments', 
+          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+        },
+        
+        { 
+          id: 'finance-transactions', 
+          title: 'Transactions', 
+          icon: <FileText size={16} />, 
+          url: '', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
