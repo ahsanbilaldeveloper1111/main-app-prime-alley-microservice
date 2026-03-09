@@ -5,7 +5,7 @@ export interface RichNoteEditorProps {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
-  minHeight?: number;
+  height?: number;
   disabled?: boolean;
 }
 
@@ -13,7 +13,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
   value,
   onChange,
   placeholder = "Start typing…",
-  minHeight = 120,
+  height = 120,
   disabled = false,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -167,7 +167,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
         onKeyDown={handleKeyDown}
         suppressContentEditableWarning
         style={{
-          minHeight: `${minHeight}px`,
+          height: `${height}px`,
           width: "100%",
           padding: "10px 12px",
           border: "1px solid #cbd5e0",

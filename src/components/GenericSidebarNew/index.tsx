@@ -65,6 +65,7 @@ import {
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
@@ -4978,19 +4979,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       .finally(() => setActivityHistoryChainLoading(false));
   }, [isOpen, recordType, recordId, activityEntityType]);
 
-  // Record summary from API crm_summary. Show section when crmSummary is passed (even null/empty); display "No summary available" when summary is empty.
-  const recordSummary: RecordSummaryDisplay | undefined =
-    crmSummary !== undefined
-      ? {
-          content: (crmSummary?.summary ?? "").trim(),
-          timestamp: "",
-          onAskQuestion: () => {
-            globalThis.window?.dispatchEvent(
-              new CustomEvent("breeze-assistant:open"),
-            );
-          },
-        }
-      : undefined;
+  // Record summary from API crm_summary.
+  // Always show the section; when summary is missing/empty, the UI will display a fallback message.
+  const recordSummary: RecordSummaryDisplay = {
+    content: (crmSummary?.summary ?? "").trim(),
+    timestamp: "",
+    onCopy: () => copyToClipboard(crmSummary?.summary ?? ""),
+    onAskQuestion: () => {
+      globalThis.window?.dispatchEvent(
+        new CustomEvent("breeze-assistant:open"),
+      );
+    },
+  };
 
   const handleCall = useCallback(
     async (phoneNumber: string) => {
@@ -5078,6 +5078,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const hasEmail = emailList.length > 0;
   const hasPhone = phoneList.length > 0;
 
+  // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
+  const activityRecordTypeForModals =
+    recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
+      ? (recordType as "prospect" | "lead" | "deal" | "order")
+      : undefined;
+  const activityRecordIdForModals =
+    activityRecordTypeForModals && recordId != null && !Number.isNaN(Number(recordId))
+      ? Number(recordId)
+      : undefined;
+
+  const activityModals =
+    activityRecordTypeForModals && activityRecordIdForModals != null
+      ? useCrmActivityModals({
+          recordType: activityRecordTypeForModals,
+          recordId: activityRecordIdForModals,
+          recordName: title,
+          recordEmail: emailList[0] ?? "",
+          recordPhone: phoneList[0] ?? "",
+        })
+      : null;
+
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(),
   );
@@ -5114,7 +5135,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // Initialize collapsed sections based on defaultExpanded
+  // Only reset when record context changes (not on every async sections update),
+  // so user toggles are preserved while viewing the same record.
   useEffect(() => {
+    if (!isOpen) return;
+
     const collapsed = new Set<string>();
     if (sections && sections.length > 0) {
       sections.forEach((section) => {
@@ -5124,7 +5149,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       });
     }
     setCollapsedSections(collapsed);
-  }, [sections]);
+  }, [isOpen, recordType, recordId]);
 
   // Fetch notes when sidebar is open and we have a CRM record
   useEffect(() => {
@@ -5222,11 +5247,39 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     });
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string | number) => {
+    const value = String(text ?? "");
+    if (!value) {
+      toast.error("Nothing to copy");
+      return;
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      toast.success("Copied to clipboard");
+    } catch (err) {
+      console.error("Failed to copy to clipboard", err);
+      toast.error("Failed to copy. Please try again.");
+    }
   };
 
   const handleNoteClick = () => {
+    if (activityModals) {
+      activityModals.openNote();
+      return;
+    }
     setShowNotesModal(true);
   };
 
@@ -5266,6 +5319,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleEmailClick = () => {
+    if (activityModals) {
+      activityModals.openEmail();
+      return;
+    }
     setShowEmailModal(true);
   };
 
@@ -5319,6 +5376,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleTaskClick = () => {
+    if (activityModals) {
+      activityModals.openTask();
+      return;
+    }
     setShowTaskModal(true);
   };
 
@@ -5420,6 +5481,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
 
   const handleMeetingClick = () => {
+    if (activityModals) {
+      activityModals.openMeeting();
+      return;
+    }
     setShowMeetingModal(true);
   };
 
@@ -5500,6 +5565,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleWhatsAppClick = () => {
+    if (activityModals) {
+      activityModals.openWhatsApp();
+      return;
+    }
     setShowWhatsAppModal(true);
   };
 
@@ -5537,6 +5606,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleSmsClick = () => {
+    if (activityModals) {
+      activityModals.openSms();
+      return;
+    }
     setShowSmsModal(true);
   };
 
@@ -5613,7 +5686,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       case "log-sms":
       case "log-meeting":
       case "log-email":
-        goToProspectDetailActivity();
+        if (activityModals) {
+          if (actionId === "log-whatsapp") {
+            activityModals.openWhatsApp();
+          } else if (actionId === "log-sms") {
+            activityModals.openSms();
+          } else if (actionId === "log-meeting") {
+            activityModals.openMeeting();
+          } else if (actionId === "log-email") {
+            activityModals.openEmail();
+          }
+        } else {
+          goToProspectDetailActivity();
+        }
         break;
       default:
         break;
@@ -7297,42 +7382,49 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         `}
       </style>
 
-      {/* Notes Modal - Rendered as floating window */}
-      <NotesModal
-        isOpen={showNotesModal}
-        onClose={handleNoteClose}
-        recordName={title}
-        onSave={handleNoteSave}
-      />
+      {/* Notes / Email / Task / Meeting / SMS / WhatsApp modals */}
+      {activityModals ? (
+        <>{activityModals.modals}</>
+      ) : (
+        <>
+          {/* Notes Modal - Rendered as floating window */}
+          <NotesModal
+            isOpen={showNotesModal}
+            onClose={handleNoteClose}
+            recordName={title}
+            onSave={handleNoteSave}
+          />
 
-      {/* Email Modal - Rendered as floating window */}
-      <EmailModal
-        isOpen={showEmailModal}
-        onClose={handleEmailClose}
-        recipientEmail={emailList[0]}
-        recipientName={title}
-        senderEmail={senderEmail}
-        senderName={senderName}
-        contextPayload={
-          contextPayload
-            ? {
-                lead: contextPayload.lead,
-                deal: contextPayload.deal,
-                order: contextPayload.order,
-              }
-            : undefined
-        }
-        onSend={(emailData) => handleEmailSend(emailData, record)}
-      />
+          {/* Email Modal - Rendered as floating window */}
+          <EmailModal
+            isOpen={showEmailModal}
+            onClose={handleEmailClose}
+            recipientEmail={emailList[0]}
+            recipientName={title}
+            senderEmail={senderEmail}
+            senderName={senderName}
+            contextPayload={
+              contextPayload
+                ? {
+                    lead: contextPayload.lead,
+                    deal: contextPayload.deal,
+                    order: contextPayload.order,
+                  }
+                : undefined
+            }
+            onSend={(emailData) => handleEmailSend(emailData, record)}
+          />
 
-      {/* Task Modal - Rendered as floating window */}
-      <TaskModal
-        isOpen={showTaskModal}
-        onClose={handleTaskClose}
-        assignedTo={title}
-        assignedToName={title}
-        onSave={handleTaskSave}
-      />
+          {/* Task Modal - Rendered as floating window */}
+          <TaskModal
+            isOpen={showTaskModal}
+            onClose={handleTaskClose}
+            assignedTo={title}
+            assignedToName={title}
+            onSave={handleTaskSave}
+          />
+        </>
+      )}
 
       {/* Call Modal - Rendered as floating dropdown */}
       <CallModal
@@ -7359,23 +7451,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       />
 
       {/* Meeting Modal - Rendered as floating window (shared component, same as prospects) */}
-      <MeetingModal
-        isOpen={showMeetingModal}
-        onClose={handleMeetingClose}
-        hostEmail={session?.user?.email ?? ""}
-        hostName={session?.user?.name ?? ""}
-        attendeeEmail={
-          Array.isArray(emailList)
-            ? emailList[0]
-            : typeof emailList === "string"
-              ? emailList
-              : ""
-        }
-        attendeeName={title}
-        recordType={record?.type as any}
-        recordId={record?.id}
-        onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
-      />
+      {!activityModals && (
+        <MeetingModal
+          isOpen={showMeetingModal}
+          onClose={handleMeetingClose}
+          hostEmail={session?.user?.email ?? ""}
+          hostName={session?.user?.name ?? ""}
+          attendeeEmail={
+            Array.isArray(emailList)
+              ? emailList[0]
+              : typeof emailList === "string"
+                ? emailList
+                : ""
+          }
+          attendeeName={title}
+          recordType={record?.type as any}
+          recordId={record?.id}
+          onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
+        />
+      )}
 
       {/* More Actions Modal */}
       <MoreActionsModal
@@ -8089,132 +8183,136 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   <div
                     style={{
                       fontSize: "14px",
-                      color: "#141414",
+                      color: recordSummary.content ? "#141414" : "#718096",
                       lineHeight: "1.6",
                       marginBottom: "16px",
-                      border: "1px solid #ff9fcc",
-                      padding: "18px 20px",
+                      border: recordSummary.content ? "1px solid #ff9fcc" : "none",
+                      padding: recordSummary.content ? "18px 20px" : "0 20px",
                       borderRadius: "5px",
                       overflowWrap: "break-word",
                       wordBreak: "break-word",
                       minWidth: 0,
                     }}
                   >
-                    {recordSummary.content || "No summary available"}
+                    {recordSummary.content || "No summary available."}
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #fee",
-                    }}
-                  >
-                    <button
-                      onClick={() => recordSummary.onThumbsUp?.()}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Good summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#718096";
-                      }}
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      onClick={() => recordSummary.onThumbsDown?.()}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Bad summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#718096";
-                      }}
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button
-                      onClick={() => recordSummary.onCopy?.()}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#718096";
-                      }}
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
+                  {recordSummary.content && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #fee",
+                        }}
+                      >
+                        <button
+                          onClick={() => recordSummary.onThumbsUp?.()}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Good summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = "#718096";
+                          }}
+                        >
+                          <ThumbsUp size={16} />
+                        </button>
+                        <button
+                          onClick={() => recordSummary.onThumbsDown?.()}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Bad summary"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = "#718096";
+                          }}
+                        >
+                          <ThumbsDown size={16} />
+                        </button>
+                        <button
+                          onClick={() => recordSummary.onCopy?.()}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "6px",
+                            cursor: "pointer",
+                            color: "#141414",
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: "3px",
+                          }}
+                          title="Copy"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f7fafc";
+                            e.currentTarget.style.color = "#2d3748";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = "#718096";
+                          }}
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
 
-                  <button
-                    onClick={() => recordSummary.onAskQuestion?.()}
-                    style={{
-                      marginTop: "16px",
-                      width: "36%",
-                      padding: "6px 0",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "5px",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fff5f7";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
+                      <button
+                        onClick={() => recordSummary.onAskQuestion?.()}
+                        style={{
+                          marginTop: "16px",
+                          width: "36%",
+                          padding: "6px 0",
+                          backgroundColor: "transparent",
+                          border: "1px solid #d20688",
+                          borderRadius: "20px",
+                          fontSize: "12px",
+                          fontWeight: "500",
+                          color: "#d20688",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "5px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#fff5f7";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <Sparkles size={16} />
+                        Ask a question
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -8225,21 +8323,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Message Modal */}
-      <WhatsAppMessageModal
-        isOpen={showWhatsAppModal}
-        onClose={handleWhatsAppClose}
-        associatedRecords={title ? [title] : []}
-        onSave={handleWhatsAppLog}
-      />
+      {/* WhatsApp / SMS Modals (fallback when shared CRM activity modals are not available) */}
+      {!activityModals && (
+        <>
+          {/* WhatsApp Message Modal */}
+          <WhatsAppMessageModal
+            isOpen={showWhatsAppModal}
+            onClose={handleWhatsAppClose}
+            associatedRecords={title ? [title] : []}
+            onSave={handleWhatsAppLog}
+          />
 
-      {/* SMS Message Modal */}
-      <LogSmsModal
-        isOpen={showSmsModal}
-        onClose={handleSmsClose}
-        associatedRecords={title ? [title] : []}
-        onSave={handleSmsLog}
-      />
+          {/* SMS Message Modal */}
+          <LogSmsModal
+            isOpen={showSmsModal}
+            onClose={handleSmsClose}
+            associatedRecords={title ? [title] : []}
+            onSave={handleSmsLog}
+          />
+        </>
+      )}
     </>
   );
 };

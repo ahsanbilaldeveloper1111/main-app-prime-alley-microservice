@@ -4143,7 +4143,7 @@ const CrmProspectsManagement = () => {
     onExportClick: () => setShowExportModal(true),
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: true,
-    onImportClick: () => {},
+    onImportClick: () => setShowUploadModal(true),
     currentTableView: prospectsViewMode,
     onTableViewChange: setProspectsViewMode,
     extensions,
