@@ -767,7 +767,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Quotes', 
           icon: <Scroll size={16} />, 
           url: '/billing/quotes', 
-          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+          permission: PERMISSIONS.VIEW_CRM_QUOTES 
         },
         
         { 
@@ -775,7 +775,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Products', 
           icon: <ShoppingBag size={16} />, 
           url: '/billing/products', 
-          permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
+          permission: PERMISSIONS.VIEW_PRODUCTS_BILLING 
         },
         
         { 
