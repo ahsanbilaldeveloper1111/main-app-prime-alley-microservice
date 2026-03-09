@@ -79,6 +79,19 @@ const EmailModal: React.FC<EmailModalProps> = ({
   >("templates");
   const [createTask, setCreateTask] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
+  const [activityDate, setActivityDate] = useState(
+    "In 3 business days (Friday)",
+  );
+  const [activityTime, setActivityTime] = useState(() =>
+    new Date().toTimeString().slice(0, 5),
+  );
+  const [customDate, setCustomDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [customTime, setCustomTime] = useState(() =>
+    new Date().toTimeString().slice(0, 5),
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Generate email (AI) state – same options as EmailSection
   const [generatePrompt, setGeneratePrompt] = useState("");
@@ -106,6 +119,16 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showCtaDropdown, setShowCtaDropdown] = useState(false);
   const optionsPanelRef = useRef<HTMLDivElement>(null);
+
+  const dateOptions = [
+    "Today",
+    "Tomorrow",
+    "In 3 business days (Friday)",
+    "In 1 week",
+    "In 2 weeks",
+    "In 1 month",
+    "Custom...",
+  ];
 
   useEffect(() => {
     const next = normalizeRecipientEmails(recipientEmail);
@@ -477,6 +500,10 @@ const EmailModal: React.FC<EmailModalProps> = ({
       if (!confirmSend) return;
     }
     const bodyToSend = bodyEditorRef.current?.innerHTML?.trim() ?? emailBody;
+    const dateToSend =
+      activityDate === "Custom..." ? customDate : activityDate;
+    const timeToSend =
+      activityDate === "Custom..." ? customTime : activityTime;
     setSendLoading(true);
     try {
       await onSend({
@@ -486,7 +513,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         subject,
         body: bodyToSend,
         createTask,
-        taskDueDate: createTask ? "In 3 business days (Friday)" : undefined,
+        taskDueDate: createTask ? `${dateToSend} ${timeToSend}` : undefined,
       });
       setToEmails([]);
       setCcEmails([]);
@@ -498,6 +525,14 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setShowBcc(false);
       setCreateTask(false);
       setIsMaximized(false);
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const timeStr = now.toTimeString().slice(0, 5);
+      setActivityDate("In 3 business days (Friday)");
+      setActivityTime(timeStr);
+      setCustomDate(today);
+      setCustomTime(timeStr);
+      setShowDatePicker(false);
       onClose();
     } finally {
       setSendLoading(false);
@@ -518,7 +553,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
         borderRadius: "8px",
         border: "1px solid #cbd5e0",
-        overflow: "hidden",
+        overflow: "visible",
         animation: "slideInUp 0.3s ease-out",
       }}
     >
@@ -1556,12 +1591,186 @@ const EmailModal: React.FC<EmailModalProps> = ({
         style={{
           padding: "16px 20px",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: "12px",
           backgroundColor: "#ffffff",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            cursor: "pointer",
+            fontSize: "13px",
+            color: "#141414",
+            width: "100%",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={createTask}
+            onChange={(e) => setCreateTask(e.target.checked)}
+            style={{
+              width: "16px",
+              height: "16px",
+              cursor: "pointer",
+            }}
+          />
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span>
+              Create a <strong>To-do</strong> task to follow up
+            </span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                position: "relative",
+              }}
+            >
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDatePicker(!showDatePicker)}
+                  style={{
+                    padding: "4px 0",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    textDecoration: "underline",
+                  }}
+                >
+                  {activityDate === "Custom..." ? customDate : activityDate}
+                  <ChevronDown size={14} />
+                </button>
+                {showDatePicker && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      bottom: "100%",
+                      marginBottom: "4px",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "5px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                      minWidth: "200px",
+                      zIndex: 1001,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {dateOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          if (option === "Custom...") {
+                            setActivityDate("Custom...");
+                            setActivityTime(customTime);
+                            setShowDatePicker(false);
+                          } else {
+                            setActivityDate(option);
+                            setShowDatePicker(false);
+                          }
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "10px 16px",
+                          backgroundColor: "transparent",
+                          border: "none",
+                          textAlign: "left",
+                          fontSize: "14px",
+                          color: "#33475b",
+                          cursor: "pointer",
+                          transition: "background-color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f7fafc";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="time"
+                  value={
+                    activityDate === "Custom..." ? customTime : activityTime
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setActivityTime(v);
+                    if (activityDate === "Custom...") {
+                      setCustomTime(v);
+                    }
+                  }}
+                  style={{
+                    padding: "4px 8px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "5px",
+                    fontSize: "13px",
+                    color: "#141414",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+              </div>
+            </div>
+            {activityDate === "Custom..." && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginTop: "6px",
+                }}
+              >
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  style={{
+                    padding: "4px 8px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "5px",
+                    fontSize: "13px",
+                    color: "#141414",
+                    backgroundColor: "#ffffff",
+                  }}
+                />
+              </div>
+            )}
+          </span>
+        </label>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            alignSelf: "flex-start",
+          }}
+        >
           <div style={{ position: "relative" }}>
             <button
               onClick={handleSend}
@@ -1583,6 +1792,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
+                whiteSpace: "nowrap",
               }}
               onMouseEnter={(e) => {
                 if (toEmails.length > 0 && !sendLoading) {
@@ -1615,49 +1825,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
             </button>
           </div>
         </div>
-
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            cursor: "pointer",
-            fontSize: "13px",
-            color: "#141414",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={createTask}
-            onChange={(e) => setCreateTask(e.target.checked)}
-            style={{
-              width: "16px",
-              height: "16px",
-              cursor: "pointer",
-            }}
-          />
-          <span>
-            Create a <strong>To-do</strong> task to follow up{" "}
-            <button
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#141414",
-                textDecoration: "underline",
-                cursor: "pointer",
-                padding: 0,
-                fontSize: "13px",
-                fontWeight: "600",
-              }}
-            >
-              In 3 business days (Friday)
-            </button>
-            <ChevronDown
-              size={14}
-              style={{ marginLeft: "4px", verticalAlign: "middle" }}
-            />
-          </span>
-        </label>
       </div>
     </div>
   );

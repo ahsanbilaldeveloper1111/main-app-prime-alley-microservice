@@ -875,7 +875,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           startTime,
           endTime,
           attendees,
-          location: (full as any)?.location ?? "",
+          location: (full as any)?.meeting_outcome ?? "",
           reminders,
           summary: (full as any)?.summary ?? "",
           meetingType: (full as any)?.meeting_type ?? meeting.meeting_type ?? "Video",

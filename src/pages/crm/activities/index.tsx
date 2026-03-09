@@ -677,6 +677,11 @@ const HistoryPage = () => {
     },
   ];
 
+  const handlePreviewClick = (row: ActivityRecord) => {
+    setSelectedActivityRecord(row);
+    setShowActivitySidebar(true);
+  };
+
   return (
     <ProtectedRoute requiredPermissions={[PERMISSIONS.VIEW_CRM_HISTORY]}>
       <div>
@@ -722,17 +727,7 @@ const HistoryPage = () => {
             }));
             fetchHistoryData(page, rowsPerPage);
           }}
-          actions={[
-            {
-              label: "View",
-              icon: <Eye size={16} />,
-              onClick: (row) => {
-                setSelectedActivityRecord(row);
-                setShowActivitySidebar(true);
-              },
-              variant: "link",
-            },
-          ]}
+          onPreviewClick={handlePreviewClick}
           onRowClick={(row) => {
             setSelectedActivityRecord(row);
             setShowActivitySidebar(true);

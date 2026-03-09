@@ -208,6 +208,8 @@ interface TaskModalProps {
   onClose: () => void;
   assignedTo?: string;
   assignedToName?: string;
+  /** Optional HTML string used to prefill the notes editor (e.g. when editing an existing task). */
+  initialNotesHtml?: string;
   onSave: (taskData: {
     title: string;
     activityDate: string;
@@ -227,6 +229,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onClose,
   assignedTo = '',
   assignedToName = 'Unassigned',
+  initialNotesHtml,
   onSave,
 }) => {
   const [title, setTitle] = useState('');
@@ -239,10 +242,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [taskType, setTaskType] = useState('To-do');
   const [priority, setPriority] = useState('None');
   const [queue, setQueue] = useState('None');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(initialNotesHtml || '');
   const [isMaximized, setIsMaximized] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [showTaskTypeDropdown, setShowTaskTypeDropdown] = useState(false);
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
@@ -275,6 +277,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
       titleInputRef.current.focus();
     }
   }, [isOpen]);
+
+  // When the modal is opened for editing, ensure the rich-text editor
+  // shows the HTML notes exactly as provided from the API response.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof initialNotesHtml === 'string') {
+      setNotes(initialNotesHtml);
+    }
+  }, [isOpen, initialNotesHtml]);
 
   useEffect(() => {
     const anyOpen =
@@ -666,7 +677,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              gridTemplateColumns: '2fr 1fr',
               gap: '20px',
               marginBottom: '20px',
             }}
@@ -690,7 +701,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     type="button"
                     onClick={() => {
                       setShowDatePicker(!showDatePicker);
-                      setShowTimePicker(false);
+                      // setShowTimePicker(false);
                     }}
                     style={{
                       padding: '8px 2px',
@@ -762,70 +773,29 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   )}
                 </div>
                 <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTimePicker(true);
-                      setShowDatePicker(false);
+                  <input
+                    type="time"
+                    value={
+                      activityDate === 'Custom...'
+                        ? customTime
+                        : activityTime
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setActivityTime(v);
+                      if (activityDate === 'Custom...') {
+                        setCustomTime(v);
+                      }
                     }}
                     style={{
-                      padding: '8px 2px',
-                      backgroundColor: '#ffffff',
-                      border: 'none',
-                      borderRadius: '4px',
+                      padding: '8px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '5px',
                       fontSize: '14px',
                       color: '#141414',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontWeight: '300',
+                      backgroundColor: '#ffffff',
                     }}
-                  >
-                    <Clock size={16} />
-                    {activityDate === 'Custom...' ? customTime : activityTime}
-                  </button>
-                  {showTimePicker && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: '100%',
-                        marginTop: '4px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '5px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                        padding: '12px',
-                        zIndex: 1001,
-                      }}
-                    >
-                      <input
-                        type="time"
-                        value={
-                          activityDate === 'Custom...'
-                            ? customTime
-                            : activityTime
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setActivityTime(v);
-                          if (activityDate === 'Custom...') {
-                            setCustomTime(v);
-                          }
-                          setShowTimePicker(false);
-                        }}
-                        style={{
-                          padding: '8px 12px',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '5px',
-                          fontSize: '14px',
-                          color: '#141414',
-                          backgroundColor: '#ffffff',
-                        }}
-                      />
-                    </div>
-                  )}
+                  />
                 </div>
               </div>
 

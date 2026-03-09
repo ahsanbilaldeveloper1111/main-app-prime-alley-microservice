@@ -1032,7 +1032,17 @@ const GenericTable = <T extends Record<string, any>>({
                   )}
                   {/* <Dropdown.Item>Bulk Actions</Dropdown.Item> */}
                   <Dropdown.Divider />
-                  <Dropdown.Item>Settings</Dropdown.Item>
+                  <Dropdown.Item
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.open("/main-settings/smart-crm", "_blank");
+                      } else {
+                        router.push("/main-settings/smart-crm");
+                      }
+                    }}
+                  >
+                    Settings
+                  </Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
             )}

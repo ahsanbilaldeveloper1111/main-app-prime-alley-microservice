@@ -27,6 +27,7 @@ import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCti } from "@hooks/useCti";
 import { toast } from "react-toastify";
 
@@ -992,20 +993,6 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                     >
                       <Copy size={14} />
                     </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        color: "#718096",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Link"
-                    >
-                      <Link2 size={14} />
-                    </button>
                   </>
                 ) : (
                   <span style={{ fontSize: "14px", color: "#718096" }}>No email</span>
@@ -1110,8 +1097,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 }}
               >
                 {[
-                  { label: "Message", onClick: activityModals.openSms },
-                  { label: "Task", onClick: activityModals.openTask },
+                  { label: "SMS", onClick: activityModals.openSms },
                   { label: "WhatsApp", onClick: activityModals.openWhatsApp },
                 ].map(({ label, onClick }) => (
                   <button
@@ -1271,131 +1257,39 @@ const CompanyDetailPage: NextPageWithLayout = () => {
       <div style={{ padding: "14px 20px", flex: 1 }}>
         {activeTab === "about" && (
           <>
-            {/* Breeze record summary */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #cccccc",
-                borderRadius: "10px",
-                marginBottom: "20px",
-                overflow: "hidden",
+            {/* Record Summary */}
+            <CrmRecordSummarySection
+              isCollapsed={collapsedSections.has("breeze")}
+              onToggle={() => toggleSection("breeze")}
+              summary={(company as any)?.crm_summary?.summary ?? null}
+              metaLabel={
+                (company as any)?.crm_summary?.updated_at
+                  ? `Updated ${new Date(
+                      (company as any).crm_summary.updated_at,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : undefined
+              }
+              onRefreshClick={async () => {
+                const id = Number(companyId || company?.id);
+                if (!id || Number.isNaN(id)) {
+                  toast.error("Invalid company ID");
+                  return;
+                }
+                try {
+                  const refreshed = await getCompany(id);
+                  setCompany(refreshed);
+                  toast.success("Summary refreshed");
+                } catch {
+                  toast.error("Failed to refresh summary");
+                }
               }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "16px 20px",
-                  cursor: "pointer",
-                  borderBottom: collapsedSections.has("breeze") ? "none" : "1px solid #eaf0f6",
-                }}
-                onClick={() => toggleSection("breeze")}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("breeze") ? "rotate(-90deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>
-                    Breeze record summary
-                  </h3>
-                  <div
-                    style={{
-                      padding: "3px 10px",
-                      background: "linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)",
-                      color: "white",
-                      borderRadius: "12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI
-                  </div>
-                </div>
-              </div>
-              {!collapsedSections.has("breeze") && (
-                <div style={{ padding: "20px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontSize: "13px",
-                      color: "#141414",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <span>Generated {moment().format("MMM DD, YYYY")}</span>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "2px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Refresh"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      color: "#141414",
-                      lineHeight: "1.6",
-                      marginBottom: "16px",
-                      border: "1px solid #ff9fcc",
-                      padding: "18px 20px",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    {company?.name ?? "This company"} is in the {company?.industry ?? "N/A"} industry
-                    {company?.city || company?.country ? `, based in ${[company?.city, company?.country].filter(Boolean).join(", ")}.` : "."}
-                    {websiteUrl ? " Company website is available for reference." : ""}
-                    Recommended next steps: log a call or schedule a meeting to track engagement.
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingTop: "12px", borderTop: "1px solid #fee" }}>
-                    <button title="Good summary" style={{ background: "transparent", border: "none", padding: "6px", cursor: "pointer", color: "#141414" }}>
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button title="Bad summary" style={{ background: "transparent", border: "none", padding: "6px", cursor: "pointer", color: "#141414" }}>
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button title="Copy" style={{ background: "transparent", border: "none", padding: "6px", cursor: "pointer", color: "#141414" }}>
-                      <Copy size={16} />
-                    </button>
-                  </div>
-                  <button
-                    style={{
-                      marginTop: "16px",
-                      padding: "6px 16px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
-                </div>
-              )}
-            </div>
+            />
 
             {/* Company profile */}
             <div

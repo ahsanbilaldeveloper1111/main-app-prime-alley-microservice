@@ -10,6 +10,8 @@ interface CrmAssociatedCompaniesCardProps {
   primaryEmail?: string | null | undefined;
   phones?: { number: string; type?: string | null }[] | null | undefined;
   count?: number;
+  /** Optional CRM company ID for navigating to detail view */
+  companyId?: number | string | null;
 }
 
 const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
@@ -21,6 +23,7 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
   primaryEmail,
   phones,
   count,
+  companyId,
 }) => {
   const companiesCount = count ?? (companyName ? 1 : 0);
   const phoneList =
@@ -200,6 +203,16 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
               </div>
               <a
                 href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const href =
+                    companyId != null && companyId !== ""
+                      ? `/crm/companies/company-detailpage?id=${encodeURIComponent(
+                          String(companyId),
+                        )}`
+                      : "/crm/companies";
+                  window.open(href, "_blank", "noopener,noreferrer");
+                }}
                 style={{
                   fontSize: "12px",
                   color: "#141414",

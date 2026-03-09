@@ -10,6 +10,7 @@ import { useRouter } from 'next/router';
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
+import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { getOrder, getDeal, getLead } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
@@ -824,8 +825,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                 }}>
                   {[
-                    { label: 'Message', onClick: activityModals.openSms },
-                    { label: 'Task', onClick: activityModals.openTask },
+                    { label: 'SMS', onClick: activityModals.openSms },
                     { label: 'WhatsApp', onClick: activityModals.openWhatsApp },
                   ].map(({ label, onClick }) => (
                     <button
@@ -1069,209 +1069,38 @@ const OrderRecordPage: NextPageWithLayout = () => {
         <div style={{ padding: '14px 0', flex: 1 }}>
           {activeTab === 'about' && (
             <>
-              <div style={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #cccccc',
-                borderRadius: '10px',
-                marginBottom: '20px',
-                overflow: 'hidden',
-              }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '16px 20px',
-                    cursor: 'pointer',
-                    borderBottom: collapsedSections.has('breeze') ? 'none' : '1px solid #eaf0f6',
-                  }}
-                  onClick={() => toggleSection('breeze')}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <ChevronDown
-                      size={18}
-                      style={{
-                        color: '#141414',
-                        transform: collapsedSections.has('breeze') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                      }}
-                    />
-                    <h3 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#141414',
-                      margin: 0,
-                    }}>
-                      Record summary
-                    </h3>
-                    <div style={{
-                      padding: '3px 10px',
-                      background: 'linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)',
-                      color: 'white',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      textTransform: 'uppercase',
-                    }}>
-                      AI
-                    </div>
-                  </div>
-                </div>
-
-                {!collapsedSections.has('breeze') && (
-                  <div style={{ padding: '20px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontSize: '13px',
-                      color: '#141414',
-                      marginBottom: '12px',
-                    }}>
-                      <span>Generated {orderData?.updated_at ? moment(orderData.updated_at).format('MMM DD, YYYY') : moment().format('MMM DD, YYYY')}</span>
-                      <button
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '2px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                        }}
-                        title="Refresh"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    </div>
-
-                    <div style={{
-                      fontSize: '14px',
-                      color: '#141414',
-                      lineHeight: '1.6',
-                      marginBottom: '16px',
-                      border: '1px solid #ff9fcc',
-                      padding: '18px 20px',
-                      borderRadius: '10px',
-                    }}>
-                      This order for {orderData?.customer_name || 'Customer'} is currently in the {orderData?.stage?.name || 'No Stage'} stage with a value of {orderData?.final_amount || orderData?.total_amount 
-                        ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
-                        : 'N/A'}. {orderData?.expected_delivery_date ? `Expected delivery date is ${formatDateForTable(orderData.expected_delivery_date)}.` : ''} {orderData?.order_approval_status ? `Approval status: ${orderData.order_approval_status}.` : ''} {orderData?.fulfillment_status ? `Fulfillment status: ${orderData.fulfillment_status}.` : ''} {orderData?.payment_status ? `Payment status: ${orderData.payment_status}.` : ''} Recent activity shows order processing and customer engagement. Recommended next steps: monitor fulfillment progress, ensure payment processing, and maintain customer communication.
-                    </div>
-
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      paddingTop: '12px',
-                      borderTop: '1px solid #fee',
-                    }}>
-                      <button
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px',
-                        }}
-                        title="Good summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#141414';
-                        }}
-                      >
-                        <ThumbsUp size={16} />
-                      </button>
-                      <button
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px',
-                        }}
-                        title="Bad summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#141414';
-                        }}
-                      >
-                        <ThumbsDown size={16} />
-                      </button>
-                      <button
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px',
-                        }}
-                        title="Copy"
-                        onClick={() => {
-                          const summaryText = `This order for ${orderData?.customer_name || 'Customer'} is currently in the ${orderData?.stage?.name || 'No Stage'} stage with a value of ${orderData?.final_amount || orderData?.total_amount 
-                            ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
-                            : 'N/A'}. ${orderData?.expected_delivery_date ? `Expected delivery date is ${formatDateForTable(orderData.expected_delivery_date)}.` : ''} ${orderData?.order_approval_status ? `Approval status: ${orderData.order_approval_status}.` : ''} ${orderData?.fulfillment_status ? `Fulfillment status: ${orderData.fulfillment_status}.` : ''} ${orderData?.payment_status ? `Payment status: ${orderData.payment_status}.` : ''} Recent activity shows order processing and customer engagement. Recommended next steps: monitor fulfillment progress, ensure payment processing, and maintain customer communication.`;
-                          copyToClipboard(summaryText);
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#141414';
-                        }}
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
-
-                    <button
-                      style={{
-                        marginTop: '16px',
-                        padding: '6px 16px',
-                        backgroundColor: 'transparent',
-                        border: '1px solid #d20688',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        color: '#d20688',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fff5f7';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <Sparkles size={16} />
-                      Ask a question
-                    </button>
-                  </div>
-                )}
-              </div>
+              <CrmRecordSummarySection
+                isCollapsed={collapsedSections.has('breeze')}
+                onToggle={() => toggleSection('breeze')}
+                summary={(orderData as any)?.crm_summary?.summary ?? null}
+                metaLabel={
+                  (orderData as any)?.crm_summary?.updated_at
+                    ? `Updated ${new Date(
+                        (orderData as any).crm_summary.updated_at,
+                      ).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`
+                    : undefined
+                }
+                onRefreshClick={async () => {
+                  const idNum = Number(id || orderData?.id);
+                  if (!idNum || Number.isNaN(idNum)) {
+                    toast.error('Invalid order ID');
+                    return;
+                  }
+                  try {
+                    const refreshed = await getOrder(idNum);
+                    setOrderData(refreshed);
+                    toast.success('Summary refreshed');
+                  } catch {
+                    toast.error('Failed to refresh summary');
+                  }
+                }}
+              />
 
               <div style={{
                 backgroundColor: '#ffffff',
