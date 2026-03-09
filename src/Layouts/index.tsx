@@ -1229,7 +1229,7 @@ font-weight:600;
               )}
               {/* Create Button */}
                 <div >
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_CRM) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) || session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
+                
                 <button
                   className="crm-prime-create-btn"
                   onClick={() => setShowCreateDropdown(!showCreateDropdown)}
@@ -1237,7 +1237,7 @@ font-weight:600;
                 >
                   <Plus size={14} />
                     </button>
-                )}
+                
                 
                 {/* Create Dropdown */}
                 {showCreateDropdown && (
