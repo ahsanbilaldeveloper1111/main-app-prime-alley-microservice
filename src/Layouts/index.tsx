@@ -88,7 +88,6 @@ const Layout = ({ children }: LayoutProps) => {
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
-	const sessionExpiredRedirectRef = useRef(false);
 	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
 	const [dialedNumber, setDialedNumber] = useState('');
 	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
@@ -133,19 +132,13 @@ const Layout = ({ children }: LayoutProps) => {
     };
   }, []);
 
-  // If session exists but permissions are empty, server likely lost session (e.g. after deploy/restart). Redirect to signin instead of showing "Access denied".
+  // When session is invalid (e.g. server restarted and in-memory store was cleared), redirect to signin.
   useEffect(() => {
-    if (status !== 'authenticated' || !session?.user) return;
+    if (status !== 'unauthenticated') return;
     if (router.pathname.startsWith('/auth/') || router.pathname === '/access-denied') return;
-    const perms = session.user.permissions ?? [];
-    if (perms.length > 0) return;
-    if (sessionExpiredRedirectRef.current) return;
-    sessionExpiredRedirectRef.current = true;
     const callbackUrl = encodeURIComponent(router.asPath);
-    signOut({ redirect: false }).then(() => {
-      router.replace(`/auth/signin?reason=session_expired&callbackUrl=${callbackUrl}`);
-    });
-  }, [status, session?.user?.permissions, router.pathname, router.asPath]);
+    router.replace(`/auth/signin?reason=session_expired&callbackUrl=${callbackUrl}`);
+  }, [status, router.pathname, router.asPath]);
 
   // Permission check: session has permissions from store (not cookie). Redirect to access-denied if user lacks required perms for this route.
   useEffect(() => {
@@ -1235,14 +1228,16 @@ font-weight:600;
                 </div>
               )}
               {/* Create Button */}
-              <div >
+                <div >
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_CRM) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM) || session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) || session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
                 <button
                   className="crm-prime-create-btn"
                   onClick={() => setShowCreateDropdown(!showCreateDropdown)}
                   title="Create new"
                 >
                   <Plus size={14} />
-                </button>
+                    </button>
+                )}
                 
                 {/* Create Dropdown */}
                 {showCreateDropdown && (
@@ -1258,37 +1253,51 @@ font-weight:600;
                       }}
                       onClick={() => setShowCreateDropdown(false)}
                     />
-                    <div className="create-dropdown-menu">
+                      <div className="create-dropdown-menu">
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           setShowCreateLeadModal(true);
                         }}>
                         Lead
                       </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_CRM) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           setShowCreateCompanySidebar(true);
                         }}>
                         Company
-                      </button>
+                          </button>
+                        )}
+
+                        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           router.push('/crm/inbox');
                         }}>
                         Inbox
                       </button>
+                      )}
+
+                        {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           router.push('/help-center/my-tickets/new');
                         }}>
                         Ticket
-                      </button>
+                          </button>
+                      )}
+
+                        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false); /* Add Task handler */
                           router.push('/planner/tasks');
                         }}>
                         Task
-                      </button>
+                          </button>
+                      )}
                     </div>
                   </>
                 )}

@@ -1,5 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
+import { GetPayments } from "@utils/accounting";
+
+function formatBillingDate(value: string | undefined): string {
+  if (!value) return "—";
+  try {
+    const d = new Date(value);
+    const day = d.getDate();
+    const month = d.toLocaleDateString("en-GB", { month: "short" });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch {
+    return String(value);
+  }
+}
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -282,50 +296,12 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
   );
 }
 
-// ── Card: Invoice issued ───────────────────────────────────────────────────────
-function InvoiceCard({ id, product, amount, balance }: {
-  id: string; product: string; amount: string; balance: string;
-}) {
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div style={s.cardTitleRow}>
-          <FileText size={22} color="#141414" />
-          <h3 style={s.cardTitle}>Invoice issued #{id}</h3>
-        </div>
-        <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
-          <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
-        </div>
-      </div>
-      <div style={s.cardBody}>
-        <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
-          <div>
-            <div style={s.colLabel}>Products</div>
-            <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
-            </div>
-          </div>
-          <div>
-            <div style={s.colLabel}>Invoice amount</div>
-            <div style={s.colValue}>{amount}</div>
-          </div>
-        </div>
-        <hr style={s.hr} />
-        <div style={s.balanceRow}>
-          <span style={s.balanceLabel}>Invoice balance</span>
-          <span style={s.balanceAmount}>{balance}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Card: Payment processed ────────────────────────────────────────────────────
-function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }: {
+function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount, brand = "VISA" }: {
   id: string; product: string; invoiceRef: string;
   cardLast4: string; cardHolder: string; amount: string;
+  brand?: string;
 }) {
   return (
     <div style={s.card}>
@@ -334,11 +310,11 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }:
           <Landmark size={22} color="#141414" />
           <h3 style={s.cardTitle}>Payment processed #{id}</h3>
         </div>
-        <div style={s.cardActions}>
+        {/* <div style={s.cardActions}>
           <a style={s.actionLink}>View</a>
           <span style={s.divider}>|</span>
           <a style={s.actionLink}>Download</a>
-        </div>
+        </div> */}
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
@@ -357,10 +333,10 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }:
           <div>
             <div style={s.colLabel}>Payment method</div>
             <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
-              <span style={s.visaChip}>VISA</span>
+              <span style={s.visaChip}>{brand}</span>
               <div>
                 <div style={{ fontSize: 14, color: "#141414", fontFamily: font }}>
-                  Visa <em>ending in</em> {cardLast4}
+                  {brand} <em>ending in</em> {cardLast4}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, fontFamily: font, color: "#141414" }}>{cardHolder}</div>
               </div>
@@ -377,45 +353,43 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }:
   );
 }
 
-// ── Card: Order issued ─────────────────────────────────────────────────────────
-function OrderCard({ id, product, amount }: {
-  id: string; product: string; amount: string;
-}) {
-  return (
-    <div style={s.card}>
-      <div style={s.cardHeader}>
-        <div style={s.cardTitleRow}>
-          <FileMinus size={22} color="#141414" />
-          <h3 style={s.cardTitle}>Order issued #{id}</h3>
-        </div>
-        <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
-          <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
-        </div>
-      </div>
-      <div style={s.cardBody}>
-        <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
-          <div>
-            <div style={s.colLabel}>Products</div>
-            <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
-            </div>
-          </div>
-        </div>
-        <hr style={s.hr} />
-        <div style={s.balanceRow}>
-          <span style={s.balanceLabel}>Amount</span>
-          <span style={s.balanceAmount}>{amount}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main page ──────────────────────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { value: "", label: "All Status" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "failed", label: "Failed" },
+];
+
 export default function BillingHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [paymentsList, setPaymentsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPayments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await GetPayments({
+        page: 1,
+        per_page: 50,
+        ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }) as any;
+      const list = response?.dataList ?? response?.data ?? [];
+      setPaymentsList(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("GetPayments error:", err);
+      setPaymentsList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, statusFilter]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
@@ -427,53 +401,94 @@ export default function BillingHistoryPage() {
     { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
   ];
 
+  const currency = (row: any) => row?.currency_code ?? row?.currency ?? "AED";
+  const amountStr = (row: any) => `${currency(row)} ${Number(row?.amount ?? 0).toFixed(2)}`;
+  const cardLast4 = (row: any) =>
+    row?.payment_method?.last4 ?? row?.card_last4 ?? row?.last4 ?? (typeof row?.payment_method === "string" ? "****" : "****");
+  const cardHolder = (row: any) =>
+    row?.payment_method?.holder_name ?? row?.billing_details?.name ?? row?.card_holder ?? "—";
+  const cardBrand = (row: any) =>
+    (row?.payment_method?.brand ?? row?.payment_method ?? "CARD").toString().toUpperCase();
+
+  const paymentsByDate = paymentsList.reduce<Record<string, any[]>>((acc, row) => {
+    const dateKey = row?.payment_date ?? row?.created_at ?? row?.date ?? "";
+    const d = dateKey ? formatBillingDate(dateKey) : "—";
+    if (!acc[d]) acc[d] = [];
+    acc[d].push(row);
+    return acc;
+  }, {});
+  const sortedDates = Object.keys(paymentsByDate).sort((a, b) => {
+    if (a === "—" || b === "—") return a === "—" ? 1 : -1;
+    const timeA = paymentsByDate[a][0]?.payment_date ?? paymentsByDate[a][0]?.created_at ?? 0;
+    const timeB = paymentsByDate[b][0]?.payment_date ?? paymentsByDate[b][0]?.created_at ?? 0;
+    return new Date(timeB).getTime() - new Date(timeA).getTime();
+  });
+
   return (
     <div style={s.page}>
-      {/* Top bar: search + filters */}
+      {/* Top bar: search + status filter (same as payment-history) + filters */}
       <div style={s.topBar}>
-        {/* Search */}
         <div style={s.searchWrapper}>
           <Search size={16} color="#888" style={s.searchIcon} />
           <input
             style={s.searchInput}
             type="text"
-            placeholder="Search Billing History"
+            placeholder="Search by invoice number or payment ID..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-
-        {/* Filter dropdowns */}
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{
+            ...s.filterBtn,
+            minWidth: 160,
+            paddingLeft: 12,
+            paddingRight: 28,
+            cursor: "pointer",
+            appearance: "auto",
+          }}
+        >
+          {STATUS_OPTIONS.map(opt => (
+            <option key={opt.value || "all"} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         {filters.map(f => (
           <FilterDropdown key={f.label} label={f.label} options={f.options} />
         ))}
       </div>
 
-      {/* Content */}
       <div style={s.content}>
-        <div style={s.dateLabel}>11 Feb 2026</div>
-
-        <InvoiceCard
-          id="720886618"
-          product="Starter Customer Platform"
-          amount="AED 97.20"
-          balance="AED 0.00"
-        />
-
-        <PaymentCard
-          id="43595815"
-          product="Starter Customer Platform"
-          invoiceRef="720886618"
-          cardLast4="5478"
-          cardHolder="RIZWAN HAIDER"
-          amount="AED 97.20"
-        />
-
-        <OrderCard
-          id="22970930"
-          product="Starter Customer Platform"
-          amount="AED 97.20"
-        />
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center" as const, color: "#666", fontFamily: font }}>
+            Loading…
+          </div>
+        ) : paymentsList.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center" as const, color: "#666", fontFamily: font }}>
+            No billing history found.
+          </div>
+        ) : (
+          sortedDates.map((dateLabel) => (
+            <div key={dateLabel}>
+              <div style={s.dateLabel}>{dateLabel}</div>
+              {paymentsByDate[dateLabel].map((row: any) => (
+                <PaymentCard
+                  key={row?.id ?? row?.payment_id ?? Math.random()}
+                  id={String(row?.id ?? row?.payment_id ?? "—")}
+                  product={row?.product_name ?? row?.invoice?.product ?? row?.description ?? "—"}
+                  invoiceRef={row?.invoice?.invoice_number ?? row?.invoice_number ?? row?.invoice_id ?? "—"}
+                  cardLast4={cardLast4(row)}
+                  cardHolder={cardHolder(row)}
+                  amount={amountStr(row)}
+                  brand={cardBrand(row)}
+                />
+              ))}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
