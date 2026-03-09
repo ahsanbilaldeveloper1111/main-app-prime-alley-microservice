@@ -483,7 +483,7 @@ const SalesDashboard: NextPageWithLayout = () => {
   const navTabs = React.useMemo(() => {
     const perms = session?.user?.permissions ?? [];
     return NAV_TAB_CONFIG.filter(
-      (tab) => tab.permission && perms.includes(tab.permission)
+      (tab) => !tab.permission || perms.includes(tab.permission)
     );
   }, [session?.user?.permissions]);
 
