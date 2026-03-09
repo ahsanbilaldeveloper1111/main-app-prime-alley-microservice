@@ -250,7 +250,7 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
             { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
-            { path: '/account-billing',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
+            { path: '/account-billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
             { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
             { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},

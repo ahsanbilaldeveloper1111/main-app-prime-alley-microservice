@@ -184,7 +184,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'unified-reports',
     'audit-logs',
     // 'settings',
-    //'voicebot-platform'
+    'voicebot-platform'
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -817,7 +817,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'voicebot-platform',
       key: 'voicebot-platform',
-      permission: PERMISSIONS.ACCOUNTS_SERVICES,
+      permission: PERMISSIONS.AI_ML_SERVICES,
       icon: <PhoneCall size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: 'Voicebot Platform',
@@ -832,27 +832,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound'
         },
-        {
-          id: 'voicebot-inbound-companies',
-          title: 'Inbound Companies',
-          icon: <Building2 size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/companies'
-        },
-        {
-          id: 'voicebot-inbound-bots',
-          title: 'Inbound Bots',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/bots'
-        },
-        {
-          id: 'voicebot-inbound-calls',
-          title: 'Inbound Calls',
-          icon: <Phone size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/calls'
-        },
+       
 
         {
           id: 'voicebot-inbound-separator',
@@ -868,20 +848,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound'
         },
-        {
-          id: 'voicebot-outbound-trunks',
-          title: 'Outbound Trunks',
-          icon: <Phone size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/trunks'
-        },
-        {
-          id: 'voicebot-outbound-voicebots',
-          title: 'Outbound Voice Bots',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/voicebots'
-        },
+        
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
     // voicebot inbound end
