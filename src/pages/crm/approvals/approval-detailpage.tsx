@@ -2243,6 +2243,16 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const companyId = (deal as any)?.company?.id ?? null;
+                          const href = companyId
+                            ? `/crm/companies/company-detailpage?id=${encodeURIComponent(
+                                String(companyId),
+                              )}`
+                            : "/crm/companies";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "12px",
                           color: "#141414",
@@ -2404,9 +2414,19 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const id = deal?.id;
+                          const href = id
+                            ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                String(id),
+                              )}`
+                            : "/crm/deals";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "13px",
-                          color: "#006162",
+                          color: " #006162",
                           textDecoration: "none",
                           fontWeight: "500",
                           display: "flex",
@@ -2553,6 +2573,16 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const ticketId = (deal.ticket as any)?.id;
+                          const href = ticketId
+                            ? `/crm/leads/leads-detailpage?id=${encodeURIComponent(
+                                String(ticketId),
+                              )}`
+                            : "/crm/leads";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "13px",
                           color: "#006162",

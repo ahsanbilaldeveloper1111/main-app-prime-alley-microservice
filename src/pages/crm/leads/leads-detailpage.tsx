@@ -1976,21 +1976,32 @@ const ContactRecordPage: NextPageWithLayout = () => {
                               </p>
                             </div>
                           ))}
-                          <a
-                            href="#"
-                            style={{
-                              fontSize: "13px",
-                              color: "#006162",
-                              textDecoration: "none",
-                              fontWeight: "500",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            View all associated Deals
-                            <ExternalLink size={12} />
-                          </a>
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const firstDeal = allDeals[0];
+                          const id = firstDeal?.id;
+                          const href = id
+                            ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                String(id),
+                              )}`
+                            : "/crm/deals";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
+                        style={{
+                          fontSize: "13px",
+                          color: "#006162",
+                          textDecoration: "none",
+                          fontWeight: "500",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        View all associated Deals
+                        <ExternalLink size={12} />
+                      </a>
                         </>
                       )}
                     </div>

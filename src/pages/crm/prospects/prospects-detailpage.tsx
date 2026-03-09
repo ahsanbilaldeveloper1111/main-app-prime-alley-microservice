@@ -1444,7 +1444,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 }}
               >
                 {[
-                  { label: "Message", onClick: activityModals.openSms },
+                  { label: "SMS", onClick: activityModals.openSms },
                   { label: "WhatsApp", onClick: activityModals.openWhatsApp },
                 ].map(({ label, onClick }) => (
                   <button
@@ -1741,8 +1741,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       margin: 0,
                     }}
                   >
-                    Record summary
-                  </h3>
+                    Record summary 
+                  </h3> 
                   <div
                     style={{
                       padding: "3px 10px",
@@ -1776,20 +1776,50 @@ const ContactRecordPage: NextPageWithLayout = () => {
                           marginBottom: "12px",
                         }}
                       >
-                        {prospect?.data?.updated_at && (
+                        {prospect?.data?.crm_summary?.updated_at && (
                           <span>
                             Updated{" "}
-                            {new Date(prospect.data.updated_at).toLocaleDateString(
+                            {new Date(prospect.data.crm_summary.updated_at).toLocaleDateString(
                               "en-US",
                               {
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
                               },
                             )}
                           </span>
                         )}
                         <button
+                          onClick={async () => {
+                            const id = Number(
+                              prospectId || prospect?.data?.id || prospect?.id,
+                            );
+                            if (!id || Number.isNaN(id)) {
+                              toast.error("Invalid prospect ID");
+                              return;
+                            }
+                            try {
+                              const refreshed = await getAllCrmDataById(id);
+                              setProspect((prev) => {
+                                if (!prev) return refreshed;
+                                const refreshedSummary =
+                                  (refreshed as any)?.data?.crm_summary;
+                                if (!refreshedSummary) return prev;
+                                return {
+                                  ...prev,
+                                  data: {
+                                    crm_summary: refreshedSummary,
+                                    ...(prev as any).data,
+                                  },
+                                } as any;
+                              });
+                              toast.success("Summary refreshed");
+                            } catch {
+                              toast.error("Failed to refresh summary");
+                            }
+                          }}
                           style={{
                             background: "transparent",
                             border: "none",
@@ -1889,6 +1919,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
                           <ThumbsDown size={16} />
                         </button>
                         <button
+                          onClick={() =>
+                            copyToClipboard(
+                              (prospect as any)?.data?.crm_summary?.summary ?? "",
+                            )
+                          }
                           style={{
                             background: "transparent",
                             border: "none",
@@ -2183,7 +2218,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             }}
           >
 
-{(() => {
+            {(() => {
               const company = (prospect as any)?.data?.company ?? null;
               const struct = company?.enrichment_data?.structured_data ?? null;
               const companyName =
@@ -2201,6 +2236,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   number: p?.number ?? "",
                   type: p?.type ?? null,
                 })) ?? undefined;
+              const companyId =
+                company?.id ??
+                (prospect as any)?.data?.company_id ??
+                (prospect as any)?.data?.company?.company_id ??
+                null;
               return (
                 <CrmAssociatedCompaniesCard
                   sectionId="companies"
@@ -2209,6 +2249,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   companyName={companyName}
                   primaryPhone={primaryPhone}
                   phones={phones}
+                  companyId={companyId}
                 />
               );
             })()}
@@ -2352,6 +2393,17 @@ const ContactRecordPage: NextPageWithLayout = () => {
                           ))}
                           <a
                             href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const firstDeal = allDeals[0];
+                              const id = firstDeal?.id;
+                              const href = id
+                                ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                    String(id),
+                                  )}`
+                                : "/crm/deals";
+                              window.open(href, "_blank", "noopener,noreferrer");
+                            }}
                             style={{
                               fontSize: "13px",
                               color: "#006162",
@@ -2509,6 +2561,17 @@ const ContactRecordPage: NextPageWithLayout = () => {
                           ))}
                           <a
                             href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const firstLead = leads[0];
+                              const id = firstLead?.id;
+                              const href = id
+                                ? `/crm/leads/leads-detailpage?id=${encodeURIComponent(
+                                    String(id),
+                                  )}`
+                                : "/crm/leads";
+                              window.open(href, "_blank", "noopener,noreferrer");
+                            }}
                             style={{
                               fontSize: "13px",
                               color: "#006162",
