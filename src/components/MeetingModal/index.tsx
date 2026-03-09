@@ -253,6 +253,8 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     }
   }, [selectedHost]);
 
+  const canSchedule = title.trim() && location.trim();
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -361,6 +363,10 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   const handleSchedule = async () => {
     if (!title.trim()) {
       alert('Please enter a meeting title');
+      return;
+    }
+    if (!location.trim()) {
+      alert('Please select a location');
       return;
     }
     const cleanAttendees = normalizeEmailList(attendees);
@@ -815,7 +821,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 display: 'block',
                 marginBottom: '8px'
               }}>
-                Location
+                Location *
               </label>
               <button
                 onClick={() => setShowLocationDropdown(!showLocationDropdown)}
@@ -1031,28 +1037,28 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
           >
             <button
               onClick={handleSchedule}
-              disabled={!title.trim() || scheduleLoading}
+              disabled={!canSchedule || scheduleLoading}
               style={{
                 padding: '10px 24px',
-                backgroundColor: title.trim() && !scheduleLoading ? '#cbd5e0' : '#e2e8f0',
+                backgroundColor: canSchedule && !scheduleLoading ? '#cbd5e0' : '#e2e8f0',
                 color: '#141414',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
-                cursor: title.trim() && !scheduleLoading ? 'pointer' : 'not-allowed',
+                cursor: canSchedule && !scheduleLoading ? 'pointer' : 'not-allowed',
                 transition: 'background-color 0.2s',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
               }}
               onMouseEnter={(e) => {
-                if (title.trim() && !scheduleLoading) {
+                if (canSchedule && !scheduleLoading) {
                   e.currentTarget.style.backgroundColor = '#b8c5d0';
                 }
               }}
               onMouseLeave={(e) => {
-                if (title.trim() && !scheduleLoading) {
+                if (canSchedule && !scheduleLoading) {
                   e.currentTarget.style.backgroundColor = '#cbd5e0';
                 }
               }}

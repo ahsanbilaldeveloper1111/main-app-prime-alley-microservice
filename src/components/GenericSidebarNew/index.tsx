@@ -65,6 +65,7 @@ import {
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
@@ -5077,6 +5078,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const hasEmail = emailList.length > 0;
   const hasPhone = phoneList.length > 0;
 
+  // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
+  const activityRecordTypeForModals =
+    recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
+      ? (recordType as "prospect" | "lead" | "deal" | "order")
+      : undefined;
+  const activityRecordIdForModals =
+    activityRecordTypeForModals && recordId != null && !Number.isNaN(Number(recordId))
+      ? Number(recordId)
+      : undefined;
+
+  const activityModals =
+    activityRecordTypeForModals && activityRecordIdForModals != null
+      ? useCrmActivityModals({
+          recordType: activityRecordTypeForModals,
+          recordId: activityRecordIdForModals,
+          recordName: title,
+          recordEmail: emailList[0] ?? "",
+          recordPhone: phoneList[0] ?? "",
+        })
+      : null;
+
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(),
   );
@@ -5254,6 +5276,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleNoteClick = () => {
+    if (activityModals) {
+      activityModals.openNote();
+      return;
+    }
     setShowNotesModal(true);
   };
 
@@ -5293,6 +5319,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleEmailClick = () => {
+    if (activityModals) {
+      activityModals.openEmail();
+      return;
+    }
     setShowEmailModal(true);
   };
 
@@ -5346,6 +5376,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleTaskClick = () => {
+    if (activityModals) {
+      activityModals.openTask();
+      return;
+    }
     setShowTaskModal(true);
   };
 
@@ -5447,6 +5481,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
 
   const handleMeetingClick = () => {
+    if (activityModals) {
+      activityModals.openMeeting();
+      return;
+    }
     setShowMeetingModal(true);
   };
 
@@ -5527,6 +5565,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleWhatsAppClick = () => {
+    if (activityModals) {
+      activityModals.openWhatsApp();
+      return;
+    }
     setShowWhatsAppModal(true);
   };
 
@@ -5564,6 +5606,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleSmsClick = () => {
+    if (activityModals) {
+      activityModals.openSms();
+      return;
+    }
     setShowSmsModal(true);
   };
 
@@ -5640,7 +5686,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       case "log-sms":
       case "log-meeting":
       case "log-email":
-        goToProspectDetailActivity();
+        if (activityModals) {
+          if (actionId === "log-whatsapp") {
+            activityModals.openWhatsApp();
+          } else if (actionId === "log-sms") {
+            activityModals.openSms();
+          } else if (actionId === "log-meeting") {
+            activityModals.openMeeting();
+          } else if (actionId === "log-email") {
+            activityModals.openEmail();
+          }
+        } else {
+          goToProspectDetailActivity();
+        }
         break;
       default:
         break;
@@ -7324,42 +7382,49 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         `}
       </style>
 
-      {/* Notes Modal - Rendered as floating window */}
-      <NotesModal
-        isOpen={showNotesModal}
-        onClose={handleNoteClose}
-        recordName={title}
-        onSave={handleNoteSave}
-      />
+      {/* Notes / Email / Task / Meeting / SMS / WhatsApp modals */}
+      {activityModals ? (
+        <>{activityModals.modals}</>
+      ) : (
+        <>
+          {/* Notes Modal - Rendered as floating window */}
+          <NotesModal
+            isOpen={showNotesModal}
+            onClose={handleNoteClose}
+            recordName={title}
+            onSave={handleNoteSave}
+          />
 
-      {/* Email Modal - Rendered as floating window */}
-      <EmailModal
-        isOpen={showEmailModal}
-        onClose={handleEmailClose}
-        recipientEmail={emailList[0]}
-        recipientName={title}
-        senderEmail={senderEmail}
-        senderName={senderName}
-        contextPayload={
-          contextPayload
-            ? {
-                lead: contextPayload.lead,
-                deal: contextPayload.deal,
-                order: contextPayload.order,
-              }
-            : undefined
-        }
-        onSend={(emailData) => handleEmailSend(emailData, record)}
-      />
+          {/* Email Modal - Rendered as floating window */}
+          <EmailModal
+            isOpen={showEmailModal}
+            onClose={handleEmailClose}
+            recipientEmail={emailList[0]}
+            recipientName={title}
+            senderEmail={senderEmail}
+            senderName={senderName}
+            contextPayload={
+              contextPayload
+                ? {
+                    lead: contextPayload.lead,
+                    deal: contextPayload.deal,
+                    order: contextPayload.order,
+                  }
+                : undefined
+            }
+            onSend={(emailData) => handleEmailSend(emailData, record)}
+          />
 
-      {/* Task Modal - Rendered as floating window */}
-      <TaskModal
-        isOpen={showTaskModal}
-        onClose={handleTaskClose}
-        assignedTo={title}
-        assignedToName={title}
-        onSave={handleTaskSave}
-      />
+          {/* Task Modal - Rendered as floating window */}
+          <TaskModal
+            isOpen={showTaskModal}
+            onClose={handleTaskClose}
+            assignedTo={title}
+            assignedToName={title}
+            onSave={handleTaskSave}
+          />
+        </>
+      )}
 
       {/* Call Modal - Rendered as floating dropdown */}
       <CallModal
@@ -7386,23 +7451,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       />
 
       {/* Meeting Modal - Rendered as floating window (shared component, same as prospects) */}
-      <MeetingModal
-        isOpen={showMeetingModal}
-        onClose={handleMeetingClose}
-        hostEmail={session?.user?.email ?? ""}
-        hostName={session?.user?.name ?? ""}
-        attendeeEmail={
-          Array.isArray(emailList)
-            ? emailList[0]
-            : typeof emailList === "string"
-              ? emailList
-              : ""
-        }
-        attendeeName={title}
-        recordType={record?.type as any}
-        recordId={record?.id}
-        onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
-      />
+      {!activityModals && (
+        <MeetingModal
+          isOpen={showMeetingModal}
+          onClose={handleMeetingClose}
+          hostEmail={session?.user?.email ?? ""}
+          hostName={session?.user?.name ?? ""}
+          attendeeEmail={
+            Array.isArray(emailList)
+              ? emailList[0]
+              : typeof emailList === "string"
+                ? emailList
+                : ""
+          }
+          attendeeName={title}
+          recordType={record?.type as any}
+          recordId={record?.id}
+          onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
+        />
+      )}
 
       {/* More Actions Modal */}
       <MoreActionsModal
@@ -8256,21 +8323,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Message Modal */}
-      <WhatsAppMessageModal
-        isOpen={showWhatsAppModal}
-        onClose={handleWhatsAppClose}
-        associatedRecords={title ? [title] : []}
-        onSave={handleWhatsAppLog}
-      />
+      {/* WhatsApp / SMS Modals (fallback when shared CRM activity modals are not available) */}
+      {!activityModals && (
+        <>
+          {/* WhatsApp Message Modal */}
+          <WhatsAppMessageModal
+            isOpen={showWhatsAppModal}
+            onClose={handleWhatsAppClose}
+            associatedRecords={title ? [title] : []}
+            onSave={handleWhatsAppLog}
+          />
 
-      {/* SMS Message Modal */}
-      <LogSmsModal
-        isOpen={showSmsModal}
-        onClose={handleSmsClose}
-        associatedRecords={title ? [title] : []}
-        onSave={handleSmsLog}
-      />
+          {/* SMS Message Modal */}
+          <LogSmsModal
+            isOpen={showSmsModal}
+            onClose={handleSmsClose}
+            associatedRecords={title ? [title] : []}
+            onSave={handleSmsLog}
+          />
+        </>
+      )}
     </>
   );
 };
