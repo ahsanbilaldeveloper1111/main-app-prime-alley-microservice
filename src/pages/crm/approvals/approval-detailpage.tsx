@@ -29,6 +29,8 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmProfileSection from "@components/CrmProfileSection";
+import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
+import { toast } from "react-toastify";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -1355,7 +1357,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                 }}
               >
-                {["Message", "Task", "WhatsApp"].map((action) => (
+                {["SMS", "WhatsApp"].map((action) => (
                   <button
                     key={action}
                     onClick={() => setShowMoreActivities(false)}
@@ -1601,227 +1603,38 @@ const DealRecordPage: NextPageWithLayout = () => {
         {activeTab === "about" && (
           <>
             {/* Record Summary */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #cccccc",
-                borderRadius: "10px",
-                marginBottom: "20px",
-                overflow: "hidden",
+            <CrmRecordSummarySection
+              isCollapsed={collapsedSections.has("breeze")}
+              onToggle={() => toggleSection("breeze")}
+              summary={(deal as any)?.crm_summary?.summary ?? null}
+              metaLabel={
+                (deal as any)?.crm_summary?.updated_at
+                  ? `Updated ${new Date(
+                      (deal as any).crm_summary.updated_at,
+                    ).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : undefined
+              }
+              onRefreshClick={async () => {
+                const idNum = Number(dealId || deal?.id);
+                if (!idNum || Number.isNaN(idNum)) {
+                  toast.error("Invalid deal ID");
+                  return;
+                }
+                try {
+                  const refreshed = await getDeal(idNum);
+                  setDeal(refreshed);
+                  toast.success("Summary refreshed");
+                } catch {
+                  toast.error("Failed to refresh summary");
+                }
               }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "16px 20px",
-                  cursor: "pointer",
-                  borderBottom: collapsedSections.has("breeze")
-                    ? "none"
-                    : "1px solid #eaf0f6",
-                }}
-                onClick={() => toggleSection("breeze")}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
-                >
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("breeze")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                    }}
-                  >
-                    Record summary
-                  </h3>
-                  <div
-                    style={{
-                      padding: "3px 10px",
-                      background:
-                        "linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)",
-                      color: "white",
-                      borderRadius: "12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI
-                  </div>
-                </div>
-              </div>
-
-              {!collapsedSections.has("breeze") && (
-                <div style={{ padding: "20px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontSize: "13px",
-                      color: "#141414",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <span>Generated Feb 14, 2026</span>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "2px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Refresh"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      color: "#141414",
-                      lineHeight: "1.6",
-                      marginBottom: "16px",
-                      border: "1px solid #ff9fcc",
-                      padding: "18px 20px",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    {deal?.name ?? "This deal"} is a deal at{" "}
-                    {deal?.company_name ?? "N/A"}, currently in the{" "}
-                    {deal?.stage?.name ?? deal?.status ?? "N/A"} stage. Deal
-                    value: {formatDealAmount(deal)}. Expected close:{" "}
-                    {formatDate(deal?.expected_close_date)}. The deal owner is{" "}
-                    {deal?.assigned_to ?? "N/A"}. Recommended next steps: review
-                    for approval and consider a follow-up call to discuss next
-                    steps.
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #fee",
-                    }}
-                  >
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Good summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Bad summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
-
-                  <button
-                    style={{
-                      marginTop: "16px",
-                      padding: "6px 16px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fff5f7";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
-                </div>
-              )}
-            </div>
+            />
 
             {/* Contact Profile */}
             <CrmProfileSection
@@ -2243,6 +2056,16 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const companyId = (deal as any)?.company?.id ?? null;
+                          const href = companyId
+                            ? `/crm/companies/company-detailpage?id=${encodeURIComponent(
+                                String(companyId),
+                              )}`
+                            : "/crm/companies";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "12px",
                           color: "#141414",
@@ -2404,9 +2227,19 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const id = deal?.id;
+                          const href = id
+                            ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                String(id),
+                              )}`
+                            : "/crm/deals";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "13px",
-                          color: "#006162",
+                          color: " #006162",
                           textDecoration: "none",
                           fontWeight: "500",
                           display: "flex",
@@ -2553,6 +2386,16 @@ const DealRecordPage: NextPageWithLayout = () => {
                       </div>
                       <a
                         href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const ticketId = (deal.ticket as any)?.id;
+                          const href = ticketId
+                            ? `/crm/leads/leads-detailpage?id=${encodeURIComponent(
+                                String(ticketId),
+                              )}`
+                            : "/crm/leads";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
                         style={{
                           fontSize: "13px",
                           color: "#006162",

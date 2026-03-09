@@ -482,8 +482,10 @@ MENU_COLORS: {
     VIEW_INVOICES_BILLING: 'invoices-billing',
     VIEW_ORDER_INVOICES_BILLING: 'view-order-invoices-billing-billing',
     VIEW_PAYMENT_METHODS_BILLING: 'payment-methods-billing',
+    VIEW_QUOTES_BILLING: 'view-quotes-billing',
 
     VIEW_CRM_DASHBOARD: 'dashboard-crm',
+    VIEW_CRM_QUOTES: 'view-crm-quotes',
     VIEW_CRM_CAMPAIGNS: 'view-crm-campaigns',
     VIEW_CRM_DATA_MANAGEMENT: 'view-crm-data-management',
     CREATE_CRM_DATA_MANAGEMENT: 'add-crm-data-management',

@@ -127,6 +127,16 @@ export const GetProducts = async (params: PaginationParams = {}) => {
   }
 };
 
+export const GetCustomerStatements = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.post('accounting/reports/customer-statement', params);
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch customer statements");
+    throw error;
+  }
+};
+
 export const GetProductCategories = async (): Promise<any[]> => {
   try {
     const response = await axiosInstance.get('accounting/get-product-categories');

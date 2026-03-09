@@ -32,6 +32,14 @@ const nextConfig: NextConfig = {
             ...config.resolve.alias,
             '~bootstrap': path.resolve(__dirname, 'node_modules/bootstrap'),
         };
+
+        // Server only: force sockjs-client to use Node WebSocket driver (faye-websocket)
+        // so /api/finesse-ws-stream receives STOMP events in production build.
+        if (isServer) {
+            const sockjsPath = path.resolve(__dirname, 'node_modules/sockjs-client');
+            config.resolve.alias['sockjs-client/lib/transport/browser/websocket'] =
+                path.join(sockjsPath, 'lib/transport/driver/websocket.js');
+        }
         
         // Suppress CSS loader import trace warnings
         config.ignoreWarnings = [

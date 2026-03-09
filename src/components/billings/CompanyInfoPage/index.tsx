@@ -1,7 +1,28 @@
-import { useState } from "react";
-import { Info, Plus, ChevronDown } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Info, Plus } from "lucide-react";
+import { GetCompanyDetails } from "@utils/accounting";
+import { useSession } from "next-auth/react";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+
+function getAddressLines(companyDetails: any): string[] {
+  if (!companyDetails) return [];
+  const p = companyDetails?.profile ?? companyDetails?.billing_address ?? {};
+  const addressStr = companyDetails?.profile?.address;
+  const country = companyDetails?.country ?? p?.country ?? "";
+  if (typeof addressStr === "string" && addressStr.trim()) {
+    const lines = addressStr.split("\n").filter(Boolean);
+    if (country.trim()) lines.push(country.trim());
+    return lines;
+  }
+  const line1 = p?.address_line1 ?? p?.address ?? "";
+  const line2 = p?.address_line2 ?? p?.building ?? "";
+  const city = p?.city ?? p?.region ?? "";
+  const postal = p?.postal_code ?? "";
+  const countryFallback = p?.country ?? country;
+  const parts = [line1, line2, [city, postal].filter(Boolean).join(" "), countryFallback].filter(Boolean);
+  return parts;
+}
 
 const s: Record<string, React.CSSProperties> = {
   page: {
@@ -291,23 +312,59 @@ function SelectField({
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function CompanyInfoPage() {
+  const { data: session } = useSession();
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCompany = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await GetCompanyDetails() as any;
+      setCompanyDetails(res);
+    } catch (err) {
+      console.error("GetCompanyDetails error:", err);
+      setCompanyDetails(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCompany();
+  }, [fetchCompany]);
+
+  const companyName = companyDetails?.name ?? session?.user?.company_name ?? "—";
+  const addressLines = getAddressLines(companyDetails);
+  const addressDisplay = addressLines.length > 0 ? addressLines.join("\n") : null;
+  const trn = companyDetails?.profile?.trn ?? companyDetails?.trn ?? companyDetails?.business_trn ?? companyDetails?.business_trn_number ?? "—";
+  const primaryContactLabel = companyDetails?.primary_contact_name ?? companyDetails?.billing_contact_name
+    ? `${companyDetails.primary_contact_name ?? companyDetails.billing_contact_name}${companyDetails?.email ? ` (${companyDetails.email})` : ""}`
+    : session?.user?.name ?? "—";
+  const billingContactLabel = companyDetails?.billing_contact_name
+    ? `${companyDetails.billing_contact_name}${companyDetails?.billing_email ? ` (${companyDetails.billing_email})` : companyDetails?.email ? ` (${companyDetails.email})` : ""}`
+    : primaryContactLabel;
+
   return (
     <div style={s.page}>
 
       {/* ── Company Information ── */}
       <h1 style={s.pageHeading}>Company Information</h1>
 
+      {loading ? (
+        <div style={{ ...s.card, padding: 40, textAlign: "center" as const, color: "#666", fontFamily: font }}>
+          Loading…
+        </div>
+      ) : (
       <div style={s.card}>
         {/* Company Name */}
         <div style={s.infoRow}>
           <div style={s.infoLeft}>
-            {/* Logo only on first row, spanning vertically */}
             <div style={{ width: 100, flexShrink: 0, display: "flex", alignItems: "flex-start", paddingTop: 4 }}>
               <CompanyLogo />
             </div>
             <div>
               <p style={s.fieldLabel}>Company Name</p>
-              <p style={s.fieldValue}>Prime Alley Technology</p>
+              <p style={s.fieldValue}>{companyName}</p>
             </div>
           </div>
           <button style={s.btnLight}>Edit name</button>
@@ -322,11 +379,8 @@ export default function CompanyInfoPage() {
                 <p style={{ ...s.fieldLabel, margin: 0 }}>Primary Company Address</p>
                 <Info size={14} color="#888" />
               </div>
-              <p style={{ ...s.fieldValue, lineHeight: "24px" }}>
-                office 2208<br />
-                The burlington Tower<br />
-                Business Bay DU<br />
-                United Arab Emirates
+              <p style={{ ...s.fieldValue, lineHeight: "24px", whiteSpace: "pre-line" }}>
+                {addressDisplay ?? "—"}
               </p>
             </div>
           </div>
@@ -339,12 +393,13 @@ export default function CompanyInfoPage() {
             <div style={{ width: 100, flexShrink: 0 }} />
             <div>
               <p style={s.fieldLabel}>Business TRN number</p>
-              <p style={s.fieldValue}>100507016200003</p>
+              <p style={s.fieldValue}>{trn}</p>
             </div>
           </div>
           <button style={s.btnLight}>Edit Business TRN number</button>
         </div>
       </div>
+      )}
 
       {/* ── Points of Contact ── */}
       <div style={{ ...s.sectionHeadingRow, marginTop: 8 }}>
@@ -364,7 +419,8 @@ export default function CompanyInfoPage() {
             label="Select a user"
             required
             requiredNote
-            defaultValue="Rizwan Haider (rizwan@primealley.com)"
+            defaultValue={primaryContactLabel !== "—" ? primaryContactLabel : undefined}
+            placeholder="Select a contact"
           />
           <button style={s.addAnother}>
             <Plus size={14} />
@@ -382,7 +438,8 @@ export default function CompanyInfoPage() {
             label="Select a user"
             required
             requiredNote
-            defaultValue="Rizwan Haider (rizwan@primealley.com)"
+            defaultValue={billingContactLabel !== "—" ? billingContactLabel : undefined}
+            placeholder="Select a contact"
           />
           <button style={s.addAnother}>
             <Plus size={14} />

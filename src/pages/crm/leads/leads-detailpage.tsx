@@ -41,6 +41,7 @@ import CrmActivitiesPanel, {
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
+import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CreateLeadModal from "@components/CreateLeadModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -908,20 +909,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     >
                       <Copy size={14} />
                     </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        color: "#718096",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Link"
-                    >
-                      <Link2 size={14} />
-                    </button>
                   </>
                 ) : (
                   <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
@@ -1068,8 +1055,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 }}
               >
                 {[
-                  { label: "Message", onClick: activityModals.openSms },
-                  { label: "Task", onClick: activityModals.openTask },
+                  { label: "SMS", onClick: activityModals.openSms },
                   { label: "WhatsApp", onClick: activityModals.openWhatsApp },
                 ].map(({ label, onClick }) => (
                   <button
@@ -1387,241 +1373,39 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {activeTab === "about" && (
           <>
             {/* Record Summary */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #cccccc",
-                borderRadius: "10px",
-                marginBottom: "20px",
-                overflow: "hidden",
+            <CrmRecordSummarySection
+              isCollapsed={collapsedSections.has("breeze")}
+              onToggle={() => toggleSection("breeze")}
+              summary={(lead as any)?.crm_summary?.summary ?? null}
+              metaLabel={
+                lead?.updated_at
+                  ? `Updated ${new Date(lead.updated_at).toLocaleDateString(
+                      "en-US",
+                      {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )}`
+                  : undefined
+              }
+              onRefreshClick={async () => {
+                const id = Number(leadId || lead?.id);
+                if (!id || Number.isNaN(id)) {
+                  toast.error("Invalid lead ID");
+                  return;
+                }
+                try {
+                  const refreshed = await getLead(id);
+                  setLead(refreshed);
+                  toast.success("Summary refreshed");
+                } catch {
+                  toast.error("Failed to refresh summary");
+                }
               }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "16px 20px",
-                  cursor: "pointer",
-                  borderBottom: collapsedSections.has("breeze")
-                    ? "none"
-                    : "1px solid #eaf0f6",
-                }}
-                onClick={() => toggleSection("breeze")}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
-                >
-                  <ChevronDown
-                    size={18}
-                    style={{
-                      color: "#141414",
-                      transform: collapsedSections.has("breeze")
-                        ? "rotate(-90deg)"
-                        : "rotate(0deg)",
-                      transition: "transform 0.2s ease",
-                    }}
-                  />
-                  <h3
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: "600",
-                      color: "#141414",
-                      margin: 0,
-                    }}
-                  >
-                    Record summary
-                  </h3>
-                  <div
-                    style={{
-                      padding: "3px 10px",
-                      background:
-                        "linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)",
-                      color: "white",
-                      borderRadius: "12px",
-                      fontSize: "11px",
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI
-                  </div>
-                </div>
-              </div>
-
-              {!collapsedSections.has("breeze") && (
-                <div style={{ padding: "20px" }}>
-                  {(lead as any)?.crm_summary?.summary != null && (
-                    <>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          fontSize: "13px",
-                          color: "#141414",
-                          marginBottom: "12px",
-                        }}
-                      >
-                        {lead?.updated_at && (
-                          <span>
-                            Updated{" "}
-                            {new Date(lead.updated_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
-                          </span>
-                        )}
-                        <button
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: "2px",
-                            cursor: "pointer",
-                            color: "#141414",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                          title="Refresh"
-                        >
-                          <RefreshCw size={12} />
-                        </button>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: "14px",
-                          color: "#141414",
-                          lineHeight: "1.6",
-                          marginBottom: "16px",
-                          border: "1px solid #ff9fcc",
-                          padding: "18px 20px",
-                          borderRadius: "10px",
-                        }}
-                      >
-                        {(lead as any)?.crm_summary?.summary}
-                      </div>
-                    </>
-                  )}
-                  {(lead as any)?.crm_summary?.summary == null && (
-                    <div style={{ fontSize: "14px", color: "#718096" }}>
-                      No summary available.
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #fee",
-                    }}
-                  >
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Good summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsUp size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Bad summary"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <ThumbsDown size={16} />
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "6px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f7fafc";
-                        e.currentTarget.style.color = "#2d3748";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                        e.currentTarget.style.color = "#141414";
-                      }}
-                    >
-                      <Copy size={16} />
-                    </button>
-                  </div>
-
-                  <button
-                    style={{
-                      marginTop: "16px",
-                      padding: "6px 16px",
-                      backgroundColor: "transparent",
-                      border: "1px solid #d20688",
-                      borderRadius: "20px",
-                      fontSize: "12px",
-                      fontWeight: "500",
-                      color: "#d20688",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#fff5f7";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    <Sparkles size={16} />
-                    Ask a question
-                  </button>
-                </div>
-              )}
-            </div>
+            />
 
             {/* Contact Profile */}
             <div
@@ -1976,21 +1760,32 @@ const ContactRecordPage: NextPageWithLayout = () => {
                               </p>
                             </div>
                           ))}
-                          <a
-                            href="#"
-                            style={{
-                              fontSize: "13px",
-                              color: "#006162",
-                              textDecoration: "none",
-                              fontWeight: "500",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                            }}
-                          >
-                            View all associated Deals
-                            <ExternalLink size={12} />
-                          </a>
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const firstDeal = allDeals[0];
+                          const id = firstDeal?.id;
+                          const href = id
+                            ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                String(id),
+                              )}`
+                            : "/crm/deals";
+                          window.open(href, "_blank", "noopener,noreferrer");
+                        }}
+                        style={{
+                          fontSize: "13px",
+                          color: "#006162",
+                          textDecoration: "none",
+                          fontWeight: "500",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        View all associated Deals
+                        <ExternalLink size={12} />
+                      </a>
                         </>
                       )}
                     </div>

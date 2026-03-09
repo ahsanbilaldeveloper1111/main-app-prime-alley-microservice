@@ -7,9 +7,48 @@
  * 502 with app on SSL: reverse proxy (nginx/Apache) in front of Next.js is closing long-lived
  * SSE. Fix: disable buffering and set long timeouts for this path. See
  * docs/FINESSE-WS-STREAM-502-FIX.md and ci/nginx-finesse-ws-stream.conf.example.
+ *
+ * Production fix: In production build, Next may bundle sockjs-client with its "browser" driver,
+ * which relies on global.WebSocket (undefined in Node). Polyfill it with the "ws" package so
+ * SockJS can connect and receive socket events.
  */
-
 import { Client } from '@stomp/stompjs';
+
+// Ensure Node has WebSocket for sockjs-client when this API route runs in production.
+// The browser build of sockjs-client expects (1) global.WebSocket and (2) message/close
+// handlers to receive browser-style events (e.data, e.code, e.reason). The "ws" package
+// passes (data) and (code, reason) directly. Wrap "ws" so sockjs gets the expected shape.
+if (typeof global !== 'undefined' && typeof global.WebSocket === 'undefined') {
+  try {
+    const Ws = require('ws');
+    class NodeWebSocketBrowserAdapter {
+      constructor(url, protocols) {
+        this._ws = new Ws(url, protocols);
+        this._ws.on('message', (data) => {
+          if (this.onmessage) this.onmessage({ data });
+        });
+        this._ws.on('close', (code, reason) => {
+          if (this.onclose) this.onclose({ code, reason: reason && reason.toString() });
+        });
+        this._ws.on('error', (err) => {
+          if (this.onerror) this.onerror(err);
+        });
+      }
+      send(data) {
+        this._ws.send(data);
+      }
+      close() {
+        this._ws.close();
+      }
+      get readyState() {
+        return this._ws.readyState;
+      }
+    }
+    global.WebSocket = NodeWebSocketBrowserAdapter;
+  } catch (_) {
+    // ignore if ws not available
+  }
+}
 
 const KEEP_ALIVE_MS = 30_000;
 const DEFAULT_BACKEND = 'http://localhost:8010';
@@ -254,7 +293,7 @@ export default async function handler(req, res) {
       connectHeaders: { Authorization: `Bearer ${token}` },
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
-      reconnectDelay: 0,
+      reconnectDelay: 5000,
       connectionTimeout: 10000,
       debug: isDev
         ? (str) => {
@@ -263,7 +302,7 @@ export default async function handler(req, res) {
               console.log('[Finesse STOMP]', s.substring(0, 120));
             }
           }
-        : undefined,
+        : () => {},
       onConnect: () => {
         connectionPool.set(connectionKey, {
           client,
