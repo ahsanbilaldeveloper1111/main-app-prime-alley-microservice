@@ -834,13 +834,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
        
 
-        {
-          id: 'voicebot-inbound-separator',
-          title: '---',
-          icon: null,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: ''
-        },
+        // {
+        //   id: 'voicebot-inbound-separator',
+        //   title: '---',
+        //   icon: null,
+        //   permission: PERMISSIONS.AI_ML_SERVICES,
+        //   url: ''
+        // },
         {
           id: 'voicebot-outbound-overview',
           title: 'Outbound Overview',

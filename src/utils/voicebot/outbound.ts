@@ -155,8 +155,40 @@ export const deleteVoicebot = async (botId: string, params?: { company_id?: stri
 // 3) Campaigns Management
 // ---------------------------------------------------------------------------
 
+export interface ListCampaignsParams {
+  company_id?: string;
+  voicebot_id?: number | string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}
+
+/** Create campaign payload (POST /campaigns/) */
+export interface CreateCampaignPayload {
+  company_id: string;
+  name: string;
+  description?: string;
+  voicebot_id?: number;
+  trunk_id?: string;
+  caller_id?: string;
+  target_list?: string[];
+  schedule_start?: string;
+  schedule_end?: string;
+  retry_attempts?: number;
+  retry_interval_minutes?: number;
+  status?: string;
+}
+
+/** Update campaign payload (PUT /campaigns/:campaign_id/) */
+export interface UpdateCampaignPayload {
+  company_id?: string;
+  name?: string;
+  description?: string;
+  retry_attempts?: number;
+}
+
 /** GET /campaigns - Get campaigns */
-export const getCampaigns = async (params?: Record<string, unknown>) => {
+export const getCampaigns = async (params?: ListCampaignsParams) => {
   try {
     const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}`, { params });
     return response.data;
@@ -166,7 +198,7 @@ export const getCampaigns = async (params?: Record<string, unknown>) => {
 };
 
 /** POST /campaigns - Create campaign */
-export const postCampaigns = async (payload: Record<string, unknown>) => {
+export const postCampaigns = async (payload: CreateCampaignPayload | Record<string, unknown>) => {
   try {
     const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}`, payload);
     return response.data;
@@ -176,9 +208,9 @@ export const postCampaigns = async (payload: Record<string, unknown>) => {
 };
 
 /** GET /campaigns/{campaignId} - Get campaign by id */
-export const getCampaign = async (campaignId: string) => {
+export const getCampaign = async (campaignId: string, params?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}`);
+    const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}`, { params });
     return response.data;
   } catch (error) {
     throw error;
@@ -186,7 +218,7 @@ export const getCampaign = async (campaignId: string) => {
 };
 
 /** PUT /campaigns/{campaignId} - Update campaign */
-export const putCampaign = async (campaignId: string, payload: Record<string, unknown>) => {
+export const putCampaign = async (campaignId: string, payload: UpdateCampaignPayload | Record<string, unknown>) => {
   try {
     const response = await axiosInstance.put(`${PREFIX_CAMPAIGNS}/${campaignId}`, payload);
     return response.data;
@@ -196,9 +228,9 @@ export const putCampaign = async (campaignId: string, payload: Record<string, un
 };
 
 /** DELETE /campaigns/{campaignId} - Delete campaign */
-export const deleteCampaign = async (campaignId: string) => {
+export const deleteCampaign = async (campaignId: string, params?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.delete(`${PREFIX_CAMPAIGNS}/${campaignId}`);
+    const response = await axiosInstance.delete(`${PREFIX_CAMPAIGNS}/${campaignId}`, { params });
     return response.data;
   } catch (error) {
     throw error;
@@ -220,9 +252,9 @@ export const postCampaignDispatch = async (campaignId: string, payload?: Record<
 };
 
 /** POST /campaigns/{campaignId}/pause - Pause campaign */
-export const postCampaignPause = async (campaignId: string) => {
+export const postCampaignPause = async (campaignId: string, payload?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/pause`);
+    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/pause`, payload ?? {});
     return response.data;
   } catch (error) {
     throw error;
@@ -230,9 +262,9 @@ export const postCampaignPause = async (campaignId: string) => {
 };
 
 /** POST /campaigns/{campaignId}/resume - Resume campaign */
-export const postCampaignResume = async (campaignId: string) => {
+export const postCampaignResume = async (campaignId: string, payload?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/resume`);
+    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/resume`, payload ?? {});
     return response.data;
   } catch (error) {
     throw error;
@@ -240,9 +272,9 @@ export const postCampaignResume = async (campaignId: string) => {
 };
 
 /** POST /campaigns/{campaignId}/stop - Stop campaign */
-export const postCampaignStop = async (campaignId: string) => {
+export const postCampaignStop = async (campaignId: string, payload?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/stop`);
+    const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/stop`, payload ?? {});
     return response.data;
   } catch (error) {
     throw error;
@@ -250,9 +282,9 @@ export const postCampaignStop = async (campaignId: string) => {
 };
 
 /** GET /campaigns/{campaignId}/status - Get campaign status */
-export const getCampaignStatus = async (campaignId: string) => {
+export const getCampaignStatus = async (campaignId: string, params?: Record<string, unknown>) => {
   try {
-    const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}/status`);
+    const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}/status`, { params });
     return response.data;
   } catch (error) {
     throw error;
