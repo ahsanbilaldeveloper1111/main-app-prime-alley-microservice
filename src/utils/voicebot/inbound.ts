@@ -8,6 +8,7 @@ const PREFIX = "/voicebot-platform";
 
 export interface ListCompaniesParams {
   show_inactive?: boolean;
+  company_id?: string;
 }
 
 export interface CreateCompanyPayload {
@@ -31,6 +32,7 @@ export interface UpdateCompanyPayload {
   subscription_tier?: string;
   max_bots?: number;
   max_calls_per_month?: number;
+  company_id?: string;
 }
 
 /** GET /companies/ - List companies. Set show_inactive=true to include inactive. */

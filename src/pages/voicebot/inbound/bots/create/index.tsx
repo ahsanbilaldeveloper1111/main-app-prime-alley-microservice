@@ -1,0 +1,1013 @@
+import "@assets/scss/datatable-style.scss";
+import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import {
+  getCompanies,
+  getBot,
+  postBots,
+  putBot,
+  type CreateBotPayload,
+  type BotConfiguration,
+  type UpdateBotPayload,
+} from "@utils/voicebot/inbound";
+import { Form, Spinner, Tab } from "react-bootstrap";
+import { toast } from "react-toastify";
+import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
+import PageHeader from "@components/PageHeader";
+import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone, Check, ChevronDown } from "lucide-react";
+import OverlayTrigger from "react-bootstrap/OverlayTrigger";
+import Tooltip from "react-bootstrap/Tooltip";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+
+const VOICE_OPTIONS = [
+  "alloy",
+  "echo",
+  "fable",
+  "onyx",
+  "nova",
+  "shimmer",
+];
+
+const LLM_MODEL_OPTIONS = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-4-turbo",
+  "gpt-3.5-turbo",
+];
+
+const defaultConfig: BotConfiguration = {
+  instructions: "You are a helpful AI assistant. Answer questions clearly and concisely.",
+  knowledge_base: "",
+  voice_name: "alloy",
+  voice_model: "gpt-4o-mini-tts",
+  voice_speed: 1,
+  voice_instructions: "",
+  greeting_message: "Hello! I'm here to help you. How can I assist you today?",
+  llm_model: "gpt-4o-mini",
+  temperature: 0.7,
+  max_tokens: 1000,
+  transfer_enabled: true,
+  transfer_number: "",
+  max_duration: 1800,
+  idle_timeout: 300,
+  allow_interruptions: true,
+  noise_cancellation: true,
+  min_endpointing_delay: 0.05,
+  sip_trunk_id: "",
+  phone_number: "",
+};
+
+interface CompanyOption {
+  id: string;
+  company_id?: string;
+  name: string;
+}
+
+const TAB_KEYS = {
+  basic: "basic",
+  configuration: "configuration",
+  voice: "voice",
+  llm: "llm",
+  behavior: "behavior",
+  sip: "sip",
+} as const;
+
+const TAB_ORDER: string[] = [
+  TAB_KEYS.basic,
+  TAB_KEYS.configuration,
+  TAB_KEYS.voice,
+  TAB_KEYS.llm,
+  TAB_KEYS.behavior,
+  TAB_KEYS.sip,
+];
+
+const TABS = [
+  { id: TAB_KEYS.basic, label: "Basic Information", icon: FileText },
+  { id: TAB_KEYS.configuration, label: "Configuration", icon: Settings },
+  { id: TAB_KEYS.voice, label: "Voice Settings", icon: Mic },
+  { id: TAB_KEYS.llm, label: "LLM Settings", icon: Cpu },
+  { id: TAB_KEYS.behavior, label: "Behavior", icon: Shield },
+  { id: TAB_KEYS.sip, label: "SIP Settings", icon: Phone },
+];
+
+const VoicebotInboundBotsCreate = () => {
+  const router = useRouter();
+  const botId = router.query.id as string | undefined;
+  const isEditMode = Boolean(botId);
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const userCompanyIdentifier = (session?.user as { company_identifier?: string } | undefined)?.company_identifier ?? "";
+  const userCompanyName = (session?.user as { company_name?: string } | undefined)?.company_name ?? userCompanyIdentifier;
+  const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingBot, setLoadingBot] = useState(isEditMode);
+  const [submitting, setSubmitting] = useState(false);
+  const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
+  const [form, setForm] = useState<CreateBotPayload>({
+    company: "",
+    name: "",
+    description: "",
+    status: "draft",
+    configuration: { ...defaultConfig },
+  });
+
+  const fetchCompanies = useCallback(async () => {
+    setLoadingCompanies(true);
+    try {
+      const res = await getCompanies({ show_inactive: false });
+      const list = Array.isArray(res) ? res : (res as { results?: unknown[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
+      const opts = (Array.isArray(list) ? list : []).map((c: { company_id?: string; id?: string; name?: string }) => ({
+        id: c.company_id ?? c.id ?? "",
+        company_id: c.company_id ?? c.id,
+        name: c.name ?? "",
+      }));
+      setCompanies(opts);
+      if (opts.length && !form.company) {
+        setForm((f) => ({ ...f, company: opts[0].id }));
+      }
+    } catch (_) {
+      setCompanies([]);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, [fetchCompanies]);
+
+  useEffect(() => {
+    if (!isAdmin && userCompanyIdentifier) {
+      setForm((f) => ({ ...f, company: userCompanyIdentifier }));
+    }
+  }, [isAdmin, userCompanyIdentifier]);
+
+  useEffect(() => {
+    if (!isEditMode || !botId) return;
+    setLoadingBot(true);
+    getBot(botId)
+      .then((data: Record<string, unknown>) => {
+        const company = (data.company as string) ?? "";
+        const configuration = { ...defaultConfig, ...(data.configuration as Record<string, unknown>) };
+        setForm({
+          company,
+          name: (data.name as string) ?? "",
+          description: (data.description as string) ?? "",
+          status: (data.status as string) ?? "draft",
+          configuration: configuration as BotConfiguration,
+        });
+      })
+      .catch(() => {
+        toast.error("Failed to load bot");
+        router.push("/voicebot/inbound/bots");
+      })
+      .finally(() => setLoadingBot(false));
+  }, [isEditMode, botId, router]);
+
+  const updateConfig = (key: keyof BotConfiguration, value: unknown) => {
+    setForm((f) => ({
+      ...f,
+      configuration: { ...f.configuration, [key]: value },
+    }));
+  };
+
+  /** Build API payload from form state. Shape matches POST /bots/ (company, name, description, status, configuration). */
+  const buildCreateBotPayload = (): CreateBotPayload => {
+    const c = form.configuration ?? defaultConfig;
+    const num = (v: unknown, def: number, parse: (s: string) => number) =>
+      typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
+    return {
+      company: form.company,
+      name: form.name?.trim() ?? "",
+      description: form.description?.trim() ?? "",
+      status: form.status ?? "draft",
+      configuration: {
+        instructions: c.instructions?.trim() ?? "",
+        knowledge_base: c.knowledge_base?.trim() ?? "",
+        voice_name: c.voice_name ?? "alloy",
+        voice_model: c.voice_model ?? "gpt-4o-mini-tts",
+        voice_speed: num(c.voice_speed, 1, parseFloat),
+        voice_instructions: c.voice_instructions?.trim() ?? "",
+        llm_model: c.llm_model ?? "gpt-4o-mini",
+        temperature: num(c.temperature, 0.7, parseFloat),
+        max_tokens: num(c.max_tokens, 1000, (s) => parseInt(s, 10)),
+        greeting_message: c.greeting_message?.trim() ?? "",
+        transfer_enabled: Boolean(c.transfer_enabled),
+        transfer_number: c.transfer_number?.trim() ?? "",
+        max_duration: num(c.max_duration, 1800, (s) => parseInt(s, 10)),
+        idle_timeout: num(c.idle_timeout, 300, (s) => parseInt(s, 10)),
+        sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
+        phone_number: c.phone_number?.trim() ?? "",
+        allow_interruptions: Boolean(c.allow_interruptions),
+        min_endpointing_delay: num(c.min_endpointing_delay, 0.05, parseFloat),
+        noise_cancellation: Boolean(c.noise_cancellation),
+      },
+    };
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.company) {
+      toast.error("Please select a company");
+      return;
+    }
+    if (!form.name?.trim()) {
+      toast.error("Bot Name is required");
+      return;
+    }
+    if (!form.description?.trim()) {
+      toast.error("Description is required");
+      return;
+    }
+    if (!form.configuration?.instructions?.trim()) {
+      toast.error("Instructions are required");
+      return;
+    }
+    if (!form.configuration?.knowledge_base?.trim()) {
+      toast.error("Knowledge Base is required");
+      return;
+    }
+    if (!form.configuration?.voice_instructions?.trim()) {
+      toast.error("Voice Instructions are required");
+      return;
+    }
+    if (!form.configuration?.transfer_number?.trim()) {
+      toast.error("Transfer Number is required");
+      return;
+    }
+    if (!form.configuration?.sip_trunk_id?.trim()) {
+      toast.error("SIP Trunk ID is required");
+      return;
+    }
+    if (!form.configuration?.phone_number?.trim()) {
+      toast.error("Phone Number is required");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (isEditMode && botId) {
+        const c = form.configuration ?? defaultConfig;
+        const num = (v: unknown, def: number, parse: (s: string) => number) =>
+          typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
+        const updatePayload: UpdateBotPayload = {
+          name: form.name?.trim() ?? "",
+          description: form.description?.trim() ?? "",
+          status: form.status ?? "draft",
+          configuration: {
+            instructions: c.instructions?.trim() ?? "",
+            knowledge_base: c.knowledge_base?.trim() ?? "",
+            voice_name: c.voice_name ?? "alloy",
+            voice_model: c.voice_model ?? "gpt-4o-mini-tts",
+            voice_speed: num(c.voice_speed, 1, parseFloat),
+            voice_instructions: c.voice_instructions?.trim() ?? "",
+            llm_model: c.llm_model ?? "gpt-4o-mini",
+            temperature: num(c.temperature, 0.7, parseFloat),
+            max_tokens: num(c.max_tokens, 1000, (s) => parseInt(s, 10)),
+            greeting_message: c.greeting_message?.trim() ?? "",
+            transfer_enabled: Boolean(c.transfer_enabled),
+            transfer_number: c.transfer_number?.trim() ?? "",
+            max_duration: num(c.max_duration, 1800, (s) => parseInt(s, 10)),
+            idle_timeout: num(c.idle_timeout, 300, (s) => parseInt(s, 10)),
+            sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
+            phone_number: c.phone_number?.trim() ?? "",
+            allow_interruptions: Boolean(c.allow_interruptions),
+            min_endpointing_delay: num(c.min_endpointing_delay, 0.05, parseFloat),
+            noise_cancellation: Boolean(c.noise_cancellation),
+          },
+        };
+        await putBot(botId, updatePayload);
+        toast.success("Bot updated");
+      } else {
+        const payload = buildCreateBotPayload();
+        await postBots(payload);
+        toast.success("Bot created");
+      }
+      router.push("/voicebot/inbound/bots");
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      toast.error(axErr?.response?.data?.detail || axErr?.message || (isEditMode ? "Failed to update bot" : "Failed to create bot"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    router.push("/voicebot/inbound/bots");
+  };
+
+  const currentTabIndex = TAB_ORDER.indexOf(activeTab);
+  const isFirstTab = currentTabIndex <= 0;
+  const isLastTab = currentTabIndex >= TAB_ORDER.length - 1;
+
+  const goPrev = () => {
+    if (!isFirstTab) setActiveTab(TAB_ORDER[currentTabIndex - 1]);
+  };
+  const goNext = () => {
+    if (!isLastTab) setActiveTab(TAB_ORDER[currentTabIndex + 1]);
+  };
+
+  const cfg = form.configuration ?? defaultConfig;
+
+  const validationItems = [
+    {
+      id: "basic",
+      label: "Basic Information",
+      checked: !!(form.name?.trim() && form.company && form.description?.trim()),
+      message: form.name?.trim() && form.company && form.description?.trim()
+        ? `Bot "${form.name.trim()}", company and description set`
+        : "Provide bot name, company and description",
+    },
+    {
+      id: "config",
+      label: "Configuration",
+      checked: !!(cfg.instructions?.trim() && cfg.knowledge_base?.trim()),
+      message: cfg.instructions?.trim() && cfg.knowledge_base?.trim()
+        ? "Instructions and knowledge base configured"
+        : "Instructions and knowledge base are required",
+    },
+    {
+      id: "voice",
+      label: "Voice Settings",
+      checked: !!(cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim()),
+      message: cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim()
+        ? `Voice, greeting and voice instructions set`
+        : "Set voice, greeting message and voice instructions",
+    },
+    {
+      id: "llm",
+      label: "LLM Settings",
+      checked: !!(cfg.llm_model && cfg.max_tokens),
+      message: cfg.llm_model && cfg.max_tokens
+        ? `${cfg.llm_model}, max ${cfg.max_tokens} tokens`
+        : "Select LLM model and max tokens",
+    },
+    {
+      id: "behavior",
+      label: "Behavior",
+      checked: !!cfg.transfer_number?.trim(),
+      message: cfg.transfer_number?.trim()
+        ? "Transfer number configured"
+        : "Transfer number is required",
+    },
+    {
+      id: "sip",
+      label: "SIP Settings",
+      checked: !!(cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim()),
+      message: cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim()
+        ? "SIP trunk ID and phone number set"
+        : "SIP Trunk ID and phone number are required",
+    },
+  ];
+
+  const inputStyle = {
+    width: "100%" as const,
+    padding: "10px 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: "6px",
+    fontSize: "14px",
+    color: "#1f2937",
+  };
+  const labelStyle = {
+    display: "block" as const,
+    fontSize: "13px",
+    fontWeight: 500 as const,
+    color: "#6b7280",
+    marginBottom: "6px",
+  };
+
+  if (loadingBot) {
+    return (
+      <React.Fragment>
+        <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Bots - Edit" />
+        <PageHeader title="Edit Inbound Bot" showSearch={false} />
+        <div className="d-flex justify-content-center align-items-center p-5">
+          <Spinner animation="border" />
+        </div>
+      </React.Fragment>
+    );
+  }
+
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle={isEditMode ? "Voicebot Inbound - Bots - Edit" : "Voicebot Inbound - Bots - Create"} />
+      <PageHeader title={isEditMode ? "Edit Inbound Bot" : "Create Inbound Bot"} showSearch={false} />
+
+      {/* Tab navigation */}
+      <div style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb" }}>
+        <div style={{ maxWidth: "1600px", margin: "0 auto", display: "flex", gap: "8px", overflowX: "auto" }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 20px",
+                border: "none",
+                backgroundColor: "transparent",
+                color: activeTab === tab.id ? "#667eea" : "#9ca3af",
+                fontWeight: activeTab === tab.id ? 600 : 500,
+                fontSize: "14px",
+                cursor: "pointer",
+                borderBottom: activeTab === tab.id ? "3px solid #667eea" : "3px solid transparent",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <div
+                style={{
+                  width: "24px",
+                  height: "24px",
+                  borderRadius: "50%",
+                  backgroundColor: activeTab === tab.id ? "#667eea" : "#e5e7eb",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <tab.icon size={14} color={activeTab === tab.id ? "white" : "#9ca3af"} />
+              </div>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Form
+        onSubmit={handleSubmit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.preventDefault();
+        }}
+      >
+        <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px 0" }}>
+          <div
+            className="content-grid inbound-bot-create-grid"
+            style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "24px", alignItems: "start" }}
+          >
+            {/* Left column - form card */}
+            <div>
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  padding: "24px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                }}
+              >
+                <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k ?? TAB_KEYS.basic)}>
+                  <Tab.Content>
+                    <Tab.Pane eventKey={TAB_KEYS.basic}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        Basic Information
+                      </h6>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                        <Form.Group className="mb-3">
+                          <Form.Label style={labelStyle}>Bot Name *</Form.Label>
+                          <Form.Control
+                            value={form.name}
+                            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                            required
+                            placeholder="Bot name"
+                            style={inputStyle}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label style={labelStyle}>Company *</Form.Label>
+                          <Form.Select
+                            value={form.company}
+                            onChange={(e) => isAdmin && setForm((f) => ({ ...f, company: e.target.value }))}
+                            required
+                            disabled={loadingCompanies || !isAdmin || isEditMode}
+                            style={inputStyle}
+                          >
+                            <option value="">Select company</option>
+                            {isAdmin
+                              ? companies.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))
+                              : userCompanyIdentifier
+                                ? <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>
+                                : null}
+                          </Form.Select>
+                        </Form.Group>
+                      </div>
+                      <Form.Group className="mb-3">
+                        <Form.Label style={labelStyle}>Description *</Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          value={form.description ?? ""}
+                          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                          placeholder="Description"
+                          required
+                          style={{ ...inputStyle, resize: "vertical" as const }}
+                        />
+                      </Form.Group>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey={TAB_KEYS.configuration}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        Configuration
+                      </h6>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="d-flex align-items-center gap-1" style={labelStyle}>
+                          Instructions *
+                          <OverlayTrigger
+                            placement="top"
+                            overlay={
+                              <Tooltip id="instructions-tooltip">
+                                System instructions for the bot behavior.
+                              </Tooltip>
+                            }
+                          >
+                            <span className="text-muted" style={{ cursor: "pointer" }}>
+                              <HelpCircle size={14} />
+                            </span>
+                          </OverlayTrigger>
+                        </Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          value={cfg.instructions ?? ""}
+                          onChange={(e) => updateConfig("instructions", e.target.value)}
+                          required
+                          placeholder="You are a helpful AI assistant..."
+                          style={{ ...inputStyle, resize: "vertical" as const }}
+                        />
+                      </Form.Group>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="d-flex align-items-center gap-1" style={labelStyle}>
+                          Knowledge Base *
+                          <OverlayTrigger
+                            placement="top"
+                            overlay={
+                              <Tooltip id="kb-tooltip">
+                                Q&A or context the bot can use. e.g. Q1. Question? A1. Answer...
+                              </Tooltip>
+                            }
+                          >
+                            <span className="text-muted" style={{ cursor: "pointer" }}>
+                              <HelpCircle size={14} />
+                            </span>
+                          </OverlayTrigger>
+                        </Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          value={cfg.knowledge_base ?? ""}
+                          onChange={(e) => updateConfig("knowledge_base", e.target.value)}
+                          placeholder={'Q1. What is this company?\nA1. We provide excellent services...'}
+                          required
+                          style={{ ...inputStyle, resize: "vertical" as const }}
+                        />
+                      </Form.Group>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey={TAB_KEYS.voice}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        Voice Settings
+                      </h6>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Voice</Form.Label>
+                            <Form.Select
+                              value={cfg.voice_name ?? "alloy"}
+                              onChange={(e) => updateConfig("voice_name", e.target.value)}
+                              style={inputStyle}
+                            >
+                              {VOICE_OPTIONS.map((v) => (
+                                <option key={v} value={v}>{v}</option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Voice Model</Form.Label>
+                            <Form.Control
+                              value={cfg.voice_model ?? ""}
+                              onChange={(e) => updateConfig("voice_model", e.target.value)}
+                              placeholder="gpt-4o-mini-tts"
+                              disabled
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Voice Speed ({(cfg.voice_speed ?? 1).toFixed(2)})</Form.Label>
+                            <Form.Range
+                              min={0.5}
+                              max={2}
+                              step={0.01}
+                              value={cfg.voice_speed ?? 1}
+                              onChange={(e) => updateConfig("voice_speed", parseFloat(e.target.value))}
+                            />
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
+                              <span>0.50</span>
+                              <span>2.00</span>
+                            </div>
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Voice Instructions *</Form.Label>
+                            <Form.Control
+                              value={cfg.voice_instructions ?? ""}
+                              onChange={(e) => updateConfig("voice_instructions", e.target.value)}
+                              placeholder="Voice-specific instructions"
+                              required
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                      </div>
+                      <Form.Group className="mb-3">
+                        <Form.Label style={labelStyle}>Greeting Message</Form.Label>
+                        <Form.Control
+                          value={cfg.greeting_message ?? ""}
+                          onChange={(e) => updateConfig("greeting_message", e.target.value)}
+                          placeholder="Hello! I'm here to help you. How can I assist you today?"
+                          style={inputStyle}
+                        />
+                      </Form.Group>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey={TAB_KEYS.llm}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        LLM Settings
+                      </h6>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>LLM Model</Form.Label>
+                            <Form.Select
+                              value={cfg.llm_model ?? "gpt-4o-mini"}
+                              onChange={(e) => updateConfig("llm_model", e.target.value)}
+                              disabled
+                              style={inputStyle}
+                            >
+                              {LLM_MODEL_OPTIONS.map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                        </div>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Temperature ({(cfg.temperature ?? 0.7).toFixed(2)})</Form.Label>
+                            <Form.Range
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              value={cfg.temperature ?? 0.7}
+                              onChange={(e) => updateConfig("temperature", parseFloat(e.target.value))}
+                            />
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
+                              <span>0.00</span>
+                              <span>1.00</span>
+                            </div>
+                          </Form.Group>
+                        </div>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Max Tokens</Form.Label>
+                            <Form.Control
+                              type="number"
+                              min={100}
+                              max={4000}
+                              step={100}
+                              value={cfg.max_tokens ?? 1000}
+                              onChange={(e) => updateConfig("max_tokens", parseInt(e.target.value, 10) || 1000)}
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                      </div>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey={TAB_KEYS.behavior}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        Behavior Settings
+                      </h6>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Check
+                              type="switch"
+                              id="transfer-enabled"
+                              label="Enable Transfer"
+                              checked={!!cfg.transfer_enabled}
+                              onChange={(e) => updateConfig("transfer_enabled", e.target.checked)}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Transfer Number *</Form.Label>
+                            <Form.Control
+                              value={cfg.transfer_number ?? ""}
+                              onChange={(e) => updateConfig("transfer_number", e.target.value)}
+                              placeholder="Transfer number"
+                              required
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Max Duration (seconds)</Form.Label>
+                            <Form.Control
+                              type="number"
+                              min={60}
+                              step={60}
+                              value={cfg.max_duration ?? 1800}
+                              onChange={(e) => updateConfig("max_duration", parseInt(e.target.value, 10) || 1800)}
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Idle Timeout (seconds)</Form.Label>
+                            <Form.Control
+                              type="number"
+                              min={30}
+                              step={30}
+                              value={cfg.idle_timeout ?? 300}
+                              onChange={(e) => updateConfig("idle_timeout", parseInt(e.target.value, 10) || 300)}
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                        <div>
+                          <Form.Group className="mb-3">
+                            <Form.Check
+                              type="switch"
+                              id="allow-interruptions"
+                              label="Allow Interruptions"
+                              checked={!!cfg.allow_interruptions}
+                              onChange={(e) => updateConfig("allow_interruptions", e.target.checked)}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Check
+                              type="switch"
+                              id="noise-cancellation"
+                              label="Noise Cancellation"
+                              checked={!!cfg.noise_cancellation}
+                              onChange={(e) => updateConfig("noise_cancellation", e.target.checked)}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>Min Endpointing Delay</Form.Label>
+                            <Form.Control
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              value={cfg.min_endpointing_delay ?? 0.05}
+                              onChange={(e) => updateConfig("min_endpointing_delay", parseFloat(e.target.value) || 0.05)}
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                        </div>
+                      </div>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey={TAB_KEYS.sip}>
+                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                        SIP Settings
+                      </h6>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                        <Form.Group className="mb-3">
+                          <Form.Label style={labelStyle}>SIP Trunk ID *</Form.Label>
+                          <Form.Control
+                            value={cfg.sip_trunk_id ?? ""}
+                            onChange={(e) => updateConfig("sip_trunk_id", e.target.value)}
+                            placeholder="SIP trunk identifier"
+                            required
+                            style={inputStyle}
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label style={labelStyle}>Phone Number *</Form.Label>
+                          <Form.Control
+                            value={cfg.phone_number ?? ""}
+                            onChange={(e) => updateConfig("phone_number", e.target.value)}
+                            placeholder="Phone number"
+                            required
+                            style={inputStyle}
+                          />
+                        </Form.Group>
+                      </div>
+                    </Tab.Pane>
+                  </Tab.Content>
+                </Tab.Container>
+              </div>
+            </div>
+
+            {/* Right column - Validation sidebar */}
+            <div style={{ position: "sticky", top: "24px" }}>
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  padding: "20px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                    Validation Checklist
+                  </h6>
+                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                    {validationItems.filter((item) => item.checked).length}/{validationItems.length} Complete
+                  </span>
+                </div>
+                {validationItems.map((item, index) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      borderBottom: index < validationItems.length - 1 ? "1px solid #f3f4f6" : "none",
+                      paddingBottom: expandedValidation === item.id ? "12px" : "0",
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setExpandedValidation(expandedValidation === item.id ? null : item.id)}
+                      onKeyDown={(e) => e.key === "Enter" && setExpandedValidation(expandedValidation === item.id ? null : item.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 0",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div
+                          style={{
+                            width: "20px",
+                            height: "20px",
+                            borderRadius: "50%",
+                            backgroundColor: item.checked ? "#d1fae5" : "#fee2e2",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {item.checked ? (
+                            <Check size={14} color="#059669" />
+                          ) : (
+                            <span style={{ fontSize: "12px", color: "#dc2626", fontWeight: "bold" }}>!</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 500 }}>{item.label}</span>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        color="#9ca3af"
+                        style={{
+                          transform: expandedValidation === item.id ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.2s",
+                        }}
+                      />
+                    </div>
+                    {expandedValidation === item.id && (
+                      <div
+                        style={{
+                          fontSize: "13px",
+                          color: item.checked ? "#059669" : "#dc2626",
+                          backgroundColor: item.checked ? "#f0fdf4" : "#fef2f2",
+                          padding: "8px 12px 8px 30px",
+                          borderRadius: "6px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {item.message}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom action bar */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: "24px",
+              padding: "24px",
+              backgroundColor: "white",
+              borderRadius: "12px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={submitting}
+              style={{
+                padding: "10px 24px",
+                backgroundColor: "transparent",
+                border: "none",
+                color: "#6b7280",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: submitting ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                opacity: submitting ? 0.6 : 1,
+              }}
+            >
+              ← Cancel
+            </button>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={isFirstTab || submitting}
+                style={{
+                  padding: "10px 24px",
+                  backgroundColor: "transparent",
+                  border: "1px solid #e5e7eb",
+                  color: "#6b7280",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  borderRadius: "8px",
+                  cursor: isFirstTab || submitting ? "not-allowed" : "pointer",
+                  opacity: isFirstTab || submitting ? 0.6 : 1,
+                }}
+              >
+                Previous
+              </button>
+              {isLastTab ? (
+                <button
+                  type="submit"
+                  disabled={submitting || !form.company || !form.name?.trim()}
+                  style={{
+                    padding: "10px 32px",
+                    backgroundColor: submitting || !form.company || !form.name?.trim() ? "#9ca3af" : "#667eea",
+                    border: "none",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    borderRadius: "8px",
+                    cursor: submitting || !form.company || !form.name?.trim() ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {submitting ? <Spinner animation="border" size="sm" /> : null}
+                  {isEditMode ? "Update Bot" : "Create Bot"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  style={{
+                    padding: "10px 32px",
+                    backgroundColor: "#667eea",
+                    border: "none",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  Next →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Form>
+
+      <style>{`
+        .inbound-bot-create-grid select:focus,
+        .inbound-bot-create-grid input:focus,
+        .inbound-bot-create-grid textarea:focus {
+          outline: none;
+          border-color: #667eea;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        @media (max-width: 1200px) {
+          .inbound-bot-create-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+    </React.Fragment>
+  );
+};
+
+VoicebotInboundBotsCreate.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
+};
+
+export default VoicebotInboundBotsCreate;

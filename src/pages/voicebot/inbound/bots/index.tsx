@@ -6,13 +6,11 @@ import GenericTable, { TableColumn } from "@components/GenericTable";
 import {
   getBots,
   postBots,
-  putBot,
   deleteBot,
   publishBot,
   unpublishBot,
   getCompanies,
   type CreateBotPayload,
-  type UpdateBotPayload,
   type BotConfiguration,
 } from "@utils/voicebot/inbound";
 import { Row, Col, Button, Modal, Form, Spinner } from "react-bootstrap";
@@ -21,6 +19,7 @@ import { useRouter } from "next/router";
 import { Plus, Pencil, Trash2, Send, Undo2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
+import { useSession } from "next-auth/react";
 
 interface CompanyOption {
   id: string;
@@ -55,12 +54,13 @@ const defaultConfig: BotConfiguration = {
 
 const BotsPage = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<BotRow | null>(null);
@@ -75,7 +75,7 @@ const BotsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies({ show_inactive: true });
+      const res = await getCompanies({ show_inactive: false });
       const list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
       const opts = (Array.isArray(list) ? list : []).map((c: any) => ({
         id: c.company_id ?? c.id ?? "",
@@ -116,7 +116,7 @@ const BotsPage = () => {
 
   const columns: TableColumn<BotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "description", label: "Description", render: (r) => (r.description as string) || "—" },
+    ...(isAdmin ? [{ key: "company_name", label: "Company", render: (r: BotRow) => (r.company_name as string) || "—" }] : []),
     {
       key: "status",
       label: "Status",
@@ -128,7 +128,7 @@ const BotsPage = () => {
           <span className="status-badge secondary">Draft</span>
         ),
     },
-    { key: "company", label: "Company ID", render: (r) => (r.company as string) || "—" },
+    
     {
       key: "actions",
       label: "Actions",
@@ -137,17 +137,7 @@ const BotsPage = () => {
           <Button
             size="sm"
             variant="outline-primary"
-            onClick={() => {
-              setSelectedRow(row);
-              setForm({
-                company: (row.company as string) ?? "",
-                name: row.name ?? "",
-                description: (row.description as string) ?? "",
-                status: (row.status as string) ?? "draft",
-                configuration: { ...defaultConfig, ...(row.configuration as BotConfiguration) },
-              });
-              setShowEditModal(true);
-            }}
+            onClick={() => router.push(`/voicebot/inbound/bots/edit?id=${encodeURIComponent(botId(row))}`)}
           >
             <Pencil size={14} />
           </Button>
@@ -218,29 +208,6 @@ const BotsPage = () => {
     }
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRow) return;
-    setFormLoading(true);
-    try {
-      const payload: UpdateBotPayload = {
-        name: form.name,
-        description: form.description || undefined,
-        status: form.status,
-        configuration: form.configuration,
-      };
-      await putBot(botId(selectedRow), payload);
-      toast.success("Bot updated");
-      setShowEditModal(false);
-      setSelectedRow(null);
-      fetchBots();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Update failed");
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
   const handleDeleteConfirm = async () => {
     if (!selectedRow) return;
     setDeleteLoading(true);
@@ -303,12 +270,11 @@ const BotsPage = () => {
         <Col md={12}>
           <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2">
-              <Button variant="link" className="p-0" onClick={() => router.push("/voicebot/inbound")}>
-                ← Back
-              </Button>
               <h2 className="mb-0">Bots</h2>
             </div>
             <div className="d-flex align-items-center gap-2">
+              
+              {String(session?.user?.is_admin ?? "") === "1" && (
               <Form.Select
                 style={{ width: "200px" }}
                 value={companyFilter}
@@ -319,7 +285,9 @@ const BotsPage = () => {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Form.Select>
-              <Button variant="primary" onClick={() => { setForm({ ...form, company: companies[0]?.id ?? "" }); setShowAddModal(true); }}>
+              )}
+
+              <Button variant="primary" onClick={() => { router.push("/voicebot/inbound/bots/create"); }}>
                 <Plus size={18} className="me-1" /> Add Bot
               </Button>
             </div>
@@ -388,51 +356,6 @@ const BotsPage = () => {
             <Button variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</Button>
             <Button variant="primary" type="submit" disabled={formLoading || !form.company || !form.name}>
               {formLoading ? <Spinner animation="border" size="sm" /> : "Create"}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setSelectedRow(null); }} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Bot</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleEditSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-2">
-              <Form.Label>Name *</Form.Label>
-              <Form.Control
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-                placeholder="Bot name"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={form.description ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </Form.Select>
-            </Form.Group>
-            {configForm}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowEditModal(false); setSelectedRow(null); }}>Cancel</Button>
-            <Button variant="primary" type="submit" disabled={formLoading || !form.name}>
-              {formLoading ? <Spinner animation="border" size="sm" /> : "Save"}
             </Button>
           </Modal.Footer>
         </Form>
