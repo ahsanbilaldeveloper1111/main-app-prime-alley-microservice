@@ -199,6 +199,77 @@ const ColumnHeader: React.FC<{
 }> = ({ title, count, isCollapsed, isLast, onToggle }) => {
   const [hov, setHov] = useState(false);
 
+  if (isCollapsed) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          height: "100%",
+          minHeight: 120,
+        }}
+      >
+        <div
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{
+            height: HEADER_H,
+            backgroundColor: "#f7f2f7",
+            cursor: "pointer",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "3px",
+            transition: "all 0.2s",
+            opacity: hov ? 0.9 : 1,
+            boxShadow: hov ? "0 2px 4px rgba(0,0,0,0.1)" : "none",
+            marginBottom: 8,
+            border: "1px solid #ccc",
+          }}
+          title={`${title} (${count}) - Click to expand`}
+        >
+          <ChevronRight size={16} style={{ color: "#141414", marginBottom: 2 }} />
+          {count > 0 && (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 600,
+              color: "#141414",
+              fontFamily: FONT,
+              backgroundColor: "#e2e8f0",
+              borderRadius: "8px",
+              padding: "1px 4px",
+              minWidth: 16,
+              textAlign: "center",
+            }}>
+              {count}
+            </span>
+          )}
+        </div>
+        {/* Vertical column name */}
+        <div
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          style={{
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#666",
+            fontFamily: FONT,
+            cursor: "pointer",
+            textAlign: "center",
+            margin: "8px auto",
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}
+          title={`${title} - Click to expand`}
+        >
+          {title}
+        </div>
+      </div>
+    );
+  }
+
   const clipPathValue = isLast
     ? `polygon(0px 0px, 100% 0px, 100% 100%, 0px 100%, ${ARROW_W}px 50%)`
     : `polygon(0px 0px, calc(100% - ${ARROW_W}px) 0px, 100% 50%, calc(100% - ${ARROW_W}px) 100%, 0px 100%, ${ARROW_W}px 50%)`;
