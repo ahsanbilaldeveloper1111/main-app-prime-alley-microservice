@@ -1,0 +1,91 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+      branch:
+        description: "Optional: override branch deployed on server"
+        required: false
+        type: string
+      stage_run_npm:
+        description: "Stage only: run npm install/ci (0 or 1)"
+        required: false
+        type: choice
+        options:
+          - "0"
+          - "1"
+        default: "0"
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  deploy:
+    name: Deploy via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        shell: bash
+        env:
+          # --- SSH (required) ---
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+          # --- Dev env (required when deploying dev) ---
+          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          DEV_SSH_PORT: ${{ secrets.DEV_SSH_PORT }}
+          DEV_APP_DIR: ${{ secrets.DEV_APP_DIR }}
+          DEV_DOTENV: ${{ secrets.DEV_DOTENV }}
+          DEV_SERVICE_NAME: ${{ secrets.DEV_SERVICE_NAME }}
+          DEV_BRANCH: ${{ secrets.DEV_BRANCH }}
+
+          # --- Stage env (required when deploying stage) ---
+          STAGE_SSH_HOST: ${{ secrets.STAGE_SSH_HOST }}
+          STAGE_SSH_USER: ${{ secrets.STAGE_SSH_USER }}
+          STAGE_SSH_PORT: ${{ secrets.STAGE_SSH_PORT }}
+          STAGE_APP_DIR: ${{ secrets.STAGE_APP_DIR }}
+          STAGE_DOTENV: ${{ secrets.STAGE_DOTENV }}
+          STAGE_SERVICE_NAME: ${{ secrets.STAGE_SERVICE_NAME }}
+          STAGE_BRANCH: ${{ secrets.STAGE_BRANCH }}
+
+          # --- Behavior toggles ---
+          STAGE_RUN_NPM: ${{ github.event.inputs.stage_run_npm || '0' }}
+
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ENV="${{ github.event.inputs.environment }}"
+          DEPLOY_BRANCH="${{ github.event.inputs.branch }}"
+
+          if [ -z "$DEPLOY_ENV" ]; then
+            case "${GITHUB_REF_NAME}" in
+              develop) DEPLOY_ENV="dev" ;;
+              main) DEPLOY_ENV="stage" ;;
+              *)
+                echo "No deploy mapping for branch: ${GITHUB_REF_NAME}"
+                echo "Use workflow_dispatch to deploy manually."
+                exit 1
+                ;;
+            esac
+          fi
+
+          chmod +x ./ci/deploy.sh
+          if [ -n "$DEPLOY_BRANCH" ]; then
+            ./ci/deploy.sh "$DEPLOY_ENV" "$DEPLOY_BRANCH"
+          else
+            ./ci/deploy.sh "$DEPLOY_ENV"
+          fi
+

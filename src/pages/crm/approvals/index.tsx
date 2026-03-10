@@ -133,6 +133,7 @@ import { useSession } from "next-auth/react";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
+import { useCti } from "@hooks/useCti";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -467,7 +468,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmDeals = () => {
   const { data: session } = useSession();
   const router = useRouter();
-
+  const { dialNumber, isInitialized } = useCti();
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
@@ -1383,16 +1384,28 @@ const CrmDeals = () => {
 
   const handleCallClick = useCallback(
     async (deal: any) => {
-      const phone = deal?.phone || deal?.rawData?.phone || relatedLead?.phone;
+      const phone = deal?.decision_maker_phone || deal?.crm_data?.phone;
       if (!phone) {
         toast.error("No phone number available for this deal");
         return;
       }
-      // Handle call logic here - similar to leads page
-      // This might integrate with CTI or open a phone dialer
-      console.log("Calling:", phone);
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+      try {
+        const result = await dialNumber(phone);
+        if (result.success) {
+          toast.success(`Calling ${deal?.name || phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
     },
-    [relatedLead],
+    [dialNumber, isInitialized],
   );
 
   const handleNoteCreate = useCallback(
@@ -3570,7 +3583,9 @@ const CrmDeals = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedDeal?.audit_trail)
+                  ? selectedDeal.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this deal.",
@@ -3587,26 +3602,14 @@ const CrmDeals = () => {
                 collapsible: true,
                 defaultExpanded: true,
                 count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedDeal?.phone ||
-                        selectedDeal?.rawData?.phone ||
-                        relatedLead?.phone;
-                      if (phone) {
-                        handleCallClick(selectedDeal);
-                      }
-                    },
+                    onClick: () => 
+                      selectedDeal?.decision_maker_phone &&
+                      handleCallClick(selectedDeal),
                   },
                 },
               },
