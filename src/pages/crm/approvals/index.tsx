@@ -3570,7 +3570,9 @@ const CrmDeals = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedDeal?.audit_trail)
+                  ? selectedDeal.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this deal.",
@@ -3587,12 +3589,6 @@ const CrmDeals = () => {
                 collapsible: true,
                 defaultExpanded: true,
                 count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",

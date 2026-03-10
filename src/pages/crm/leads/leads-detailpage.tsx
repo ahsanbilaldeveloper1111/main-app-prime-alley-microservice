@@ -760,7 +760,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   overflow: "hidden",
                 }}
               >
-                {["Edit", "Delete", "Clone", "Export"].map((action) => (
+                {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
             onClick={() => {
@@ -1584,6 +1584,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   number: p?.number ?? "",
                   type: p?.type ?? null,
                 })) ?? undefined;
+              const companyId =
+                company?.id ??
+                (lead as any)?.company_id ??
+                null;
               return (
                 <CrmAssociatedCompaniesCard
                   sectionId="companies"
@@ -1592,6 +1596,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   companyName={companyName}
                   primaryPhone={primaryPhone}
                   phones={phones}
+                  companyId={companyId}
                 />
               );
             })()}

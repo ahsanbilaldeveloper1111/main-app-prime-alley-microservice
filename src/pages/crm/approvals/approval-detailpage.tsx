@@ -1075,7 +1075,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   overflow: "hidden",
                 }}
               >
-                {["Edit", "Delete", "Clone", "Export"].map((action) => (
+                {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
                     onClick={() => setShowActionsDropdown(false)}

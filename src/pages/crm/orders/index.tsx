@@ -3278,7 +3278,9 @@ const CrmOrders = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedOrder?.audit_trail)
+                  ? selectedOrder.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this order.",
@@ -3294,13 +3296,7 @@ const CrmOrders = () => {
                 icon: PhoneIcon,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
+                count: 0,               
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",

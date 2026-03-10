@@ -6068,21 +6068,32 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Process sections to override note-related actions and enrich "About this prospect" when we have API data
   const processedSections = sections.map((section) => {
-    // If this is a notes section with an empty state action, override it to open modal
-    if (section.id === "notes" && section.emptyState?.action) {
-      return {
+    // If this is a notes section, override:
+    // - the empty state action to open the note modal
+    // - the count to reflect the number of notes fetched for the sidebar
+    if (section.id === "notes") {
+      const updatedSection = {
         ...section,
-        emptyState: {
-          ...section.emptyState,
-          action: {
-            ...section.emptyState.action,
-            onClick: () => {
-              handleNoteClick();
-              section.emptyState?.action?.onClick?.(); // Call original if provided
+        count: sidebarNotesList.length,
+      };
+
+      if (section.emptyState?.action) {
+        return {
+          ...updatedSection,
+          emptyState: {
+            ...section.emptyState,
+            action: {
+              ...section.emptyState.action,
+              onClick: () => {
+                handleNoteClick();
+                section.emptyState?.action?.onClick?.(); // Call original if provided
+              },
             },
           },
-        },
-      };
+        };
+      }
+
+      return updatedSection;
     }
 
     // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status

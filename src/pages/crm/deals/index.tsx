@@ -559,6 +559,14 @@ const CrmDeals = () => {
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
 
+  // Helper function to get name by extension
+  function getNameByExtension(extension: string) {
+    const extensionData = extensions.find(
+      (ext) => ext.id === extension || ext.extension === extension,
+    );
+    return extensionData?.display_name || extensionData?.name || extension;
+  }
+
   // View Modal
   const [showDealViewModal, setShowDealViewModal] = useState(false);
   const [viewingDeal, setViewingDeal] = useState<any>(null);
@@ -3321,11 +3329,8 @@ const CrmDeals = () => {
                   },
                   {
                     label: "Owner",
-                    value:
-                      selectedDeal?.assigned_user?.display_name ||
-                      selectedDeal?.assigned_user?.name ||
-                      selectedDeal?.assignedUser ||
-                      "Unassigned",
+                value: getNameByExtension(
+                  (selectedDeal as any)?.assigned_to) || "Unassigned",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
                   },
@@ -3358,7 +3363,9 @@ const CrmDeals = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedDeal?.audit_trail)
+                  ? selectedDeal.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this deal.",
@@ -3375,12 +3382,6 @@ const CrmDeals = () => {
                 collapsible: true,
                 defaultExpanded: true,
                 count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",

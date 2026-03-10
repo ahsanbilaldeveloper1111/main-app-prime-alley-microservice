@@ -7531,7 +7531,9 @@ const CrmProspectsManagement = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedProspect?.audit_trail)
+                  ? selectedProspect.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this prospect.",

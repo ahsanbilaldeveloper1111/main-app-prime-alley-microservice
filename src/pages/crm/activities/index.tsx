@@ -2168,7 +2168,7 @@ const HistoryPage = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: historyChain.length,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this record.",

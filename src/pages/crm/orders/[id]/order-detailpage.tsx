@@ -625,7 +625,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                   overflow: 'hidden',
                 }}>
-                  {['Edit', 'Delete', 'Clone', 'Export'].map((action) => (
+                  {['Edit', 'Delete', 'Export'].map((action) => (
                     <button
                       key={action}
                       onClick={() => {
@@ -1502,6 +1502,10 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   number: p?.number ?? "",
                   type: p?.type ?? null,
                 })) ?? undefined;
+              const companyId =
+                company?.id ??
+                orderData?.customer_id ??
+                null;
               return (
                 <CrmAssociatedCompaniesCard
                   sectionId="companies"
@@ -1510,6 +1514,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   companyName={companyName}
                   primaryPhone={primaryPhone}
                   phones={phones}
+                  companyId={companyId}
                 />
               );
             })()}

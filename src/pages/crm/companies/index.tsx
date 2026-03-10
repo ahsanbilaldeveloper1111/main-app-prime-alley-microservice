@@ -7434,7 +7434,9 @@ const CrmCompanyManagement = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedCompany?.audit_trail)
+                  ? selectedCompany.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this order.",
@@ -7451,12 +7453,6 @@ const CrmCompanyManagement = () => {
                 collapsible: true,
                 defaultExpanded: true,
                 count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",
