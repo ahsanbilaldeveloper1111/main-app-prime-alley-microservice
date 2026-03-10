@@ -20,10 +20,11 @@ import {
   type CreateCampaignPayload,
   type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
@@ -63,7 +64,12 @@ interface CampaignRow {
   [key: string]: unknown;
 }
 
-const defaultCreateForm: CreateCampaignPayload & { target_list_raw?: string } = {
+const defaultCreateForm: CreateCampaignPayload & {
+  target_list_raw?: string;
+  campaign_script?: string;
+  custom_greeting?: string;
+  input_method?: "manual" | "csv";
+} = {
   company_id: "",
   name: "",
   description: "",
@@ -72,6 +78,9 @@ const defaultCreateForm: CreateCampaignPayload & { target_list_raw?: string } = 
   caller_id: "",
   target_list: [],
   target_list_raw: "",
+  campaign_script: "",
+  custom_greeting: "",
+  input_method: "manual",
   schedule_start: "",
   schedule_end: "",
   retry_attempts: 3,
@@ -88,6 +97,8 @@ const defaultEditForm: UpdateCampaignPayload = {
 
 const CampaignsPage = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CampaignRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
@@ -113,17 +124,21 @@ const CampaignsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies({ show_inactive: true });
+      const res = await GetCompanies();
+      if (res === false) {
+        setCompanies([]);
+        return;
+      }
       const list = Array.isArray(res)
         ? res
-        : (res as { results?: { company_id?: string; id?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; name?: string }[] })?.data ??
+        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
+          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
           [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => ({
-        id: c.company_id ?? (c as { id?: string }).id ?? "",
-        company_id: c.company_id ?? (c as { id?: string }).id,
-        name: (c as { name?: string }).name ?? "",
-      }));
+      const opts = (Array.isArray(list) ? list : []).map((c) => {
+        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
+        const id = item.company_id ?? item.identifier ?? item.id ?? "";
+        return { id, company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
+      });
       setCompanies(opts);
       if (opts.length && !createForm.company_id) setCreateForm((f) => ({ ...f, company_id: opts[0].id }));
     } catch {
@@ -199,6 +214,13 @@ const CampaignsPage = () => {
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
+    if (!isAdmin && companyIdentifier) {
+      setCompanyFilter(companyIdentifier);
+    }
+  }, [isAdmin, session?.user]);
 
   useEffect(() => {
     fetchVoicebots();
@@ -367,13 +389,17 @@ const CampaignsPage = () => {
       toast.error("Company and name are required");
       return;
     }
+    if (!(createForm.campaign_script ?? "").trim()) {
+      toast.error("Campaign Script is required");
+      return;
+    }
     setFormLoading(true);
     try {
       const targetList = (createForm.target_list_raw ?? "")
         .split(/[\n,]/)
         .map((s) => s.trim())
         .filter(Boolean);
-      const payload: CreateCampaignPayload = {
+      const payload: CreateCampaignPayload & Record<string, unknown> = {
         company_id: createForm.company_id,
         name: createForm.name,
         description: createForm.description || undefined,
@@ -387,6 +413,10 @@ const CampaignsPage = () => {
         retry_interval_minutes: createForm.retry_interval_minutes,
         status: createForm.status || undefined,
       };
+      const script = (createForm.campaign_script ?? "").trim();
+      const greeting = (createForm.custom_greeting ?? "").trim();
+      if (script) payload.campaign_script = script;
+      if (greeting) payload.custom_greeting = greeting;
       await postCampaigns(payload);
       toast.success("Campaign created");
       setShowAddModal(false);
@@ -455,24 +485,24 @@ const CampaignsPage = () => {
         <Col md={12}>
           <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2">
-              <Button variant="link" className="p-0" onClick={() => router.push("/voicebot/outbound")}>
-                ← Back
-              </Button>
+              
               <h2 className="mb-0">Campaigns</h2>
             </div>
             <div className="d-flex align-items-center gap-2 flex-wrap">
-              <Form.Select
-                style={{ width: "180px" }}
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-              >
-                <option value="">All companies</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
+              {isAdmin && (
+                <Form.Select
+                  style={{ width: "180px" }}
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                >
+                  <option value="">All companies</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              )}
               <Form.Select
                 style={{ width: "120px" }}
                 value={statusFilter}
@@ -526,45 +556,46 @@ const CampaignsPage = () => {
           <Modal.Title>Create Campaign</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleCreateSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-2">
-              <Form.Label>Company *</Form.Label>
-              <Form.Select
-                value={createForm.company_id}
-                onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
-                required
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Name *</Form.Label>
-              <Form.Control
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                required
-                placeholder="e.g. Q1 2026 Sales Campaign"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={createForm.description ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Lead generation campaign for Q1"
-              />
-            </Form.Group>
+          <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
+            <h6 className="mb-3" id="campaign-configuration">Campaign Configuration</h6>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-2">
-                  <Form.Label>Voicebot</Form.Label>
+                  <Form.Label>Campaign Name *</Form.Label>
+                  <Form.Control
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                    required
+                    placeholder="e.g. Q1 2026 Sales Campaign"
+                  />
+                </Form.Group>
+                <Form.Group className="mb-2">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    value={createForm.description ?? ""}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="Lead generation campaign for Q1"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-2">
+                  <Form.Label>Company *</Form.Label>
+                  <Form.Select
+                    value={createForm.company_id}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select company</option>
+                    {companies.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+                <Form.Group className="mb-2">
+                  <Form.Label>Select VoiceBot *</Form.Label>
                   <Form.Select
                     value={createForm.voicebot_id ?? ""}
                     onChange={(e) =>
@@ -573,13 +604,81 @@ const CampaignsPage = () => {
                   >
                     <option value="">—</option>
                     {voicebots.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
+                      <option key={v.id} value={v.id}>{v.name}</option>
                     ))}
                   </Form.Select>
                 </Form.Group>
+                <Form.Group className="mb-2">
+                  <Form.Label>Status</Form.Label>
+                  <Form.Select
+                    value={createForm.status ?? "draft"}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="draft">draft</option>
+                    <option value="active">active</option>
+                  </Form.Select>
+                </Form.Group>
               </Col>
+            </Row>
+            <hr className="my-3" />
+            <p className="fw-bold mb-2">Target Numbers</p>
+            <Form.Group className="mb-2">
+              <Form.Label>Input Method</Form.Label>
+              <div className="d-flex gap-3">
+                <Form.Check
+                  type="radio"
+                  id="input-manual"
+                  name="input_method"
+                  label="Manual Entry"
+                  checked={(createForm.input_method ?? "manual") === "manual"}
+                  onChange={() => setCreateForm((f) => ({ ...f, input_method: "manual" }))}
+                />
+                <Form.Check
+                  type="radio"
+                  id="input-csv"
+                  name="input_method"
+                  label="Upload CSV"
+                  checked={(createForm.input_method ?? "manual") === "csv"}
+                  onChange={() => setCreateForm((f) => ({ ...f, input_method: "csv" }))}
+                />
+              </div>
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Phone Numbers (one per line) *</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={createForm.target_list_raw ?? ""}
+                onChange={(e) => setCreateForm((f) => ({ ...f, target_list_raw: e.target.value }))}
+                placeholder={"+1234567890\n+0987654321"}
+              />
+              <Form.Text className="text-muted">
+                Total numbers: {(createForm.target_list_raw ?? "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean).length}
+              </Form.Text>
+            </Form.Group>
+            <hr className="my-3" />
+            <p className="fw-bold mb-2">Campaign Script</p>
+            <Form.Group className="mb-2">
+              <Form.Label>Campaign Script *</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={createForm.campaign_script ?? ""}
+                onChange={(e) => setCreateForm((f) => ({ ...f, campaign_script: e.target.value }))}
+                placeholder="You are calling to discuss our new product. Focus on benefits..."
+              />
+            </Form.Group>
+            <Form.Group className="mb-2">
+              <Form.Label>Custom Greeting (optional)</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={createForm.custom_greeting ?? ""}
+                onChange={(e) => setCreateForm((f) => ({ ...f, custom_greeting: e.target.value }))}
+                placeholder="Hello, this is John from ABC Company..."
+              />
+            </Form.Group>
+            <Row className="mt-2">
               <Col md={6}>
                 <Form.Group className="mb-2">
                   <Form.Label>Trunk</Form.Label>
@@ -589,32 +688,22 @@ const CampaignsPage = () => {
                   >
                     <option value="">—</option>
                     {trunks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
+                      <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </Form.Select>
                 </Form.Group>
               </Col>
+              <Col md={6}>
+                <Form.Group className="mb-2">
+                  <Form.Label>Caller ID</Form.Label>
+                  <Form.Control
+                    value={createForm.caller_id ?? ""}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, caller_id: e.target.value }))}
+                    placeholder="+1234567890"
+                  />
+                </Form.Group>
+              </Col>
             </Row>
-            <Form.Group className="mb-2">
-              <Form.Label>Caller ID</Form.Label>
-              <Form.Control
-                value={createForm.caller_id ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, caller_id: e.target.value }))}
-                placeholder="+1234567890"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Target list (comma or newline separated)</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={createForm.target_list_raw ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, target_list_raw: e.target.value }))}
-                placeholder="+0987654321, +1122334455"
-              />
-            </Form.Group>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-2">
@@ -687,16 +776,6 @@ const CampaignsPage = () => {
                 </Form.Group>
               </Col>
             </Row>
-            <Form.Group className="mb-2">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={createForm.status ?? "draft"}
-                onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-              </Form.Select>
-            </Form.Group>
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowAddModal(false)}>
@@ -705,9 +784,14 @@ const CampaignsPage = () => {
             <Button
               variant="primary"
               type="submit"
-              disabled={formLoading || !createForm.company_id || !createForm.name}
+              disabled={
+                formLoading ||
+                !createForm.company_id ||
+                !createForm.name ||
+                !(createForm.campaign_script ?? "").trim()
+              }
             >
-              {formLoading ? <Spinner animation="border" size="sm" /> : "Create"}
+              {formLoading ? <Spinner animation="border" size="sm" /> : "Save Campaign"}
             </Button>
           </Modal.Footer>
         </Form>

@@ -751,7 +751,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/calls', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/bots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
         ]
     },
 
@@ -762,6 +763,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/voicebots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
         ]
     },

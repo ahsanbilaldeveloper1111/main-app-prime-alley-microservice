@@ -79,24 +79,24 @@ const TrunksPage = () => {
         return ids.length ? ids.join(", ") : "—";
       },
     },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (row) => (
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-danger"
-            onClick={() => {
-              setSelectedRow(row);
-              setShowDeleteModal(true);
-            }}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </div>
-      ),
-    },
+    // {
+    //   key: "actions",
+    //   label: "Actions",
+    //   render: (row) => (
+    //     <div className="d-flex gap-1">
+    //       <Button
+    //         size="sm"
+    //         variant="outline-danger"
+    //         onClick={() => {
+    //           setSelectedRow(row);
+    //           setShowDeleteModal(true);
+    //         }}
+    //       >
+    //         <Trash2 size={14} />
+    //       </Button>
+    //     </div>
+    //   ),
+    // },
   ];
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -164,9 +164,7 @@ const TrunksPage = () => {
               <h2 className="mb-0">Trunks</h2>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                <Plus size={18} className="me-1" /> Add Trunk
-              </Button>
+             
             </div>
           </div>
         </Col>

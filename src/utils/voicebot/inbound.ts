@@ -8,6 +8,7 @@ const PREFIX = "/voicebot-platform";
 
 export interface ListCompaniesParams {
   show_inactive?: boolean;
+  company_id?: string;
 }
 
 export interface CreateCompanyPayload {
@@ -31,6 +32,7 @@ export interface UpdateCompanyPayload {
   subscription_tier?: string;
   max_bots?: number;
   max_calls_per_month?: number;
+  company_id?: string;
 }
 
 /** GET /companies/ - List companies. Set show_inactive=true to include inactive. */
@@ -130,6 +132,7 @@ export const getCompanyBots = async (companyId: string) => {
 export interface ListBotsParams {
   company_id?: string;
   limit?: number;
+  status?: string;
 }
 
 export interface BotConfiguration {
@@ -264,10 +267,20 @@ export const getBotConfig = async (botId: string) => {
   }
 };
 
+/** Response item from GET /bots/{botId}/versions/ */
+export interface BotVersionItem {
+  id: string;
+  version: number;
+  configuration_snapshot: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+  change_description: string;
+}
+
 /** GET /bots/{botId}/versions/ - Get bot version history */
-export const getBotVersions = async (botId: string) => {
+export const getBotVersions = async (botId: string): Promise<BotVersionItem[]> => {
   try {
-    const response = await axiosInstance.get(`${PREFIX}/bots/${botId}/versions/`);
+    const response = await axiosInstance.get<BotVersionItem[]>(`${PREFIX}/bots/${botId}/versions/`);
     return response.data;
   } catch (error) {
     throw error;
