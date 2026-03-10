@@ -92,7 +92,7 @@ jobs:
 
   deploy-stage:
     name: Deploy to Stage (self-hosted)
-    runs-on: [self-hosted, mainapp, stage]
+    runs-on: [self-hosted, mainapp, prod]
     if: |
       github.ref_name == 'main' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'stage')
