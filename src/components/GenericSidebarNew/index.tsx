@@ -5667,11 +5667,50 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowMoreModal(false);
   };
 
-  const goToProspectDetailActivity = useCallback(() => {
-    if (recordType === "prospect" && recordId != null) {
-      router.push(`/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`);
-    }
-  }, [recordType, recordId, router]);
+  const goToRecordDetailActivity = useCallback(
+    (activityType?: string) => {
+      if (!recordType || recordId == null) return;
+
+      let baseUrl: string | null = null;
+
+      if (recordType === "prospect") {
+        baseUrl = `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`;
+      } else if (recordType === "lead") {
+        baseUrl = `/crm/leads/leads-detailpage?id=${recordId}&section=activities`;
+      } else if (recordType === "deal") {
+        baseUrl = `/crm/deals/deals-detailpage?id=${recordId}&section=activities`;
+      } else if (recordType === "order") {
+        baseUrl = `/crm/orders/${recordId}/order-detailpage?section=activities`;
+      } else if (recordType === "activity") {
+        // For activity timelines, fall back to the underlying entity type when available
+        const id = Number(recordId);
+        if (Number.isNaN(id)) return;
+        const entityType = activityEntityType ?? "lead";
+        if (entityType === "prospect") {
+          baseUrl = `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
+        } else if (entityType === "lead") {
+          baseUrl = `/crm/leads/leads-detailpage?id=${id}&section=activities`;
+        } else if (entityType === "deal") {
+          baseUrl = `/crm/deals/deals-detailpage?id=${id}&section=activities`;
+        } else {
+          baseUrl = `/crm/orders/${id}/order-detailpage?section=activities`;
+        }
+      }
+
+      if (!baseUrl) return;
+
+      let url = baseUrl;
+      if (activityType != null && activityType.trim()) {
+        const separator = baseUrl.includes("?") ? "&" : "?";
+        url = `${baseUrl}${separator}activityType=${encodeURIComponent(
+          activityType,
+        )}`;
+      }
+
+      router.push(url);
+    },
+    [recordType, recordId, activityEntityType, router],
+  );
 
   const handleMoreActionSelect = (actionId: string) => {
     switch (actionId) {
@@ -5682,23 +5721,22 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         handleTaskClick();
         break;
       case "log-call":
+        goToRecordDetailActivity("calls");
+        break;
       case "log-whatsapp":
+        goToRecordDetailActivity("whatsapp");
+        break;
       case "log-sms":
+        // Navigate to Activities tab with SMS sub-tab active
+        goToRecordDetailActivity("sms");
+        break;
       case "log-meeting":
+        // Navigate to Activities tab with Meetings sub-tab active
+        goToRecordDetailActivity("meetings");
+        break;
       case "log-email":
-        if (activityModals) {
-          if (actionId === "log-whatsapp") {
-            activityModals.openWhatsApp();
-          } else if (actionId === "log-sms") {
-            activityModals.openSms();
-          } else if (actionId === "log-meeting") {
-            activityModals.openMeeting();
-          } else if (actionId === "log-email") {
-            activityModals.openEmail();
-          }
-        } else {
-          goToProspectDetailActivity();
-        }
+        // Navigate to Activities tab with Emails sub-tab active
+        goToRecordDetailActivity("emails");
         break;
       default:
         break;

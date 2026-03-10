@@ -138,6 +138,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [exporting, setExporting] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
   // Fetch lead detail by ID from URL (same pattern as prospect detail page)
   useEffect(() => {
     if (!router.isReady) {
@@ -402,6 +414,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       copyable: true,
     },
     { label: "Company Name", value: lead?.company_name ?? "--" },
+    { label: "Company Domain", value: lead?.company_domain ?? "--" },
     { label: "Lead Status", value: lead?.status ?? "--" },
     {
       label: "Lifecycle Stage",

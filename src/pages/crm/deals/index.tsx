@@ -178,6 +178,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { useCti } from "@hooks/useCti";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -512,7 +513,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmDeals = () => {
   const { data: session } = useSession();
   const router = useRouter();
-
+  const { dialNumber, isInitialized } = useCti();
   const [stages, setStages] = useState<any[]>([]);
   const [estimationItems, setEstimationItems] = useState<
     Array<{
@@ -1555,16 +1556,28 @@ const CrmDeals = () => {
 
   const handleCallClick = useCallback(
     async (deal: any) => {
-      const phone = deal?.phone || deal?.rawData?.phone || relatedLead?.phone;
+      const phone = deal?.decision_maker_phone || deal?.crm_data?.phone;
       if (!phone) {
         toast.error("No phone number available for this deal");
         return;
       }
-      // Handle call logic here - similar to leads page
-      // This might integrate with CTI or open a phone dialer
-      console.log("Calling:", phone);
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+        try {
+        const result = await dialNumber(phone);
+        if (result.success) {
+          toast.success(`Calling ${deal?.name || phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
     },
-    [relatedLead],
+    [dialNumber, isInitialized],
   );
 
   const handleNoteCreate = useCallback(
@@ -3123,14 +3136,10 @@ const CrmDeals = () => {
               ""
             }
             email={
-              selectedDeal?.email ||
-              selectedDeal?.rawData?.email ||
-              relatedLead?.email
+              selectedDeal?.main_decision_maker?.email
             }
             phone={
-              selectedDeal?.phone ||
-              selectedDeal?.rawData?.phone ||
-              relatedLead?.phone
+              selectedDeal?.decision_maker_phone_country_code && selectedDeal?.decision_maker_phone ? `${selectedDeal?.decision_maker_phone_country_code} ${selectedDeal?.decision_maker_phone}` : selectedDeal?.decision_maker_phone
             }
             avatar={{
               initials: getInitials(selectedDeal?.name || "NA"),
@@ -3387,15 +3396,9 @@ const CrmDeals = () => {
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedDeal?.phone ||
-                        selectedDeal?.rawData?.phone ||
-                        relatedLead?.phone;
-                      if (phone) {
-                        handleCallClick(selectedDeal);
-                      }
-                    },
+                    onClick: () => 
+                      selectedDeal?.decision_maker_phone &&
+                      handleCallClick(selectedDeal),
                   },
                 },
               },

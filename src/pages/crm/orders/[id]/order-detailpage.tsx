@@ -83,6 +83,18 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "revenue", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
   // Fetch extensions
   useEffect(() => {
     const fetchExtensions = async () => {
@@ -1461,21 +1473,23 @@ const OrderRecordPage: NextPageWithLayout = () => {
                           : 'N/A'}
                       </p>
                     </div>
-                    <a
-                      href="#"
-                      style={{
-                        fontSize: '12px',
-                        color: '#141414',
-                        textDecoration: 'none',
-                        fontWeight: '300',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        border: '1px solid #cccccc',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                      }}
-                    >
+                   <a
+                     href={`/crm/deals/deals-detailpage?id=${encodeURIComponent(String(relatedDeal?.id ?? ''))}`}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     style={{
+                       fontSize: '12px',
+                       color: '#141414',
+                       textDecoration: 'none',
+                       fontWeight: '300',
+                       display: 'inline-flex',
+                       alignItems: 'center',
+                       gap: '4px',
+                       border: '1px solid #cccccc',
+                       borderRadius: '6px',
+                       padding: '6px 12px',
+                     }}
+                   >
                       View all associated Deals
                       <ExternalLink size={12} />
                     </a>

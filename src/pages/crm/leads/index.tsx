@@ -1742,7 +1742,7 @@ const CrmLeads = () => {
   // Handle call button click
   const handleCallClick = useCallback(
     async (lead: any) => {
-      const phone = lead.phone;
+      const phone = lead?.contact_persons?.[0]?.phone || lead?.crm_data?.phone;
       if (!phone) {
         toast.error("No phone number available for this entry");
         return;
@@ -4225,13 +4225,10 @@ const CrmLeads = () => {
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedLead?.phone || selectedLead?.rawData?.phone;
-                      if (phone) {
-                        handleCallClick(selectedLead);
-                      }
-                    },
+                    onClick: () =>
+                      (selectedLead?.contact_persons?.[0]?.phone ||
+                      selectedLead?.crm_data?.phone ) &&
+                      handleCallClick(selectedLead),
                   },
                 },
               },

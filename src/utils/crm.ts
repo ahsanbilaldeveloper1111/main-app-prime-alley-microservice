@@ -109,6 +109,7 @@ export interface LeadData {
   type: "lead" | "opportunity";
   description: string | null;
   company_name: string | null;
+  company_domain: string | null;
   company_contact: string | null;
   company_description: string | null;
   status: string;

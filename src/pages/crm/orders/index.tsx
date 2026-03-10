@@ -150,6 +150,7 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
+import { useCti } from "@hooks/useCti";
 
 // Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
@@ -448,6 +449,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmOrders = () => {
   const { data: session } = useSession();
   const router = useRouter();
+  const { dialNumber, isInitialized } = useCti();
   const [isOrderEditModeAccount, setIsOrderEditModeAccount] = useState(false);
   const [isOrderEditModeDelivery, setIsOrderEditModeDelivery] = useState(false);
 
@@ -786,16 +788,28 @@ const CrmOrders = () => {
   // initiate call
   const handleCallClick = useCallback(
     async (order: any) => {
-      const phone = order?.phone || order?.rawData?.phone || relatedLead?.phone;
+      const phone = order?.customer_phone;
       if (!phone) {
         toast.error("No phone number available for this order");
         return;
       }
-      // Handle call logic here - similar to leads page
-      // This might integrate with CTI or open a phone dialer
-      console.log("Calling:", phone);
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+      try {
+        const result = await dialNumber(phone);
+        if (result.success) {
+          toast.success(`Calling ${order?.name || phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
     },
-    [relatedLead],
+    [dialNumber, isInitialized],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -3302,15 +3316,9 @@ const CrmOrders = () => {
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedOrder?.phone ||
-                        selectedOrder?.rawData?.phone ||
-                        relatedLead?.phone;
-                      if (phone) {
-                        handleCallClick(selectedOrder);
-                      }
-                    },
+                    onClick: () => 
+                      selectedOrder?.customer_phone &&
+                      handleCallClick(selectedOrder),                      
                   },
                 },
               },

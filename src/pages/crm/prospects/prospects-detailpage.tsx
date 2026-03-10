@@ -654,6 +654,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         prospect?.data?.name ??
         "--",
     },
+    { label: "Company Domain", value: prospect?.data?.company_domain ?? "--" },
     // {
     //   label: "Lifecycle Stage",
     //   value:
