@@ -851,10 +851,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         
         {
           id: 'voicebot-inbound-calls',
-          title: 'Calls',
+          title: 'Conversations',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/calls'
+          url: '/voicebot/inbound/conversations'
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -881,7 +881,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'voicebot-outbound-voicebots',
-          title: 'Voicebots',
+          title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/voicebots'

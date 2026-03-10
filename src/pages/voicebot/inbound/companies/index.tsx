@@ -110,6 +110,7 @@ const CompaniesPage = () => {
   const [viewLoading, setViewLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     name?: string;
+    description?: string;
     email?: string;
     phone?: string;
     subscription_tier?: string;
@@ -267,8 +268,9 @@ const CompaniesPage = () => {
   };
 
   const validateForm = () => {
-    const errors: { name?: string; email?: string; phone?: string; subscription_tier?: string } = {};
+    const errors: { name?: string; description?: string; email?: string; phone?: string; subscription_tier?: string } = {};
     if (!form.company_id?.trim() || !form.name?.trim()) errors.name = "Company is required.";
+    if (!form.description?.trim()) errors.description = "Description is required.";
     if (!form.email?.trim()) errors.email = "Email is required.";
     if (!form.phone?.trim()) errors.phone = "Phone is required.";
     else if (!isPhoneValidE164(form.phone)) errors.phone = "Phone must be a valid E.164 number.";
@@ -388,14 +390,17 @@ const CompaniesPage = () => {
         {formErrors.name && <Form.Text className="text-danger d-block mt-1">{formErrors.name}</Form.Text>}
       </Form.Group>
       <Form.Group className="mb-2">
-        <Form.Label>Description</Form.Label>
+        <Form.Label>Description <span className="text-danger">*</span></Form.Label>
         <Form.Control
           as="textarea"
           rows={2}
           value={form.description || ""}
-          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          onChange={(e) => { setForm((f) => ({ ...f, description: e.target.value })); setFormErrors((e) => ({ ...e, description: undefined })); }}
           placeholder="Description"
+          required
+          isInvalid={!!formErrors.description}
         />
+        {formErrors.description && <Form.Text className="text-danger d-block mt-1">{formErrors.description}</Form.Text>}
       </Form.Group>
       <Form.Group className="mb-2">
         <Form.Label>Email <span className="text-danger">*</span></Form.Label>

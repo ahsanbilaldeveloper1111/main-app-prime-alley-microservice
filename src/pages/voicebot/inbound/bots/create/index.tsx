@@ -944,8 +944,12 @@ const VoicebotInboundBotsCreate = () => {
               </button>
               {isLastTab ? (
                 <button
-                  type="submit"
+                  type="button"
                   disabled={submitting || !form.company || !form.name?.trim()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSubmit(e as unknown as React.FormEvent);
+                  }}
                   style={{
                     padding: "10px 32px",
                     backgroundColor: submitting || !form.company || !form.name?.trim() ? "#9ca3af" : "#667eea",
