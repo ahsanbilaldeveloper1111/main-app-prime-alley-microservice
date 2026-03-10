@@ -139,15 +139,11 @@ jobs:
           echo "→ Stopping service"
           sudo systemctl stop "$SERVICE_NAME" || true
 
-          if [[ "$STAGE_RUN_NPM" == "1" ]]; then
-            echo "→ Stage: STAGE_RUN_NPM=1, installing dependencies"
-            if [[ -f package-lock.json ]]; then
-              npm ci --no-audit --no-fund
-            else
-              npm install --no-audit --no-fund
-            fi
+          echo "→ Installing dependencies"
+          if [[ -f package-lock.json ]]; then
+            npm ci --no-audit --no-fund
           else
-            echo "→ Stage: STAGE_RUN_NPM=0, skipping npm install/ci"
+            npm install --no-audit --no-fund
           fi
 
           echo "→ Building app"
