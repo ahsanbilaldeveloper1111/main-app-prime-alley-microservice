@@ -1,0 +1,160 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - stage
+      branch:
+        description: "Optional: override branch deployed on server"
+        required: false
+        type: string
+      stage_run_npm:
+        description: "Stage only: run npm install/ci (0 or 1)"
+        required: false
+        type: choice
+        options:
+          - "0"
+          - "1"
+        default: "0"
+  push:
+    branches:
+      - develop
+      - main
+jobs:
+  deploy-dev:
+    name: Deploy to Dev (self-hosted)
+    runs-on: [self-hosted, mainapp, dev]
+    if: |
+      github.ref_name == 'develop' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+
+    env:
+      APP_DIR: ${{ secrets.DEV_APP_DIR }}
+      DOTENV_CONTENT: ${{ secrets.DEV_DOTENV }}
+      SERVICE_NAME: ${{ secrets.DEV_SERVICE_NAME }}
+      DEFAULT_BRANCH: ${{ secrets.DEV_BRANCH }}
+      BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Dev
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_DIR="${APP_DIR:?DEV_APP_DIR secret is required}"
+          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          BRANCH="${DEFAULT_BRANCH:-develop}"
+
+          if [ -n "${BRANCH_OVERRIDE}" ]; then
+            BRANCH="${BRANCH_OVERRIDE}"
+          fi
+
+          echo "Deploying Next.js [dev] → $APP_DIR (branch=$BRANCH)"
+
+          cd "$APP_DIR"
+
+          echo "→ Fetching code"
+          git fetch origin
+          git checkout "$BRANCH"
+          git pull origin "$BRANCH"
+
+          echo "→ Writing .env.local"
+          printf "%b" "$DOTENV_CONTENT" > .env.local
+          chmod 600 .env.local || true
+
+          echo "→ Stopping service"
+          sudo systemctl stop "$SERVICE_NAME" || true
+
+          echo "→ Installing dependencies"
+          if [[ -f package-lock.json ]]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+          echo "→ Building app"
+          npm run build
+
+          echo "→ Starting service"
+          sudo systemctl start "$SERVICE_NAME"
+
+          echo "→ Service status"
+          sudo systemctl --no-pager status "$SERVICE_NAME" || true
+
+  deploy-stage:
+    name: Deploy to Stage (self-hosted)
+    runs-on: [self-hosted, mainapp, prod]
+    if: |
+      github.ref_name == 'main' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'stage')
+
+    env:
+      APP_DIR: ${{ secrets.STAGE_APP_DIR }}
+      DOTENV_CONTENT: ${{ secrets.STAGE_DOTENV }}
+      SERVICE_NAME: ${{ secrets.STAGE_SERVICE_NAME }}
+      DEFAULT_BRANCH: ${{ secrets.STAGE_BRANCH }}
+      BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
+      STAGE_RUN_NPM: ${{ github.event.inputs.stage_run_npm || '0' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Stage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_DIR="${APP_DIR:?STAGE_APP_DIR secret is required}"
+          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          BRANCH="${DEFAULT_BRANCH:-main}"
+          STAGE_RUN_NPM="${STAGE_RUN_NPM:-0}"
+
+          if [ -n "${BRANCH_OVERRIDE}" ]; then
+            BRANCH="${BRANCH_OVERRIDE}"
+          fi
+
+          echo "Deploying Next.js [stage] → $APP_DIR (branch=$BRANCH, STAGE_RUN_NPM=$STAGE_RUN_NPM)"
+
+          cd "$APP_DIR"
+
+          echo "→ Fetching code"
+          git fetch origin
+          git checkout "$BRANCH"
+          git pull origin "$BRANCH"
+
+          echo "→ Writing .env.local"
+          printf "%b" "$DOTENV_CONTENT" > .env.local
+          chmod 600 .env.local || true
+
+          echo "→ Stopping service"
+          sudo systemctl stop "$SERVICE_NAME" || true
+
+          if [[ "$STAGE_RUN_NPM" == "1" ]]; then
+            echo "→ Stage: STAGE_RUN_NPM=1, installing dependencies"
+            if [[ -f package-lock.json ]]; then
+              npm ci --no-audit --no-fund
+            else
+              npm install --no-audit --no-fund
+            fi
+          else
+            echo "→ Stage: STAGE_RUN_NPM=0, skipping npm install/ci"
+          fi
+
+          echo "→ Building app"
+          npm run build
+
+          echo "→ Starting service"
+          sudo systemctl start "$SERVICE_NAME"
+
+          echo "→ Service status"
+          sudo systemctl --no-pager status "$SERVICE_NAME" || true

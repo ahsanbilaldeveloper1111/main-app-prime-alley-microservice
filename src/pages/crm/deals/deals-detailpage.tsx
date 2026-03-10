@@ -108,6 +108,18 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
 
+  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
+  const validTabIds = ["about", "activities", "revenue", "intelligence"];
+  useEffect(() => {
+    if (!router.isReady) return;
+    const section = router.query.section;
+    const tabId =
+      typeof section === "string" ? section.toLowerCase().trim() : null;
+    if (tabId && validTabIds.includes(tabId)) {
+      setActiveTab(tabId);
+    }
+  }, [router.isReady, router.query.section]);
+
   // Load deal by ID from URL
   useEffect(() => {
     if (!router.isReady || dealId == null || dealId === '') {
@@ -306,9 +318,9 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   const dealRecordId = Number(dealId) || deal?.id || 0;
   const dealRecordName = deal?.name ?? 'Deal';
-  const dealRecordEmail = (deal as any)?.decision_maker_email ?? (deal as any)?.contact_email ?? '';
+  const dealRecordEmail = (deal as any)?.contact_email ??  (deal as any)?.decision_maker_email  ?? '';
 
-  const dealRecordPhone = deal?.decision_maker_phone ?? (deal as any)?.phone ?? "";
+  const dealRecordPhone = (deal as any)?.phone ?? deal?.decision_maker_phone ?? "";
 
   const handleOpenEditDeal = useCallback(() => {
     if (!dealRecordId) return;
@@ -690,7 +702,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 zIndex: 1000,
                 overflow: 'hidden',
               }}>
-                {['Edit', 'Delete', 'Clone', 'Export'].map((action) => (
+                {['Edit', 'Delete', 'Export'].map((action) => (
                   <button
                     key={action}
                     onClick={() => {
@@ -800,11 +812,36 @@ const DealRecordPage: NextPageWithLayout = () => {
           paddingRight: '24px',
         }}>
           {[
-            { icon: ClipboardList, label: 'Note', disabled: false, onClick: activityModals.openNote },
-            { icon: Mail, label: 'Email', disabled: false, onClick: activityModals.openEmail },
-            { icon: Phone, label: 'Call', disabled: false, onClick: undefined },
-            { icon: ClipboardList, label: 'Task', disabled: false, onClick: activityModals.openTask },
-            { icon: Calendar, label: 'Meeting', disabled: false, onClick: activityModals.openMeeting },
+            {
+              icon: ClipboardList,
+              label: 'Note',
+              disabled: false,
+              onClick: activityModals.openNote
+            },
+            {
+              icon: Mail,
+              label: 'Email',
+              disabled: !dealRecordEmail,
+              onClick: dealRecordEmail ? activityModals.openEmail : undefined
+            },
+            {
+              icon: Phone,
+              label: 'Call',
+              disabled: !dealRecordPhone,
+              onClick: undefined, 
+            },
+            {
+              icon: ClipboardList,
+              label: 'Task',
+              disabled: false,
+              onClick: activityModals.openTask
+            },
+            {
+              icon: Calendar,
+              label: 'Meeting',
+              disabled: false,
+              onClick: activityModals.openMeeting
+            },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -1401,6 +1438,11 @@ const DealRecordPage: NextPageWithLayout = () => {
                 number: p?.number ?? "",
                 type: p?.type ?? null,
               }))}
+              companyId={
+                (deal as any)?.company?.id ??
+                (deal as any)?.company_id ??
+                null
+              }
             />
 
             <div style={{
@@ -1497,7 +1539,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                         </p>
                       </div>
                       <a
-                        href="#"
+                        href={`/crm/contacts/contact-detailpage?id=${encodeURIComponent(String((deal as any)?.main_decision_maker?.id ?? ''))}`}
                         style={{
                           fontSize: '12px',
                           color: '#141414',

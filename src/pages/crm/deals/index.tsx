@@ -15,6 +15,7 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
+import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -177,6 +178,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { useCti } from "@hooks/useCti";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -511,7 +513,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmDeals = () => {
   const { data: session } = useSession();
   const router = useRouter();
-
+  const { dialNumber, isInitialized } = useCti();
   const [stages, setStages] = useState<any[]>([]);
   const [estimationItems, setEstimationItems] = useState<
     Array<{
@@ -558,6 +560,14 @@ const CrmDeals = () => {
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
 
+  // Helper function to get name by extension
+  function getNameByExtension(extension: string) {
+    const extensionData = extensions.find(
+      (ext) => ext.id === extension || ext.extension === extension,
+    );
+    return extensionData?.display_name || extensionData?.name || extension;
+  }
+
   // View Modal
   const [showDealViewModal, setShowDealViewModal] = useState(false);
   const [viewingDeal, setViewingDeal] = useState<any>(null);
@@ -573,7 +583,7 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("board");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -1546,16 +1556,28 @@ const CrmDeals = () => {
 
   const handleCallClick = useCallback(
     async (deal: any) => {
-      const phone = deal?.phone || deal?.rawData?.phone || relatedLead?.phone;
+      const phone = deal?.decision_maker_phone || deal?.crm_data?.phone;
       if (!phone) {
         toast.error("No phone number available for this deal");
         return;
       }
-      // Handle call logic here - similar to leads page
-      // This might integrate with CTI or open a phone dialer
-      console.log("Calling:", phone);
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+        try {
+        const result = await dialNumber(phone);
+        if (result.success) {
+          toast.success(`Calling ${deal?.name || phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
     },
-    [relatedLead],
+    [dialNumber, isInitialized],
   );
 
   const handleNoteCreate = useCallback(
@@ -2274,6 +2296,71 @@ const CrmDeals = () => {
       isLost: deal.is_lost || false,
       rawData: deal, // Keep original data for actions
     };
+  };
+
+  // Helper function to get initials from a name
+  const getInitials = (name: string): string => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Helper function to get a color for a name
+  const getRandomColor = (name: string): string => {
+    const colors = [
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#FFA07A",
+      "#98D8C8",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#85C1E2",
+    ];
+    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  // Transform deals to Kanban columns based on stages
+  const dealsToKanbanColumns = (deals: any[], stagesData: any[]): KanbanColumnDef[] => {
+    const buckets: Record<string | number, KanbanCardData[]> = {};
+    
+    // Initialize buckets for each stage
+    stagesData.forEach((stage) => {
+      buckets[stage.id] = [];
+    });
+
+    // Distribute deals into stage buckets
+    deals.forEach((deal: any) => {
+      const stageId = deal.stage_id || deal.stage?.id;
+      if (stageId && buckets[stageId]) {
+        const dealName = deal.name || "";
+        buckets[stageId].push({
+          id: deal.id,
+          name: dealName,
+          email: deal.company_name || "",
+          avatarInitials: getInitials(dealName),
+          avatarColor: getRandomColor(dealName),
+          metaLines: [
+            deal.net_value || deal.grand_total
+              ? `${deal.currency || "AED"} ${deal.net_value || deal.grand_total}`
+              : "",
+          ].filter(Boolean),
+          raw: deal,
+        });
+      }
+    });
+
+    // Create column definitions
+    return stagesData.map((stage) => ({
+      id: String(stage.id),
+      title: stage.name || "No Stage",
+      cards: buckets[stage.id] || [],
+    }));
   };
 
   // Calculate analytics data
@@ -3009,19 +3096,24 @@ const CrmDeals = () => {
                 statsCards={dealsStatsCards}
                 customBody={
                   dealsViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
+                    <KanbanBoard
+                      columns={dealsToKanbanColumns(dealsData, stages)}
+                      onCardClick={(card) => handleViewDeal(Number(card.id))}
+                      onCardMove={(cardId, fromCol, toCol) => {
+                        const deal = dealsData.find((d) => d.id === Number(cardId) || d.id === cardId);
+                        if (deal) {
+                          updateDeal(Number(deal.id), {
+                            stage_id: toCol,
+                          }).then(() => {
+                            fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                          }).catch((err) => {
+                            console.error("Failed to update deal stage:", err);
+                            toast.error("Failed to update deal stage");
+                          });
+                        }
+                      }}
+                      searchValue={dealsSearch}
+                    />
                   ) : undefined
                 }
               />
@@ -3044,14 +3136,10 @@ const CrmDeals = () => {
               ""
             }
             email={
-              selectedDeal?.email ||
-              selectedDeal?.rawData?.email ||
-              relatedLead?.email
+              selectedDeal?.main_decision_maker?.email
             }
             phone={
-              selectedDeal?.phone ||
-              selectedDeal?.rawData?.phone ||
-              relatedLead?.phone
+              selectedDeal?.decision_maker_phone_country_code && selectedDeal?.decision_maker_phone ? `${selectedDeal?.decision_maker_phone_country_code} ${selectedDeal?.decision_maker_phone}` : selectedDeal?.decision_maker_phone
             }
             avatar={{
               initials: getInitials(selectedDeal?.name || "NA"),
@@ -3250,11 +3338,8 @@ const CrmDeals = () => {
                   },
                   {
                     label: "Owner",
-                    value:
-                      selectedDeal?.assigned_user?.display_name ||
-                      selectedDeal?.assigned_user?.name ||
-                      selectedDeal?.assignedUser ||
-                      "Unassigned",
+                value: getNameByExtension(
+                  (selectedDeal as any)?.assigned_to) || "Unassigned",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
                   },
@@ -3287,7 +3372,9 @@ const CrmDeals = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedDeal?.audit_trail)
+                  ? selectedDeal.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this deal.",
@@ -3304,26 +3391,14 @@ const CrmDeals = () => {
                 collapsible: true,
                 defaultExpanded: true,
                 count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedDeal?.phone ||
-                        selectedDeal?.rawData?.phone ||
-                        relatedLead?.phone;
-                      if (phone) {
-                        handleCallClick(selectedDeal);
-                      }
-                    },
+                    onClick: () => 
+                      selectedDeal?.decision_maker_phone &&
+                      handleCallClick(selectedDeal),
                   },
                 },
               },

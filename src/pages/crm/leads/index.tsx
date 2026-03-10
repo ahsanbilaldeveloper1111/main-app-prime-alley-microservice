@@ -1742,7 +1742,7 @@ const CrmLeads = () => {
   // Handle call button click
   const handleCallClick = useCallback(
     async (lead: any) => {
-      const phone = lead.phone;
+      const phone = lead?.contact_persons?.[0]?.phone || lead?.crm_data?.phone;
       if (!phone) {
         toast.error("No phone number available for this entry");
         return;
@@ -4147,11 +4147,9 @@ const CrmLeads = () => {
                           : "secondary",
                   },
                   {
-                    label: "Assigned To",
+                    label: "Owner",
                     value:
-                      selectedLead?.assigned_user?.display_name ||
-                      selectedLead?.assigned_user?.name ||
-                      selectedLead?.assignedUser ||
+                      getNameByExtension(selectedLead?.user_extension) ||                     
                       "Unassigned",
                     hasDetails: true,
                     onDetailsClick: () => console.log("Show user details"),
@@ -4201,7 +4199,9 @@ const CrmLeads = () => {
                 icon: History,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
+                count: Array.isArray(selectedLead?.audit_trail)
+                  ? selectedLead.audit_trail.length
+                  : 0,
                 emptyState: {
                   icon: History,
                   message: "No recent activities for this lead.",
@@ -4217,25 +4217,18 @@ const CrmLeads = () => {
                 icon: PhoneIcon,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
-                actions: [
-                  {
-                    label: "View all recordings",
-                    onClick: () => console.log("View all"),
-                  },
-                ],
+                count: Array.isArray(selectedLead?.call_recordings)
+                  ? selectedLead.call_recordings.length
+                  : 0,
                 emptyState: {
                   icon: PhoneIcon,
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () => {
-                      const phone =
-                        selectedLead?.phone || selectedLead?.rawData?.phone;
-                      if (phone) {
-                        handleCallClick(selectedLead);
-                      }
-                    },
+                    onClick: () =>
+                      (selectedLead?.contact_persons?.[0]?.phone ||
+                      selectedLead?.crm_data?.phone ) &&
+                      handleCallClick(selectedLead),
                   },
                 },
               },
@@ -4245,7 +4238,6 @@ const CrmLeads = () => {
                 icon: FileText,
                 collapsible: true,
                 defaultExpanded: true,
-                count: 0,
                 emptyState: {
                   icon: FileText,
                   message: "No notes added yet.",
