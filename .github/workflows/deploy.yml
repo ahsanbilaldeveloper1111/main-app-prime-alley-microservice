@@ -26,66 +26,131 @@ on:
     branches:
       - develop
       - main
-
 jobs:
-  deploy:
-    name: Deploy via SSH
-    runs-on: ubuntu-latest
+  deploy-dev:
+    name: Deploy to Dev (self-hosted)
+    runs-on: [self-hosted, mainapp, dev]
+    if: |
+      github.ref_name == 'develop' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+
+    env:
+      APP_DIR: ${{ secrets.DEV_APP_DIR }}
+      DOTENV_CONTENT: ${{ secrets.DEV_DOTENV }}
+      SERVICE_NAME: ${{ secrets.DEV_SERVICE_NAME }}
+      DEFAULT_BRANCH: ${{ secrets.DEV_BRANCH }}
+      BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy
+      - name: Deploy to Dev
         shell: bash
-        env:
-          # --- SSH (required) ---
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-
-          # --- Dev env (required when deploying dev) ---
-          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
-          DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
-          DEV_SSH_PORT: ${{ secrets.DEV_SSH_PORT }}
-          DEV_APP_DIR: ${{ secrets.DEV_APP_DIR }}
-          DEV_DOTENV: ${{ secrets.DEV_DOTENV }}
-          DEV_SERVICE_NAME: ${{ secrets.DEV_SERVICE_NAME }}
-          DEV_BRANCH: ${{ secrets.DEV_BRANCH }}
-
-          # --- Stage env (required when deploying stage) ---
-          STAGE_SSH_HOST: ${{ secrets.STAGE_SSH_HOST }}
-          STAGE_SSH_USER: ${{ secrets.STAGE_SSH_USER }}
-          STAGE_SSH_PORT: ${{ secrets.STAGE_SSH_PORT }}
-          STAGE_APP_DIR: ${{ secrets.STAGE_APP_DIR }}
-          STAGE_DOTENV: ${{ secrets.STAGE_DOTENV }}
-          STAGE_SERVICE_NAME: ${{ secrets.STAGE_SERVICE_NAME }}
-          STAGE_BRANCH: ${{ secrets.STAGE_BRANCH }}
-
-          # --- Behavior toggles ---
-          STAGE_RUN_NPM: ${{ github.event.inputs.stage_run_npm || '0' }}
-
         run: |
           set -euo pipefail
 
-          DEPLOY_ENV="${{ github.event.inputs.environment }}"
-          DEPLOY_BRANCH="${{ github.event.inputs.branch }}"
+          APP_DIR="${APP_DIR:?DEV_APP_DIR secret is required}"
+          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          BRANCH="${DEFAULT_BRANCH:-develop}"
 
-          if [ -z "$DEPLOY_ENV" ]; then
-            case "${GITHUB_REF_NAME}" in
-              develop) DEPLOY_ENV="dev" ;;
-              main) DEPLOY_ENV="stage" ;;
-              *)
-                echo "No deploy mapping for branch: ${GITHUB_REF_NAME}"
-                echo "Use workflow_dispatch to deploy manually."
-                exit 1
-                ;;
-            esac
+          if [ -n "${BRANCH_OVERRIDE}" ]; then
+            BRANCH="${BRANCH_OVERRIDE}"
           fi
 
-          chmod +x ./ci/deploy.sh
-          if [ -n "$DEPLOY_BRANCH" ]; then
-            ./ci/deploy.sh "$DEPLOY_ENV" "$DEPLOY_BRANCH"
+          echo "Deploying Next.js [dev] → $APP_DIR (branch=$BRANCH)"
+
+          cd "$APP_DIR"
+
+          echo "→ Fetching code"
+          git fetch origin
+          git checkout "$BRANCH"
+          git pull origin "$BRANCH"
+
+          echo "→ Writing .env.local"
+          printf "%b" "$DOTENV_CONTENT" > .env.local
+          chmod 600 .env.local || true
+
+          echo "→ Stopping service"
+          sudo systemctl stop "$SERVICE_NAME" || true
+
+          echo "→ Installing dependencies"
+          if [[ -f package-lock.json ]]; then
+            npm ci --no-audit --no-fund
           else
-            ./ci/deploy.sh "$DEPLOY_ENV"
+            npm install --no-audit --no-fund
           fi
 
+          echo "→ Building app"
+          npm run build
+
+          echo "→ Starting service"
+          sudo systemctl start "$SERVICE_NAME"
+
+          echo "→ Service status"
+          sudo systemctl --no-pager status "$SERVICE_NAME" || true
+
+  deploy-stage:
+    name: Deploy to Stage (self-hosted)
+    runs-on: [self-hosted, mainapp, prod]
+    if: |
+      github.ref_name == 'main' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'stage')
+
+    env:
+      APP_DIR: ${{ secrets.STAGE_APP_DIR }}
+      DOTENV_CONTENT: ${{ secrets.STAGE_DOTENV }}
+      SERVICE_NAME: ${{ secrets.STAGE_SERVICE_NAME }}
+      DEFAULT_BRANCH: ${{ secrets.STAGE_BRANCH }}
+      BRANCH_OVERRIDE: ${{ github.event.inputs.branch }}
+      STAGE_RUN_NPM: ${{ github.event.inputs.stage_run_npm || '0' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Stage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_DIR="${APP_DIR:?STAGE_APP_DIR secret is required}"
+          SERVICE_NAME="${SERVICE_NAME:-nextjs}"
+          BRANCH="${DEFAULT_BRANCH:-main}"
+          STAGE_RUN_NPM="${STAGE_RUN_NPM:-0}"
+
+          if [ -n "${BRANCH_OVERRIDE}" ]; then
+            BRANCH="${BRANCH_OVERRIDE}"
+          fi
+
+          echo "Deploying Next.js [stage] → $APP_DIR (branch=$BRANCH, STAGE_RUN_NPM=$STAGE_RUN_NPM)"
+
+          cd "$APP_DIR"
+
+          echo "→ Fetching code"
+          git fetch origin
+          git checkout "$BRANCH"
+          git pull origin "$BRANCH"
+
+          echo "→ Writing .env.local"
+          printf "%b" "$DOTENV_CONTENT" > .env.local
+          chmod 600 .env.local || true
+
+          echo "→ Stopping service"
+          sudo systemctl stop "$SERVICE_NAME" || true
+
+          echo "→ Installing dependencies"
+          if [[ -f package-lock.json ]]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+          echo "→ Building app"
+          npm run build
+
+          echo "→ Starting service"
+          sudo systemctl start "$SERVICE_NAME"
+
+          echo "→ Service status"
+          sudo systemctl --no-pager status "$SERVICE_NAME" || true
