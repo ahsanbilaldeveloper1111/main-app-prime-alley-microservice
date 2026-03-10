@@ -89,6 +89,7 @@ sudo systemctl stop "$SERVICE_NAME" || true
 #   fi
 # fi
 
+echo "→ Installing dependencies"
 npm install
 
 echo "→ Building app"
