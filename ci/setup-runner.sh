@@ -75,6 +75,10 @@ curl -fsSL "$RUNNER_URL" -o actions-runner-linux-x64.tar.gz
 tar xzf actions-runner-linux-x64.tar.gz
 
 echo "→ Configuring runner..."
+
+# Allow running as root (GitHub runner normally forbids this unless explicitly enabled).
+export RUNNER_ALLOW_RUNASROOT=1
+
 ./config.sh \
   --unattended \
   --url "$GITHUB_URL" \
