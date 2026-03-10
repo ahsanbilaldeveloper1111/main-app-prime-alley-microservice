@@ -15,6 +15,7 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
+import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -573,7 +574,7 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("board");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -2276,6 +2277,71 @@ const CrmDeals = () => {
     };
   };
 
+  // Helper function to get initials from a name
+  const getInitials = (name: string): string => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Helper function to get a color for a name
+  const getRandomColor = (name: string): string => {
+    const colors = [
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#FFA07A",
+      "#98D8C8",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#85C1E2",
+    ];
+    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  // Transform deals to Kanban columns based on stages
+  const dealsToKanbanColumns = (deals: any[], stagesData: any[]): KanbanColumnDef[] => {
+    const buckets: Record<string | number, KanbanCardData[]> = {};
+    
+    // Initialize buckets for each stage
+    stagesData.forEach((stage) => {
+      buckets[stage.id] = [];
+    });
+
+    // Distribute deals into stage buckets
+    deals.forEach((deal: any) => {
+      const stageId = deal.stage_id || deal.stage?.id;
+      if (stageId && buckets[stageId]) {
+        const dealName = deal.name || "";
+        buckets[stageId].push({
+          id: deal.id,
+          name: dealName,
+          email: deal.company_name || "",
+          avatarInitials: getInitials(dealName),
+          avatarColor: getRandomColor(dealName),
+          metaLines: [
+            deal.net_value || deal.grand_total
+              ? `${deal.currency || "AED"} ${deal.net_value || deal.grand_total}`
+              : "",
+          ].filter(Boolean),
+          raw: deal,
+        });
+      }
+    });
+
+    // Create column definitions
+    return stagesData.map((stage) => ({
+      id: String(stage.id),
+      title: stage.name || "No Stage",
+      cards: buckets[stage.id] || [],
+    }));
+  };
+
   // Calculate analytics data
   const analyticsData = useMemo(() => {
     const transformedDeals = dealsData.map(transformDealData);
@@ -3009,19 +3075,24 @@ const CrmDeals = () => {
                 statsCards={dealsStatsCards}
                 customBody={
                   dealsViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
+                    <KanbanBoard
+                      columns={dealsToKanbanColumns(dealsData, stages)}
+                      onCardClick={(card) => handleViewDeal(Number(card.id))}
+                      onCardMove={(cardId, fromCol, toCol) => {
+                        const deal = dealsData.find((d) => d.id === Number(cardId) || d.id === cardId);
+                        if (deal) {
+                          updateDeal(Number(deal.id), {
+                            stage_id: toCol,
+                          }).then(() => {
+                            fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
+                          }).catch((err) => {
+                            console.error("Failed to update deal stage:", err);
+                            toast.error("Failed to update deal stage");
+                          });
+                        }
+                      }}
+                      searchValue={dealsSearch}
+                    />
                   ) : undefined
                 }
               />

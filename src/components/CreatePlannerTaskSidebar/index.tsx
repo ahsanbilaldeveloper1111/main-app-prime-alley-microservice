@@ -750,7 +750,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const labelStyle = {
     fontSize: "14px",
-    color: "#2d3748",
+    color: "#141414",
     fontWeight: 600,
     marginBottom: 8,
   };
@@ -758,6 +758,24 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   return (
     <>
+      <style>{`
+        .create-task-sidebar-panel .form-control,
+        .create-task-sidebar-panel .form-select {
+          border-color: #8a8a8a !important;
+          border-radius: 4px !important;
+          height: 40px !important;
+          font-size: 16px !important;
+          font-weight: 300 !important;
+        }
+
+        .create-task-sidebar-panel .form-control::placeholder,
+        .create-task-sidebar-panel textarea::placeholder,
+        .create-task-sidebar-panel input::placeholder {
+          font-size: 16px !important;
+          font-weight: 300 !important;
+        }
+      `}</style>
+
       <div
         onClick={onClose}
         style={{
@@ -768,6 +786,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         }}
       />
       <div
+        className="create-task-sidebar-panel"
         style={{
           position: "fixed",
           top: 0,
@@ -929,7 +948,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         fetchLinkRecordsForSearch(value, formData.projectId);
                       }}
                       className="py-2"
-                      style={{ paddingLeft: 40, fontSize: "14px" }}
+                      style={{  fontSize: "14px" }}
                     />
                   </div>
                   <div
@@ -1022,7 +1041,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             <div
                               style={{
                                 fontSize: "0.9rem",
-                                color: "#2d3748",
+                                color: "#141414",
                                 fontWeight: 600,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -1082,14 +1101,26 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       if (!showAssigneeDropdown) setAssigneeSearchQuery("");
                     }}
                     style={{
+                      backgroundColor: "rgb(255, 255, 255)",
+                      borderColor: "rgb(138, 138, 138)",
+                      color: "rgb(20, 20, 20)",
+                      textDecoration: "none",
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      verticalAlign: "middle",
+                      paddingBlock: "8px",
+                      paddingInline: "16px",
+                      maxWidth: "100%",
+                      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                      fontSize: "12px",
+                      fontWeight: 300,
+                      letterSpacing: "0px",
+                      lineHeight: "14px",
+                      textUnderlineOffset: "24%",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
                       cursor: "pointer",
                     }}
                   >
@@ -1127,7 +1158,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         cursor: "pointer",
                       }}
                     >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
+                      <span style={{ color: "#141414", fontWeight: 500 }}>
                         {user.name}
                       </span>
                       <X size={14} style={{ color: "#64748b" }} />
@@ -1186,7 +1217,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           <span
                             style={{
                               fontSize: "13px",
-                              color: "#2d3748",
+                              color: "#141414",
                               // fontWeight: 500,
                             }}
                           >
@@ -1230,14 +1261,26 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       if (!showWatcherDropdown) setWatcherSearchQuery("");
                     }}
                     style={{
+                      backgroundColor: "rgb(255, 255, 255)",
+                      borderColor: "rgb(138, 138, 138)",
+                      color: "rgb(20, 20, 20)",
+                      textDecoration: "none",
+                      borderRadius: 4,
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      verticalAlign: "middle",
+                      paddingBlock: "8px",
+                      paddingInline: "16px",
+                      maxWidth: "100%",
+                      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                      fontSize: "12px",
+                      fontWeight: 300,
+                      letterSpacing: "0px",
+                      lineHeight: "14px",
+                      textUnderlineOffset: "24%",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 6,
-                      padding: "6px 12px",
-                      fontSize: "0.875rem",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 6,
-                      background: "#fff",
                       cursor: "pointer",
                     }}
                   >
@@ -1275,7 +1318,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         cursor: "pointer",
                       }}
                     >
-                      <span style={{ color: "#2d3748", fontWeight: 500 }}>
+                      <span style={{ color: "#141414", fontWeight: 500 }}>
                         {user.name}
                       </span>
                       <X size={14} style={{ color: "#64748b" }} />
@@ -1334,7 +1377,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           <span
                             style={{
                               fontSize: "13px",
-                              color: "#2d3748",
+                              color: "#141414",
                               // fontWeight: 500,
                             }}
                           >
@@ -1680,7 +1723,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             gap: 8,
                             padding: "6px 12px",
                             backgroundColor: label.color,
-                            color: "#2d3748",
+                            color: "#141414",
                             fontSize: "0.875rem",
                             fontWeight: 500,
                             cursor: "pointer",
@@ -1699,7 +1742,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       backgroundColor: "#f8fafc",
                       maxHeight: 140,
                       overflowY: "auto",
-                      padding: 12,
+                      padding: 9,
                       borderRadius: 4,
                       border: "1px solid #e2e8f0",
                     }}
@@ -1734,7 +1777,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               )
                                 ? label.color
                                 : "#ffffff",
-                              color: "#2d3748",
+                              color: "#141414",
                               fontSize: "0.75rem",
                               fontWeight: 500,
                               padding: "6px 12px",
@@ -1803,7 +1846,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               padding: "8px 20px",
               fontSize: 14,
               fontWeight: 600,
-              backgroundColor: "#4e6fa5",
+              backgroundColor: "#000000",
               border: "none",
               borderRadius: 4,
               color: "#fff",

@@ -144,6 +144,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
+            { path: '/contacts',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
             {path:'/companies',permissions: [PERMISSIONS.VIEW_COMPANIES_CRM]},
             {path:'/approvals',permissions: [PERMISSIONS.APPROVE_REJECT_CRM_DEALS]},//approvals 
             {path:'/approvals/approval-detailpage',permissions: [PERMISSIONS.APPROVE_REJECT_CRM_DEALS]},
@@ -222,6 +223,7 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/{id}', permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER] }
                 ]
              },
+            { path: '/projectstasks', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
             { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
         ]

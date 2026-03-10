@@ -86,6 +86,7 @@ MENU_COLORS: {
 
   // Submenu Labels
   SUBMENU_LABELS: {
+    CONTACTS: 'Contacts',
     TASKS: 'Tasks',
     // Control Hub
     USER_DIRECTORY: 'User Management',

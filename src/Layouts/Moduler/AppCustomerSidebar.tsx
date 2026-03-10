@@ -62,7 +62,8 @@ import {
   ChevronRight,
   ChevronLeft,
   House,
-  Building2
+  Building2,
+  Book
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -270,11 +271,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'crm-company',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACTS,
+          icon: <Book size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
+          url: '/crm/contacts'
+        },
+        {
+          id: 'crm-company',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_COMPANIES_CRM,
           url: '/crm/companies'
         },
+        
         {
           id: 'crm-inbox',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX_CRM,
