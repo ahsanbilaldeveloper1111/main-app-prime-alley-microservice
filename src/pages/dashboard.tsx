@@ -30,7 +30,10 @@ import CreateTaskSidebar from "@components/CreateTaskSidebar";
 import UserActivityByCategory from "@components/UserActivityByCategory";
 import TwoCharts from "@components/TwoCharts";
 import SchedulePage from "@components/SchedulePage";
-import {useSession} from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // ─── Styles (inline via style tag approach using className strings) ───────────
 
@@ -462,7 +465,13 @@ function StalledIllustration() {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-const navTabs = ["Summary", "Companies", "Deals", "Tasks", "Calendar"];
+const NAV_TAB_CONFIG: { id: string; label: string; permission: string }[] = [
+  { id: "Summary", label: "Summary", permission: '' },
+  { id: "Companies", label: "Companies", permission: PERMISSIONS.VIEW_COMPANIES_CRM },
+  { id: "Deals", label: "Deals", permission: PERMISSIONS.VIEW_CRM_DEALS },
+  { id: "Tasks", label: "Tasks", permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER },
+  { id: "Calendar", label: "Calendar", permission: PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER },
+];
 
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
@@ -470,11 +479,22 @@ type NextPageWithLayout = React.FC & {
 
 const SalesDashboard: NextPageWithLayout = () => {
   const { data: session, status } = useSession();
-  
 
-
+  const navTabs = React.useMemo(() => {
+    const perms = session?.user?.permissions ?? [];
+    return NAV_TAB_CONFIG.filter(
+      (tab) => !tab.permission || perms.includes(tab.permission)
+    );
+  }, [session?.user?.permissions]);
 
   const [activeTab, setActiveTab] = useState("Summary");
+
+  // If current activeTab is not in allowed tabs, switch to first allowed tab
+  React.useEffect(() => {
+    if (navTabs.length && !navTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(navTabs[0].id);
+    }
+  }, [navTabs, activeTab]);
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -512,14 +532,14 @@ const SalesDashboard: NextPageWithLayout = () => {
         <nav style={styles.nav}>
           {navTabs.map((tab) => (
             <a
-              key={tab}
+              key={tab.id}
               style={{
                 ...styles.navTab,
-                ...(activeTab === tab ? styles.navTabActive : {}),
+                ...(activeTab === tab.id ? styles.navTabActive : {}),
               }}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab.id)}
             >
-              {tab}
+              {tab.label}
             </a>
           ))}
         </nav>
