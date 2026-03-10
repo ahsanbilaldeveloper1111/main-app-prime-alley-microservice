@@ -72,6 +72,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { useSession } from "next-auth/react";
 import moment from "moment-timezone";
+import { useRouter } from "next/router";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -295,6 +296,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   },
   ref,
 ) => {
+  const router = useRouter();
   const { data: session } = useSession();
   const userEmail =
     (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
@@ -422,6 +424,19 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     ModuleSlug.CALL_RECORDINGS,
   );
   const [campaignsList, setCampaignsList] = useState<AuditTrailCampaign[]>([]);
+
+  // Initialize activity sub-tab from URL query (e.g. ?activityType=calls|whatsapp)
+  useEffect(() => {
+    if (!router.isReady) return;
+    const raw = router.query.activityType;
+    const activityType =
+      typeof raw === "string" ? raw.toLowerCase().trim() : null;
+    if (!activityType) return;
+    const isValid = ACTIVITY_TYPE_TABS.some((tab) => tab.id === activityType);
+    if (isValid) {
+      setActivityFilter(activityType);
+    }
+  }, [router.isReady, router.query.activityType]);
 
   useEffect(() => {
     if (recordType !== "prospect" && recordType !== "lead") return;
@@ -1933,7 +1948,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               value={editingText}
                               onChange={setEditingText}
                               placeholder="Edit note..."
-                              minHeight={80}
+                              height={80}
                             />
                             <div
                               style={{
