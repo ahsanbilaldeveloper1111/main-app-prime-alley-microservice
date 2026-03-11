@@ -93,6 +93,15 @@ const TABS = [
   { id: TAB_KEYS.sip, label: "SIP Settings", icon: Phone },
 ];
 
+/** Safely coerce API value to string; avoids '[object Object]' when value is an object. */
+function toFormString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && value instanceof Date) return value.toISOString();
+  return "";
+}
+
 interface ValidationItemType {
   id: string;
   label: string;
@@ -393,17 +402,17 @@ function useBotLoader(
 ) {
   const [loadingBot, setLoadingBot] = useState(isEditMode);
   useEffect(() => {
-    if (!isEditMode || !botId) return;
+    if (isEditMode && botId) {
     setLoadingBot(true);
     getBot(botId)
       .then((data: Record<string, unknown>) => {
-        const company = String(data.company ?? "");
+        const company = toFormString(data.company);
         const configuration = { ...defaultConfig, ...(data.configuration as Record<string, unknown>) };
         setForm({
           company,
-          name: String(data.name ?? ""),
-          description: String(data.description ?? ""),
-          status: String(data.status ?? "draft"),
+          name: toFormString(data.name),
+          description: toFormString(data.description),
+          status: toFormString(data.status) || "draft",
           configuration: configuration as BotConfiguration,
         });
       })
@@ -412,6 +421,7 @@ function useBotLoader(
         router.push("/voicebot/inbound/bots");
       })
       .finally(() => setLoadingBot(false));
+    }
   }, [isEditMode, botId, router, setForm]);
   return loadingBot;
 }

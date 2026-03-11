@@ -67,11 +67,12 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
   return list.map((c) => {
     const item = c as Record<string, unknown>;
     const idVal = item.company_id ?? item.id;
+    const idStr = typeof idVal === "string" ? idVal : typeof idVal === "number" ? String(idVal) : "";
     const option: CompanyOption = {
-      id: String(idVal ?? ""),
-      name: String(item.name ?? ""),
+      id: idStr,
+      name: typeof item.name === "string" ? item.name : "",
     };
-    if (idVal != null) option.company_id = String(idVal);
+    if (idStr !== "") option.company_id = idStr;
     return option;
   });
 }

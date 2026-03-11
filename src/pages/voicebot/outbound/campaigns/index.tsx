@@ -212,10 +212,7 @@ const CampaignsPage = () => {
   ) => {
     const id = campaignId(row);
     const companyId = String(row.company_id ?? effectiveCompanyId ?? "");
-    if (!id) {
-      toast.error("Missing campaign id");
-      return;
-    }
+    if (id) {
     setOpLoading(`${op}-${id}`);
     try {
       const payload = companyId ? { company_id: companyId } : undefined;
@@ -230,6 +227,9 @@ const CampaignsPage = () => {
       toast.error(e?.response?.data?.detail || String(e?.message ?? `${op} failed`));
     } finally {
       setOpLoading(null);
+    }
+    } else {
+      toast.error("Missing campaign id");
     }
   };
 
@@ -278,9 +278,11 @@ const CampaignsPage = () => {
       label: "Company",
       render: (r) => {
         const cid = r.company_id;
-        if (!cid) return "—";
-        const company = companies.find((c) => c.id === cid || c.company_id === cid);
-        return company?.name ?? cid;
+        if (cid) {
+          const company = companies.find((c) => c.id === cid || c.company_id === cid);
+          return company?.name ?? cid;
+        }
+        return "—";
       },
     },
 
@@ -296,7 +298,7 @@ const CampaignsPage = () => {
         const isCompleted = status === "completed";
         return (
           <div className="d-flex flex-wrap gap-1 align-items-center">
-            {!isCompleted && (
+            {isCompleted ? null : (
               <>
                 <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${encodeURIComponent(String(row.company_id ?? effectiveCompanyId ?? ""))}`}>
                   <Button size="sm" variant="outline-primary" title="Edit campaign">
@@ -312,11 +314,8 @@ const CampaignsPage = () => {
                     setDispatchSummaryData(null);
                     setDispatchSummaryLoading(true);
                     const cid = String(row.company_id ?? effectiveCompanyId ?? "");
-                    if (!cid) {
-                      setDispatchSummaryLoading(false);
-                      return;
-                    }
-                    getCampaign(id, { company_id: cid })
+                    if (cid) {
+                      getCampaign(id, { company_id: cid })
                       .then((res: Record<string, unknown>) => {
                         const detail = (res?.data ?? res) as Record<string, unknown>;
                         setDispatchSummaryData(detail);
@@ -327,6 +326,9 @@ const CampaignsPage = () => {
                         setRowToDispatch(null);
                       })
                       .finally(() => setDispatchSummaryLoading(false));
+                    } else {
+                      setDispatchSummaryLoading(false);
+                    }
                   }}
                   disabled={!!loadingKey}
                   title="Dispatch campaign"
@@ -542,10 +544,12 @@ const CampaignsPage = () => {
                         {(() => {
                           const vbRec = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
                           const sec = typeof vbRec?.max_call_duration === "number" ? vbRec.max_call_duration : undefined;
-                          if (sec == null) return "—";
+                          if (sec != null) {
                           const m = Math.floor(sec / 60);
                           const suffix = m > 0 ? " (" + m + "m)" : "";
                           return String(sec) + "s" + suffix;
+                        }
+                        return "—";
                         })()}
                       </span>
                     </div>
@@ -560,7 +564,8 @@ const CampaignsPage = () => {
                         {(() => {
                           const v = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
                           const limit = v?.concurrency_limit;
-                          return limit == null ? "—" : limit + " calls";
+                          if (limit == null) return "—";
+                          return limit + " calls";
                         })()}
                       </span>
                     </div>
@@ -580,7 +585,7 @@ const CampaignsPage = () => {
                     const items = [
                       { ok: String(vb?.status ?? "") === "active", label: "VoiceBot is active" },
                       { ok: !!vb?.trunk_id, label: "Trunk is configured" },
-                      { ok: targetCount > 0, label: `${targetCount} target number${targetCount !== 1 ? "s" : ""} loaded` },
+                      { ok: targetCount > 0, label: `${targetCount} target number${targetCount === 1 ? "" : "s"} loaded` },
                       { ok: scriptOk, label: "Campaign script is configured" },
                     ];
                     return items.map((item) => (

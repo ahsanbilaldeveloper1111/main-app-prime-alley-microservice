@@ -68,6 +68,15 @@ function normalizeToE164(raw: string): string | null {
   return `+${digitsOnly}`;
 }
 
+/** Safely coerce API value to string for form fields; avoids '[object Object]' when value is an object. */
+function toFormString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && value instanceof Date) return value.toISOString();
+  return "";
+}
+
 /** Parse raw text area or CSV line into E.164 numbers (one per line), skipping invalid. */
 function parseTargetListToE164(text: string): string[] {
   const headerWords = new Set(["phone", "number", "tel", "telephone", "mobile", "contact"]);
@@ -117,7 +126,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const text = String(reader.result ?? "");
+      const text = typeof reader.result === "string" ? reader.result : "";
       const numbers = parseTargetListToE164(text);
       setForm((f) => ({ ...f, target_list_raw: numbers.join("\n") }));
       toast.success(`Loaded ${numbers.length} number(s) in E.164 format from ${file.name}`);
@@ -210,19 +219,19 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
         const targetList = (detail.target_numbers as string[] | undefined) ?? (detail.target_list as string[] | undefined);
         const targetListRaw = Array.isArray(targetList) ? targetList.join("\n") : "";
         setForm({
-          company_id: String(detail.company_id ?? editCompanyId),
-          name: String(detail.name ?? ""),
-          description: String(detail.description ?? ""),
+          company_id: toFormString(detail.company_id ?? editCompanyId),
+          name: toFormString(detail.name),
+          description: toFormString(detail.description),
           voicebot_id: detail.voicebot_id != null ? Number(detail.voicebot_id) : undefined,
           target_list_raw: targetListRaw,
-          campaign_script: String(detail.campaign_script ?? ""),
-          custom_greeting: String(detail.custom_greeting ?? ""),
+          campaign_script: toFormString(detail.campaign_script),
+          custom_greeting: toFormString(detail.custom_greeting),
           input_method: "manual",
-          schedule_start: String(detail.schedule_start ?? ""),
-          schedule_end: String(detail.schedule_end ?? ""),
+          schedule_start: toFormString(detail.schedule_start),
+          schedule_end: toFormString(detail.schedule_end),
           retry_attempts: Number(detail.retry_attempts ?? 3),
           retry_interval_minutes: Number(detail.retry_interval_minutes ?? 60),
-          status: String(detail.status ?? "draft"),
+          status: toFormString(detail.status) || "draft",
         });
       })
       .catch((err: unknown) => {

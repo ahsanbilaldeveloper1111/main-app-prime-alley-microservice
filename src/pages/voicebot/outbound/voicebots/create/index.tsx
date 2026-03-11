@@ -26,6 +26,23 @@ interface CompanyOption {
   name: string;
 }
 
+/** Safely coerce API value to string for form fields; avoids '[object Object]' when value is an object. */
+function toFormString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object" && value instanceof Date) return value.toISOString();
+  return "";
+}
+
+/** Pick first value that is a string, otherwise return default (avoids stringifying objects). */
+function firstString(...values: unknown[]): string {
+  for (const v of values) {
+    if (typeof v === "string") return v;
+  }
+  return "";
+}
+
 /** Form state (UI uses first_message/system_prompt; API expects default_greeting/default_system_prompt) */
 interface OutboundVoicebotFormState {
   company_id: string;
@@ -191,24 +208,24 @@ const VoicebotOutboundCreate = () => {
         const detail = (res?.data != null ? res.data : res) as Record<string, unknown>;
         const d = detail;
         setForm({
-          company_id: String(d.company_id ?? ""),
-          name: String(d.name ?? ""),
-          description: String(d.description ?? ""),
-          system_prompt: String(d.default_system_prompt ?? d.system_prompt ?? defaultForm.system_prompt),
-          first_message: String(d.default_greeting ?? d.first_message ?? defaultForm.first_message),
-          llm_model: String(d.llm_model ?? defaultForm.llm_model),
-          tts_model: String(d.tts_model ?? defaultForm.tts_model),
-          stt_model: String(d.stt_model ?? defaultForm.stt_model),
-          voice: String(d.voice ?? d.voice_model ?? defaultForm.voice),
+          company_id: toFormString(d.company_id),
+          name: toFormString(d.name),
+          description: toFormString(d.description),
+          system_prompt: firstString(d.default_system_prompt, d.system_prompt) || defaultForm.system_prompt,
+          first_message: firstString(d.default_greeting, d.first_message) || defaultForm.first_message,
+          llm_model: typeof d.llm_model === "string" ? d.llm_model : defaultForm.llm_model,
+          tts_model: typeof d.tts_model === "string" ? d.tts_model : defaultForm.tts_model,
+          stt_model: typeof d.stt_model === "string" ? d.stt_model : defaultForm.stt_model,
+          voice: firstString(d.voice, d.voice_model) || defaultForm.voice,
           temperature: Number(d.temperature ?? defaultForm.temperature),
           max_tokens: Number(d.max_tokens ?? defaultForm.max_tokens),
-          transfer_number: String(d.transfer_number ?? ""),
+          transfer_number: toFormString(d.transfer_number),
           enable_transfer: Boolean(d.enable_transfer ?? false),
           idle_timeout_seconds: Number(d.idle_timeout_seconds ?? d.idle_timeout ?? defaultForm.idle_timeout_seconds),
           max_call_duration_seconds: Number(d.max_call_duration_seconds ?? d.max_call_duration ?? defaultForm.max_call_duration_seconds),
-          status: String(d.status ?? defaultForm.status),
-          trunk_id: String(d.trunk_id ?? ""),
-          language: String(d.language ?? defaultForm.language),
+          status: typeof d.status === "string" ? d.status : defaultForm.status,
+          trunk_id: typeof d.trunk_id === "string" ? d.trunk_id : "",
+          language: typeof d.language === "string" ? d.language : defaultForm.language,
           concurrency_limit: Number(d.concurrency_limit ?? defaultForm.concurrency_limit),
         });
       })
