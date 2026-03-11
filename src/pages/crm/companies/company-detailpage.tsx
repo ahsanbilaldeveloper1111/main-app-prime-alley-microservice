@@ -1165,7 +1165,11 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           </div>
         </div>
         {!collapsedSections.has("key-info") && (
-          <div style={{ padding: "20px" }}>
+          <div style={{
+            padding: "20px",
+            maxHeight: "480px",
+            overflowY: "auto",
+          }}>
             {keyInfoFields.map((field, index) => (
               <div key={index} style={{ marginBottom: "16px" }}>
                 <div style={{ fontSize: "13px", fontWeight: "400", color: "#666", marginBottom: "4px" }}>
