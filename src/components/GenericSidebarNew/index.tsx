@@ -5084,7 +5084,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       ? (recordType as "prospect" | "lead" | "deal" | "order")
       : undefined;
   const activityRecordIdForModals =
-    activityRecordTypeForModals && recordId != null && !Number.isNaN(Number(recordId))
+    activityRecordTypeForModals &&
+    recordId != null &&
+    !Number.isNaN(Number(recordId))
       ? Number(recordId)
       : undefined;
 
@@ -5096,6 +5098,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           recordName: title,
           recordEmail: emailList[0] ?? "",
           recordPhone: phoneList[0] ?? "",
+          // When a note is created via the shared activity modals,
+          // refresh the sidebar notes list for this record so the
+          // "Notes" section in GenericSidebar updates immediately.
+          onNoteCreated: () => {
+            setSidebarNotesLoading(true);
+            getCrmNotes(
+              activityRecordTypeForModals,
+              activityRecordIdForModals,
+            )
+              .then((res) => {
+                setSidebarNotesList(res?.data ?? []);
+              })
+              .catch(() => {
+                setSidebarNotesList([]);
+              })
+              .finally(() => {
+                setSidebarNotesLoading(false);
+              });
+          },
         })
       : null;
 
@@ -6706,6 +6727,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                               color: "#141414",
                               margin: "0 0 8px 0",
                               lineHeight: "1.6",
+                              
                             }}
                             dangerouslySetInnerHTML={{ __html: note.text }}
                           />
