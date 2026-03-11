@@ -1405,31 +1405,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                     }}>
                       Deals (1)
                     </h3>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#141414',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      padding: '6px',
-                      borderRadius: '3px',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f8fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                  </button>
+                  </div>                
                 </div>
 
                 {!collapsedSections.has('deals') && (
@@ -1571,31 +1547,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                     }}>
                       Contacts (1)
                     </h3>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#141414',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      padding: '6px',
-                      borderRadius: '3px',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f8fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                  </button>
+                  </div>          
                 </div>
 
                 {!collapsedSections.has('contacts') && (
@@ -1693,31 +1645,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   }}>
                     Attachments
                   </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#141414',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    padding: '6px',
-                    borderRadius: '3px',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f8fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                </button>
+                </div>               
               </div>
 
               {!collapsedSections.has('attachments') && (
