@@ -3,16 +3,13 @@ import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
-import {
-  getCalls,
-  getCallsStats,
-  getCompanies,
-  getBots,
-} from "@utils/voicebot/inbound";
-import { Row, Col, Button, Form } from "react-bootstrap";
+import { getCalls, getCallsStats, getBots, getCall } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
+import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { Filter } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Filter, Eye } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
 
@@ -31,11 +28,53 @@ interface CallRow {
   [key: string]: unknown;
 }
 
+interface CallMessage {
+  id?: string;
+  role?: string;
+  content?: string;
+  timestamp?: string;
+  token_count?: number;
+  processing_time_ms?: number;
+}
+
+interface UsageMetrics {
+  stt_tokens?: number;
+  llm_input_tokens?: number;
+  llm_output_tokens?: number;
+  tts_tokens?: number;
+  total_tokens?: number;
+  stt_cost?: string;
+  llm_cost?: string;
+  tts_cost?: string;
+  total_cost?: string;
+  model_used?: string;
+  voice_used?: string;
+  stt_model?: string;
+  interruption_count?: number;
+  [key: string]: unknown;
+}
+
+interface CallDetail {
+  id?: string;
+  session_id?: string;
+  company_name?: string;
+  bot_name?: string;
+  caller_phone?: string;
+  status?: string;
+  call_duration_seconds?: number;
+  messages?: CallMessage[];
+  usage_metrics?: UsageMetrics;
+  [key: string]: unknown;
+}
+
 const CallsPage = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CallRow[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; identifier?: string; name: string }[]>([]);
   const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
+  const [botCounts, setBotCounts] = useState<{ published: number; active: number }>({ published: 0, active: 0 });
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<{ total_calls?: number; completed?: number; avg_duration_seconds?: number; total_cost?: number } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -47,24 +86,58 @@ const CallsPage = () => {
     end_date: "",
     limit: 50,
   });
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewCallId, setViewCallId] = useState<string | null>(null);
+  const [viewCallData, setViewCallData] = useState<CallDetail | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewActiveTab, setViewActiveTab] = useState<"transcript" | "usage">("transcript");
+
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies({ show_inactive: true });
-      const list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
-      setCompanies((Array.isArray(list) ? list : []).map((c: any) => ({ id: c.company_id ?? c.id ?? "", name: c.name ?? "" })));
+      const res = await GetCompanies();
+      if (res === false) {
+        setCompanies([]);
+        return;
+      }
+      const list = Array.isArray(res)
+        ? res
+        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
+          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
+          [];
+      const opts = (Array.isArray(list) ? list : []).map((c) => {
+        const id = c.company_id ?? c.identifier ?? c.id ?? "";
+        const identifier = c.identifier ?? c.company_id ?? c.id ?? "";
+        return { id, identifier, name: c.name ?? "" };
+      });
+      setCompanies(opts);
     } catch (_) {
       setCompanies([]);
     }
   }, []);
 
-  const fetchBots = useCallback(async () => {
+  useEffect(() => {
+    const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
+    if (!isAdmin && companyIdentifier) {
+      setFilters((f) => ({ ...f, company_id: companyIdentifier }));
+    }
+  }, [isAdmin, session?.user]);
+
+  const fetchBots = useCallback(async (companyId?: string) => {
     try {
-      const res = await getBots({ limit: 200 });
-      const list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
-      setBots((Array.isArray(list) ? list : []).map((b: any) => ({ id: b.id ?? "", name: b.name ?? "" })));
+      const params: { limit: number; company_id?: string } = { limit: 200 };
+      if (companyId?.trim()) params.company_id = companyId.trim();
+      const res = await getBots(params);
+      const list = Array.isArray(res) ? res : (res as { results?: { status?: string; is_active?: boolean }[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
+      const rawList = Array.isArray(list) ? list : [];
+      setBots(rawList.map((b: { id?: string; name?: string }) => ({ id: b.id ?? "", name: b.name ?? "" })));
+      setBotCounts({
+        published: rawList.filter((b: { status?: string }) => b.status === "published").length,
+        active: rawList.filter((b: { is_active?: boolean }) => b.is_active === true).length,
+      });
     } catch (_) {
       setBots([]);
+      setBotCounts({ published: 0, active: 0 });
     }
   }, []);
 
@@ -72,7 +145,12 @@ const CallsPage = () => {
     setLoading(true);
     try {
       const params: Record<string, string | number | undefined> = { limit: filters.limit };
-      if (filters.company_id) params.company_id = filters.company_id;
+      const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
+      if (!isAdmin && companyIdentifier) {
+        params.company_id = companyIdentifier;
+      } else if (filters.company_id) {
+        params.company_id = filters.company_id;
+      }
       if (filters.bot_id) params.bot_id = filters.bot_id;
       if (filters.status) params.status = filters.status;
       if (filters.start_date) params.start_date = filters.start_date;
@@ -86,12 +164,17 @@ const CallsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, isAdmin, session?.user]);
 
   const fetchStats = useCallback(async () => {
     try {
       const params: Record<string, string | undefined> = {};
-      if (filters.company_id) params.company_id = filters.company_id;
+      const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
+      if (!isAdmin && companyIdentifier) {
+        params.company_id = companyIdentifier;
+      } else if (filters.company_id) {
+        params.company_id = filters.company_id;
+      }
       if (filters.bot_id) params.bot_id = filters.bot_id;
       if (filters.start_date) params.start_date = filters.start_date;
       if (filters.end_date) params.end_date = filters.end_date;
@@ -100,26 +183,49 @@ const CallsPage = () => {
     } catch (_) {
       setStats(null);
     }
-  }, [filters.company_id, filters.bot_id, filters.start_date, filters.end_date]);
+  }, [filters.company_id, filters.bot_id, filters.start_date, filters.end_date, isAdmin, session?.user]);
 
   useEffect(() => {
     fetchCompanies();
-    fetchBots();
-  }, [fetchCompanies, fetchBots]);
+  }, [fetchCompanies]);
+
+  useEffect(() => {
+    const effectiveCompanyId = isAdmin
+      ? (filters.company_id || "")
+      : ((session?.user as { company_identifier?: string })?.company_identifier ?? "");
+    fetchBots(effectiveCompanyId || undefined);
+  }, [isAdmin, session?.user, filters.company_id, fetchBots]);
 
   useEffect(() => {
     fetchCalls();
     fetchStats();
   }, [fetchCalls, fetchStats]);
 
+  useEffect(() => {
+    if (!showViewModal || !viewCallId) return;
+    setViewLoading(true);
+    setViewCallData(null);
+    getCall(viewCallId)
+      .then((res: unknown) => {
+        const data = (res as { data?: CallDetail })?.data ?? (res as CallDetail);
+        setViewCallData(typeof data === "object" && data ? data : null);
+      })
+      .catch((err: { response?: { data?: { detail?: string } }; message?: string }) => {
+        toast.error(err?.response?.data?.detail || err?.message || "Failed to load call details");
+      })
+      .finally(() => setViewLoading(false));
+  }, [showViewModal, viewCallId]);
+
   const formatDate = (iso?: string) => (iso ? moment(iso).format("YYYY-MM-DD HH:mm") : "—");
   const formatDuration = (sec?: number) => (sec != null ? `${Math.floor(sec / 60)}m ${sec % 60}s` : "—");
 
   const columns: TableColumn<CallRow>[] = [
-    { key: "session_id", label: "Session ID", render: (r) => (r.session_id as string)?.slice(0, 20) + (r.session_id && String(r.session_id).length > 20 ? "…" : "") || "—" },
+  
     { key: "caller_phone", label: "Caller", sortable: true, render: (r) => r.caller_phone || r.caller_id || "—" },
-    { key: "company", label: "Company", render: (r) => (r.company as string) || "—" },
-    { key: "bot", label: "Bot", render: (r) => (r.bot as string) || "—" },
+    ...(isAdmin
+      ? [{ key: "company_name", label: "Company", render: (r: CallRow) => (r.company_name as string) || "—" }]
+      : []),
+    { key: "bot_name", label: "Bot", render: (r) => (r.bot_name as string) || "—" },
     {
       key: "status",
       label: "Status",
@@ -133,25 +239,64 @@ const CallsPage = () => {
       },
     },
     { key: "session_start_time", label: "Start", render: (r) => formatDate(r.session_start_time as string) },
+    { key: "session_end_time", label: "End", render: (r) => formatDate(r.session_end_time as string) },
+
     { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(r.call_duration_seconds as number) },
-    { key: "disconnect_reason", label: "Disconnect", render: (r) => (r.disconnect_reason as string) || "—" },
+    { key: "room_name", label: "Room", render: (r) => (r.room_name as string) || "—" },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (row) => (
+        <Button
+          size="sm"
+          variant="outline-primary"
+          onClick={() => {
+            const id = (row.id ?? row.session_id) as string;
+            if (id) {
+              setViewCallId(id);
+              setViewActiveTab("transcript");
+              setShowViewModal(true);
+            }
+          }}
+        >
+          <Eye size={14} />
+        </Button>
+      ),
+    },
   ];
 
   const applyFilters = () => {
     setShowFilters(false);
   };
 
+  const hasActiveFilters = !!(
+    filters.company_id ||
+    filters.bot_id ||
+    filters.status ||
+    filters.start_date ||
+    filters.end_date
+  );
+
+  const resetFilters = () => {
+    setFilters({
+      company_id: "",
+      bot_id: "",
+      status: "",
+      start_date: "",
+      end_date: "",
+      limit: 50,
+    });
+    setShowFilters(false);
+  };
+
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Calls" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Conversations" />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2">
-              <Button variant="link" className="p-0" onClick={() => router.push("/voicebot/inbound")}>
-                ← Back
-              </Button>
-              <h2 className="mb-0">Calls</h2>
+              <h2 className="mb-0">Conversations</h2>
             </div>
             <Button variant="outline-secondary" onClick={() => setShowFilters(!showFilters)}>
               <Filter size={16} className="me-2" /> Filters
@@ -162,25 +307,31 @@ const CallsPage = () => {
 
       {stats && (
         <Row className="mb-3">
-          <Col md={3}>
+          <Col>
             <div className="p-3 rounded border bg-light">
               <div className="small text-muted">Total calls</div>
               <div className="h4 mb-0">{stats.total_calls ?? 0}</div>
             </div>
           </Col>
-          <Col md={3}>
+          <Col>
             <div className="p-3 rounded border bg-light">
-              <div className="small text-muted">Completed</div>
-              <div className="h4 mb-0">{stats.completed ?? 0}</div>
+              <div className="small text-muted">Published Bots</div>
+              <div className="h4 mb-0">{botCounts.published}</div>
             </div>
           </Col>
-          <Col md={3}>
+          <Col>
+            <div className="p-3 rounded border bg-light">
+              <div className="small text-muted">Active Bots</div>
+              <div className="h4 mb-0">{botCounts.active}</div>
+            </div>
+          </Col>
+          <Col>
             <div className="p-3 rounded border bg-light">
               <div className="small text-muted">Avg duration</div>
               <div className="h4 mb-0">{stats.avg_duration_seconds != null ? formatDuration(stats.avg_duration_seconds) : "—"}</div>
             </div>
           </Col>
-          <Col md={3}>
+          <Col>
             <div className="p-3 rounded border bg-light">
               <div className="small text-muted">Total cost</div>
               <div className="h4 mb-0">{stats.total_cost != null ? `$${Number(stats.total_cost).toFixed(4)}` : "—"}</div>
@@ -194,20 +345,22 @@ const CallsPage = () => {
           <Col md={12}>
             <h6 className="mb-2">Filters</h6>
             <Row>
-              <Col md={2}>
-                <Form.Group className="mb-2">
-                  <Form.Label className="small">Company</Form.Label>
-                  <Form.Select
-                    value={filters.company_id}
-                    onChange={(e) => setFilters((f) => ({ ...f, company_id: e.target.value }))}
-                  >
-                    <option value="">All</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+              {isAdmin && (
+                <Col md={2}>
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small">Company</Form.Label>
+                    <Form.Select
+                      value={filters.company_id}
+                      onChange={(e) => setFilters((f) => ({ ...f, company_id: e.target.value }))}
+                    >
+                      <option value="">All</option>
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
               <Col md={2}>
                 <Form.Group className="mb-2">
                   <Form.Label className="small">Bot</Form.Label>
@@ -260,8 +413,11 @@ const CallsPage = () => {
                   />
                 </Form.Group>
               </Col>
-              <Col md={2} className="d-flex align-items-end">
+              <Col md={2} className="d-flex align-items-end gap-2">
                 <Button variant="primary" onClick={applyFilters}>Apply</Button>
+                {hasActiveFilters && (
+                  <Button variant="outline-secondary" onClick={resetFilters}>Reset</Button>
+                )}
               </Col>
             </Row>
           </Col>
@@ -284,6 +440,85 @@ const CallsPage = () => {
         hover
         striped={false}
       />
+
+      <Modal show={showViewModal} onHide={() => { setShowViewModal(false); setViewCallId(null); setViewCallData(null); }} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Call details {viewCallData?.bot_name ? `— ${viewCallData.bot_name}` : ""}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {viewLoading ? (
+            <div className="text-center py-4">Loading...</div>
+          ) : viewCallData ? (
+            <>
+              <Nav variant="tabs" activeKey={viewActiveTab} onSelect={(k) => setViewActiveTab((k as "transcript" | "usage") ?? "transcript")}>
+                <Nav.Item>
+                  <Nav.Link eventKey="transcript">Transcript</Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link eventKey="usage">Usage</Nav.Link>
+                </Nav.Item>
+              </Nav>
+              <div className="mt-3">
+                {viewActiveTab === "transcript" && (
+                  <div className="border rounded p-3 bg-light" style={{ maxHeight: "400px", overflowY: "auto" }}>
+                    {(viewCallData.messages ?? []).length === 0 ? (
+                      <p className="text-muted mb-0">No messages.</p>
+                    ) : (
+                      (viewCallData.messages ?? []).map((msg, i) => (
+                        <div key={msg.id ?? i} className={`mb-3 ${msg.role === "user" ? "text-end" : ""}`}>
+                          <span className="small text-muted d-block mb-1">
+                            {msg.role === "assistant" ? "Bot" : "User"}
+                            {msg.timestamp ? ` · ${moment(msg.timestamp).format("YYYY-MM-DD HH:mm:ss")}` : ""}
+                          </span>
+                          <div className={`d-inline-block p-2 rounded text-start ${msg.role === "user" ? "bg-primary text-white" : "bg-white border"}`} style={{ maxWidth: "85%" }}>
+                            {(msg.content ?? "").split("\n").map((line, j) => (
+                              <span key={j}>{line}{j < (msg.content ?? "").split("\n").length - 1 ? <br /> : null}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                {viewActiveTab === "usage" && (
+                  <div className="border rounded p-3">
+                    {viewCallData.usage_metrics ? (
+                      <table className="table table-sm table-bordered mb-0">
+                        <tbody>
+                          {[
+                            ["STT tokens", viewCallData.usage_metrics.stt_tokens],
+                            ["LLM input tokens", viewCallData.usage_metrics.llm_input_tokens],
+                            ["LLM output tokens", viewCallData.usage_metrics.llm_output_tokens],
+                            ["TTS tokens", viewCallData.usage_metrics.tts_tokens],
+                            ["Total tokens", viewCallData.usage_metrics.total_tokens],
+                            ["STT cost", viewCallData.usage_metrics.stt_cost != null ? `$${viewCallData.usage_metrics.stt_cost}` : "—"],
+                            ["LLM cost", viewCallData.usage_metrics.llm_cost != null ? `$${viewCallData.usage_metrics.llm_cost}` : "—"],
+                            ["TTS cost", viewCallData.usage_metrics.tts_cost != null ? `$${viewCallData.usage_metrics.tts_cost}` : "—"],
+                            ["Total cost", viewCallData.usage_metrics.total_cost != null ? `$${viewCallData.usage_metrics.total_cost}` : "—"],
+                            ["Model used", viewCallData.usage_metrics.model_used],
+                            ["Voice used", viewCallData.usage_metrics.voice_used],
+                            ["STT model", viewCallData.usage_metrics.stt_model],
+                            ["Interruption count", viewCallData.usage_metrics.interruption_count],
+                          ].map(([label, value]) => (
+                            <tr key={String(label)}>
+                              <td className="text-muted" style={{ width: "40%" }}>{label}</td>
+                              <td>{value ?? "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-muted mb-0">No usage data.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-muted mb-0">No data.</p>
+          )}
+        </Modal.Body>
+      </Modal>
     </React.Fragment>
   );
 };

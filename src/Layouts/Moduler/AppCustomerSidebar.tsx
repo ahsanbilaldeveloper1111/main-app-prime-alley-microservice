@@ -835,6 +835,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
+          id: 'voicebot-inbound-dashboard',
+          title: 'Dashboard',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/dashboard'
+        },
+        {
           id: 'voicebot-inbound-companies',
           title: 'Companies',
           icon: <LayoutDashboard size={16} />,
@@ -855,6 +862,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/conversations'
+        },
+        {
+          id: 'voicebot-inbound-analytics',
+          title: 'Analytics',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/analytics'
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
