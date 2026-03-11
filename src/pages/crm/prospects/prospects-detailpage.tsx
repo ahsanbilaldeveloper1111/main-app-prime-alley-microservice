@@ -1542,7 +1542,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
         </div>
 
         {!collapsedSections.has("key-info") && (
-          <div style={{ padding: "20px" }}>
+          <div style={{ padding: "20px", maxHeight: "480px",
+            overflowY: "auto", }}>
             {keyInfoFields.map((field, index) => (
               <div key={index} style={{ marginBottom: "16px" }}>
                 <div
@@ -2078,15 +2079,25 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   {!collapsedSections.has("deals") && (
                     <div style={{ padding: "20px" }}>
                       {dealsCount === 0 ? (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: 0,
-                          }}
-                        >
-                          No deals associated.
-                        </p>
+                         <div
+                         style={{ padding: "32px 20px", textAlign: "center" }}
+                       >
+                         <Ticket
+                           size={48}
+                           style={{ color: "#cbd5e0", marginBottom: "16px" }}
+                         />
+                         <p
+                           style={{
+                             fontSize: "14px",
+                             color: "#718096",
+                             margin: 0,
+                             lineHeight: "1.6",
+                           }}
+                         >
+                           Track the customer requests associated with this
+                           record.
+                         </p>
+                       </div>
                       ) : (
                         <>
                           {allDeals.map((deal: any) => (
