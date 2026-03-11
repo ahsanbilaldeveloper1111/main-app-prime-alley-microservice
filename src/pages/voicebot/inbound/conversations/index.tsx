@@ -5,19 +5,13 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { getCalls, getCallsStats, getBots, getCall } from "@utils/voicebot/inbound";
 import { GetCompanies } from "@utils/users";
+import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { Filter, Eye } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
-
-function safeDisplayString(value: unknown, fallback = "—"): string {
-  if (value == null) return fallback;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return fallback;
-}
 
 interface CallRow {
   id?: string;

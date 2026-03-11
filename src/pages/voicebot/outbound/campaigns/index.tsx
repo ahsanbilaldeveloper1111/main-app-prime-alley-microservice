@@ -14,6 +14,7 @@ import {
   getCampaignStatus,
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
+import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -59,14 +60,6 @@ function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | 
   if (status === "paused") return "warning";
   if (status === "running") return "primary";
   return "secondary";
-}
-
-/** Safely coerce to string for display; avoids '[object Object]'. */
-function safeDisplayString(value: unknown, fallback = "—"): string {
-  if (value == null) return fallback;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return fallback;
 }
 
 const CampaignsPage = () => {

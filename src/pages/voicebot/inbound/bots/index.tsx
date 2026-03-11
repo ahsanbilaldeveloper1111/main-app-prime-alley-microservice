@@ -17,6 +17,7 @@ import {
   type BotConfiguration,
   type BotVersionItem,
 } from "@utils/voicebot/inbound";
+import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { Row, Col, Button, Modal, Form, Spinner, Nav, Tab, Accordion } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -77,13 +78,6 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
     if (idStr !== "") option.company_id = idStr;
     return option;
   });
-}
-
-function safeDisplayString(value: unknown, fallback = "—"): string {
-  if (value == null) return fallback;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  return fallback;
 }
 
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */

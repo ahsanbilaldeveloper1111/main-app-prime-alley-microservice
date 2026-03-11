@@ -10,6 +10,7 @@ import {
   type CreateCampaignPayload,
   type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
+import { toFormString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -59,15 +60,6 @@ function normalizeToE164(raw: string): string | null {
   const digitsOnly = raw.replaceAll(/\D/g, "");
   if (digitsOnly.length < 10 || digitsOnly.length > 15) return null;
   return `+${digitsOnly}`;
-}
-
-/** Safely coerce API value to string for form fields; avoids '[object Object]' when value is an object. */
-function toFormString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (typeof value === "object" && value instanceof Date) return value.toISOString();
-  return "";
 }
 
 /** Parse raw text area or CSV line into E.164 numbers (one per line), skipping invalid. */

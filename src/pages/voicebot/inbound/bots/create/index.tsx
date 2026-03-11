@@ -11,6 +11,7 @@ import {
   type BotConfiguration,
   type UpdateBotPayload,
 } from "@utils/voicebot/inbound";
+import { toFormString } from "@utils/voicebot/formDisplay";
 import { Form, Spinner, Tab } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -92,15 +93,6 @@ const TABS = [
   { id: TAB_KEYS.behavior, label: "Behavior", icon: Shield },
   { id: TAB_KEYS.sip, label: "SIP Settings", icon: Phone },
 ];
-
-/** Safely coerce API value to string; avoids '[object Object]' when value is an object. */
-function toFormString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (typeof value === "object" && value instanceof Date) return value.toISOString();
-  return "";
-}
 
 interface ValidationItemType {
   id: string;

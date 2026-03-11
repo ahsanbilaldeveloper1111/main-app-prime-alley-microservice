@@ -10,6 +10,7 @@ import {
   type CreateVoicebotPayload,
   type UpdateVoicebotPayload,
 } from "@utils/voicebot/outbound";
+import { toFormString, firstString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -24,23 +25,6 @@ interface CompanyOption {
   id: string;
   company_id?: string;
   name: string;
-}
-
-/** Safely coerce API value to string for form fields; avoids '[object Object]' when value is an object. */
-function toFormString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (typeof value === "object" && value instanceof Date) return value.toISOString();
-  return "";
-}
-
-/** Pick first value that is a string, otherwise return default (avoids stringifying objects). */
-function firstString(...values: unknown[]): string {
-  for (const v of values) {
-    if (typeof v === "string") return v;
-  }
-  return "";
 }
 
 /** Form state (UI uses first_message/system_prompt; API expects default_greeting/default_system_prompt) */
