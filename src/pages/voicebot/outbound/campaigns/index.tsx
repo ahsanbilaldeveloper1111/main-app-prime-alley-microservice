@@ -54,6 +54,13 @@ function getDispatchStatusVariant(status: string): "warning" | "success" | "seco
   return "secondary";
 }
 
+function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | "primary" | "secondary" {
+  if (status === "active") return "success";
+  if (status === "paused") return "warning";
+  if (status === "running") return "primary";
+  return "secondary";
+}
+
 /** Safely coerce to string for display; avoids '[object Object]'. */
 function safeDisplayString(value: unknown, fallback = "—"): string {
   if (value == null) return fallback;
@@ -212,8 +219,7 @@ const CampaignsPage = () => {
       sortable: true,
       render: (r) => {
         const s = String(r.status ?? "—");
-        const variant =
-          s === "active" ? "success" : s === "paused" ? "warning" : s === "running" ? "primary" : "secondary";
+        const variant = getCampaignStatusBadgeVariant(s);
         return <Badge className="status-badge text-capitalize" bg={variant}>{s}</Badge>;
       },
     },
@@ -426,11 +432,16 @@ const CampaignsPage = () => {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {dispatchSummaryLoading ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" />
-            </div>
-          ) : dispatchSummaryData ? (
+          {(() => {
+            if (dispatchSummaryLoading) {
+              return (
+                <div className="text-center py-5">
+                  <Spinner animation="border" />
+                </div>
+              );
+            }
+            if (dispatchSummaryData) {
+              return (
             <>
               <Row>
                 <Col md={6}>
@@ -554,9 +565,10 @@ const CampaignsPage = () => {
                 </div>
               </div>
             </>
-          ) : (
-            <p className="text-muted mb-0">No campaign data to display.</p>
-          )}
+              );
+            }
+            return <p className="text-muted mb-0">No campaign data to display.</p>;
+          })()}
         </Modal.Body>
         {dispatchSummaryData && !dispatchSummaryLoading && (
           <Modal.Footer>
