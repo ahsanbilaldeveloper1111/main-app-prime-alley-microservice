@@ -110,6 +110,8 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
                 ]
             },
+            { path: '/tickets',permissions: [PERMISSIONS.TICKETS_SERVICES]},
+            { path: '/tickets/tickets-detailpage',permissions: [PERMISSIONS.TICKETS_SERVICES]},
 
             { 
                 path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
