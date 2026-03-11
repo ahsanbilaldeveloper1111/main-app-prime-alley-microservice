@@ -19,7 +19,7 @@ export const TIME_PERIODS = [
 
 export function getDateRange(period: string): { start_date?: string; end_date?: string } {
   if (period === "all") return {};
-  const days = parseInt(period, 10);
+  const days = Number.parseInt(period, 10);
   if (Number.isNaN(days) || days <= 0) return {};
   const end = new Date();
   const start = new Date(end);

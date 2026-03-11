@@ -22,25 +22,31 @@ const CompanyOverviewTable = ({ loading, rows }: CompanyOverviewTableProps) => (
           </tr>
         </thead>
         <tbody>
-          {loading ? (
-            <tr>
-              <td colSpan={5} className="text-center text-muted">Loading...</td>
-            </tr>
-          ) : rows.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="text-center text-muted">No companies.</td>
-            </tr>
-          ) : (
-            rows.map((row, i) => (
-              <tr key={i}>
+          {(() => {
+            if (loading) {
+              return (
+                <tr>
+                  <td colSpan={5} className="text-center text-muted">Loading...</td>
+                </tr>
+              );
+            }
+            if (rows.length === 0) {
+              return (
+                <tr>
+                  <td colSpan={5} className="text-center text-muted">No companies.</td>
+                </tr>
+              );
+            }
+            return rows.map((row, i) => (
+              <tr key={row.company + "-" + i}>
                 <td>{row.company}</td>
                 <td className="text-capitalize">{row.tier}</td>
                 <td>{row.bots}</td>
                 <td>{row.calls}</td>
                 <td>${row.cost}</td>
               </tr>
-            ))
-          )}
+            ));
+          })()}
         </tbody>
       </Table>
     </div>

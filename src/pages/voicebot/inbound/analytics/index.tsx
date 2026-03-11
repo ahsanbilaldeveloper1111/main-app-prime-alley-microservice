@@ -103,7 +103,7 @@ const AnalyticsPage = () => {
       DURATION_BUCKETS.forEach((b) => { byDuration[b.key] = 0; });
 
       rawList.forEach((c: CallItem) => {
-        const s = (c.status as string) || "unknown";
+        const s = String(c.status ?? "unknown");
         byStatus[s] = (byStatus[s] ?? 0) + 1;
         const sec = Number(c.call_duration_seconds);
         const validSec = Number.isFinite(sec) && sec >= 0 ? sec : 0;
@@ -121,7 +121,7 @@ const AnalyticsPage = () => {
         }
         const botId = c.bot ?? "";
         if (botId) {
-          if (!byBot[botId]) byBot[botId] = { name: (c.bot_name as string) ?? "—", total: 0, completed: 0, transferred: 0, failed: 0 };
+          if (!byBot[botId]) byBot[botId] = { name: String(c.bot_name ?? "—"), total: 0, completed: 0, transferred: 0, failed: 0 };
           byBot[botId].total += 1;
           if (s === "completed") byBot[botId].completed += 1;
           else if (s === "transferred") byBot[botId].transferred += 1;
@@ -202,7 +202,7 @@ const AnalyticsPage = () => {
   const totalFromStats = stats?.total_calls ?? totalCalls;
   const successRate = totalFromStats > 0 ? ((completedCount / totalFromStats) * 100).toFixed(1) : "0.0";
   const transferRate = totalFromStats > 0 ? ((transferredCount / totalFromStats) * 100).toFixed(1) : "0.0";
-  const totalCost = stats?.total_cost != null ? Number(stats.total_cost) : 0;
+  const totalCost = Number(stats?.total_cost ?? 0);
   const costPerCall = totalFromStats > 0 && totalCost >= 0 ? (totalCost / totalFromStats).toFixed(4) : "0.0000";
   const formatAvgDuration = (sec?: number) => {
     if (sec == null) return "0:00";

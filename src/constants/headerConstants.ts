@@ -313,13 +313,23 @@ MENU_COLORS: {
 
     //Virtual Agents permissions start
     VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml-aiml',
-    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    
     VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml-aiml',
     CREATE_CAMPAIGN_AIML: 'view-create-campaign-aiml-aiml',
     VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml-aiml',
     VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml-aiml',
     VIEW_ANALYTICS_AIML: 'view-analytics-aiml-aiml',
     VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml-aiml',
+
+    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    VIEW_INBOUND_COMPANIES_AIML: 'view-inbound-companies-aiml',
+    VIEW_INBOUND_BOTS_AIML: 'view-inbound-bots-aiml',
+    VIEW_INBOUND_ANALYTICS_AIML: 'view-inbound-analytics-aiml',
+    VIEW_INBOUND_USAGE_REPORTS_AIML: 'view-inbound-dashboard-aiml',
+
+    MANAGE_INBOUND_COMPANIES_AIML: 'manage-inbound-companies-aiml',
+    MANAGE_INBOUND_BOTS_AIML: 'manage-inbound-bots-aiml',
+
     //Virtual Agents permissions end
 
     //pulse permissions start

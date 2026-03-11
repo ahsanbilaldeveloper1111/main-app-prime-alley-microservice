@@ -7,7 +7,6 @@ import { getCalls, getCallsStats, getBots, getCall } from "@utils/voicebot/inbou
 import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import { Filter, Eye } from "lucide-react";
 import "@assets/scss/common.scss";
@@ -68,7 +67,6 @@ interface CallDetail {
 }
 
 const CallsPage = () => {
-  const router = useRouter();
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CallRow[]>([]);
@@ -111,7 +109,8 @@ const CallsPage = () => {
         return { id, identifier, name: c.name ?? "" };
       });
       setCompanies(opts);
-    } catch (_) {
+    } catch {
+      toast.error("Failed to load companies");
       setCompanies([]);
     }
   }, []);
@@ -135,7 +134,8 @@ const CallsPage = () => {
         published: rawList.filter((b: { status?: string }) => b.status === "published").length,
         active: rawList.filter((b: { is_active?: boolean }) => b.is_active === true).length,
       });
-    } catch (_) {
+    } catch {
+      toast.error("Failed to load bots");
       setBots([]);
       setBotCounts({ published: 0, active: 0 });
     }
@@ -156,10 +156,11 @@ const CallsPage = () => {
       if (filters.start_date) params.start_date = filters.start_date;
       if (filters.end_date) params.end_date = filters.end_date;
       const res = await getCalls(params);
-      const list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
+      const list = Array.isArray(res) ? res : (res as { results?: unknown[]; data?: unknown[] })?.results ?? (res as { results?: unknown[]; data?: unknown[] })?.data ?? [];
       setData(Array.isArray(list) ? list : []);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Failed to load calls");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail ?? (err as { message?: string })?.message ?? "Failed to load calls";
+      toast.error(msg);
       setData([]);
     } finally {
       setLoading(false);
@@ -179,8 +180,9 @@ const CallsPage = () => {
       if (filters.start_date) params.start_date = filters.start_date;
       if (filters.end_date) params.end_date = filters.end_date;
       const res = await getCallsStats(params);
-      setStats(res as any);
-    } catch (_) {
+      setStats(res as { total_calls?: number; completed?: number; avg_duration_seconds?: number; total_cost?: number } | null);
+    } catch {
+      toast.error("Failed to load stats");
       setStats(null);
     }
   }, [filters.company_id, filters.bot_id, filters.start_date, filters.end_date, isAdmin, session?.user]);
@@ -217,32 +219,32 @@ const CallsPage = () => {
   }, [showViewModal, viewCallId]);
 
   const formatDate = (iso?: string) => (iso ? moment(iso).format("YYYY-MM-DD HH:mm") : "—");
-  const formatDuration = (sec?: number) => (sec != null ? `${Math.floor(sec / 60)}m ${sec % 60}s` : "—");
+  const formatDuration = (sec?: number) => (sec == null ? "—" : `${Math.floor(sec / 60)}m ${sec % 60}s`);
 
   const columns: TableColumn<CallRow>[] = [
   
     { key: "caller_phone", label: "Caller", sortable: true, render: (r) => r.caller_phone || r.caller_id || "—" },
     ...(isAdmin
-      ? [{ key: "company_name", label: "Company", render: (r: CallRow) => (r.company_name as string) || "—" }]
+      ? [{ key: "company_name", label: "Company", render: (r: CallRow) => String(r.company_name ?? "—") }]
       : []),
-    { key: "bot_name", label: "Bot", render: (r) => (r.bot_name as string) || "—" },
+    { key: "bot_name", label: "Bot", render: (r) => String(r.bot_name ?? "—") },
     {
       key: "status",
       label: "Status",
       sortable: true,
       render: (r) => {
-        const s = (r.status as string) || "";
+        const s = String(r.status ?? "");
         if (s === "completed") return <span className="status-badge success">Completed</span>;
         if (s === "failed" || s === "timeout") return <span className="status-badge danger">{s}</span>;
         if (s === "transferred") return <span className="status-badge info">Transferred</span>;
         return <span className="status-badge secondary">{s || "—"}</span>;
       },
     },
-    { key: "session_start_time", label: "Start", render: (r) => formatDate(r.session_start_time as string) },
-    { key: "session_end_time", label: "End", render: (r) => formatDate(r.session_end_time as string) },
+    { key: "session_start_time", label: "Start", render: (r) => formatDate(r.session_start_time) },
+    { key: "session_end_time", label: "End", render: (r) => formatDate(r.session_end_time) },
 
-    { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(r.call_duration_seconds as number) },
-    { key: "room_name", label: "Room", render: (r) => (r.room_name as string) || "—" },
+    { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(r.call_duration_seconds) },
+    { key: "room_name", label: "Room", render: (r) => String(r.room_name ?? "—") },
     {
       key: "actions",
       label: "Actions",
@@ -251,8 +253,8 @@ const CallsPage = () => {
           size="sm"
           variant="outline-primary"
           onClick={() => {
-            const id = (row.id ?? row.session_id) as string;
-            if (id) {
+            const id = String(row.id ?? row.session_id ?? "");
+            if (id !== "") {
               setViewCallId(id);
               setViewActiveTab("transcript");
               setShowViewModal(true);
@@ -328,13 +330,13 @@ const CallsPage = () => {
           <Col>
             <div className="p-3 rounded border bg-light">
               <div className="small text-muted">Avg duration</div>
-              <div className="h4 mb-0">{stats.avg_duration_seconds != null ? formatDuration(stats.avg_duration_seconds) : "—"}</div>
+              <div className="h4 mb-0">{stats.avg_duration_seconds == null ? "—" : formatDuration(stats.avg_duration_seconds)}</div>
             </div>
           </Col>
           <Col>
             <div className="p-3 rounded border bg-light">
               <div className="small text-muted">Total cost</div>
-              <div className="h4 mb-0">{stats.total_cost != null ? `$${Number(stats.total_cost).toFixed(4)}` : "—"}</div>
+              <div className="h4 mb-0">{stats.total_cost == null ? "—" : `$${Number(stats.total_cost).toFixed(4)}`}</div>
             </div>
           </Col>
         </Row>
@@ -446,9 +448,10 @@ const CallsPage = () => {
           <Modal.Title>Call details {viewCallData?.bot_name ? `— ${viewCallData.bot_name}` : ""}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {viewLoading ? (
-            <div className="text-center py-4">Loading...</div>
-          ) : viewCallData ? (
+          {(() => {
+            if (viewLoading) return <div className="text-center py-4">Loading...</div>;
+            if (!viewCallData) return <p className="text-muted mb-0">No data.</p>;
+            return (
             <>
               <Nav variant="tabs" activeKey={viewActiveTab} onSelect={(k) => setViewActiveTab((k as "transcript" | "usage") ?? "transcript")}>
                 <Nav.Item>
@@ -465,15 +468,17 @@ const CallsPage = () => {
                       <p className="text-muted mb-0">No messages.</p>
                     ) : (
                       (viewCallData.messages ?? []).map((msg, i) => (
-                        <div key={msg.id ?? i} className={`mb-3 ${msg.role === "user" ? "text-end" : ""}`}>
+                        <div key={msg.id ?? `msg-${i}`} className={`mb-3 ${msg.role === "user" ? "text-end" : ""}`}>
                           <span className="small text-muted d-block mb-1">
                             {msg.role === "assistant" ? "Bot" : "User"}
                             {msg.timestamp ? ` · ${moment(msg.timestamp).format("YYYY-MM-DD HH:mm:ss")}` : ""}
                           </span>
                           <div className={`d-inline-block p-2 rounded text-start ${msg.role === "user" ? "bg-primary text-white" : "bg-white border"}`} style={{ maxWidth: "85%" }}>
-                            {(msg.content ?? "").split("\n").map((line, j) => (
-                              <span key={j}>{line}{j < (msg.content ?? "").split("\n").length - 1 ? <br /> : null}</span>
-                            ))}
+                            {(msg.content ?? "").split("\n").map((line, j) => {
+                              const msgKey = msg.id ?? "msg-" + i;
+                              const lineKey = msgKey + "-" + String(line).slice(0, 40) + "-" + j;
+                              return <span key={lineKey}>{line}{j < (msg.content ?? "").split("\n").length - 1 ? <br /> : null}</span>;
+                            })}
                           </div>
                         </div>
                       ))
@@ -491,10 +496,10 @@ const CallsPage = () => {
                             ["LLM output tokens", viewCallData.usage_metrics.llm_output_tokens],
                             ["TTS tokens", viewCallData.usage_metrics.tts_tokens],
                             ["Total tokens", viewCallData.usage_metrics.total_tokens],
-                            ["STT cost", viewCallData.usage_metrics.stt_cost != null ? `$${viewCallData.usage_metrics.stt_cost}` : "—"],
-                            ["LLM cost", viewCallData.usage_metrics.llm_cost != null ? `$${viewCallData.usage_metrics.llm_cost}` : "—"],
-                            ["TTS cost", viewCallData.usage_metrics.tts_cost != null ? `$${viewCallData.usage_metrics.tts_cost}` : "—"],
-                            ["Total cost", viewCallData.usage_metrics.total_cost != null ? `$${viewCallData.usage_metrics.total_cost}` : "—"],
+                            ["STT cost", viewCallData.usage_metrics.stt_cost == null ? "—" : `$${viewCallData.usage_metrics.stt_cost}`],
+                            ["LLM cost", viewCallData.usage_metrics.llm_cost == null ? "—" : `$${viewCallData.usage_metrics.llm_cost}`],
+                            ["TTS cost", viewCallData.usage_metrics.tts_cost == null ? "—" : `$${viewCallData.usage_metrics.tts_cost}`],
+                            ["Total cost", viewCallData.usage_metrics.total_cost == null ? "—" : `$${viewCallData.usage_metrics.total_cost}`],
                             ["Model used", viewCallData.usage_metrics.model_used],
                             ["Voice used", viewCallData.usage_metrics.voice_used],
                             ["STT model", viewCallData.usage_metrics.stt_model],
@@ -514,9 +519,8 @@ const CallsPage = () => {
                 )}
               </div>
             </>
-          ) : (
-            <p className="text-muted mb-0">No data.</p>
-          )}
+            );
+          })()}
         </Modal.Body>
       </Modal>
     </React.Fragment>

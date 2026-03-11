@@ -118,7 +118,7 @@ const VoicebotsPage = () => {
       setData(rows);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Failed to load voicebots");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load voicebots"));
       setData([]);
     } finally {
       setLoading(false);
@@ -153,7 +153,7 @@ const VoicebotsPage = () => {
 
   const columns: TableColumn<VoicebotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "trunk_id", label: "Trunk", render: (r) => (trunks.find((t) => t.id === (r.trunk_id as string) || t.trunk_id === (r.trunk_id as string))?.name) ?? (r.trunk_id as string) ?? "—" },
+    { key: "trunk_id", label: "Trunk", render: (r) => (trunks.find((t) => t.id === r.trunk_id || t.trunk_id === r.trunk_id)?.name) ?? String(r.trunk_id ?? "—") },
     {
       key: "status",
       label: "Status",
@@ -165,7 +165,7 @@ const VoicebotsPage = () => {
           <span className="status-badge secondary">{r.status || "—"}</span>
         ),
     },
-    ...(isAdmin ? [{ key: "company_id" as const, label: "Company", render: (r: VoicebotRow) => (companies.find((c) => (c.id === (r.company_id as string) || c.company_id === (r.company_id as string)))?.name) ?? (r.company_id as string) ?? "—" }] : []),
+    ...(isAdmin ? [{ key: "company_id" as const, label: "Company", render: (r: VoicebotRow) => (companies.find((c) => c.id === r.company_id || c.company_id === r.company_id)?.name) ?? String(r.company_id ?? "—") }] : []),
     {
       key: "actions",
       label: "Actions",
@@ -174,7 +174,7 @@ const VoicebotsPage = () => {
           <Button
             size="sm"
             variant="outline-primary"
-            onClick={() => router.push(`/voicebot/outbound/voicebots/edit?id=${encodeURIComponent(botId(row))}&company_id=${encodeURIComponent((row.company_id as string) ?? "")}`)}
+            onClick={() => router.push(`/voicebot/outbound/voicebots/edit?id=${encodeURIComponent(botId(row))}&company_id=${encodeURIComponent(String(row.company_id ?? ""))}`)}
           >
             <Pencil size={14} />
           </Button>
@@ -209,7 +209,7 @@ const VoicebotsPage = () => {
       fetchVoicebots();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Delete failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
     } finally {
       setDeleteLoading(false);
     }

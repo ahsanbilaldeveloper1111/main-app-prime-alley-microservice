@@ -93,28 +93,28 @@ const InboundDashboardPage = () => {
       }
       const botsByCompany: Record<string, number> = {};
       bots.forEach((b) => {
-        const cid = (b.company_id ?? b.company ?? "") as string;
+        const cid = String(b.company_id ?? b.company ?? "");
         if (cid) botsByCompany[cid] = (botsByCompany[cid] ?? 0) + 1;
       });
       const rows: CompanyTableRow[] = await Promise.all(
         companyList.map(async (c) => {
-          const cid = (c.company_id ?? c.id ?? "") as string;
+          const cid = String(c.company_id ?? c.id ?? "");
           try {
             const res = await getCallsStats(cid ? { company_id: cid } : undefined);
             const data = (res as { data?: { total_calls?: number; total_cost?: number } })?.data ?? (res as { total_calls?: number; total_cost?: number });
             const totalCalls = typeof data === "object" && data ? (data.total_calls ?? 0) : 0;
-            const totalCost = typeof data === "object" && data && data.total_cost != null ? Number(data.total_cost) : 0;
+            const totalCost = data?.total_cost == null ? 0 : Number(data.total_cost);
             return {
-              company: (c.name as string) ?? "—",
-              tier: (c.subscription_tier as string) ?? "Free",
+              company: String(c.name ?? "—"),
+              tier: String(c.subscription_tier ?? "Free"),
               bots: botsByCompany[cid] ?? 0,
               calls: totalCalls,
               cost: totalCost.toFixed(4),
             };
           } catch {
             return {
-              company: (c.name as string) ?? "—",
-              tier: (c.subscription_tier as string) ?? "Free",
+              company: String(c.name ?? "—"),
+              tier: String(c.subscription_tier ?? "Free"),
               bots: botsByCompany[cid] ?? 0,
               calls: 0,
               cost: "0.0000",
@@ -146,9 +146,9 @@ const InboundDashboardPage = () => {
   const totalCalls = stats?.total_calls ?? 0;
   const completedCalls = stats?.completed ?? 0;
   const successRate = totalCalls > 0 ? ((completedCalls / totalCalls) * 100).toFixed(1) : "0.0";
-  const totalCost = stats?.total_cost != null ? Number(stats.total_cost) : 0;
+  const totalCost = stats?.total_cost == null ? 0 : Number(stats.total_cost);
   const avgDuration = formatDuration(stats?.avg_duration_seconds);
-  const transferRate = totalCalls > 0 ? "0.0" : "0.0";
+  const transferRate = "0.0";
 
   return (
     <React.Fragment>

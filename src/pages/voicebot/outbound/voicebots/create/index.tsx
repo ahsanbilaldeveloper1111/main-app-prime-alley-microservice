@@ -120,7 +120,7 @@ const VoicebotOutboundCreate = () => {
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const userCompanyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
   const userCompanyName = (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
-  const botId = router.query.id as string | undefined;
+  const botId = typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -185,31 +185,31 @@ const VoicebotOutboundCreate = () => {
   useEffect(() => {
     if (!isEditMode || !botId) return;
     setLoadingBot(true);
-    const companyId = router.query.company_id as string | undefined;
+    const companyId = typeof router.query.company_id === "string" ? router.query.company_id : undefined;
     getVoicebot(botId, companyId ? { company_id: companyId } : undefined)
       .then((res: Record<string, unknown>) => {
         const detail = (res?.data != null ? res.data : res) as Record<string, unknown>;
         const d = detail;
         setForm({
-          company_id: (d.company_id ?? "") as string,
-          name: (d.name ?? "") as string,
-          description: (d.description ?? "") as string,
-          system_prompt: (d.default_system_prompt ?? d.system_prompt ?? defaultForm.system_prompt) as string,
-          first_message: (d.default_greeting ?? d.first_message ?? defaultForm.first_message) as string,
-          llm_model: (d.llm_model ?? defaultForm.llm_model) as string,
-          tts_model: (d.tts_model ?? defaultForm.tts_model) as string,
-          stt_model: (d.stt_model ?? defaultForm.stt_model) as string,
-          voice: (d.voice ?? d.voice_model ?? defaultForm.voice) as string,
-          temperature: (d.temperature ?? defaultForm.temperature) as number,
-          max_tokens: (d.max_tokens ?? defaultForm.max_tokens) as number,
-          transfer_number: (d.transfer_number ?? "") as string,
-          enable_transfer: (d.enable_transfer ?? false) as boolean,
-          idle_timeout_seconds: (d.idle_timeout_seconds ?? d.idle_timeout ?? defaultForm.idle_timeout_seconds) as number,
-          max_call_duration_seconds: (d.max_call_duration_seconds ?? d.max_call_duration ?? defaultForm.max_call_duration_seconds) as number,
-          status: (d.status ?? defaultForm.status) as string,
-          trunk_id: ((d.trunk_id as string) ?? "") as string,
-          language: (d.language as string) ?? defaultForm.language,
-          concurrency_limit: (d.concurrency_limit as number) ?? defaultForm.concurrency_limit,
+          company_id: String(d.company_id ?? ""),
+          name: String(d.name ?? ""),
+          description: String(d.description ?? ""),
+          system_prompt: String(d.default_system_prompt ?? d.system_prompt ?? defaultForm.system_prompt),
+          first_message: String(d.default_greeting ?? d.first_message ?? defaultForm.first_message),
+          llm_model: String(d.llm_model ?? defaultForm.llm_model),
+          tts_model: String(d.tts_model ?? defaultForm.tts_model),
+          stt_model: String(d.stt_model ?? defaultForm.stt_model),
+          voice: String(d.voice ?? d.voice_model ?? defaultForm.voice),
+          temperature: Number(d.temperature ?? defaultForm.temperature),
+          max_tokens: Number(d.max_tokens ?? defaultForm.max_tokens),
+          transfer_number: String(d.transfer_number ?? ""),
+          enable_transfer: Boolean(d.enable_transfer ?? false),
+          idle_timeout_seconds: Number(d.idle_timeout_seconds ?? d.idle_timeout ?? defaultForm.idle_timeout_seconds),
+          max_call_duration_seconds: Number(d.max_call_duration_seconds ?? d.max_call_duration ?? defaultForm.max_call_duration_seconds),
+          status: String(d.status ?? defaultForm.status),
+          trunk_id: String(d.trunk_id ?? ""),
+          language: String(d.language ?? defaultForm.language),
+          concurrency_limit: Number(d.concurrency_limit ?? defaultForm.concurrency_limit),
         });
       })
       .catch(() => {

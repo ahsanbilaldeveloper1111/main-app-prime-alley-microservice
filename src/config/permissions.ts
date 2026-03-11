@@ -769,6 +769,12 @@ export const routePermissions: RoutePermission[] = [
             { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/voicebots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/campaigns/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/reports', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+
+
+
         ]
     },
     //voicebot services end
@@ -848,7 +854,7 @@ export interface SearchableRoute {
 
 function pathToLabel(path: string): string {
     const segments = path.split('/').filter(Boolean);
-    return segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')).join(' / ') || 'Home';
+    return segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replaceAll('-', ' ')).join(' / ') || 'Home';
 }
 
 /** True if path contains a dynamic segment ([id], :id, {id}, etc.) */
@@ -883,9 +889,9 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
 ];
 
 function isExcludedFromSearch(path: string): boolean {
-    const normalized = path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    const normalized = path.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
     return SEARCH_EXCLUDED_ROUTES.some((ex) => {
-        const exNorm = ex.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+        const exNorm = ex.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
         return normalized === exNorm || normalized.startsWith(exNorm + '/');
     });
 }
@@ -895,7 +901,7 @@ export function getSearchableRoutes(): SearchableRoute[] {
     const result: SearchableRoute[] = [];
     function traverse(routes: RoutePermission[], currentPath: string = '') {
         for (const route of routes) {
-            const fullPath = `${currentPath}${route.path}`.replace(/\/+/g, '/') || '/';
+            const fullPath = `${currentPath}${route.path}`.replaceAll(/\/+/g, '/') || '/';
             if (isDynamicPath(fullPath)) continue;
             const normalized = fullPath.endsWith('/') && fullPath.length > 1 ? fullPath.slice(0, -1) : fullPath;
             if (isExcludedFromSearch(normalized)) continue;

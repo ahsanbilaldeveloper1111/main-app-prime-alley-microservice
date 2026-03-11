@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -93,71 +93,317 @@ const TABS = [
   { id: TAB_KEYS.sip, label: "SIP Settings", icon: Phone },
 ];
 
-const VoicebotInboundBotsCreate = () => {
-  const router = useRouter();
-  const botId = router.query.id as string | undefined;
-  const isEditMode = Boolean(botId);
+interface ValidationItemType {
+  id: string;
+  label: string;
+  checked: boolean;
+  message: string;
+}
+
+const ValidationChecklist = ({
+  items,
+  expandedId,
+  onToggle,
+}: {
+  items: ValidationItemType[];
+  expandedId: string | null;
+  onToggle: (id: string | null) => void;
+}) => (
+  <div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+      <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>Validation Checklist</h6>
+      <span style={{ fontSize: "12px", color: "#6b7280" }}>
+        {items.filter((item) => item.checked).length}/{items.length} Complete
+      </span>
+    </div>
+    {items.map((item, index) => (
+      <div
+        key={item.id}
+        style={{
+          borderBottom: index < items.length - 1 ? "1px solid #f3f4f6" : "none",
+          paddingBottom: expandedId === item.id ? "12px" : "0",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => onToggle(expandedId === item.id ? null : item.id)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 0",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            width: "100%",
+            border: "none",
+            background: "none",
+            textAlign: "left",
+            font: "inherit",
+            color: "inherit",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                width: "20px",
+                height: "20px",
+                borderRadius: "50%",
+                backgroundColor: item.checked ? "#d1fae5" : "#fee2e2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {item.checked ? (
+                <Check size={14} color="#059669" />
+              ) : (
+                <span style={{ fontSize: "12px", color: "#dc2626", fontWeight: "bold" }}>!</span>
+              )}
+            </div>
+            <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 500 }}>{item.label}</span>
+          </div>
+          <ChevronDown
+            size={16}
+            color="#9ca3af"
+            style={{
+              transform: expandedId === item.id ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+            }}
+          />
+        </button>
+        {expandedId === item.id && (
+          <div
+            style={{
+              fontSize: "13px",
+              color: item.checked ? "#059669" : "#dc2626",
+              backgroundColor: item.checked ? "#f0fdf4" : "#fef2f2",
+              padding: "8px 12px 8px 30px",
+              borderRadius: "6px",
+              marginTop: "4px",
+            }}
+          >
+            {item.message}
+          </div>
+        )}
+      </div>
+    ))}
+  </div>
+);
+
+function getFirstValidationError(form: CreateBotPayload): string | null {
+  if (!form.company) return "Please select a company";
+  if (!form.name?.trim()) return "Bot Name is required";
+  if (!form.description?.trim()) return "Description is required";
+  const c = form.configuration;
+  if (!c?.instructions?.trim()) return "Instructions are required";
+  if (!c?.knowledge_base?.trim()) return "Knowledge Base is required";
+  if (!c?.voice_instructions?.trim()) return "Voice Instructions are required";
+  if (!c?.transfer_number?.trim()) return "Transfer Number is required";
+  if (!c?.sip_trunk_id?.trim()) return "SIP Trunk ID is required";
+  if (!c?.phone_number?.trim()) return "Phone Number is required";
+  return null;
+}
+
+function validateFormAndToast(form: CreateBotPayload): boolean {
+  const err = getFirstValidationError(form);
+  if (err) {
+    toast.error(err);
+    return false;
+  }
+  return true;
+}
+
+function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
+  const c = form.configuration ?? defaultConfig;
+  const num = (v: unknown, def: number, parse: (s: string) => number) =>
+    typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
+  return {
+    name: form.name?.trim() ?? "",
+    description: form.description?.trim() ?? "",
+    status: form.status ?? "draft",
+    configuration: {
+      instructions: c.instructions?.trim() ?? "",
+      knowledge_base: c.knowledge_base?.trim() ?? "",
+      voice_name: c.voice_name ?? "alloy",
+      voice_model: c.voice_model ?? "gpt-4o-mini-tts",
+      voice_speed: num(c.voice_speed, 1, Number.parseFloat),
+      voice_instructions: c.voice_instructions?.trim() ?? "",
+      llm_model: c.llm_model ?? "gpt-4o-mini",
+      temperature: num(c.temperature, 0.7, Number.parseFloat),
+      max_tokens: num(c.max_tokens, 1000, (s) => Number.parseInt(s, 10)),
+      greeting_message: c.greeting_message?.trim() ?? "",
+      transfer_enabled: Boolean(c.transfer_enabled),
+      transfer_number: c.transfer_number?.trim() ?? "",
+      max_duration: num(c.max_duration, 1800, (s) => Number.parseInt(s, 10)),
+      idle_timeout: num(c.idle_timeout, 300, (s) => Number.parseInt(s, 10)),
+      sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
+      phone_number: c.phone_number?.trim() ?? "",
+      allow_interruptions: Boolean(c.allow_interruptions),
+      min_endpointing_delay: num(c.min_endpointing_delay, 0.05, Number.parseFloat),
+      noise_cancellation: Boolean(c.noise_cancellation),
+    },
+  };
+}
+
+function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
+  const updatePayload = buildUpdatePayload(form);
+  return {
+    company: form.company,
+    name: updatePayload.name ?? "",
+    description: updatePayload.description ?? "",
+    status: updatePayload.status ?? "draft",
+    configuration: updatePayload.configuration ?? defaultConfig,
+  };
+}
+
+async function loadCompanyOptions(): Promise<CompanyOption[]> {
+  const res = await getCompanies({ show_inactive: false });
+  const list = Array.isArray(res) ? res : (res as { results?: unknown[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
+  const arr = Array.isArray(list) ? list : [];
+  return arr.map((c: { company_id?: string; id?: string; name?: string }) => ({
+    id: c.company_id ?? c.id ?? "",
+    company_id: c.company_id ?? c.id,
+    name: c.name ?? "",
+  }));
+}
+
+function validationItem(id: string, label: string, checked: boolean, okMsg: string, failMsg: string): ValidationItemType {
+  return { id, label, checked, message: checked ? okMsg : failMsg };
+}
+
+function getBasicValidationItem(form: CreateBotPayload): ValidationItemType {
+  const ok = !!(form.name?.trim() && form.company && form.description?.trim());
+  return validationItem("basic", "Basic Information", ok, `Bot "${form.name?.trim()}", company and description set`, "Provide bot name, company and description");
+}
+
+function getConfigValidationItem(cfg: BotConfiguration): ValidationItemType {
+  const ok = !!(cfg.instructions?.trim() && cfg.knowledge_base?.trim());
+  return validationItem("config", "Configuration", ok, "Instructions and knowledge base configured", "Instructions and knowledge base are required");
+}
+
+function getVoiceValidationItem(cfg: BotConfiguration): ValidationItemType {
+  const ok = !!(cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim());
+  return validationItem("voice", "Voice Settings", ok, "Voice, greeting and voice instructions set", "Set voice, greeting message and voice instructions");
+}
+
+function getLlmValidationItem(cfg: BotConfiguration): ValidationItemType {
+  const ok = !!(cfg.llm_model && cfg.max_tokens);
+  return validationItem("llm", "LLM Settings", ok, `${cfg.llm_model}, max ${cfg.max_tokens} tokens`, "Select LLM model and max tokens");
+}
+
+function getBehaviorValidationItem(cfg: BotConfiguration): ValidationItemType {
+  const ok = !!cfg.transfer_number?.trim();
+  return validationItem("behavior", "Behavior", ok, "Transfer number configured", "Transfer number is required");
+}
+
+function getSipValidationItem(cfg: BotConfiguration): ValidationItemType {
+  const ok = !!(cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim());
+  return validationItem("sip", "SIP Settings", ok, "SIP trunk ID and phone number set", "SIP Trunk ID and phone number are required");
+}
+
+function buildValidationItemsList(form: CreateBotPayload, cfg: BotConfiguration): ValidationItemType[] {
+  return [
+    getBasicValidationItem(form),
+    getConfigValidationItem(cfg),
+    getVoiceValidationItem(cfg),
+    getLlmValidationItem(cfg),
+    getBehaviorValidationItem(cfg),
+    getSipValidationItem(cfg),
+  ];
+}
+
+function getValidationItems(form: CreateBotPayload): ValidationItemType[] {
+  return buildValidationItemsList(form, form.configuration ?? defaultConfig);
+}
+
+async function submitBotForm(
+  form: CreateBotPayload,
+  isEditMode: boolean,
+  botId: string | undefined,
+  router: ReturnType<typeof useRouter>
+): Promise<void> {
+  try {
+    if (isEditMode && botId) {
+      await putBot(botId, buildUpdatePayload(form));
+      toast.success("Bot updated");
+    } else {
+      await postBots(buildCreateBotPayload(form));
+      toast.success("Bot created");
+    }
+    router.push("/voicebot/inbound/bots");
+  } catch (err: unknown) {
+    const axErr = err as { response?: { data?: { detail?: string } }; message?: string };
+    toast.error(axErr?.response?.data?.detail ?? axErr?.message ?? (isEditMode ? "Failed to update bot" : "Failed to create bot"));
+  }
+}
+
+const LoadingBotPlaceholder = () => (
+  <React.Fragment>
+    <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Bots - Edit" />
+    <PageHeader title="Edit Inbound Bot" showSearch={false} />
+    <div className="d-flex justify-content-center align-items-center p-5">
+      <Spinner animation="border" />
+    </div>
+  </React.Fragment>
+);
+
+function useTabNavigation(activeTab: string, setActiveTab: (tab: string) => void) {
+  const currentIndex = TAB_ORDER.indexOf(activeTab);
+  const goPrev = () => {
+    if (currentIndex > 0) setActiveTab(TAB_ORDER[currentIndex - 1]);
+  };
+  const goNext = () => {
+    if (currentIndex < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[currentIndex + 1]);
+  };
+  return { isFirstTab: currentIndex <= 0, isLastTab: currentIndex >= TAB_ORDER.length - 1, goPrev, goNext };
+}
+
+function useSessionCompany() {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const userCompanyIdentifier = (session?.user as { company_identifier?: string } | undefined)?.company_identifier ?? "";
   const userCompanyName = (session?.user as { company_name?: string } | undefined)?.company_name ?? userCompanyIdentifier;
-  const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
+  return { isAdmin, userCompanyIdentifier, userCompanyName };
+}
+
+function useCompanies(setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>) {
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [loadingBot, setLoadingBot] = useState(isEditMode);
-  const [submitting, setSubmitting] = useState(false);
-  const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateBotPayload>({
-    company: "",
-    name: "",
-    description: "",
-    status: "draft",
-    configuration: { ...defaultConfig },
-  });
-
-  const fetchCompanies = useCallback(async () => {
+  useEffect(() => {
     setLoadingCompanies(true);
-    try {
-      const res = await getCompanies({ show_inactive: false });
-      const list = Array.isArray(res) ? res : (res as { results?: unknown[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
-      const opts = (Array.isArray(list) ? list : []).map((c: { company_id?: string; id?: string; name?: string }) => ({
-        id: c.company_id ?? c.id ?? "",
-        company_id: c.company_id ?? c.id,
-        name: c.name ?? "",
-      }));
-      setCompanies(opts);
-      if (opts.length && !form.company) {
-        setForm((f) => ({ ...f, company: opts[0].id }));
-      }
-    } catch (_) {
-      setCompanies([]);
-    } finally {
-      setLoadingCompanies(false);
-    }
-  }, []);
+    loadCompanyOptions()
+      .then((opts) => {
+        setCompanies(opts);
+        if (opts.length > 0) setForm((f) => (f.company ? f : { ...f, company: opts[0].id }));
+      })
+      .catch(() => {
+        toast.error("Failed to load companies");
+        setCompanies([]);
+      })
+      .finally(() => setLoadingCompanies(false));
+  }, [setForm]);
+  return { companies, setCompanies, loadingCompanies };
+}
 
-  useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
-
-  useEffect(() => {
-    if (!isAdmin && userCompanyIdentifier) {
-      setForm((f) => ({ ...f, company: userCompanyIdentifier }));
-    }
-  }, [isAdmin, userCompanyIdentifier]);
-
+function useBotLoader(
+  botId: string | undefined,
+  isEditMode: boolean,
+  setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
+  router: ReturnType<typeof useRouter>
+) {
+  const [loadingBot, setLoadingBot] = useState(isEditMode);
   useEffect(() => {
     if (!isEditMode || !botId) return;
     setLoadingBot(true);
     getBot(botId)
       .then((data: Record<string, unknown>) => {
-        const company = (data.company as string) ?? "";
+        const company = String(data.company ?? "");
         const configuration = { ...defaultConfig, ...(data.configuration as Record<string, unknown>) };
         setForm({
           company,
-          name: (data.name as string) ?? "",
-          description: (data.description as string) ?? "",
-          status: (data.status as string) ?? "draft",
+          name: String(data.name ?? ""),
+          description: String(data.description ?? ""),
+          status: String(data.status ?? "draft"),
           configuration: configuration as BotConfiguration,
         });
       })
@@ -166,7 +412,31 @@ const VoicebotInboundBotsCreate = () => {
         router.push("/voicebot/inbound/bots");
       })
       .finally(() => setLoadingBot(false));
-  }, [isEditMode, botId, router]);
+  }, [isEditMode, botId, router, setForm]);
+  return loadingBot;
+}
+
+const VoicebotInboundBotsCreate = () => {
+  const router = useRouter();
+  const botId = typeof router.query.id === "string" ? router.query.id : undefined;
+  const isEditMode = Boolean(botId);
+  const { isAdmin, userCompanyIdentifier, userCompanyName } = useSessionCompany();
+  const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
+  const [form, setForm] = useState<CreateBotPayload>({
+    company: "",
+    name: "",
+    description: "",
+    status: "draft",
+    configuration: { ...defaultConfig },
+  });
+  const { companies, loadingCompanies } = useCompanies(setForm);
+  const loadingBot = useBotLoader(botId, isEditMode, setForm, router);
+  const [submitting, setSubmitting] = useState(false);
+  const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin && userCompanyIdentifier) setForm((f) => ({ ...f, company: userCompanyIdentifier }));
+  }, [isAdmin, userCompanyIdentifier]);
 
   const updateConfig = (key: keyof BotConfiguration, value: unknown) => {
     setForm((f) => ({
@@ -175,193 +445,22 @@ const VoicebotInboundBotsCreate = () => {
     }));
   };
 
-  /** Build API payload from form state. Shape matches POST /bots/ (company, name, description, status, configuration). */
-  const buildCreateBotPayload = (): CreateBotPayload => {
-    const c = form.configuration ?? defaultConfig;
-    const num = (v: unknown, def: number, parse: (s: string) => number) =>
-      typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
-    return {
-      company: form.company,
-      name: form.name?.trim() ?? "",
-      description: form.description?.trim() ?? "",
-      status: form.status ?? "draft",
-      configuration: {
-        instructions: c.instructions?.trim() ?? "",
-        knowledge_base: c.knowledge_base?.trim() ?? "",
-        voice_name: c.voice_name ?? "alloy",
-        voice_model: c.voice_model ?? "gpt-4o-mini-tts",
-        voice_speed: num(c.voice_speed, 1, parseFloat),
-        voice_instructions: c.voice_instructions?.trim() ?? "",
-        llm_model: c.llm_model ?? "gpt-4o-mini",
-        temperature: num(c.temperature, 0.7, parseFloat),
-        max_tokens: num(c.max_tokens, 1000, (s) => parseInt(s, 10)),
-        greeting_message: c.greeting_message?.trim() ?? "",
-        transfer_enabled: Boolean(c.transfer_enabled),
-        transfer_number: c.transfer_number?.trim() ?? "",
-        max_duration: num(c.max_duration, 1800, (s) => parseInt(s, 10)),
-        idle_timeout: num(c.idle_timeout, 300, (s) => parseInt(s, 10)),
-        sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
-        phone_number: c.phone_number?.trim() ?? "",
-        allow_interruptions: Boolean(c.allow_interruptions),
-        min_endpointing_delay: num(c.min_endpointing_delay, 0.05, parseFloat),
-        noise_cancellation: Boolean(c.noise_cancellation),
-      },
-    };
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.company) {
-      toast.error("Please select a company");
-      return;
-    }
-    if (!form.name?.trim()) {
-      toast.error("Bot Name is required");
-      return;
-    }
-    if (!form.description?.trim()) {
-      toast.error("Description is required");
-      return;
-    }
-    if (!form.configuration?.instructions?.trim()) {
-      toast.error("Instructions are required");
-      return;
-    }
-    if (!form.configuration?.knowledge_base?.trim()) {
-      toast.error("Knowledge Base is required");
-      return;
-    }
-    if (!form.configuration?.voice_instructions?.trim()) {
-      toast.error("Voice Instructions are required");
-      return;
-    }
-    if (!form.configuration?.transfer_number?.trim()) {
-      toast.error("Transfer Number is required");
-      return;
-    }
-    if (!form.configuration?.sip_trunk_id?.trim()) {
-      toast.error("SIP Trunk ID is required");
-      return;
-    }
-    if (!form.configuration?.phone_number?.trim()) {
-      toast.error("Phone Number is required");
-      return;
-    }
+    if (!validateFormAndToast(form)) return;
     setSubmitting(true);
-    try {
-      if (isEditMode && botId) {
-        const c = form.configuration ?? defaultConfig;
-        const num = (v: unknown, def: number, parse: (s: string) => number) =>
-          typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
-        const updatePayload: UpdateBotPayload = {
-          name: form.name?.trim() ?? "",
-          description: form.description?.trim() ?? "",
-          status: form.status ?? "draft",
-          configuration: {
-            instructions: c.instructions?.trim() ?? "",
-            knowledge_base: c.knowledge_base?.trim() ?? "",
-            voice_name: c.voice_name ?? "alloy",
-            voice_model: c.voice_model ?? "gpt-4o-mini-tts",
-            voice_speed: num(c.voice_speed, 1, parseFloat),
-            voice_instructions: c.voice_instructions?.trim() ?? "",
-            llm_model: c.llm_model ?? "gpt-4o-mini",
-            temperature: num(c.temperature, 0.7, parseFloat),
-            max_tokens: num(c.max_tokens, 1000, (s) => parseInt(s, 10)),
-            greeting_message: c.greeting_message?.trim() ?? "",
-            transfer_enabled: Boolean(c.transfer_enabled),
-            transfer_number: c.transfer_number?.trim() ?? "",
-            max_duration: num(c.max_duration, 1800, (s) => parseInt(s, 10)),
-            idle_timeout: num(c.idle_timeout, 300, (s) => parseInt(s, 10)),
-            sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
-            phone_number: c.phone_number?.trim() ?? "",
-            allow_interruptions: Boolean(c.allow_interruptions),
-            min_endpointing_delay: num(c.min_endpointing_delay, 0.05, parseFloat),
-            noise_cancellation: Boolean(c.noise_cancellation),
-          },
-        };
-        await putBot(botId, updatePayload);
-        toast.success("Bot updated");
-      } else {
-        const payload = buildCreateBotPayload();
-        await postBots(payload);
-        toast.success("Bot created");
-      }
-      router.push("/voicebot/inbound/bots");
-    } catch (err: unknown) {
-      const axErr = err as { response?: { data?: { detail?: string }; status?: number }; message?: string };
-      toast.error(axErr?.response?.data?.detail || axErr?.message || (isEditMode ? "Failed to update bot" : "Failed to create bot"));
-    } finally {
-      setSubmitting(false);
-    }
+    await submitBotForm(form, isEditMode, botId, router);
+    setSubmitting(false);
   };
 
   const handleCancel = () => {
     router.push("/voicebot/inbound/bots");
   };
 
-  const currentTabIndex = TAB_ORDER.indexOf(activeTab);
-  const isFirstTab = currentTabIndex <= 0;
-  const isLastTab = currentTabIndex >= TAB_ORDER.length - 1;
-
-  const goPrev = () => {
-    if (!isFirstTab) setActiveTab(TAB_ORDER[currentTabIndex - 1]);
-  };
-  const goNext = () => {
-    if (!isLastTab) setActiveTab(TAB_ORDER[currentTabIndex + 1]);
-  };
+  const { isFirstTab, isLastTab, goPrev, goNext } = useTabNavigation(activeTab, setActiveTab);
 
   const cfg = form.configuration ?? defaultConfig;
-
-  const validationItems = [
-    {
-      id: "basic",
-      label: "Basic Information",
-      checked: !!(form.name?.trim() && form.company && form.description?.trim()),
-      message: form.name?.trim() && form.company && form.description?.trim()
-        ? `Bot "${form.name.trim()}", company and description set`
-        : "Provide bot name, company and description",
-    },
-    {
-      id: "config",
-      label: "Configuration",
-      checked: !!(cfg.instructions?.trim() && cfg.knowledge_base?.trim()),
-      message: cfg.instructions?.trim() && cfg.knowledge_base?.trim()
-        ? "Instructions and knowledge base configured"
-        : "Instructions and knowledge base are required",
-    },
-    {
-      id: "voice",
-      label: "Voice Settings",
-      checked: !!(cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim()),
-      message: cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim()
-        ? `Voice, greeting and voice instructions set`
-        : "Set voice, greeting message and voice instructions",
-    },
-    {
-      id: "llm",
-      label: "LLM Settings",
-      checked: !!(cfg.llm_model && cfg.max_tokens),
-      message: cfg.llm_model && cfg.max_tokens
-        ? `${cfg.llm_model}, max ${cfg.max_tokens} tokens`
-        : "Select LLM model and max tokens",
-    },
-    {
-      id: "behavior",
-      label: "Behavior",
-      checked: !!cfg.transfer_number?.trim(),
-      message: cfg.transfer_number?.trim()
-        ? "Transfer number configured"
-        : "Transfer number is required",
-    },
-    {
-      id: "sip",
-      label: "SIP Settings",
-      checked: !!(cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim()),
-      message: cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim()
-        ? "SIP trunk ID and phone number set"
-        : "SIP Trunk ID and phone number are required",
-    },
-  ];
+  const validationItems = getValidationItems(form);
 
   const inputStyle = {
     width: "100%" as const,
@@ -379,17 +478,7 @@ const VoicebotInboundBotsCreate = () => {
     marginBottom: "6px",
   };
 
-  if (loadingBot) {
-    return (
-      <React.Fragment>
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Bots - Edit" />
-        <PageHeader title="Edit Inbound Bot" showSearch={false} />
-        <div className="d-flex justify-content-center align-items-center p-5">
-          <Spinner animation="border" />
-        </div>
-      </React.Fragment>
-    );
-  }
+  if (loadingBot) return <LoadingBotPlaceholder />;
 
   return (
     <React.Fragment>
@@ -487,13 +576,13 @@ const VoicebotInboundBotsCreate = () => {
                             style={inputStyle}
                           >
                             <option value="">Select company</option>
-                            {isAdmin
-                              ? companies.map((c) => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))
-                              : userCompanyIdentifier
-                                ? <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>
-                                : null}
+                            {isAdmin &&
+                              companies.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            {!isAdmin && userCompanyIdentifier && (
+                              <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>
+                            )}
                           </Form.Select>
                         </Form.Group>
                       </div>
@@ -604,7 +693,7 @@ const VoicebotInboundBotsCreate = () => {
                               max={2}
                               step={0.01}
                               value={cfg.voice_speed ?? 1}
-                              onChange={(e) => updateConfig("voice_speed", parseFloat(e.target.value))}
+                              onChange={(e) => updateConfig("voice_speed", Number.parseFloat(e.target.value))}
                             />
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
                               <span>0.50</span>
@@ -661,7 +750,7 @@ const VoicebotInboundBotsCreate = () => {
                               max={1}
                               step={0.01}
                               value={cfg.temperature ?? 0.7}
-                              onChange={(e) => updateConfig("temperature", parseFloat(e.target.value))}
+                              onChange={(e) => updateConfig("temperature", Number.parseFloat(e.target.value))}
                             />
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
                               <span>0.00</span>
@@ -678,7 +767,7 @@ const VoicebotInboundBotsCreate = () => {
                               max={4000}
                               step={100}
                               value={cfg.max_tokens ?? 1000}
-                              onChange={(e) => updateConfig("max_tokens", parseInt(e.target.value, 10) || 1000)}
+                              onChange={(e) => updateConfig("max_tokens", Number.parseInt(e.target.value, 10) || 1000)}
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -719,7 +808,7 @@ const VoicebotInboundBotsCreate = () => {
                               min={60}
                               step={60}
                               value={cfg.max_duration ?? 1800}
-                              onChange={(e) => updateConfig("max_duration", parseInt(e.target.value, 10) || 1800)}
+                              onChange={(e) => updateConfig("max_duration", Number.parseInt(e.target.value, 10) || 1800)}
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -730,7 +819,7 @@ const VoicebotInboundBotsCreate = () => {
                               min={30}
                               step={30}
                               value={cfg.idle_timeout ?? 300}
-                              onChange={(e) => updateConfig("idle_timeout", parseInt(e.target.value, 10) || 300)}
+                              onChange={(e) => updateConfig("idle_timeout", Number.parseInt(e.target.value, 10) || 300)}
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -762,7 +851,7 @@ const VoicebotInboundBotsCreate = () => {
                               max={1}
                               step={0.01}
                               value={cfg.min_endpointing_delay ?? 0.05}
-                              onChange={(e) => updateConfig("min_endpointing_delay", parseFloat(e.target.value) || 0.05)}
+                              onChange={(e) => updateConfig("min_endpointing_delay", Number.parseFloat(e.target.value) || 0.05)}
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -811,81 +900,11 @@ const VoicebotInboundBotsCreate = () => {
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
-                    Validation Checklist
-                  </h6>
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                    {validationItems.filter((item) => item.checked).length}/{validationItems.length} Complete
-                  </span>
-                </div>
-                {validationItems.map((item, index) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      borderBottom: index < validationItems.length - 1 ? "1px solid #f3f4f6" : "none",
-                      paddingBottom: expandedValidation === item.id ? "12px" : "0",
-                    }}
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setExpandedValidation(expandedValidation === item.id ? null : item.id)}
-                      onKeyDown={(e) => e.key === "Enter" && setExpandedValidation(expandedValidation === item.id ? null : item.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 0",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div
-                          style={{
-                            width: "20px",
-                            height: "20px",
-                            borderRadius: "50%",
-                            backgroundColor: item.checked ? "#d1fae5" : "#fee2e2",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          {item.checked ? (
-                            <Check size={14} color="#059669" />
-                          ) : (
-                            <span style={{ fontSize: "12px", color: "#dc2626", fontWeight: "bold" }}>!</span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 500 }}>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        color="#9ca3af"
-                        style={{
-                          transform: expandedValidation === item.id ? "rotate(180deg)" : "rotate(0deg)",
-                          transition: "transform 0.2s",
-                        }}
-                      />
-                    </div>
-                    {expandedValidation === item.id && (
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: item.checked ? "#059669" : "#dc2626",
-                          backgroundColor: item.checked ? "#f0fdf4" : "#fef2f2",
-                          padding: "8px 12px 8px 30px",
-                          borderRadius: "6px",
-                          marginTop: "4px",
-                        }}
-                      >
-                        {item.message}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                <ValidationChecklist
+                  items={validationItems}
+                  expandedId={expandedValidation}
+                  onToggle={setExpandedValidation}
+                />
               </div>
             </div>
           </div>
