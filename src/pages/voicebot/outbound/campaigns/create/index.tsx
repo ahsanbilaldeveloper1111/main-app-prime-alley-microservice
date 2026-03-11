@@ -7,7 +7,6 @@ import {
   getCampaign,
   putCampaign,
   getVoicebots,
-  getTrunks,
   type CreateCampaignPayload,
   type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
@@ -29,12 +28,6 @@ interface CompanyOption {
 
 interface VoicebotOption {
   id: number | string;
-  name: string;
-}
-
-interface TrunkOption {
-  id: string;
-  trunk_id?: string;
   name: string;
 }
 
@@ -114,7 +107,6 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
-  const [trunks, setTrunks] = useState<TrunkOption[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [loadingCampaign, setLoadingCampaign] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
@@ -187,20 +179,6 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     }
   }, []);
 
-  const fetchTrunks = useCallback(async () => {
-    try {
-      const res = await getTrunks();
-      const list = Array.isArray(res) ? res : (res as { results?: { trunk_id?: string; id?: string; name?: string }[] })?.results ?? (res as { data?: { trunk_id?: string; id?: string; name?: string }[] })?.data ?? [];
-      setTrunks((Array.isArray(list) ? list : []).map((t, i) => ({
-        id: (t as { trunk_id?: string; id?: string }).trunk_id ?? (t as { id?: string }).id ?? `trunk-${i}`,
-        trunk_id: (t as { trunk_id?: string }).trunk_id ?? (t as { id?: string }).id,
-        name: (t as { name?: string }).name ?? (t as { trunk_id?: string }).trunk_id ?? (t as { id?: string }).id ?? "",
-      })));
-    } catch {
-      setTrunks([]);
-    }
-  }, []);
-
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
@@ -222,7 +200,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
           company_id: toFormString(detail.company_id ?? editCompanyId),
           name: toFormString(detail.name),
           description: toFormString(detail.description),
-          voicebot_id: detail.voicebot_id != null ? Number(detail.voicebot_id) : undefined,
+          voicebot_id: detail.voicebot_id == null ? undefined : Number(detail.voicebot_id),
           target_list_raw: targetListRaw,
           campaign_script: toFormString(detail.campaign_script),
           custom_greeting: toFormString(detail.custom_greeting),
@@ -257,10 +235,6 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     if (form.company_id) fetchVoicebots(form.company_id);
     else setVoicebots([]);
   }, [form.company_id, fetchVoicebots]);
-
-  useEffect(() => {
-    fetchTrunks();
-  }, [fetchTrunks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,9 +401,11 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
                               style={inputStyle}
                             >
                               <option value="">Select company</option>
-                              {isAdmin
-                                ? companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)
-                                : userCompanyIdentifier ? <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option> : null}
+                              {(() => {
+                                if (isAdmin) return companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>);
+                                if (userCompanyIdentifier) return <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>;
+                                return null;
+                              })()}
                             </Form.Select>
                           </Form.Group>
                           <Form.Group className="mb-3">
@@ -541,10 +517,10 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
             <div>
-              {!isFirstTab ? (
-                <Button type="button" variant="outline-secondary" onClick={goPrev}>Previous</Button>
-              ) : (
+              {isFirstTab ? (
                 <Button type="button" variant="outline-secondary" onClick={handleCancel}>Cancel</Button>
+              ) : (
+                <Button type="button" variant="outline-secondary" onClick={goPrev}>Previous</Button>
               )}
             </div>
             <div style={{ display: "flex", gap: "12px" }}>

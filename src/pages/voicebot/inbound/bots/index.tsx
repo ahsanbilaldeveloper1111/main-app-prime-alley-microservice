@@ -67,7 +67,9 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
   return list.map((c) => {
     const item = c as Record<string, unknown>;
     const idVal = item.company_id ?? item.id;
-    const idStr = typeof idVal === "string" ? idVal : typeof idVal === "number" ? String(idVal) : "";
+    let idStr = "";
+    if (typeof idVal === "string") idStr = idVal;
+    else if (typeof idVal === "number") idStr = String(idVal);
     const option: CompanyOption = {
       id: idStr,
       name: typeof item.name === "string" ? item.name : "",
@@ -77,9 +79,16 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
   });
 }
 
+function safeDisplayString(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
 const VersionConfigSnapshot = ({ config }: { config: Record<string, unknown> }) => {
-  const v = (o: Record<string, unknown> | undefined, k: string) => String(o?.[k] ?? "—");
+  const v = (o: Record<string, unknown> | undefined, k: string) => safeDisplayString(o?.[k]);
   const voice = (config.voice_settings ?? {}) as Record<string, unknown>;
   const llm = (config.llm_settings ?? {}) as Record<string, unknown>;
   const behavior = (config.behavior_settings ?? {}) as Record<string, unknown>;
@@ -170,7 +179,7 @@ const BotViewModalBody = ({ viewLoading, viewBot, viewActiveTab, onTabChange }: 
   }
   const config = viewBot.configuration;
   const hasConfig = isConfigObject(config);
-  const cfg = (key: string) => (hasConfig ? String(config[key] ?? "—") : "—");
+  const cfg = (key: string) => (hasConfig ? safeDisplayString(config[key]) : "—");
 
   return (
     <Tab.Container activeKey={viewActiveTab} onSelect={(k) => onTabChange(k ?? "basic")}>
@@ -186,10 +195,10 @@ const BotViewModalBody = ({ viewLoading, viewBot, viewActiveTab, onTabChange }: 
         <Tab.Pane eventKey="basic">
           <table className="table table-sm table-bordered mb-0">
             <tbody>
-              <tr><th style={{ width: "140px" }}>Name</th><td>{String(viewBot.name ?? "—")}</td></tr>
-              <tr><th>Description</th><td>{String(viewBot.description ?? "—")}</td></tr>
+              <tr><th style={{ width: "140px" }}>Name</th><td>{safeDisplayString(viewBot.name)}</td></tr>
+              <tr><th>Description</th><td>{safeDisplayString(viewBot.description)}</td></tr>
               <tr><th>Status</th><td>{viewBot.status === "published" ? <span className="status-badge success">Published</span> : <span className="status-badge secondary">Draft</span>}</td></tr>
-              <tr><th>Company</th><td>{String(viewBot.company ?? "—")}</td></tr>
+              <tr><th>Company</th><td>{safeDisplayString(viewBot.company)}</td></tr>
             </tbody>
           </table>
         </Tab.Pane>
@@ -500,7 +509,7 @@ const BotsPage = () => {
 
   const columns: TableColumn<BotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    ...(isAdmin ? [{ key: "company_name", label: "Company", render: (r: BotRow) => String(r.company_name ?? "—") }] : []),
+    ...(isAdmin ? [{ key: "company_name", label: "Company", render: (r: BotRow) => safeDisplayString(r.company_name) }] : []),
     {
       key: "status",
       label: "Status",

@@ -153,7 +153,7 @@ const VoicebotsPage = () => {
 
   const columns: TableColumn<VoicebotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "trunk_id", label: "Trunk", render: (r) => (trunks.find((t) => t.id === r.trunk_id || t.trunk_id === r.trunk_id)?.name) ?? String(r.trunk_id ?? "—") },
+    { key: "trunk_id", label: "Trunk", render: (r) => (trunks.find((t) => t.id === r.trunk_id || t.trunk_id === r.trunk_id)?.name) ?? (typeof r.trunk_id === "string" ? r.trunk_id : "—") },
     {
       key: "status",
       label: "Status",

@@ -12,8 +12,6 @@ import {
   postCampaignResume,
   postCampaignStop,
   getCampaignStatus,
-  getVoicebots,
-  getTrunks,
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
@@ -29,17 +27,6 @@ import "@assets/scss/common.scss";
 interface CompanyOption {
   id: string;
   company_id?: string;
-  name: string;
-}
-
-interface VoicebotOption {
-  id: number | string;
-  name: string;
-}
-
-interface TrunkOption {
-  id: string;
-  trunk_id?: string;
   name: string;
 }
 
@@ -67,13 +54,19 @@ function getDispatchStatusVariant(status: string): "warning" | "success" | "seco
   return "secondary";
 }
 
+/** Safely coerce to string for display; avoids '[object Object]'. */
+function safeDisplayString(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
 const CampaignsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CampaignRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
-  const [trunks, setTrunks] = useState<TrunkOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -112,45 +105,6 @@ const CampaignsPage = () => {
       setCompanies(opts);
     } catch {
       setCompanies([]);
-    }
-  }, []);
-
-  const fetchVoicebots = useCallback(async () => {
-    try {
-      const res = await getVoicebots({ page: 1, page_size: 500 });
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { bot_id?: number; id?: number; name?: string }[] })?.results ??
-          (res as { data?: { bot_id?: number; id?: number; name?: string }[] })?.data ??
-          [];
-      const raw = Array.isArray(list) ? list : [];
-      setVoicebots(
-        raw.map((b) => ({
-          id: b.bot_id ?? (b as { id?: number }).id ?? 0,
-          name: (b as { name?: string }).name ?? "",
-        }))
-      );
-    } catch {
-      setVoicebots([]);
-    }
-  }, []);
-
-  const fetchTrunks = useCallback(async () => {
-    try {
-      const res = await getTrunks();
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: TrunkOption[] })?.results ?? (res as { data?: TrunkOption[] })?.data ?? [];
-      const raw = Array.isArray(list) ? list : [];
-      setTrunks(
-        raw.map((t) => ({
-          id: t.trunk_id ?? t.id ?? "",
-          trunk_id: t.trunk_id ?? t.id,
-          name: (t as { name?: string }).name ?? "",
-        }))
-      );
-    } catch {
-      setTrunks([]);
     }
   }, []);
 
@@ -193,11 +147,6 @@ const CampaignsPage = () => {
       setCompanyFilter(companyIdentifier);
     }
   }, [companyIdentifier]);
-
-  useEffect(() => {
-    fetchVoicebots();
-    fetchTrunks();
-  }, [fetchVoicebots, fetchTrunks]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -271,7 +220,7 @@ const CampaignsPage = () => {
     {
       key: "voicebot_name",
       label: "Bot",
-      render: (r) => String(r.voicebot_name ?? "—"),
+      render: (r) => safeDisplayString(r.voicebot_name),
     },
     {
       key: "company_id",
@@ -516,10 +465,10 @@ const CampaignsPage = () => {
                     if (!vb) return <p className="text-muted small">No VoiceBot linked.</p>;
                     return (
                       <>
-                        <p className="mb-1"><strong>VoiceBot:</strong> {String(vb.name ?? dispatchSummaryData.voicebot_name ?? "—")}</p>
-                        <p className="mb-1"><strong>Voice Model:</strong> <span style={{ color: "#059669" }}>{String(vb.voice_model ?? "—")}</span></p>
-                        <p className="mb-1"><strong>Language:</strong> <span style={{ color: "#059669" }}>{String(vb.language ?? "—")}</span></p>
-                        <p className="mb-1"><strong>TTS Provider:</strong> <span style={{ color: "#059669" }}>{String(vb.tts_provider ?? "—")}</span></p>
+                        <p className="mb-1"><strong>VoiceBot:</strong> {safeDisplayString(vb.name, safeDisplayString(dispatchSummaryData.voicebot_name))}</p>
+                        <p className="mb-1"><strong>Voice Model:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.voice_model)}</span></p>
+                        <p className="mb-1"><strong>Language:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.language)}</span></p>
+                        <p className="mb-1"><strong>TTS Provider:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.tts_provider)}</span></p>
                       </>
                     );
                   })()}
@@ -531,7 +480,7 @@ const CampaignsPage = () => {
                     <Phone size={16} />
                     <div>
                       <small className="text-muted d-block">Trunk ID</small>
-                      <span className="small">{String((dispatchSummaryData.voicebot as Record<string, unknown> | undefined)?.trunk_id ?? "—")}</span>
+                      <span className="small">{safeDisplayString((dispatchSummaryData.voicebot as Record<string, unknown> | undefined)?.trunk_id)}</span>
                     </div>
                   </div>
                 </Col>
@@ -565,7 +514,7 @@ const CampaignsPage = () => {
                           const v = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
                           const limit = v?.concurrency_limit;
                           if (limit == null) return "—";
-                          return limit + " calls";
+                          return safeDisplayString(limit, "—") + " calls";
                         })()}
                       </span>
                     </div>
@@ -583,7 +532,7 @@ const CampaignsPage = () => {
                     const targetCount = Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0);
                     const scriptOk = String(dispatchSummaryData.campaign_script ?? "").trim().length > 0;
                     const items = [
-                      { ok: String(vb?.status ?? "") === "active", label: "VoiceBot is active" },
+                      { ok: safeDisplayString(vb?.status, "") === "active", label: "VoiceBot is active" },
                       { ok: !!vb?.trunk_id, label: "Trunk is configured" },
                       { ok: targetCount > 0, label: `${targetCount} target number${targetCount === 1 ? "" : "s"} loaded` },
                       { ok: scriptOk, label: "Campaign script is configured" },
@@ -647,14 +596,19 @@ const CampaignsPage = () => {
           <Modal.Title>Campaign Status {selectedRow?.name ? `— ${selectedRow.name}` : ""}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {statusLoading ? (
-            <div className="text-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : statusData ? (
+          {(() => {
+            if (statusLoading) {
+              return (
+                <div className="text-center py-4">
+                  <Spinner animation="border" />
+                </div>
+              );
+            }
+            if (statusData) {
+            return (
             (() => {
               const data = (statusData.data ?? statusData) as Record<string, unknown>;
-              const campaignStatus = String(data.campaign_status ?? "—");
+              const campaignStatus = safeDisplayString(data.campaign_status);
               const totalNumbers = Number(data.total_numbers ?? 0);
               const dispatched = Number(data.dispatched ?? 0);
               const inProgress = Number(data.in_progress ?? 0);
@@ -699,10 +653,10 @@ const CampaignsPage = () => {
                   ))}
                 </div>
               );
-            })()
-          ) : (
-            <p className="text-muted mb-0">No status data.</p>
-          )}
+            })() );
+            }
+            return <p className="text-muted mb-0">No status data.</p>;
+          })()}
         </Modal.Body>
       </Modal>
     </React.Fragment>

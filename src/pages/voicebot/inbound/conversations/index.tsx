@@ -12,6 +12,13 @@ import { Filter, Eye } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
 
+function safeDisplayString(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
 interface CallRow {
   id?: string;
   session_id?: string;
@@ -225,9 +232,9 @@ const CallsPage = () => {
   
     { key: "caller_phone", label: "Caller", sortable: true, render: (r) => r.caller_phone || r.caller_id || "—" },
     ...(isAdmin
-      ? [{ key: "company_name", label: "Company", render: (r: CallRow) => String(r.company_name ?? "—") }]
+      ? [{ key: "company_name", label: "Company", render: (r: CallRow) => safeDisplayString(r.company_name) }]
       : []),
-    { key: "bot_name", label: "Bot", render: (r) => String(r.bot_name ?? "—") },
+    { key: "bot_name", label: "Bot", render: (r) => safeDisplayString(r.bot_name) },
     {
       key: "status",
       label: "Status",
@@ -244,7 +251,7 @@ const CallsPage = () => {
     { key: "session_end_time", label: "End", render: (r) => formatDate(r.session_end_time) },
 
     { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(r.call_duration_seconds) },
-    { key: "room_name", label: "Room", render: (r) => String(r.room_name ?? "—") },
+    { key: "room_name", label: "Room", render: (r) => safeDisplayString(r.room_name) },
     {
       key: "actions",
       label: "Actions",

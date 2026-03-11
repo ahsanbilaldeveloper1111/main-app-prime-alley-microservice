@@ -158,13 +158,20 @@ const PROFILE_FORM_KEYS = [
   'service_type', 'language'
 ] as const;
 
+function safeFormString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
 function appendProfileToFormData(formData: FormData, profileData: Record<string, unknown>): void {
   for (const key of PROFILE_FORM_KEYS) {
     const value = profileData[key];
-    if (value) formData.append(key, String(value));
+    if (value) formData.append(key, safeFormString(value));
   }
   if (profileData.user_consent !== undefined) {
-    formData.append('user_consent', String(profileData.user_consent));
+    formData.append('user_consent', safeFormString(profileData.user_consent));
   }
 }
 
