@@ -1514,7 +1514,7 @@ font-weight:600;
                       <div className="user-dropdown-section">
                         
                           {session?.user?.permissions?.includes('tickets-tickets') && (
-                            <button className="user-dropdown-item" onClick={() => router.push('/tickets/list')}>
+                            <button className="user-dropdown-item" onClick={() => router.push('/crm/tickets')}>
                               {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
                               <span className="user-dropdown-item-text">Raise a ticket</span>
                             </button>

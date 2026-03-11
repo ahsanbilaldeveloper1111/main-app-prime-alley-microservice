@@ -434,29 +434,33 @@ const CELL_STYLE: React.CSSProperties = {
         key: "title", label: "Title", sortable: true, type: "custom",
         render: (row) => (
           <div
-            style={{ display: "flex", alignItems: "center", gap: 8 }}
+            style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}
             onMouseEnter={() => setHoveredId(row.id)}
             onMouseLeave={() => setHoveredId(null)}
           >
             <span
               onClick={e => { e.stopPropagation(); router.push(`/planner/tasks/${row.id}`); }}
-              style={{ color: "#2563eb", fontWeight: 400, fontSize: 13, cursor: "pointer",
-                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}
+              title={row.title}
+              style={{
+                color: "#2563eb", fontWeight: 400, fontSize: 13, cursor: "pointer",
+                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                flex: 1, minWidth: 0,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                display: "block",
+              }}
             >{row.title}</span>
-  
-            {hoveredId === row.id && (
-              <>
-                <button onClick={e => { e.stopPropagation(); openEdit(row); }}
-                  style={{ ...BTN_BASE, paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11 }}>
-                  Edit
-                </button>
-                {/* <button
-                  onClick={e => { e.stopPropagation(); router.push(`/planner/tasks/${row.id}?tab=history`); }}
-                  style={{ ...BTN_BASE, paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11 }}>
-                  History <ExternalLink size={10} />
-                </button> */}
-              </>
-            )}
+
+            <button
+              onClick={e => { e.stopPropagation(); openEdit(row); }}
+              style={{
+                ...BTN_BASE,
+                paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
+                flexShrink: 0,
+                visibility: hoveredId === row.id ? "visible" : "hidden",
+              }}
+            >
+              Edit
+            </button>
           </div>
         ),
       },
