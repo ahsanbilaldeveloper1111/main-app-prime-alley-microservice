@@ -1778,7 +1778,7 @@ const WorkPlannerProjects = () => {
                   <ProgressBar now={Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)} style={{ height: 10, marginBottom: "0.5rem" }} variant="primary" />
                   <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>{Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}% Complete</div>
                 </div>
-                <Row className="g-2 mb-3">
+                {/* <Row className="g-2 mb-3">
                   <Col xs={6}>
                     <div className="detail-section">
                       <div className="detail-label">Owner / PM</div>
@@ -1821,7 +1821,59 @@ const WorkPlannerProjects = () => {
                     <Calendar size={16} className="me-2 text-muted" />
                     <span>{selectedProjectDetails?.updated_at ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : selectedProject.lastUpdate}</span>
                   </div>
-                </div>
+                </div> */}
+                <Row className="g-2 mb-3">
+  <Col xs={6}>
+    <div className="detail-section" style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}>
+      <div className="detail-label">Owner / PM</div>
+      <div style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "auto" }}>
+        <span>{selectedProjectDetails?.owner_extension_number ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number) : selectedProject.owner}</span>
+      </div>
+    </div>
+  </Col>
+  <Col xs={6}>
+    <div className="detail-section" style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}>
+      <div className="detail-label">Status</div>
+      <div style={{ marginTop: "auto" }}>
+        <Badge bg={selectedProjectDetails?.status === "active" ? "success" : selectedProjectDetails?.status === "completed" ? "secondary" : "warning"} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.5rem 0.75rem" }}>
+          {(selectedProjectDetails?.status || selectedProject.status).toUpperCase()}
+        </Badge>
+      </div>
+    </div>
+  </Col>
+</Row>
+<Row className="g-2 mb-3">
+  <Col xs={6}>
+    <div className="detail-section">
+      <div className="detail-label">Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})</div>
+      <div className="d-flex flex-wrap gap-2">
+        {(selectedProjectDetails?.members || selectedProject.members).map((member: any, idx: number) => {
+          const ext = member.extension_number || member.name || "";
+          const colors = ["#667eea", "#f56565", "#48bb78", "#ed64a6", "#4299e1", "#9f7aea", "#fc8181"];
+          return (
+            <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "white", width: "100%" }}>
+              {/* <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: member.color || colors[idx % colors.length], color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600, flexShrink: 0 }}>
+                {getInitials(ext)}
+              </div> */}
+              <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: "#334155", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {member.user?.name || getUserNameFromExtension(ext)} {member.role ? `(${member.role})` : ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </Col>
+  <Col xs={6}>
+    <div className="detail-section">
+      <div className="detail-label">Last Updated</div>
+      <div className="d-flex align-items-center" style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+        <Calendar size={16} className="me-2 text-muted" />
+        <span>{selectedProjectDetails?.updated_at ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : selectedProject.lastUpdate}</span>
+      </div>
+    </div>
+  </Col>
+</Row>
                 {selectedProjectDetails?.description && (
                   <div className="detail-section">
                     <div className="detail-label">Description</div>

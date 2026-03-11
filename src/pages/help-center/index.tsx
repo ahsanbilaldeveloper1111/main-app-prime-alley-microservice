@@ -14,20 +14,75 @@ import Link from "next/link";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Row, Col, Card, Form, InputGroup, Button } from 'react-bootstrap';
-import { 
-  BookOpen, 
-  Ticket, 
-  Headphones, 
+import { Row, Col } from 'react-bootstrap';
+import {
+  BookOpen,
+  Ticket,
+  Headphones,
   Activity,
   Search,
   ChevronRight,
-  FileQuestion
+  FileQuestion,
+  TrendingUp,
+  X,
+  Layers,
+  HelpCircle,
+  Settings,
+  Users,
+  Bell,
+  CreditCard,
+  ShieldCheck,
+  Zap,
+  Globe,
+  BarChart2,
+  MessageSquare,
+  Lock,
+  Package,
+  Cpu,
+  FileText,
+  Phone,
+  Mail,
+  Star,
+  Database,
 } from 'lucide-react';
+
+// Lucide icon map — used to render topic icons from the API's icon string
+// Add more mappings here as needed to match your FAQ module icons
+const LUCIDE_ICON_MAP: Record<string, React.ElementType> = {
+  help_outline: HelpCircle,
+  help: HelpCircle,
+  settings: Settings,
+  people: Users,
+  group: Users,
+  person: Users,
+  notifications: Bell,
+  payment: CreditCard,
+  credit_card: CreditCard,
+  security: ShieldCheck,
+  flash_on: Zap,
+  language: Globe,
+  bar_chart: BarChart2,
+  chat: MessageSquare,
+  message: MessageSquare,
+  lock: Lock,
+  inventory: Package,
+  computer: Cpu,
+  description: FileText,
+  article: FileText,
+  phone: Phone,
+  mail: Mail,
+  email: Mail,
+  star: Star,
+  storage: Database,
+  book: BookOpen,
+  support: Headphones,
+  ticket: Ticket,
+  activity: Activity,
+};
 
 const HelpCenterHome = () => {
   const router = useRouter();
-  
+
   const [searchInput, setSearchInput] = useState<string>('');
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
@@ -39,43 +94,32 @@ const HelpCenterHome = () => {
   const [trendingSearches, setTrendingSearches] = useState<any[]>([]);
   const [loadingTrendingSearches, setLoadingTrendingSearches] = useState<boolean>(false);
 
-  // Color palette for modules
   const moduleColors = ['#4680ff', '#04a9f5', '#1de9b6', '#f4c22b', '#ff6b6b', '#4ecdc4', '#95a5a6', '#e74c3c'];
 
-  // Fetch FAQ modules on component mount
   useEffect(() => {
     const fetchModules = async () => {
       setLoadingModules(true);
       try {
         const response = await ListFAQModules({ page: 1, perPage: 100 });
-        if (response && response.data) {
-          setFaqModules(response.data);
-        } else if (Array.isArray(response)) {
-          setFaqModules(response);
-        }
+        if (response && response.data) setFaqModules(response.data);
+        else if (Array.isArray(response)) setFaqModules(response);
       } catch (error) {
         console.error('Error fetching FAQ modules:', error);
       } finally {
         setLoadingModules(false);
       }
     };
-
     fetchModules();
   }, []);
 
-  // Fetch most viewed FAQs for trending searches
   useEffect(() => {
     const fetchTrendingSearches = async () => {
       setLoadingTrendingSearches(true);
       try {
         const response = await getMostViewedFAQs();
-        if (response && Array.isArray(response)) {
-          setTrendingSearches(response);
-        } else if (response && response.data && Array.isArray(response.data)) {
-          setTrendingSearches(response.data);
-        } else {
-          setTrendingSearches([]);
-        }
+        if (response && Array.isArray(response)) setTrendingSearches(response);
+        else if (response && response.data && Array.isArray(response.data)) setTrendingSearches(response.data);
+        else setTrendingSearches([]);
       } catch (error) {
         console.error('Error fetching trending searches:', error);
         setTrendingSearches([]);
@@ -83,38 +127,23 @@ const HelpCenterHome = () => {
         setLoadingTrendingSearches(false);
       }
     };
-
     fetchTrendingSearches();
   }, []);
 
-  // Search FAQ items with debouncing
   useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     if (searchInput.trim().length < 2) {
       setSearchSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
     searchTimeoutRef.current = setTimeout(async () => {
       setLoadingSuggestions(true);
       try {
-        const response = await ListFAQItems({
-          page: 1,
-          perPage: 5,
-          search: searchInput.trim()
-        });
-
+        const response = await ListFAQItems({ page: 1, perPage: 5, search: searchInput.trim() });
         let items: any[] = [];
-        if (response && response.data) {
-          items = Array.isArray(response.data) ? response.data : [];
-        } else if (Array.isArray(response)) {
-          items = response;
-        }
-
+        if (response && response.data) items = Array.isArray(response.data) ? response.data : [];
+        else if (Array.isArray(response)) items = response;
         setSearchSuggestions(items);
         setShowSuggestions(items.length > 0);
       } catch (error) {
@@ -125,29 +154,19 @@ const HelpCenterHome = () => {
         setLoadingSuggestions(false);
       }
     }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [searchInput]);
 
-  // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle suggestion click
   const handleSuggestionClick = (article: any) => {
     router.push({
       pathname: '/help-center/knowledge-base/[id]',
@@ -157,62 +176,33 @@ const HelpCenterHome = () => {
     setShowSuggestions(false);
   };
 
-  // Handle search input enter key
   const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchInput.trim()) {
-      router.push({
-        pathname: '/help-center/knowledge-base',
-        query: { search: searchInput.trim() }
-      });
+      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
       setShowSuggestions(false);
     }
   };
 
   const mainCategories = [
-    {
-      icon: BookOpen,
-      title: 'Knowledge Base',
-      description: 'Browse help articles',
-      color: '#4680ff',
-      href: '/help-center/knowledge-base'
-    },
-    {
-      icon: Ticket,
-      title: 'My Tickets',
-      description: 'View your tickets',
-      color: '#04a9f5',
-      href: '/help-center/my-tickets'
-    },
-    {
-      icon: Headphones,
-      title: 'Contact Support',
-      description: 'Get in touch',
-      color: '#1de9b6',
-      href: '/help-center/contact-support'
-    },
-    {
-      icon: Activity,
-      title: 'System Status',
-      description: 'Check platform status',
-      color: '#f4c22b',
-      href: '/help-center/system-status'
-    }
+    { icon: BookOpen, title: 'Knowledge Base', description: 'Browse help articles', color: '#4680ff', bg: '#eef2ff', href: '/help-center/knowledge-base' },
+    { icon: Ticket, title: 'My Tickets', description: 'View your tickets', color: '#0ea5e9', bg: '#e0f2fe', href: '/help-center/my-tickets' },
+    { icon: Headphones, title: 'Contact Support', description: 'Get in touch', color: '#10b981', bg: '#ecfdf5', href: '/help-center/contact-support' },
+    { icon: Activity, title: 'System Status', description: 'Check platform status', color: '#f59e0b', bg: '#fffbeb', href: '/help-center/system-status' },
   ];
 
-  // Transform FAQ modules to featured topics format
   const featuredTopics = faqModules.map((module, index) => ({
     id: module.id,
     title: module.name,
-    description: module.description || `${module.faqs_count || 0} FAQs available`,
+    description: module.description || '',
+    faqCount: module.faqs_count || 0,
     color: moduleColors[index % moduleColors.length],
-    icon: module.icon || 'help_outline'
+    icon: module.icon || 'help_outline',
   }));
 
-  // Transform most viewed FAQs to trending searches format
   const transformedTrendingSearches = trendingSearches.map((faq) => ({
     id: faq.id,
     title: faq.question,
-    viewCount: faq.view_count || 0
+    viewCount: faq.view_count || 0,
   }));
 
   return (
@@ -220,441 +210,376 @@ const HelpCenterHome = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Help Center" />
 
       <style>{`
-        .card {
-          border-radius: 14px !important;
-          border: 1px solid #e9eef5 !important;
-          box-shadow: 0 2px 12px 0 rgba(70,128,255,0.06);
-          transition: box-shadow 0.18s, background 0.18s;
+        * { font-family: "Lexend Deca", Helvetica, Arial, sans-serif !important; }
+
+        .hc-wrap {
+          max-width: 1300px;
+          margin: 0 auto;
+          width: 100%;
         }
-        .card:hover {
-          box-shadow: 0 6px 24px 0 rgba(70,128,255,0.13);
+
+        .hc-card {
+          background: #ffffff;
+          border: 1px solid #eaf0f6;
+          border-radius: 8px;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.04);
         }
-        .help-main-category-card {
-          background: linear-gradient(120deg, #f8f9fb 80%, #e3f0ff 100%) !important;
-          border: 1px solid #e9ecef !important;
-          border-radius: 8px !important;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-          transition: all 0.2s ease;
+
+        .hc-category-card {
+          background: #ffffff;
+          border: 1px solid #eaf0f6;
+          border-radius: 8px;
+          padding: 28px 16px;
+          cursor: pointer;
+          transition: border-color 0.18s ease, box-shadow 0.18s ease;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          height: 100%;
         }
-        .help-main-category-card:hover {
-          background: #f0f4f8 !important;
-          border-color: #4680ff !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          transform: translateY(-3px);
+        .hc-category-card:hover {
+          border-color: #4680ff;
+          box-shadow: 0 2px 10px rgba(70,128,255,0.10);
+          text-decoration: none;
         }
-        .help-featured-card {
-          background: linear-gradient(120deg, #f8f9fb 80%, #e3f0ff 100%) !important;
+
+        .hc-topic-card {
+          background: #f9fafc;
+          border: 1px solid #eaf0f6;
+          border-radius: 6px;
+          padding: 21px 13px;
+          cursor: pointer;
+          transition: border-color 0.18s ease, background 0.18s ease;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          height: 100%;
         }
-        .help-trending-card {
-          background: linear-gradient(120deg, #f9fafb 80%, #f4f7fa 100%) !important;
+        .hc-topic-card:hover {
+          background: #f0f4ff;
+          border-color: #4680ff;
+          text-decoration: none;
         }
-        svg {
-          width: auto !important;
-          height: auto !important;
+
+        .hc-trending-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background 0.15s ease;
+          border-bottom: 1px solid #f4f6f9;
         }
+        .hc-trending-item:last-child { border-bottom: none; }
+        .hc-trending-item:hover { background: #f4f7ff; }
+
+        .hc-search-wrapper {
+          background: #ffffff;
+          border: 1px solid #E5E9F2;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          transition: border-color 0.18s, box-shadow 0.18s;
+        }
+        .hc-search-wrapper:focus-within {
+          border-color: #4680ff;
+          box-shadow: 0 2px 8px rgba(70,128,255,0.14);
+        }
+        .hc-search-input {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+          font-size: 13px !important;
+          color: #141414 !important;
+          padding: 10px 10px !important;
+          flex: 1;
+          background: transparent !important;
+          min-width: 0;
+        }
+        .hc-search-input::placeholder { color: #9ca3af !important; }
+
+        .hc-suggestion-dropdown {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          right: 0;
+          background: #ffffff;
+          border: 1px solid #eaf0f6;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+          z-index: 1000;
+          max-height: 320px;
+          overflow-y: auto;
+        }
+        .hc-suggestion-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 10px 14px;
+          cursor: pointer;
+          border-bottom: 1px solid #f4f6f9;
+          transition: background 0.15s;
+        }
+        .hc-suggestion-item:last-child { border-bottom: none; }
+        .hc-suggestion-item:hover { background: #f4f7ff; }
+
+        .hc-section-title {
+          font-size: 13px;
+          font-weight: 600;
+          color: #141414;
+          margin-bottom: 0;
+        }
+        .hc-label {
+          font-size: 11px;
+          font-weight: 500;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
+          padding: 8px 14px;
+          border-bottom: 1px solid #eaf0f6;
+        }
+
+        svg { width: auto !important; height: auto !important; }
       `}</style>
 
-      {/* Hero Section */}
-      <div style={{
-        borderRadius: '10px',
-        padding: '40px 20px',
-        textAlign: 'center',
-        marginBottom: '25px'
-      }}>
-        <h1 style={{
-          fontSize: '32px',
-          fontWeight: '700',
-          color: '#2c3e50',
-          marginBottom: '8px'
-        }}>Help Center</h1>
-        <p style={{
-          fontSize: '16px',
-          color: '#6c757d',
-          marginBottom: 0
-        }}>How can we assist you today?</p>
-      </div>
+      <div className="hc-wrap">
 
-      {/* Search Bar */}
-      <div 
-        ref={searchInputRef}
-        style={{
-          position: 'relative',
-          maxWidth: '800px',
-          margin: '0 auto 30px auto'
-        }}
-      >
-        <InputGroup style={{
-          borderRadius: '12px',
-          boxShadow: '0 4px 12px rgba(70, 128, 255, 0.15)',
-          border: '2px solid #e9ecef',
-          overflow: 'hidden'
-        }}>
-          <InputGroup.Text style={{
-            background: '#fff',
-            border: 'none',
-            padding: '12px 16px'
-          }}>
-            <Search size={20} color="#6c757d" />
-          </InputGroup.Text>
-          <Form.Control
-            type="text"
-            placeholder="Search for help articles, questions, and answers..."
-            value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value);
-              if (e.target.value.trim().length >= 2) {
-                setShowSuggestions(true);
-              }
-            }}
-            onKeyDown={handleSearchEnter}
-            onFocus={() => {
-              if (searchSuggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
-            style={{
-              border: 'none',
-              fontSize: '16px',
-              padding: '12px 16px',
-              boxShadow: 'none'
-            }}
-          />
-          {searchInput && (
-            <Button
-              variant="link"
-              onClick={() => {
-                setSearchInput('');
-                setSearchSuggestions([]);
-                setShowSuggestions(false);
-              }}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: '#6c757d',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              ×
-            </Button>
-          )}
-        </InputGroup>
+        {/* ── Hero: heading left, search right ── */}
+        <div className="hc-card" style={{ padding: '20px 24px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
 
-        {/* Suggestions Dropdown */}
-        {showSuggestions && (searchSuggestions.length > 0 || loadingSuggestions) && (
-          <Card style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '8px',
-            borderRadius: '12px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-            border: '1px solid #e9ecef',
-            zIndex: 1000,
-            maxHeight: '400px',
-            overflowY: 'auto',
-            background: '#fff'
-          }}>
-            <Card.Body style={{ padding: 0 }}>
-              {loadingSuggestions ? (
-                <div style={{
-                  padding: '20px',
-                  textAlign: 'center',
-                  color: '#6c757d'
-                }}>
-                  Searching...
-                </div>
-              ) : searchSuggestions.length > 0 ? (
-                <>
-                  <div style={{
-                    padding: '12px 16px',
-                    background: '#f8f9fa',
-                    borderBottom: '1px solid #e9ecef',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: '#6c757d',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    Suggestions ({searchSuggestions.length})
-                  </div>
-                  {searchSuggestions.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      onClick={() => handleSuggestionClick(item)}
-                      style={{
-                        padding: '16px 20px',
-                        cursor: 'pointer',
-                        borderBottom: index < searchSuggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
-                        transition: 'background 0.2s',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '12px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f8f9fa';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#fff';
-                      }}
-                    >
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '6px',
-                        background: '#e3f0ff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <FileQuestion size={16} color="#4680ff" />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h6 style={{
-                          fontSize: '15px',
-                          fontWeight: '600',
-                          color: '#2c3e50',
-                          marginBottom: '4px',
-                          lineHeight: '1.4'
-                        }}>
-                          {item.title || item.question || 'Untitled'}
-                        </h6>
-                        {item.description && (
-                          <p style={{
-                            fontSize: '13px',
-                            color: '#6c757d',
-                            margin: 0,
-                            lineHeight: '1.5',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
-                          }}>
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight size={16} color="#9ca3af" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    </div>
-                  ))}
-                </>
-              ) : null}
-            </Card.Body>
-          </Card>
-        )}
-      </div>
+            {/* Left: title + subtitle */}
+            <div style={{ flexShrink: 0 }}>
+              <h1 style={{ fontSize: 17, fontWeight: 600, color: '#141414', margin: 0, lineHeight: 1.3 }}>
+                Help Center
+              </h1>
+              <p style={{ fontSize: 12, color: '#9ca3af', margin: '3px 0 0', lineHeight: 1.4 }}>
+                How can we assist you today?
+              </p>
+            </div>
 
-      {/* Main Categories */}
-      <Row className="g-3 mb-4">
-        {mainCategories.map((category) => {
-          const Icon = category.icon;
-          return (
-            <Col xs={12} sm={6} lg={3} key={category.href}>
-              <Link href={category.href} style={{ textDecoration: 'none' }}>
-                <div
-                  className="help-main-category-card"
-                  style={{
-                    padding: '24px 16px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    height: '100%'
+            {/* Right: search bar */}
+            <div ref={searchInputRef} style={{  width: '50%',
+    minWidth: 260,
+    position: 'relative',
+    marginLeft: 'auto'}}>
+              <div className="hc-search-wrapper">
+                <span style={{ padding: '0 10px', display: 'flex', alignItems: 'center', color: '#9ca3af', flexShrink: 0 }}>
+                  <Search size={15} />
+                </span>
+                <input
+                  className="hc-search-input"
+                  type="text"
+                  placeholder="Search for help articles, questions and answers..."
+                  value={searchInput}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    if (e.target.value.trim().length >= 2) setShowSuggestions(true);
                   }}
+                  onKeyDown={handleSearchEnter}
+                  onFocus={() => { if (searchSuggestions.length > 0) setShowSuggestions(true); }}
+                />
+                {searchInput && (
+                  <button
+                    onClick={() => { setSearchInput(''); setSearchSuggestions([]); setShowSuggestions(false); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '0 8px', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (searchInput.trim()) {
+                      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  style={{
+                    background: '#141414', border: 'none', color: '#ffffff',
+                    padding: '0 16px', height: 40, cursor: 'pointer',
+                    fontSize: 12, fontWeight: 300,
+                    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                    flexShrink: 0, transition: 'background 0.15s', whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#333'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#141414'; }}
                 >
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    margin: '0 auto 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '8px',
-                  }}>
-                    <Icon size={28} color={category.color} strokeWidth={2} />
-                  </div>
-                  <h5 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '4px'
-                  }}>{category.title}</h5>
-                  <p style={{
-                    fontSize: '13px',
-                    color: '#6c757d',
-                    marginBottom: 0
-                  }}>{category.description}</p>
-                </div>
-              </Link>
-            </Col>
-          );
-        })}
-      </Row>
+                  Search
+                </button>
+              </div>
 
-      {/* Featured Topics and Trending */}
-      <Row className="g-3">
-        <Col xs={12} lg={9}>
-          <Card style={{
-            background: '#fff',
-            border: '1px solid #e9ecef',
-            borderRadius: '8px',
-            padding: '20px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-          }}>
-            <Card className="help-featured-card" style={{
-              border: '1px solid #e9ecef',
-              borderRadius: '8px',
-              padding: '20px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}>
-              <h4 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>Featured Topics</h4>
-              <Row className="g-3">
-                {loadingModules ? (
-                  <Col xs={12}>
-                    <div style={{ textAlign: 'center', padding: '20px' }}>
-                      <p style={{ color: '#6c757d' }}>Loading topics...</p>
-                    </div>
-                  </Col>
-                ) : featuredTopics.length > 0 ? (
-                  featuredTopics.map((topic) => {
-                    return (
-                      <Col xs={12} sm={6} md={4} lg={3} key={topic.id || `topic-${topic.title}`}>
-                        <Link href={`/help-center/knowledge-base?moduleId=${topic.id}&moduleName=${topic.title}`} style={{ textDecoration: 'none' }}>
-                          <div style={{
-                            background: '#fafbfc',
-                            border: '1px solid #e9ecef',
-                            borderRadius: '6px',
-                            padding: '16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            height: '100%',
-                            textAlign: 'center'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#f0f4f8';
-                            e.currentTarget.style.borderColor = topic.color;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#fafbfc';
-                            e.currentTarget.style.borderColor = '#e9ecef';
-                          }}
-                          >
-                            <div style={{
-                              width: '44px',
-                              height: '44px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              margin: '0 auto 10px auto',
-                              color: topic.color
-                            }}>
-                              <i className="material-icons-two-tone" style={{ fontSize: '28px' }}>
-                                {topic.icon}
-                              </i>
-                            </div>
-                            <h6 style={{
-                              fontSize: '15px',
-                              fontWeight: '600',
-                              color: '#2c3e50',
-                              marginBottom: '4px'
-                            }}>{topic.title}</h6>
+              {/* Suggestions Dropdown */}
+              {showSuggestions && (searchSuggestions.length > 0 || loadingSuggestions) && (
+                <div className="hc-suggestion-dropdown">
+                  {loadingSuggestions ? (
+                    <div style={{ padding: '14px', textAlign: 'center', fontSize: 13, color: '#9ca3af' }}>Searching...</div>
+                  ) : searchSuggestions.length > 0 ? (
+                    <>
+                      <div className="hc-label">Suggestions ({searchSuggestions.length})</div>
+                      {searchSuggestions.map((item, index) => (
+                        <div key={item.id || index} className="hc-suggestion-item" onClick={() => handleSuggestionClick(item)}>
+                          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <FileQuestion size={13} color="#4680ff" />
                           </div>
+                          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: '#141414', marginBottom: 1 }}>
+                              {item.title || item.question || 'Untitled'}
+                            </div>
+                            {item.description && (
+                              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                                {item.description}
+                              </div>
+                            )}
+                          </div>
+                          <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
+                        </div>
+                      ))}
+                    </>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quick Access Cards — icon left, text right ── */}
+        <Row className="g-3 mb-3">
+          {mainCategories.map((category) => {
+            const Icon = category.icon;
+            return (
+              <Col xs={12} sm={6} lg={3} key={category.href}>
+                <Link href={category.href} className="hc-category-card">
+                  <div style={{
+                    width: 38, height: 38, flexShrink: 0,
+                    backgroundColor: category.bg, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon size={19} color={category.color} strokeWidth={1.8} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#141414', marginBottom: 2, lineHeight: 1.3 }}>
+                      {category.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.3 }}>
+                      {category.description}
+                    </div>
+                  </div>
+                </Link>
+              </Col>
+            );
+          })}
+        </Row>
+
+        {/* ── Browse Topics + Trending ── */}
+        <Row className="g-3">
+
+          {/* Browse Topics */}
+          <Col xs={12} lg={8}>
+            <div className="hc-card" style={{ padding: '16px 20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #eaf0f6' }}>
+                <Layers size={14} color="#4680ff" />
+                <span className="hc-section-title">Browse Topics</span>
+              </div>
+
+              {loadingModules ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+                  Loading topics...
+                </div>
+              ) : featuredTopics.length > 0 ? (
+                <Row className="g-2">
+                  {featuredTopics.map((topic) => {
+                    // Resolve lucide icon from the API icon string, fallback to HelpCircle
+                    const TopicIcon = LUCIDE_ICON_MAP[topic.icon] || HelpCircle;
+                    return (
+                      <Col xs={12} sm={6} key={topic.id || topic.title}>
+                        <Link
+                          href={`/help-center/knowledge-base?moduleId=${topic.id}&moduleName=${encodeURIComponent(topic.title)}`}
+                          className="hc-topic-card"
+                        >
+                          {/* Icon on left */}
+                          <div style={{
+                            width: 34, height: 34, flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: topic.color + '18',
+                            borderRadius: 7,
+                          }}>
+                            <TopicIcon size={17} color={topic.color} strokeWidth={1.8} />
+                          </div>
+                          {/* Text on right */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#141414', lineHeight: 1.3, marginBottom: 2 }}>
+                              {topic.title}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                              {topic.faqCount > 0
+                                ? `${topic.faqCount} article${topic.faqCount !== 1 ? 's' : ''}`
+                                : topic.description || 'View articles'}
+                            </div>
+                          </div>
+                          <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
                         </Link>
                       </Col>
                     );
-                  })
-                ) : (
-                  <Col xs={12}>
-                    <div style={{ textAlign: 'center', padding: '20px' }}>
-                      <p style={{ color: '#6c757d' }}>No topics available</p>
-                    </div>
-                  </Col>
-                )}
-              </Row>
-            </Card>
-          </Card>
-        </Col>
+                  })}
+                </Row>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+                  No topics available
+                </div>
+              )}
+            </div>
+          </Col>
 
-        <Col xs={12} lg={3}>
-          <Card style={{
-            background: '#fff',
-            border: '1px solid #e9ecef',
-            borderRadius: '8px',
-            padding: '20px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-          }}>
-            <Card className="help-trending-card" style={{
-              border: '1px solid #e9ecef',
-              borderRadius: '8px',
-              padding: '20px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}>
-              <h4 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>Trending Searches</h4>
-              <div>
-                {loadingTrendingSearches ? (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: '#6c757d', fontSize: '13px' }}>Loading...</p>
-                  </div>
-                ) : transformedTrendingSearches.length > 0 ? (
-                  transformedTrendingSearches.map((search, index) => (
-                    <div 
-                      key={search.id || index} 
+          {/* Trending Searches */}
+          <Col xs={12} lg={4}>
+            <div className="hc-card" style={{ padding: '16px 20px', height: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #eaf0f6' }}>
+                <TrendingUp size={14} color="#4680ff" />
+                <span className="hc-section-title">Trending Searches</span>
+              </div>
+
+              {loadingTrendingSearches ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+                  Loading...
+                </div>
+              ) : transformedTrendingSearches.length > 0 ? (
+                <div>
+                  {transformedTrendingSearches.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="hc-trending-item"
                       onClick={() => {
                         router.push({
                           pathname: '/help-center/knowledge-base/[id]',
-                          query: { id: search.id?.toString() || search.id, search: search.title }
+                          query: { id: item.id?.toString(), search: item.title },
                         });
                       }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 0',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.paddingLeft = '5px';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.paddingLeft = '0';
-                      }}
                     >
-                      <div style={{
-                        width: '6px',
-                        height: '6px',
-                        background: '#4680ff',
-                        borderRadius: '50%',
-                        flexShrink: 0
-                      }} />
-                      <p style={{
-                        fontSize: '13px',
-                        color: '#495057',
-                        margin: 0
-                      }}>{search.title}</p>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#4680ff', width: 20, textAlign: 'center', flexShrink: 0 }}>
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <span style={{ fontSize: 13, color: '#334155', flex: 1, lineHeight: 1.4 }}>
+                        {item.title}
+                      </span>
+                      <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
                     </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: '#6c757d', fontSize: '13px' }}>No trending searches available</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </Card>
-        </Col>
-      </Row>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+                  No trending searches available
+                </div>
+              )}
+            </div>
+          </Col>
+
+        </Row>
+      </div>
     </React.Fragment>
   );
 };
@@ -664,4 +589,3 @@ HelpCenterHome.getLayout = (page: ReactElement) => {
 };
 
 export default HelpCenterHome;
-
