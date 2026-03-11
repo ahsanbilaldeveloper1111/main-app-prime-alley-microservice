@@ -42,10 +42,10 @@ const BotPerformanceComparisonChart = ({ loading, rows }: BotPerformanceComparis
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} layout="vertical" barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={true} vertical={false} />
-              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+            <BarChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
               <Tooltip
                 contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
                 formatter={(value: number) => [value, ""]}
@@ -57,9 +57,9 @@ const BotPerformanceComparisonChart = ({ loading, rows }: BotPerformanceComparis
                 iconSize={10}
                 formatter={(value) => value}
               />
-              <Bar dataKey="completed" name="Completed" stackId="a" fill={COMPLETED_COLOR} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="failed" name="Failed" stackId="a" fill={FAILED_COLOR} radius={[0, 0, 0, 0]} />
               <Bar dataKey="transferred" name="Transferred" stackId="a" fill={TRANSFERRED_COLOR} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="failed" name="Failed" stackId="a" fill={FAILED_COLOR} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="completed" name="Completed" stackId="a" fill={COMPLETED_COLOR} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

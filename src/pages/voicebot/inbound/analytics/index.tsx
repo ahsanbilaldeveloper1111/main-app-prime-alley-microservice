@@ -13,6 +13,7 @@ import {
   CallDurationDistributionChart,
   CallVolumeOverTimeChart,
   BotPerformanceTable,
+  BotPerformanceComparisonChart,
   getDateRange,
   getDateKeysInRange,
   DURATION_BUCKETS,
@@ -243,7 +244,9 @@ const AnalyticsPage = () => {
         <BotPerformanceTable loading={loading} rows={botPerformanceRows} />
       </div>
 
-      
+      <Row>
+        <BotPerformanceComparisonChart loading={loading} rows={botPerformanceRows} />
+      </Row>
 
 
     </React.Fragment>
