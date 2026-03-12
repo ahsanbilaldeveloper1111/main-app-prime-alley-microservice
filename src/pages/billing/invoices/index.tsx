@@ -95,7 +95,7 @@ import "@assets/scss/common.scss";
 
 import "@assets/scss/tabs.scss";
 import InvoiceViewModal, { InvoiceViewData } from "@components/billings/InvoiceViewModal";
-import { Divide, DollarSign, Download, FileText, Calendar, Eye, Receipt, CheckCircle, Clock, AlertCircle, Plus } from "lucide-react";
+import { DollarSign, Download, FileText, Calendar, Eye, Receipt, CheckCircle, Clock, AlertCircle, Plus } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
