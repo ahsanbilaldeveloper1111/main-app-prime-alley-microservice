@@ -254,8 +254,8 @@ const OverviewPage = () => {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={styles.label}>Billing Frequency</div>
-                <div style={styles.value} className="text-uppercase">
-                  {companyDetails?.profile?.payment_mode ?? ""}
+                <div style={styles.value} className="text-capitalize">
+                  {(companyDetails?.profile?.payment_mode ?? "").replace(/_/g, " ")}
                 </div>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

@@ -185,7 +185,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'unified-reports',
     'audit-logs',
     // 'settings',
-    'voicebot-platform'
+    'voicebot-inbound-platform',
+    'voicebot-outbound-platform'
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -824,43 +825,78 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     // voicebot inbound (platform) start
     {
-      id: 'voicebot-platform',
-      key: 'voicebot-platform',
+      id: 'voicebot-inbound-platform',
+      key: 'voicebot-inbound-platform',
       permission: PERMISSIONS.AI_ML_SERVICES,
       icon: <PhoneCall size={16} />,
       color: MENU_COLORS.AUTOMATION,
-      title: 'Voicebot Platform',
-      label: 'Voicebot Platform',
+      title: 'Voicebot Inbound',
+      label: 'Voicebot Inbound',
       url: '',
       subItems: [
-       
         {
-          id: 'voicebot-inbound-overview',
-          title: 'Inbound Overview',
+          id: 'voicebot-inbound-companies',
+          title: 'Companies',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound'
+          url: '/voicebot/inbound/companies'
         },
-       
-
-        // {
-        //   id: 'voicebot-inbound-separator',
-        //   title: '---',
-        //   icon: null,
-        //   permission: PERMISSIONS.AI_ML_SERVICES,
-        //   url: ''
-        // },
         {
-          id: 'voicebot-outbound-overview',
-          title: 'Outbound Overview',
+          id: 'voicebot-inbound-bots',
+          title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound'
+          url: '/voicebot/inbound/bots'
         },
         
+        {
+          id: 'voicebot-inbound-calls',
+          title: 'Conversations',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/conversations'
+        },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
-    // voicebot inbound end
+    // voicebot inbound (platform) end
+
+
+    // voicebot inbound (platform) start
+    {
+      id: 'voicebot-outbound-platform',
+      key: 'voicebot-outbound-platform',
+      permission: PERMISSIONS.AI_ML_SERVICES,
+      icon: <PhoneCall size={16} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: 'Voicebot Outbound',
+      label: 'Voicebot Outbound',
+      url: '',
+      subItems: [
+        {
+          id: 'voicebot-outbound-trunks',
+          title: 'Trunks',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/trunks'
+        },
+        {
+          id: 'voicebot-outbound-voicebots',
+          title: 'Bots',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/voicebots'
+        },
+        
+        {
+          id: 'voicebot-outbound-campaigns',
+          title: 'Campaigns',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/campaigns'
+        },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+    // voicebot inbound (platform) end
 
     //reports and audit services start
     {
