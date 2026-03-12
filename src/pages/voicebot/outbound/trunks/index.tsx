@@ -12,7 +12,6 @@ import {
 import { Row, Col, Button, Modal, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { Plus, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 
@@ -52,7 +51,7 @@ const TrunksPage = () => {
       setData(rows);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Failed to load trunks");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load trunks"));
       setData([]);
     } finally {
       setLoading(false);
@@ -123,7 +122,7 @@ const TrunksPage = () => {
       fetchTrunks();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Create failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Create failed"));
     } finally {
       setFormLoading(false);
     }
@@ -145,7 +144,7 @@ const TrunksPage = () => {
       fetchTrunks();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Delete failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
     } finally {
       setDeleteLoading(false);
     }

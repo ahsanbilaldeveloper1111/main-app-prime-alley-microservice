@@ -192,6 +192,15 @@ export interface UpdateCampaignPayload {
   name?: string;
   description?: string;
   retry_attempts?: number;
+  voicebot_id?: number;
+  target_numbers?: string[];
+  schedule_start?: string;
+  schedule_end?: string;
+  retry_interval_minutes?: number;
+  status?: string;
+  campaign_script?: string;
+  custom_greeting?: string;
+  input_method?: string;
 }
 
 /** GET /campaigns - Get campaigns */
