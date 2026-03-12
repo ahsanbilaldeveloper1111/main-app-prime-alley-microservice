@@ -13,7 +13,7 @@ import {
   type BotRow,
   type CallRow,
   type CompanyTableRow,
-} from "./partials";
+} from "@components/voicebot/inbound/dashboard";
 import "@assets/scss/common.scss";
 
 interface StatsState {
