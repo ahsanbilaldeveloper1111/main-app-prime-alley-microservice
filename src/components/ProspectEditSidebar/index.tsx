@@ -52,6 +52,43 @@ export interface ProspectEditSidebarProps {
     | undefined;
 }
 
+const getUpdatedFormForPhoneChange = (
+  value: string | undefined,
+  currentForm: ProspectFormState,
+  parsePhoneNumberInput: ProspectEditSidebarProps["parsePhoneNumberInput"],
+): ProspectFormState => {
+  if (!value) {
+    return {
+      ...currentForm,
+      phone_country_code: "",
+      phoneNumber: "",
+    };
+  }
+
+  try {
+    const phoneNumber = parsePhoneNumberInput(value);
+    if (phoneNumber) {
+      return {
+        ...currentForm,
+        phone_country_code: `+${phoneNumber.countryCallingCode}`,
+        phoneNumber: phoneNumber.nationalNumber,
+      };
+    }
+
+    return {
+      ...currentForm,
+      phone_country_code: "",
+      phoneNumber: value,
+    };
+  } catch {
+    return {
+      ...currentForm,
+      phone_country_code: "",
+      phoneNumber: value,
+    };
+  }
+};
+
 const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
   isOpen,
   title,
@@ -71,6 +108,26 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
   parsePhoneNumberInput,
 }) => {
   if (!isOpen) return null;
+
+  const updateCustomField = (
+    index: number,
+    key: "field_name" | "field_value",
+    value: string,
+  ) => {
+    setContactForm((prev) => ({
+      ...prev,
+      custom_fields: (prev.custom_fields ?? []).map((cf, i) =>
+        i === index ? { ...cf, [key]: value } : cf,
+      ),
+    }));
+  };
+
+  const removeCustomField = (id: string) => {
+    setContactForm((prev) => ({
+      ...prev,
+      custom_fields: (prev.custom_fields ?? []).filter((cf) => cf.id !== id),
+    }));
+  };
 
   return (
     <>
@@ -361,39 +418,15 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                               ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
                               : contactForm.phoneNumber || undefined
                           }
-                          onChange={(value) => {
-                            if (value) {
-                              try {
-                                const phoneNumber =
-                                  parsePhoneNumberInput(value);
-                                if (phoneNumber) {
-                                  setContactForm({
-                                    ...contactForm,
-                                    phone_country_code: `+${phoneNumber.countryCallingCode}`,
-                                    phoneNumber: phoneNumber.nationalNumber,
-                                  });
-                                } else {
-                                  setContactForm({
-                                    ...contactForm,
-                                    phone_country_code: "",
-                                    phoneNumber: value,
-                                  });
-                                }
-                              } catch {
-                                setContactForm({
-                                  ...contactForm,
-                                  phone_country_code: "",
-                                  phoneNumber: value,
-                                });
-                              }
-                            } else {
-                              setContactForm({
-                                ...contactForm,
-                                phone_country_code: "",
-                                phoneNumber: "",
-                              });
-                            }
-                          }}
+                          onChange={(value) =>
+                            setContactForm((prev) =>
+                              getUpdatedFormForPhoneChange(
+                                value,
+                                prev,
+                                parsePhoneNumberInput,
+                              ),
+                            )
+                          }
                           placeholder="Enter phone number"
                         />
                       </div>
@@ -926,16 +959,13 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                             <input
                               type="text"
                               value={f.field_name}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).map(
-                                    (cf, i) =>
-                                      i === idx ? { ...cf, field_name: v } : cf,
-                                  ),
-                                }));
-                              }}
+                              onChange={(e) =>
+                                updateCustomField(
+                                  idx,
+                                  "field_name",
+                                  e.target.value,
+                                )
+                              }
                               placeholder="Title"
                               style={{
                                 width: "100%",
@@ -955,16 +985,13 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                             <input
                               type="text"
                               value={f.field_value}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).map(
-                                    (cf, i) =>
-                                      i === idx ? { ...cf, field_value: v } : cf,
-                                  ),
-                                }));
-                              }}
+                              onChange={(e) =>
+                                updateCustomField(
+                                  idx,
+                                  "field_value",
+                                  e.target.value,
+                                )
+                              }
                               placeholder="Value"
                               style={{
                                 width: "100%",
@@ -984,14 +1011,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                             <button
                               type="button"
                               aria-label={`Remove custom field ${idx + 1}`}
-                              onClick={() =>
-                                setContactForm((prev) => ({
-                                  ...prev,
-                                  custom_fields: (prev.custom_fields ?? []).filter(
-                                    (cf) => cf.id !== f.id,
-                                  ),
-                                }))
-                              }
+                              onClick={() => removeCustomField(f.id)}
                               style={{
                                 display: "inline-flex",
                                 alignItems: "center",

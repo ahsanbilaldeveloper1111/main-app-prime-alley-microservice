@@ -6131,165 +6131,177 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     return String(value);
   };
 
-  // Process sections to override note-related actions and enrich "About this prospect" when we have API data
-  const processedSections = sections.map((section) => {
-    // If this is a notes section, override:
-    // - the empty state action to open the note modal
-    // - the count to reflect the number of notes fetched for the sidebar
-    if (section.id === "notes") {
-      const updatedSection = {
-        ...section,
-        count: sidebarNotesList.length,
-      };
+  const enhanceNotesSection = (section: any): any => {
+    const updatedSection = {
+      ...section,
+      count: sidebarNotesList.length,
+    };
 
-      if (section.emptyState?.action) {
-        return {
-          ...updatedSection,
-          emptyState: {
-            ...section.emptyState,
-            action: {
-              ...section.emptyState.action,
-              onClick: () => {
-                handleNoteClick();
-                section.emptyState?.action?.onClick?.(); // Call original if provided
-              },
-            },
-          },
-        };
-      }
-
+    if (!section.emptyState?.action) {
       return updatedSection;
     }
 
-    // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status
-    if (section.id === "about-prospect") {
-      if (recordType === "prospect" && prospectData) {
-        const prospect = prospectData as any;
-        const data = prospect.data ?? {};
-        console.log("data", data);
-        const nestedData = data.data ?? {};
-        console.log("nestedData", nestedData);
-      
-        const formatDateTime = (value?: string) =>
-          value
-            ? new Date(value).toLocaleDateString("en-US", {
-                month: "short",
-                day: "2-digit",
-                year: "numeric",
-              }) +
-              " " +
-              new Date(value).toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })
-            : undefined;
-      
-        const fields: SidebarField[] = [];
-            
-        if (data.name) {
-          fields.push({
-            label: "Name",
-            value: data.name,
-          });
-        }
-      
-        if (nestedData.email) {
-          fields.push({
-            label: "Email",
-            value: nestedData.email,
-            type: "email",
-            copyable: true,
-          });
-        }
-      
-        if (data.phone) {
-          fields.push({
-            label: "Phone",
-            value: data.phone,
-            type: "phone",
-            copyable: true,
-          });
-        }
-      
-        if (data.scheduled_call_at) {
-          const formatted = formatDateTime(data.scheduled_call_at);
-          if (formatted) {
-            fields.push({
-              label: "Scheduled Call At",
-              value: formatted,
-              type: "datetime",
-            });
-          }
-        }
-      
-        if (data.campaign?.name) {
-          fields.push({
-            label: "Campaign Name",
-            value: data.campaign.name,
-          });
-        }
-      
-        if (data.company?.name) {
-          fields.push({
-            label: "Company Name",
-            value: data.company.name,
-          });
-        }
-      
-        if (data.company_domain) {
-          fields.push({
-            label: "Company Domain",
-            value: data.company_domain,
-          });
-        }
+    return {
+      ...updatedSection,
+      emptyState: {
+        ...section.emptyState,
+        action: {
+          ...section.emptyState.action,
+          onClick: () => {
+            handleNoteClick();
+            section.emptyState?.action?.onClick?.();
+          },
+        },
+      },
+    };
+  };
 
-        if (Array.isArray(data.tags) && data.tags.length > 0) {
-          fields.push({
-            label: "Tags",
-            value: data.tags.map((t: any) => t.name),
-            type: "tags",
-          });
-        }
-      
-        const excludedKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "contact_owner",
-        ]);
-      
-        Object.entries(nestedData).forEach(([key, value]) => {
-          if (excludedKeys.has(key)) return;
-          if (value === null || value === undefined || value === "") return;
-      
-          const label = key
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-      
-          if (Array.isArray(value)) {
-            if (value.length === 0) return;
-      
-            fields.push({
-              label,
-              value,
-              type: "tags",
-            });
-          } else {
-            fields.push({
-              label,
-              value: String(value),
-            });
-          }
+  const buildProspectAboutFields = (
+    data: any,
+    nestedData: any,
+  ): SidebarField[] => {
+    const formatDateTime = (value?: string) =>
+      value
+        ? new Date(value).toLocaleDateString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+          }) +
+          " " +
+          new Date(value).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : undefined;
+
+    const fields: SidebarField[] = [];
+
+    if (data.name) {
+      fields.push({
+        label: "Name",
+        value: data.name,
+      });
+    }
+
+    if (nestedData.email) {
+      fields.push({
+        label: "Email",
+        value: nestedData.email,
+        type: "email",
+        copyable: true,
+      });
+    }
+
+    if (data.phone) {
+      fields.push({
+        label: "Phone",
+        value: data.phone,
+        type: "phone",
+        copyable: true,
+      });
+    }
+
+    if (data.scheduled_call_at) {
+      const formatted = formatDateTime(data.scheduled_call_at);
+      if (formatted) {
+        fields.push({
+          label: "Scheduled Call At",
+          value: formatted,
+          type: "datetime",
         });
-      
-        return {
-          ...section,
-          fields,
-          isLoading: prospectLoading,
-        };
       }
+    }
+
+    if (data.campaign?.name) {
+      fields.push({
+        label: "Campaign Name",
+        value: data.campaign.name,
+      });
+    }
+
+    if (data.company?.name) {
+      fields.push({
+        label: "Company Name",
+        value: data.company.name,
+      });
+    }
+
+    if (data.company_domain) {
+      fields.push({
+        label: "Company Domain",
+        value: data.company_domain,
+      });
+    }
+
+    if (Array.isArray(data.tags) && data.tags.length > 0) {
+      fields.push({
+        label: "Tags",
+        value: data.tags.map((t: any) => t.name),
+        type: "tags",
+      });
+    }
+
+    const excludedKeys = new Set([
+      "email",
+      "assigned_to",
+      "uploaded_by",
+      "contact_owner",
+    ]);
+
+    Object.entries(nestedData).forEach(([key, value]) => {
+      if (excludedKeys.has(key)) return;
+      if (value === null || value === undefined || value === "") return;
+
+      const label = key
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) return;
+
+        fields.push({
+          label,
+          value,
+          type: "tags",
+        });
+      } else {
+        fields.push({
+          label,
+          value: String(value),
+        });
+      }
+    });
+
+    return fields;
+  };
+
+  const enhanceAboutProspectSection = (section: any): any => {
+    if (recordType !== "prospect" || !prospectData) {
       return { ...section };
+    }
+
+    const prospect = prospectData as any;
+    const data = prospect.data ?? {};
+    const nestedData = data.data ?? {};
+
+    const fields = buildProspectAboutFields(data, nestedData);
+
+    return {
+      ...section,
+      fields,
+      isLoading: prospectLoading,
+    };
+  };
+
+  // Process sections to override note-related actions and enrich "About this prospect" when we have API data
+  const processedSections = sections.map((section) => {
+    if (section.id === "notes") {
+      return enhanceNotesSection(section);
+    }
+
+    if (section.id === "about-prospect") {
+      return enhanceAboutProspectSection(section);
     }
 
     return section;
