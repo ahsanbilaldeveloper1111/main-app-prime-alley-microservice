@@ -6289,6 +6289,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     return section;
   });
 
+  const isHtmlString = (value: unknown) => {
+    if (typeof value !== "string") return false;
+    // Basic check for HTML tags in the string
+    return /<\/?[a-z][\s\S]*>/i.test(value);
+  };
+
   const renderField = (field: SidebarField, index: number) => {
     if (field.show === false) return null;
 
@@ -6358,6 +6364,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       );
     }
 
+    const isHtmlContent = isHtmlString(field.value);
+
     return (
       <div key={index} style={{ marginBottom: "16px" }}>
         <div
@@ -6378,6 +6386,20 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             gap: "8px",
           }}
         >
+        {isHtmlContent ? (
+          <div
+            style={{
+              fontSize: "14px",
+              color: "#141414",
+              fontWeight: "400",
+              flex: 1,
+              wordBreak: "break-word",
+            }}
+            dangerouslySetInnerHTML={{
+              __html: (field.value as string) || "--",
+            }}
+          />
+        ) : (
           <div
             style={{
               fontSize: "14px",
@@ -6389,6 +6411,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           >
             {field.value || "--"}
           </div>
+        )}
           <div
             style={{
               display: "flex",
@@ -6821,6 +6844,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     recentActivitiesState.data,
                     resolveUserLabel,
                   );
+
+                  
                   if (auditTrail.length > 0) {
                     const isActivityRecordType = recordType === "activity";
                     const displayTrail = isActivityRecordType
@@ -6889,9 +6914,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                                     overflowWrap: "break-word",
                                     wordBreak: "break-word",
                                   }}
-                                >
-                                  {description}
-                                </p>
+                                  dangerouslySetInnerHTML={{ __html: description }}
+                                />
                                 <span
                                   style={{ fontSize: "12px", color: "#718096" }}
                                 >

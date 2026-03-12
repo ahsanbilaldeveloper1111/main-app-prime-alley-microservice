@@ -676,7 +676,7 @@ const CrmProspectsManagement = () => {
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [] as Array<{
       id: string;
       field_name: string;
@@ -846,7 +846,11 @@ const CrmProspectsManagement = () => {
           ),
           tags: tagsArray as Array<{ value: string; label: string; id: number }>,
           note: item.note ?? d.note ?? "",
-          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
+          source_file:
+            (item as any).source_file ??
+            d.source ??
+            (item as any).source ??
+            "",
           custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
@@ -3093,6 +3097,7 @@ const CrmProspectsManagement = () => {
           getVariant: () => "secondary",
         },
         emptyValue: "N/A",
+        accessor: (row) => row.source_file || row.data?.source_file || "N/A",
       },
       {
         key: "user_extension",
@@ -3854,7 +3859,7 @@ const CrmProspectsManagement = () => {
                 scheduled_call_at: "",
                 tags: [],
                 note: "",
-                source: "",
+                source_file: "",
                 custom_fields: [],
               });
               setShowCreateContactSidebar(true);
@@ -3949,6 +3954,7 @@ const CrmProspectsManagement = () => {
         legal_basis: contactForm.legal_basis?.length
           ? contactForm.legal_basis
           : undefined,
+        source_file: contactForm.source_file?.trim() || undefined,
       };
       customFieldsForPayload.forEach((f) => {
         dataPayload[f.field_name] = f.field_value;
@@ -3962,7 +3968,6 @@ const CrmProspectsManagement = () => {
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source?.trim() || undefined,
           tag_ids: contactForm.tags?.length
           ? contactForm.tags.map((t) => t.id)
           : [],
@@ -3984,7 +3989,7 @@ const CrmProspectsManagement = () => {
           scheduled_call_at: "",
           tags: [],
           note: "",
-          source: "",
+          source_file: "",
           custom_fields: [],
         });
         if (!addAnother) {
@@ -4047,7 +4052,7 @@ const CrmProspectsManagement = () => {
         phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source?.trim() || undefined,
+        source: contactForm.source_file?.trim() || undefined,
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: contactForm.tags?.length
