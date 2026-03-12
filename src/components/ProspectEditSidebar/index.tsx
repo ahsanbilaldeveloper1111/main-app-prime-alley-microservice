@@ -21,7 +21,7 @@ export interface ProspectFormState {
   scheduled_call_at: string;
   tags: Array<{ value: string; label: string; id: number }>;
   note: string;
-  source: string;
+  source_file: string;
   custom_fields: Array<{
     id: string;
     field_name: string;
@@ -542,11 +542,11 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={contactForm.source}
+                        value={contactForm.source_file}
                         onChange={(e) =>
                           setContactForm({
                             ...contactForm,
-                            source: e.target.value,
+                            source_file: e.target.value,
                           })
                         }
                         style={{
