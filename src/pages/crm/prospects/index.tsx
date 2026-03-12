@@ -1395,6 +1395,127 @@ const CrmProspectsManagement = () => {
     [buildExportParams],
   );
 
+  const buildExportHeaders = (allData: CrmDataItem[]) => {
+    const topLevelKeys = new Set<string>();
+    const nestedDataKeys = new Set<string>();
+
+    for (const row of allData as any[]) {
+      if (!row || typeof row !== "object") continue;
+      for (const k of Object.keys(row)) {
+        if (k === "data" && row.data && typeof row.data === "object") {
+          for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
+        } else if (k !== "campaign" && k !== "company") {
+          topLevelKeys.add(k);
+        }
+      }
+    }
+
+    const preferredTopLevelOrder = [
+      "id",
+      "name",
+      "phone",
+      "user_extension",
+      "campaign_id",
+      "source_file",
+      "directory",
+      "is_viewed",
+      "scheduled_call_at",
+      "uploaded_by",
+      "created_by",
+      "note",
+      "company_name",
+      "company_domain",
+      "company_id",
+      "created_at",
+      "updated_at",
+      "tags",
+      "crm_summary",
+    ];
+
+    const orderedTopLevel = [
+      ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
+      ...Array.from(topLevelKeys)
+        .filter((k) => !preferredTopLevelOrder.includes(k))
+        .sort((a, b) => a.localeCompare(b)),
+    ];
+
+    const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const nestedDataKeysSet = new Set(orderedNestedData);
+
+    const headers = [
+      ...orderedTopLevel,
+      ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
+    ];
+
+    return { headers, nestedDataKeysSet };
+  };
+
+  const getExportCellValue = (
+    row: any,
+    header: string,
+    nestedDataKeysSet: Set<string>,
+  ) => {
+    if (header === "campaign_id") {
+      const label = row?.campaign?.name;
+      if (label != null) return label;
+      return row?.campaign_id != null ? String(row.campaign_id) : "";
+    }
+
+    if (header === "company_name") {
+      const name = row?.company?.name;
+      if (name != null) return name;
+      return row?.company_name != null ? String(row.company_name) : "";
+    }
+
+    if (header === "crm_summary") {
+      const summary =
+        row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+      return summary != null
+        ? typeof summary === "string"
+          ? summary
+          : String(summary)
+        : "";
+    }
+
+    const raw = nestedDataKeysSet.has(header)
+      ? row?.data?.[header] ?? row?.[header]
+      : row?.[header];
+
+    if (raw == null) return "";
+    if (typeof raw === "string") return raw;
+    if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return String(raw);
+    }
+  };
+
+  const escapeCsv = (val: string) => {
+    const s = String(val);
+    if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const buildCsvContent = (
+    headers: string[],
+    allData: CrmDataItem[],
+    nestedDataKeysSet: Set<string>,
+  ) => {
+    return [
+      headers.map((h) => escapeCsv(h)).join(","),
+      ...allData.map((row) =>
+        headers
+          .map((h) =>
+            escapeCsv(getExportCellValue(row, h, nestedDataKeysSet)),
+          )
+          .join(","),
+      ),
+    ].join("\n");
+  };
+
   const handleProspectsExport = useCallback(async () => {
     const name =
       exportFileName.trim() || `prospects_${moment().format("YYYY-MM-DD")}`;
@@ -1406,68 +1527,10 @@ const CrmProspectsManagement = () => {
         toast.info("No prospects match the selected filters.");
         return;
       }
-      const topLevelKeys = new Set<string>();
-      const nestedDataKeys = new Set<string>();
-      for (const row of allData as any[]) {
-        if (!row || typeof row !== "object") continue;
-        for (const k of Object.keys(row)) {
-          if (k === "data" && row.data && typeof row.data === "object") {
-            for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
-          } else if (k !== "campaign" && k !== "company") {
-            topLevelKeys.add(k);
-          }
-        }
-      }
-      const preferredTopLevelOrder = [
-        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
-        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
-        "note", "company_name", "company_domain", "company_id", "created_at",
-        "updated_at", "tags", "crm_summary",
-      ];
-      const orderedTopLevel = [
-        ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
-      ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
-      const nestedDataKeysSet = new Set(orderedNestedData);
-      const headers = [
-        ...orderedTopLevel,
-        ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
-      ];
-      const getCellValue = (row: any, header: string) => {
-        if (header === "campaign_id") {
-          const label = row?.campaign?.name;
-          if (label != null) return label;
-          return row?.campaign_id != null ? String(row.campaign_id) : "";
-        }
-        if (header === "company_name") {
-          const name = row?.company?.name;
-          if (name != null) return name;
-          return row?.company_name != null ? String(row.company_name) : "";
-        }
-        if (header === "crm_summary") {
-          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
-        }
-        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
-        if (raw == null) return "";
-        if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
-        try {
-          return JSON.stringify(raw);
-        } catch {
-          return String(raw);
-        }
-      };
-      const escapeCsv = (val: string) => {
-        const s = String(val);
-        if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-        return s;
-      };
-      const csvContent = [
-        headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
-      ].join("\n");
+
+      const { headers, nestedDataKeysSet } = buildExportHeaders(allData);
+      const csvContent = buildCsvContent(headers, allData, nestedDataKeysSet);
+
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
