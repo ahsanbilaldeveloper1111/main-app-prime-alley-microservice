@@ -8,6 +8,37 @@ import TransactionsPage from "@components/billings/TransactionPage";
 import DocumentsPage from "@components/billings/DocumentPage";
 import PaymentMethodsPage from "@components/billings/PaymentMethodsPage";
 import CompanyInfoPage from "@components/billings/CompanyInfoPage";
+
+const TAB_PAGES: Record<string, React.ComponentType> = {
+  Overview: OverviewPage,
+  Subscriptions: SubscriptionsPage,
+  "Usage & Limits": UsageLimitsPage,
+  "Billing History": BillingHistoryPage,
+  "Company Info": CompanyInfoPage,
+  Transactions: TransactionsPage,
+  Documents: DocumentsPage,
+  "Payment Methods": PaymentMethodsPage,
+};
+
+type TabButtonProps = {
+  tab: string;
+  activeTab: string;
+  onSelect: (tab: string) => void;
+};
+
+const TabButton = ({ tab, activeTab, onSelect }: TabButtonProps) => {
+  const isActive = activeTab === tab;
+
+  return (
+    <button
+      type="button"
+      style={{ ...styles.tab, ...(isActive ? styles.activeTab : undefined) }}
+      onClick={() => onSelect(tab)}
+    >
+      {tab}
+    </button>
+  );
+};
 const styles: Record<string, React.CSSProperties> = {
   body: {
     fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
@@ -73,6 +104,7 @@ const tabs = [
 
 const AccountBilling = () => {
   const [activeTab, setActiveTab] = useState("Overview");
+  const ActiveTabPage = TAB_PAGES[activeTab] ?? OverviewPage;
 
   return (
     <div style={styles.body}>
@@ -82,18 +114,7 @@ const AccountBilling = () => {
           <h1 style={styles.pageHeading}>Account &amp; Billing</h1>
           <div style={styles.tabBar}>
             {tabs.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                style={{
-                  ...styles.tab,
-                  borderBottom: activeTab === tab ? "2px solid #141414" : "2px solid transparent",
-                  fontWeight: activeTab === tab ? 700 : 500,
-                }}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
+              <TabButton key={tab} tab={tab} activeTab={activeTab} onSelect={setActiveTab} />
             ))}
           </div>
         </div>
@@ -101,29 +122,11 @@ const AccountBilling = () => {
 
       {/* Main Content */}
       <div style={{ ...styles.container, paddingTop: 24 }}>
-
-      {activeTab === "Subscriptions" ? (
-          <SubscriptionsPage />
-        ) : activeTab === "Usage & Limits" ? (
-          <UsageLimitsPage />
-        ) : activeTab === "Billing History" ? (
-          <BillingHistoryPage />
-        ) : activeTab === "Transactions" ? (
-          <TransactionsPage />
-        ) : activeTab === "Documents" ? (
-          <DocumentsPage />
-        ) : activeTab === "Payment Methods" ? (
-          <PaymentMethodsPage />
-        ) : activeTab === "Company Info" ? (
-          <CompanyInfoPage />
-        ) : (
-          <OverviewPage />
-        )}
-
+        <ActiveTabPage />
       </div>
     </div>
   );
-}
+};
 AccountBilling.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };

@@ -322,9 +322,9 @@ export const postReportsCalls = async (payload: Record<string, unknown>) => {
 };
 
 /** GET /reports/calls/{sessionId} - Get call report by session */
-export const getReportsCallsBySession = async (sessionId: string) => {
+export const getReportsCallsBySession = async (sessionId: string, companyId: string) => {
   try {
-    const response = await axiosInstance.get(`${PREFIX_REPORTS}/calls/${sessionId}`);
+    const response = await axiosInstance.get(`${PREFIX_REPORTS}/calls/${sessionId}`, { params: { company_id: companyId } });
     return response.data;
   } catch (error) {
     throw error;
