@@ -5688,35 +5688,41 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowMoreModal(false);
   };
 
+  const buildActivitiesBaseUrl = (
+    type: string,
+    id: number | string,
+    entityTypeOverride?: string,
+  ): string | null => {
+    const effectiveType = type === "activity" ? entityTypeOverride ?? "lead" : type;
+    const effectiveId =
+      type === "activity" ? Number(id) : id;
+
+    if (type === "activity" && Number.isNaN(effectiveId)) {
+      return null;
+    }
+
+    switch (effectiveType) {
+      case "prospect":
+        return `/crm/prospects/prospects-detailpage?id=${effectiveId}&section=activities`;
+      case "lead":
+        return `/crm/leads/leads-detailpage?id=${effectiveId}&section=activities`;
+      case "deal":
+        return `/crm/deals/deals-detailpage?id=${effectiveId}&section=activities`;
+      case "order":
+      default:
+        return `/crm/orders/${effectiveId}/order-detailpage?section=activities`;
+    }
+  };
+
   const goToRecordDetailActivity = useCallback(
     (activityType?: string) => {
       if (!recordType || recordId == null) return;
 
-      let baseUrl: string | null = null;
-
-      if (recordType === "prospect") {
-        baseUrl = `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "lead") {
-        baseUrl = `/crm/leads/leads-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "deal") {
-        baseUrl = `/crm/deals/deals-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "order") {
-        baseUrl = `/crm/orders/${recordId}/order-detailpage?section=activities`;
-      } else if (recordType === "activity") {
-        // For activity timelines, fall back to the underlying entity type when available
-        const id = Number(recordId);
-        if (Number.isNaN(id)) return;
-        const entityType = activityEntityType ?? "lead";
-        if (entityType === "prospect") {
-          baseUrl = `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
-        } else if (entityType === "lead") {
-          baseUrl = `/crm/leads/leads-detailpage?id=${id}&section=activities`;
-        } else if (entityType === "deal") {
-          baseUrl = `/crm/deals/deals-detailpage?id=${id}&section=activities`;
-        } else {
-          baseUrl = `/crm/orders/${id}/order-detailpage?section=activities`;
-        }
-      }
+      const baseUrl = buildActivitiesBaseUrl(
+        recordType,
+        recordId,
+        activityEntityType,
+      );
 
       if (!baseUrl) return;
 

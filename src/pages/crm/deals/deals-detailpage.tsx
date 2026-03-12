@@ -1745,7 +1745,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                           <Paperclip size={18} style={{ color: "#718096" }} />
                           <button
                             type="button"
-                            onClick={() => void handleDownloadAttachment(att.id)}
+                            onClick={() => handleDownloadAttachment(att.id)}
                             style={{
                               display: "flex",
                               alignItems: "center",
