@@ -66,7 +66,6 @@ import {
   downloadInvoicePdf,
   InvoiceData,
   InvoiceCreateUpdatePayload,
-  InvoiceCreateUpdateAPIPayload,
   InvoiceItemCreateUpdatePayload,
   InvoiceItemAPIPayload,
   CompanyData,
@@ -877,8 +876,6 @@ const InvoiceList = () => {
     date_from?: string;
     date_to?: string;
   }>({});
-  const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
-  const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState<boolean>(false);
   const [pendingFilters, setPendingFilters] = useState<{
     search?: string;
@@ -1687,7 +1684,11 @@ const InvoiceList = () => {
       customer_id: Number.parseInt(selectedInvoiceForPayment.company_id || "0", 10),
     }, {
       onSuccess: (paymentResult: any) => {
-        void handleSavedCardPaymentSuccess(paymentResult);
+        handleSavedCardPaymentSuccess(paymentResult).catch((err) => {
+          console.error("Saved-card payment success handler failed:", err);
+          handleDirectPaymentError("Payment processing failed");
+          setIsProcessingPayment(false);
+        });
       },
       onError: (error) => {
         handleDirectPaymentError(error.message || 'Payment processing failed');
@@ -2053,13 +2054,11 @@ const InvoiceList = () => {
           setCurrentFilters({ ...pendingFilters });
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((prev) => prev + 1);
-          setActiveStatusTab(pendingFilters.status ?? null);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
           setPendingFilters({});
           setCurrentFilters({});
-          setActiveStatusTab(null);
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);

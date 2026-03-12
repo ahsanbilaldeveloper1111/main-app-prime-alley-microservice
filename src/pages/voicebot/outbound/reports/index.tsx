@@ -18,6 +18,16 @@ function formatCost(value: number): string {
   return n.toFixed(4);
 }
 
+function displayText(value: unknown, fallback = "—"): string {
+  if (typeof value === "string") {
+    const s = value.trim();
+    return s || fallback;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : fallback;
+  if (typeof value === "bigint") return String(value);
+  return fallback;
+}
+
 interface CompanyOption {
   id: string;
   company_id?: string;
@@ -331,13 +341,13 @@ const OutboundReportsPage = () => {
   }, [hasSearched, isAdmin, effectiveCompanyId, companies.length, handleSearch]);
 
   const columns: TableColumn<CallReportRow>[] = [
-    { key: "campaign_name", label: "Campaign", render: (r) => String(r.campaign_name ?? "—") },
-    { key: "phone_number", label: "Phone Number", render: (r) => String(r.phone_number ?? "—") },
+    { key: "campaign_name", label: "Campaign", render: (r) => displayText(r.campaign_name) },
+    { key: "phone_number", label: "Phone Number", render: (r) => displayText(r.phone_number) },
     {
       key: "call_status",
       label: "Status",
       render: (r) => {
-        const s = String(r.call_status ?? "—");
+        const s = displayText(r.call_status);
         return <span className=" text-capitalize">{s}</span>;
       },
     },
@@ -661,7 +671,7 @@ const OutboundReportsPage = () => {
                         {Object.entries(viewData.usage).map(([k, v]) => (
                           <tr key={k}>
                             <th scope="row" className="fw-bold">{k}</th>
-                            <td>{v == null ? "—" : String(v)}</td>
+                            <td>{displayText(v)}</td>
                           </tr>
                         ))}
                       </tbody>

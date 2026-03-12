@@ -73,8 +73,13 @@ function isPositiveNumberLike(value: unknown): boolean {
 }
 
 function parseMoney(value: unknown): number {
-  const n = Number.parseFloat(String(value ?? 0));
-  return Number.isFinite(n) ? n : 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (value == null) return 0;
+  return 0;
 }
 
 function formatMoney(currencyCode: unknown, amount: unknown): string {
