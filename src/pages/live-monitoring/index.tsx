@@ -340,7 +340,7 @@ const CallInfoSidebar: React.FC<{ call: CallRow; onClose: () => void }> = ({ cal
                   padding: "9px 16px", lineHeight: "18px",
                   transition: TRANS,
                 }}>
-                  Learn more about Aircall AI
+                  Learn more about Prime Alley AI
                 </button>
               </div>
             </div>
