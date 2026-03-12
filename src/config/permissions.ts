@@ -16,6 +16,7 @@ export const routePermissions: RoutePermission[] = [
     
     //profile services start
     {path: '/profile',permissions: ['']},
+    {path: '/live-monitoring',permissions: ['']},
     
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
