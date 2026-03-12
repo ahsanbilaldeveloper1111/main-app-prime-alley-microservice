@@ -24,7 +24,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -41,17 +40,14 @@ import {
   FiDatabase,
   FiSearch,
   FiFilter,
-  FiTrash2,
   FiEye,
   FiEdit,
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
@@ -65,11 +61,9 @@ import {
   X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
-  Plus,
   ArrowUp,
   ArrowDown,
   Download,
-  CheckSquare,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
@@ -86,7 +80,6 @@ import {
   History,
   FileText,
   Target,
-  Layers,
   MessageCircle,
   MessageSquare,
 } from "lucide-react";
@@ -95,7 +88,6 @@ import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
   ToolbarConfig,
   FilterPill,
   TabConfig,
@@ -1452,31 +1444,35 @@ const CrmProspectsManagement = () => {
     return { headers, nestedDataKeysSet };
   };
 
+  type ExportValueHandler = (row: any) => string;
+
+  const exportValueHandlers: Record<string, ExportValueHandler> = {
+    campaign_id: (row) => {
+      const label = row?.campaign?.name;
+      if (label != null) return label;
+      return row?.campaign_id != null ? String(row.campaign_id) : "";
+    },
+    company_name: (row) => {
+      const name = row?.company?.name;
+      if (name != null) return name;
+      return row?.company_name != null ? String(row.company_name) : "";
+    },
+    crm_summary: (row) => {
+      const summary =
+        row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+      if (summary == null) return "";
+      return typeof summary === "string" ? summary : String(summary);
+    },
+  };
+
   const getExportCellValue = (
     row: any,
     header: string,
     nestedDataKeysSet: Set<string>,
   ) => {
-    if (header === "campaign_id") {
-      const label = row?.campaign?.name;
-      if (label != null) return label;
-      return row?.campaign_id != null ? String(row.campaign_id) : "";
-    }
-
-    if (header === "company_name") {
-      const name = row?.company?.name;
-      if (name != null) return name;
-      return row?.company_name != null ? String(row.company_name) : "";
-    }
-
-    if (header === "crm_summary") {
-      const summary =
-        row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-      return summary != null
-        ? typeof summary === "string"
-          ? summary
-          : String(summary)
-        : "";
+    const specialHandler = exportValueHandlers[header];
+    if (specialHandler) {
+      return specialHandler(row);
     }
 
     const raw = nestedDataKeysSet.has(header)
