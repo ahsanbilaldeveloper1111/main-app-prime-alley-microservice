@@ -1483,6 +1483,10 @@ const CrmProspectsManagement = () => {
       ? row?.data?.[header] ?? row?.[header]
       : row?.[header];
 
+    return formatExportRawValue(raw);
+  };
+
+  const formatExportRawValue = (raw: unknown): string => {
     if (raw == null) return "";
     if (typeof raw === "string") return raw;
     if (typeof raw === "number" || typeof raw === "boolean") return String(raw);

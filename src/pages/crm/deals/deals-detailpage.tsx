@@ -176,7 +176,10 @@ const DealRecordPage: NextPageWithLayout = () => {
       }
     };
 
-    void fetchExtensions();
+    fetchExtensions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to fetch extensions:", error);
+    });
   }, []);
 
   // Close dropdowns when clicking outside
@@ -808,7 +811,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       } else if (action === 'Delete') {
                         handleOpenDeleteDeal();
                       } else if (action === 'Export') {
-                        void handleDealExport();
+                        handleDealExport();
                       }
                     }}
                     style={{

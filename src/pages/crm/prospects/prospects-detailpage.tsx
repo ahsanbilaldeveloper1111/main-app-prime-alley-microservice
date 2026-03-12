@@ -1139,7 +1139,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       } else if (action === "Delete") {
                         handleOpenDeleteProspect();
                       } else if (action === "Export") {
-                        void handleProspectExport();
+                        handleProspectExport();
                       }
                       setShowActionsDropdown(false);
                     }}
