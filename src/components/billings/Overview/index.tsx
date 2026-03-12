@@ -11,12 +11,27 @@ import {
 } from "lucide-react";
 
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
   GetCompanyDetails,
   GetPaymentMethods,
   GetDashboardCounters,
   GetPayments,
 } from "@utils/accounting";
+
+import TopSection from "./TopSection";
+
+/** Given an ISO invoice date (e.g. 2026-03-12), returns the same day next month formatted as "12 April 2026". */
+function formatNextChargeDate(invoiceDateIso: string | null | undefined): string {
+  if (!invoiceDateIso) return "—";
+  const d = new Date(invoiceDateIso);
+  if (Number.isNaN(d.getTime())) return "—";
+  d.setMonth(d.getMonth() + 1);
+  const day = d.getDate();
+  const month = d.toLocaleString("en-GB", { month: "long" });
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+}
 
 const styles: Record<string, React.CSSProperties> = {
   card: {
@@ -184,8 +199,6 @@ const OverviewPage = () => {
   const { data: session } = useSession();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [paymentMethods, setPaymentMethods] = useState<any>(null);
-  const [dashboardCounters, setDashboardCounters] = useState<any>(null);
-  const [payments, setPayments] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -204,8 +217,7 @@ const OverviewPage = () => {
 
         setCompanyDetails(companyRes);
         setPaymentMethods(paymentMethodsRes);
-        setDashboardCounters(countersRes);
-        setPayments(paymentsRes);
+        
       } catch (err) {
         console.error("Overview API error:", err);
       }
@@ -218,10 +230,6 @@ const OverviewPage = () => {
     : paymentMethods?.data ?? paymentMethods?.payment_methods ?? [];
   const displayPaymentMethod = paymentMethodsList.find((pm: any) => pm?.is_default) ?? paymentMethodsList[0];
   const hasDefaultAccount = paymentMethodsList.some((pm: any) => pm?.is_default);
-  const primaryContact =
-    companyDetails?.primary_contact_name ??
-    companyDetails?.billing_contact_name ??
-    session?.user?.name;
 
   return (
     <>
@@ -245,65 +253,13 @@ const OverviewPage = () => {
             <h2 style={styles.companyHeading}>
               {companyDetails?.name ?? session?.user?.company_name}
             </h2>
-            <div style={{ margin: 0, display: "flex", flexDirection: "row" as const, justifyContent: "space-between", marginTop: 16, gap: 24 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Tenant ID</div>
-                <div style={styles.value}>
-                  {companyDetails?.tenant_id ?? companyDetails?.company_identifier ?? session?.user?.company_identifier}
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Billing Frequency</div>
-                <div style={styles.value} className="text-capitalize">
-                  {(companyDetails?.profile?.payment_mode ?? "").replace(/_/g, " ")}
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Subscription Term</div>
-                <div style={styles.value}>
-                  {/* {companyDetails?.profile?.payment_terms ?? ""} */}1st Mar 2026 to 31st Mar 2026 <span className="text-muted text-small text-danger">(Static)</span>
-
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Primary Contact</div>
-                <div style={styles.value}>{companyDetails?.phone ?? ""}</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Payment Method</div>
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 2 }}>
-                  {displayPaymentMethod ? (
-                    <>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
-                        <div style={{
-                          background: "#1a1f71", color: "#fff", fontSize: 9, fontWeight: 700,
-                          padding: "2px 5px", borderRadius: 3, letterSpacing: 0.5,
-                        }}>
-                          {(displayPaymentMethod?.card?.brand ?? displayPaymentMethod?.brand ?? "card").toUpperCase()}
-                        </div>
-                        <span style={styles.value}>
-                          ending in {displayPaymentMethod?.card?.last4 ?? displayPaymentMethod?.last4 ?? "****"}
-                        </span>
-                        {hasDefaultAccount && displayPaymentMethod?.is_default && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, color: "rgb(0, 97, 98)",
-                            background: "rgba(0, 97, 98, 0.1)", padding: "2px 6px", borderRadius: 4,
-                          }}>
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ ...styles.value, fontSize: 12 }}>
-                        {displayPaymentMethod?.billing_details?.name ?? displayPaymentMethod?.holder_name ?? ""}
-                      </div>
-                    </>
-                  ) : (
-                    <div style={styles.value}>No payment method</div>
-                  )}
-                  <a style={{ ...styles.link, fontSize: 12 }}>Change</a>
-                </div>
-              </div>
-            </div>
+            <TopSection
+              companyDetails={companyDetails}
+              session={session}
+              displayPaymentMethod={displayPaymentMethod}
+              hasDefaultAccount={hasDefaultAccount}
+              styles={{ label: styles.label, value: styles.value, link: styles.link }}
+            />
           </div>
         </div>
       </div>
@@ -314,7 +270,7 @@ const OverviewPage = () => {
           <div style={styles.cardPadding}>
             <h2 style={styles.sectionHeading}>Your Next Payment</h2>
             <p style={{ margin: "0 0 16px 0", fontSize: 18, color: "#141414" }}>
-              A total of <strong>AED {companyDetails?.latest_invoice?.total_amount ?? "0"}</strong> will be charged on <strong>1st April 2026</strong>.
+            An estimated total of <strong>AED {companyDetails?.latest_invoice?.total_amount ?? "0"}</strong> will be charged on <strong>{formatNextChargeDate(companyDetails?.latest_invoice?.invoice_date)}</strong>.
             </p>
             <p style={{ margin: "0 0 16px 0", fontSize: 12, color: "#666", lineHeight: "18px" }}>
               *Includes estimated sales tax or VAT, based on your main company address. Excludes any recent credits to your account. Your recurring fees may increase based on your usage.
@@ -322,7 +278,7 @@ const OverviewPage = () => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div>
                 <div style={{ ...styles.label, marginBottom: 4 }}>Billing period</div>
-                <div style={{ fontSize: 14, color: "#141414" }}>1st April 2026 – 30th April 2026</div>
+                <div style={{ fontSize: 14, color: "#141414" }}>1st April 2026 – 30th April 2026 <span className=" text-small text-danger">(Static)</span></div>
               </div>
               <div>
                 <div style={{ ...styles.label, marginBottom: 4 }}>Payment method</div>
@@ -359,9 +315,9 @@ const OverviewPage = () => {
               <div style={{ ...styles.value, marginBottom: 4 }}>Need help?</div>
               <p style={{ margin: 0, fontSize: 14 }}>
                 Visit the{" "}
-                <a style={styles.link}>Knowledge Base</a>
+                <Link href="/settings" style={styles.link}>Knowledge Base</Link>
                 {" "}for answers to FAQs or{" "}
-                <a style={styles.link}>contact us</a>
+                <Link href="/settings" style={styles.link}>contact us</Link>
                 {" "}for more support.
               </p>
             </div>
@@ -375,7 +331,7 @@ const OverviewPage = () => {
               {commonActions.map((action) => (
                 <div key={action.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <action.Icon size={16} strokeWidth={2} color="#141414" />
-                  <a style={styles.link}>{action.label}</a>
+                  <Link href="/billing/account-billing" style={styles.link}>{action.label}</Link>
                 </div>
               ))}
             </div>
@@ -395,11 +351,11 @@ const OverviewPage = () => {
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 13 }}>10 of 500 credits used</span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>2%</span>
+              <span style={{ fontSize: 13 }}>0 of 0 credits used</span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>0%</span>
             </div>
             <div style={{ height: 8, backgroundColor: "#e5e5e5", borderRadius: 4, marginBottom: 8 }}>
-              <div style={{ width: "2%", height: "100%", backgroundColor: "#00a47c", borderRadius: 4 }} />
+              <div style={{ width: "0%", height: "100%", backgroundColor: "#00a47c", borderRadius: 4 }} />
             </div>
             <p style={{ fontSize: 12, color: "#666", margin: "0 0 12px 0" }}>Resets on 10 Mar 2026.</p>
             <div style={{
@@ -410,7 +366,7 @@ const OverviewPage = () => {
             </div>
             <p style={{ fontSize: 13, margin: 0 }}>
               Explore features that use Credits in{" "}
-              <a style={styles.link}> Agents Marketplace</a>
+              <Link href="/settings" style={styles.link}> Agents Marketplace</Link>
             </p>
           </div>
         </div>
@@ -422,12 +378,12 @@ const OverviewPage = () => {
               <button style={styles.btnLight}>View Usage &amp; Limits</button>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Contact tier: 1,000 contacts</span>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>0/1,000 used</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Contact tier: 0 contacts</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>0/0 used</span>
             </div>
             <p style={{ fontSize: 13, color: "#444", lineHeight: "20px", margin: 0 }}>
               Billed data for marketing contacts is updated once a day. Marketing contacts are updated to non-marketing once a month on the next update date. Go to{" "}
-              <a style={styles.link}>Usage &amp; Limits</a>
+              <Link href="/billing/account-billing" style={styles.link}>Usage &amp; Limits</Link>
               {" "}to set contacts as non-marketing.
             </p>
           </div>
@@ -513,10 +469,10 @@ const OverviewPage = () => {
                 </p>
                 <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
                   Data hosting location:{" "}
-                  <a style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Link href="/settings" style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
                     <span>Gulf Region</span>
                     <ExternalLink size={13} strokeWidth={2} />
-                  </a>
+                  </Link>
                 </p>
               </div>
               <button style={styles.btnLight}>View pricing</button>
@@ -525,7 +481,7 @@ const OverviewPage = () => {
 
           <div>
             <h3 style={styles.subHeading}>Total Credits</h3>
-            <p style={{ fontSize: 14, color: "#141414", margin: "6px 0 0 0" }}>500 Included Credits</p>
+            <p style={{ fontSize: 14, color: "#141414", margin: "6px 0 0 0" }}>0 Included Credits</p>
           </div>
         </div>
       </div>
@@ -551,16 +507,16 @@ const OverviewPage = () => {
         <div style={{ ...styles.cardPadding, position: "relative" as const }}>
           <h2 style={{ ...styles.sectionHeading, marginBottom: 20 }}>Billing Help</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
-            {billingHelpLinks.map((row, i) => (
-              <div key={row[0]} style={{ display: "contents" }}>
-                <a style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {billingHelpLinks.map((row) => (
+              <div key={`${row[0]}|${row[1]}`} style={{ display: "contents" }}>
+                <Link href="/settings" style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <span>{row[0]}</span>
                   <ExternalLink size={13} strokeWidth={2} />
-                </a>
-                <a key={`right-${i}`} style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                </Link>
+                <Link href="/settings" style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <span>{row[1]}</span>
                   <ExternalLink size={13} strokeWidth={2} />
-                </a>
+                </Link>
               </div>
             ))}
           </div>

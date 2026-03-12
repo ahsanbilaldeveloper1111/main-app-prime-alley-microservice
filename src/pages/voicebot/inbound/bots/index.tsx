@@ -17,6 +17,7 @@ import {
   type BotConfiguration,
   type BotVersionItem,
 } from "@utils/voicebot/inbound";
+import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { Row, Col, Button, Modal, Form, Spinner, Nav, Tab, Accordion } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -56,13 +57,36 @@ const defaultConfig: BotConfiguration = {
   idle_timeout: 300,
 };
 
+function getListFromResponse(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  const obj = res as Record<string, unknown> | null | undefined;
+  const list = obj?.results ?? obj?.data;
+  return Array.isArray(list) ? list : [];
+}
+
+function getCompanyOptions(list: unknown[]): CompanyOption[] {
+  return list.map((c) => {
+    const item = c as Record<string, unknown>;
+    const idVal = item.company_id ?? item.id;
+    let idStr = "";
+    if (typeof idVal === "string") idStr = idVal;
+    else if (typeof idVal === "number") idStr = String(idVal);
+    const option: CompanyOption = {
+      id: idStr,
+      name: typeof item.name === "string" ? item.name : "",
+    };
+    if (idStr !== "") option.company_id = idStr;
+    return option;
+  });
+}
+
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
 const VersionConfigSnapshot = ({ config }: { config: Record<string, unknown> }) => {
-  const v = (o: Record<string, unknown> | undefined, k: string) => (o && typeof o[k] !== "undefined" ? String(o[k]) : "—");
-  const voice = (config.voice_settings as Record<string, unknown>) ?? {};
-  const llm = (config.llm_settings as Record<string, unknown>) ?? {};
-  const behavior = (config.behavior_settings as Record<string, unknown>) ?? {};
-  const sip = (config.sip_settings as Record<string, unknown>) ?? {};
+  const v = (o: Record<string, unknown> | undefined, k: string) => safeDisplayString(o?.[k]);
+  const voice = (config.voice_settings ?? {}) as Record<string, unknown>;
+  const llm = (config.llm_settings ?? {}) as Record<string, unknown>;
+  const behavior = (config.behavior_settings ?? {}) as Record<string, unknown>;
+  const sip = (config.sip_settings ?? {}) as Record<string, unknown>;
   return (
     <div className="" style={{ maxHeight: "320px", overflow: "auto" }}>
       <table className="table table-bordered mb-2">
@@ -113,6 +137,220 @@ const VersionConfigSnapshot = ({ config }: { config: Record<string, unknown> }) 
   );
 };
 
+const getBotId = (row: BotRow) => row.id ?? "";
+
+interface BotTableActionsProps {
+  row: BotRow;
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onPublish: (id: string) => void;
+  onUnpublish: (id: string) => void;
+  onHistory: (row: BotRow) => void;
+  onDelete: (row: BotRow) => void;
+}
+
+function isConfigObject(config: unknown): config is Record<string, unknown> {
+  return config != null && typeof config === "object";
+}
+
+interface BotViewModalBodyProps {
+  viewLoading: boolean;
+  viewBot: Record<string, unknown> | null;
+  viewActiveTab: string;
+  onTabChange: (key: string) => void;
+}
+
+const BotViewModalBody = ({ viewLoading, viewBot, viewActiveTab, onTabChange }: BotViewModalBodyProps) => {
+  if (viewLoading) {
+    return (
+      <div className="d-flex justify-content-center py-4">
+        <Spinner animation="border" />
+      </div>
+    );
+  }
+  if (!viewBot) {
+    return <p className="text-muted mb-0">No details to show.</p>;
+  }
+  const config = viewBot.configuration;
+  const hasConfig = isConfigObject(config);
+  const cfg = (key: string) => (hasConfig ? safeDisplayString(config[key]) : "—");
+
+  return (
+    <Tab.Container activeKey={viewActiveTab} onSelect={(k) => onTabChange(k ?? "basic")}>
+      <Nav variant="tabs" className="mb-3">
+        <Nav.Item><Nav.Link eventKey="basic">Basic Information</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="configuration">Configuration</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="voice">Voice Settings</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="llm">LLM Settings</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="behavior">Behavior</Nav.Link></Nav.Item>
+        <Nav.Item><Nav.Link eventKey="sip">SIP Settings</Nav.Link></Nav.Item>
+      </Nav>
+      <Tab.Content>
+        <Tab.Pane eventKey="basic">
+          <table className="table table-sm table-bordered mb-0">
+            <tbody>
+              <tr><th style={{ width: "140px" }}>Name</th><td>{safeDisplayString(viewBot.name)}</td></tr>
+              <tr><th>Description</th><td>{safeDisplayString(viewBot.description)}</td></tr>
+              <tr><th>Status</th><td>{viewBot.status === "published" ? <span className="status-badge success">Published</span> : <span className="status-badge secondary">Draft</span>}</td></tr>
+              <tr><th>Company</th><td>{safeDisplayString(viewBot.company)}</td></tr>
+            </tbody>
+          </table>
+        </Tab.Pane>
+        <Tab.Pane eventKey="configuration">
+          {hasConfig ? (
+            <table className="table table-sm table-bordered mb-0">
+              <tbody>
+                <tr><th style={{ width: "140px" }}>Instructions</th><td><pre className="mb-0 small text-break" style={{ whiteSpace: "pre-wrap" }}>{cfg("instructions")}</pre></td></tr>
+                <tr><th>Knowledge Base</th><td><pre className="mb-0 small text-break" style={{ whiteSpace: "pre-wrap" }}>{cfg("knowledge_base")}</pre></td></tr>
+              </tbody>
+            </table>
+          ) : <p className="text-muted mb-0">No configuration.</p>}
+        </Tab.Pane>
+        <Tab.Pane eventKey="voice">
+          {hasConfig ? (
+            <table className="table table-sm table-bordered mb-0">
+              <tbody>
+                <tr><th style={{ width: "160px" }}>Voice</th><td>{cfg("voice_name")}</td></tr>
+                <tr><th>Voice Model</th><td>{cfg("voice_model")}</td></tr>
+                <tr><th>Voice Speed</th><td>{cfg("voice_speed")}</td></tr>
+                <tr><th>Voice Instructions</th><td>{cfg("voice_instructions")}</td></tr>
+                <tr><th>Greeting Message</th><td>{cfg("greeting_message")}</td></tr>
+              </tbody>
+            </table>
+          ) : <p className="text-muted mb-0">No voice settings.</p>}
+        </Tab.Pane>
+        <Tab.Pane eventKey="llm">
+          {hasConfig ? (
+            <table className="table table-sm table-bordered mb-0">
+              <tbody>
+                <tr><th style={{ width: "160px" }}>LLM Model</th><td>{cfg("llm_model")}</td></tr>
+                <tr><th>Temperature</th><td>{cfg("temperature")}</td></tr>
+                <tr><th>Max Tokens</th><td>{cfg("max_tokens")}</td></tr>
+              </tbody>
+            </table>
+          ) : <p className="text-muted mb-0">No LLM settings.</p>}
+        </Tab.Pane>
+        <Tab.Pane eventKey="behavior">
+          {hasConfig ? (
+            <table className="table table-sm table-bordered mb-0">
+              <tbody>
+                <tr><th style={{ width: "160px" }}>Transfer Enabled</th><td>{cfg("transfer_enabled")}</td></tr>
+                <tr><th>Transfer Number</th><td>{cfg("transfer_number")}</td></tr>
+                <tr><th>Max Duration (s)</th><td>{cfg("max_duration")}</td></tr>
+                <tr><th>Idle Timeout (s)</th><td>{cfg("idle_timeout")}</td></tr>
+                <tr><th>Allow Interruptions</th><td>{cfg("allow_interruptions")}</td></tr>
+                <tr><th>Noise Cancellation</th><td>{cfg("noise_cancellation")}</td></tr>
+                <tr><th>Min Endpointing Delay</th><td>{cfg("min_endpointing_delay")}</td></tr>
+              </tbody>
+            </table>
+          ) : <p className="text-muted mb-0">No behavior settings.</p>}
+        </Tab.Pane>
+        <Tab.Pane eventKey="sip">
+          {hasConfig ? (
+            <table className="table table-sm table-bordered mb-0">
+              <tbody>
+                <tr><th style={{ width: "160px" }}>SIP Trunk ID</th><td>{cfg("sip_trunk_id")}</td></tr>
+                <tr><th>Phone Number</th><td>{cfg("phone_number")}</td></tr>
+              </tbody>
+            </table>
+          ) : <p className="text-muted mb-0">No SIP settings.</p>}
+        </Tab.Pane>
+      </Tab.Content>
+    </Tab.Container>
+  );
+};
+
+interface BotHistoryModalBodyProps {
+  historyLoading: boolean;
+  historyVersions: BotVersionItem[];
+  historyBotId: string | null;
+  rollbackVersion: number | null;
+  onRollback: (botId: string, version: number) => void;
+}
+
+const BotHistoryModalBody = ({
+  historyLoading,
+  historyVersions,
+  historyBotId,
+  rollbackVersion,
+  onRollback,
+}: BotHistoryModalBodyProps) => {
+  if (historyLoading) {
+    return (
+      <div className="d-flex justify-content-center py-4">
+        <Spinner animation="border" />
+      </div>
+    );
+  }
+  if (historyVersions.length === 0) {
+    return <p className="text-muted mb-0">No version history.</p>;
+  }
+  return (
+    <Accordion defaultActiveKey="">
+      {historyVersions.map((v) => (
+        <Accordion.Item key={v.id} eventKey={v.id}>
+          <Accordion.Header>
+            <span className="me-2">v{v.version}</span>
+            <span className="text-muted me-2">{v.created_at ? new Date(v.created_at).toLocaleString() : "—"}</span>
+            {v.change_description && <span className="me-2">— {v.change_description}</span>}
+          </Accordion.Header>
+          <Accordion.Body>
+            {v.configuration_snapshot && typeof v.configuration_snapshot === "object" ? (
+              <VersionConfigSnapshot config={v.configuration_snapshot} />
+            ) : (
+              <p className="text-muted mb-0 small">No configuration snapshot.</p>
+            )}
+            {historyBotId && (
+              <div className="mt-3 d-flex justify-content-end">
+                <Button
+                  size="sm"
+                  variant="outline-warning"
+                  onClick={() => onRollback(historyBotId, v.version)}
+                  disabled={rollbackVersion !== null}
+                >
+                  {rollbackVersion === v.version ? <Spinner animation="border" size="sm" className="me-1" /> : null}
+                  Rollback to v{v.version}
+                </Button>
+              </div>
+            )}
+          </Accordion.Body>
+        </Accordion.Item>
+      ))}
+    </Accordion>
+  );
+};
+
+const BotTableActions = ({ row, onView, onEdit, onPublish, onUnpublish, onHistory, onDelete }: BotTableActionsProps) => {
+  const id = getBotId(row);
+  const isPublished = row.status === "published";
+  return (
+    <div className="d-flex gap-1">
+      <Button title="View" size="sm" variant="outline-secondary" onClick={() => { onView(id); }}>
+        <Eye size={14} />
+      </Button>
+      <Button title="Edit" size="sm" variant="outline-primary" onClick={() => onEdit(id)}>
+        <Pencil size={14} />
+      </Button>
+      {!isPublished && (
+        <Button title="Publish" size="sm" variant="outline-success" onClick={() => onPublish(id)}>
+          <Send size={14} />
+        </Button>
+      )}
+      {isPublished && (
+        <Button title="Unpublish" size="sm" variant="outline-warning" onClick={() => onUnpublish(id)}>
+          <Undo2 size={14} />
+        </Button>
+      )}
+      <Button title="Show history" size="sm" variant="outline-info" onClick={() => onHistory(row)}>
+        <History size={14} />
+      </Button>
+      <Button title="Delete" size="sm" variant="outline-danger" onClick={() => onDelete(row)}>
+        <Trash2 size={14} />
+      </Button>
+    </div>
+  );
+};
+
 const BotsPage = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -149,15 +387,11 @@ const BotsPage = () => {
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await getCompanies({ show_inactive: false });
-      const list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
-      const opts = (Array.isArray(list) ? list : []).map((c: any) => ({
-        id: c.company_id ?? c.id ?? "",
-        company_id: c.company_id ?? c.id,
-        name: c.name ?? "",
-      }));
+      const list = getListFromResponse(res);
+      const opts = getCompanyOptions(list);
       setCompanies(opts);
-      if (opts.length && !form.company) setForm((f) => ({ ...f, company: opts[0].id }));
-    } catch (_) {
+      if (opts.length > 0 && !form.company) setForm((f) => ({ ...f, company: opts[0].id }));
+    } catch {
       setCompanies([]);
     }
   }, []);
@@ -169,13 +403,17 @@ const BotsPage = () => {
       if (companyFilter) params.company_id = companyFilter;
       if (statusFilter) params.status = statusFilter;
       const res = await getBots(params);
-      let list = Array.isArray(res) ? res : (res as any)?.results ?? (res as any)?.data ?? [];
-      if (statusFilter && Array.isArray(list)) {
-        list = list.filter((row: BotRow) => String(row.status ?? "") === statusFilter);
+      let list = getListFromResponse(res) as BotRow[];
+      if (statusFilter) {
+        list = list.filter((row) => String(row.status ?? "") === statusFilter);
       }
-      setData(Array.isArray(list) ? list : []);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Failed to load bots");
+      setData(list);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { detail?: string }; message?: string } })?.response?.data?.detail ||
+        (err as { message?: string })?.message ||
+        "Failed to load bots";
+      toast.error(message);
       setData([]);
     } finally {
       setLoading(false);
@@ -217,11 +455,55 @@ const BotsPage = () => {
     }
   }, [showHistoryModal, historyBotId]);
 
-  const botId = (row: BotRow) => row.id ?? "";
+  const handlePublish = useCallback(
+    async (id: string) => {
+      try {
+        await publishBot(id);
+        toast.success("Bot published");
+        fetchBots();
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Publish failed";
+        toast.error(msg);
+      }
+    },
+    [fetchBots]
+  );
+
+  const handleUnpublish = useCallback(
+    async (id: string) => {
+      try {
+        await unpublishBot(id);
+        toast.success("Bot unpublished");
+        fetchBots();
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Unpublish failed";
+        toast.error(msg);
+      }
+    },
+    [fetchBots]
+  );
+
+  const handleRollback = useCallback((botId: string, version: number) => {
+    setRollbackVersion(version);
+    rollbackBot(botId, { version })
+      .then(() => {
+        toast.success(`Rolled back to v${version}`);
+        setShowHistoryModal(false);
+        setHistoryBotId(null);
+        setHistoryBotName("");
+        setHistoryVersions([]);
+        fetchBots();
+      })
+      .catch((err: unknown) => {
+        const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Rollback failed";
+        toast.error(msg);
+      })
+      .finally(() => setRollbackVersion(null));
+  }, [fetchBots]);
 
   const columns: TableColumn<BotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    ...(isAdmin ? [{ key: "company_name", label: "Company", render: (r: BotRow) => (r.company_name as string) || "—" }] : []),
+    ...(isAdmin ? [{ key: "company_name", label: "Company", render: (r: BotRow) => safeDisplayString(r.company_name) }] : []),
     {
       key: "status",
       label: "Status",
@@ -233,91 +515,29 @@ const BotsPage = () => {
           <span className="status-badge secondary">Draft</span>
         ),
     },
-    
     {
       key: "actions",
       label: "Actions",
       render: (row) => (
-        <div className="d-flex gap-1">
-          <Button
-            title="View"
-            size="sm"
-            variant="outline-secondary"
-            onClick={() => {
-              setViewBotId(botId(row));
-              setShowViewModal(true);
-            }}
-          >
-            <Eye size={14} />
-          </Button>
-          <Button
-            title="Edit"
-            size="sm"
-            variant="outline-primary"
-            onClick={() => router.push(`/voicebot/inbound/bots/edit?id=${encodeURIComponent(botId(row))}`)}
-          >
-            <Pencil size={14} />
-          </Button>
-          {row.status !== "published" && (
-            <Button
-              title="Publish"
-              size="sm"
-              variant="outline-success"
-              onClick={async () => {
-                try {
-                  await publishBot(botId(row));
-                  toast.success("Bot published");
-                  fetchBots();
-                } catch (e: any) {
-                  toast.error(e?.response?.data?.detail || "Publish failed");
-                }
-              }}
-            >
-              <Send size={14} />
-            </Button>
-          )}
-          {row.status === "published" && (
-            <Button
-              title="Unpublish"
-              size="sm"
-              variant="outline-warning"
-              onClick={async () => {
-                try {
-                  await unpublishBot(botId(row));
-                  toast.success("Bot unpublished");
-                  fetchBots();
-                } catch (e: any) {
-                  toast.error(e?.response?.data?.detail || "Unpublish failed");
-                }
-              }}
-            >
-              <Undo2 size={14} />
-            </Button>
-          )}
-          <Button
-            title="Show history"
-            size="sm"
-            variant="outline-info"
-            onClick={() => {
-              setHistoryBotId(botId(row));
-              setHistoryBotName(row.name ?? "");
-              setShowHistoryModal(true);
-            }}
-          >
-            <History size={14} />
-          </Button>
-          <Button
-            title="Delete"
-            size="sm"
-            variant="outline-danger"
-            onClick={() => {
-              setSelectedRow(row);
-              setShowDeleteModal(true);
-            }}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </div>
+        <BotTableActions
+          row={row}
+          onView={(id) => {
+            setViewBotId(id);
+            setShowViewModal(true);
+          }}
+          onEdit={(id) => router.push(`/voicebot/inbound/bots/edit?id=${encodeURIComponent(id)}`)}
+          onPublish={handlePublish}
+          onUnpublish={handleUnpublish}
+          onHistory={(r) => {
+            setHistoryBotId(getBotId(r));
+            setHistoryBotName(r.name ?? "");
+            setShowHistoryModal(true);
+          }}
+          onDelete={(r) => {
+            setSelectedRow(r);
+            setShowDeleteModal(true);
+          }}
+        />
       ),
     },
   ];
@@ -335,8 +555,9 @@ const BotsPage = () => {
       setShowAddModal(false);
       setForm({ company: form.company, name: "", description: "", status: "draft", configuration: { ...defaultConfig } });
       fetchBots();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Create failed");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail ?? (err as { message?: string })?.message ?? "Create failed";
+      toast.error(msg);
     } finally {
       setFormLoading(false);
     }
@@ -346,13 +567,14 @@ const BotsPage = () => {
     if (!selectedRow) return;
     setDeleteLoading(true);
     try {
-      await deleteBot(botId(selectedRow));
+      await deleteBot(getBotId(selectedRow));
       toast.success("Bot deleted");
       setShowDeleteModal(false);
       setSelectedRow(null);
       fetchBots();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Delete failed");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } }; message?: string })?.response?.data?.detail ?? (err as { message?: string })?.message ?? "Delete failed";
+      toast.error(msg);
     } finally {
       setDeleteLoading(false);
     }
@@ -408,7 +630,7 @@ const BotsPage = () => {
             </div>
             <div className="d-flex align-items-center gap-2">
               
-              {String(session?.user?.is_admin ?? "") === "1" && (
+              {isAdmin && (
               <Form.Select
                 style={{ width: "200px" }}
                 value={companyFilter}
@@ -510,95 +732,12 @@ const BotsPage = () => {
           <Modal.Title>Bot Details</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {viewLoading ? (
-            <div className="d-flex justify-content-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : viewBot ? (
-            <Tab.Container activeKey={viewActiveTab} onSelect={(k) => setViewActiveTab(k ?? "basic")}>
-              <Nav variant="tabs" className="mb-3">
-                <Nav.Item><Nav.Link eventKey="basic">Basic Information</Nav.Link></Nav.Item>
-                <Nav.Item><Nav.Link eventKey="configuration">Configuration</Nav.Link></Nav.Item>
-                <Nav.Item><Nav.Link eventKey="voice">Voice Settings</Nav.Link></Nav.Item>
-                <Nav.Item><Nav.Link eventKey="llm">LLM Settings</Nav.Link></Nav.Item>
-                <Nav.Item><Nav.Link eventKey="behavior">Behavior</Nav.Link></Nav.Item>
-                <Nav.Item><Nav.Link eventKey="sip">SIP Settings</Nav.Link></Nav.Item>
-              </Nav>
-              <Tab.Content>
-                <Tab.Pane eventKey="basic">
-                  <table className="table table-sm table-bordered mb-0">
-                    <tbody>
-                      <tr><th style={{ width: "140px" }}>Name</th><td>{String(viewBot.name ?? "—")}</td></tr>
-                      <tr><th>Description</th><td>{String(viewBot.description ?? "—")}</td></tr>
-                      <tr><th>Status</th><td>{viewBot.status === "published" ? <span className="status-badge success">Published</span> : <span className="status-badge secondary">Draft</span>}</td></tr>
-                      <tr><th>Company</th><td>{String(viewBot.company ?? "—")}</td></tr>
-                    </tbody>
-                  </table>
-                </Tab.Pane>
-                <Tab.Pane eventKey="configuration">
-                  {viewBot.configuration && typeof viewBot.configuration === "object" ? (
-                    <table className="table table-sm table-bordered mb-0">
-                      <tbody>
-                        <tr><th style={{ width: "140px" }}>Instructions</th><td><pre className="mb-0 small text-break" style={{ whiteSpace: "pre-wrap" }}>{String((viewBot.configuration as Record<string, unknown>).instructions ?? "—")}</pre></td></tr>
-                        <tr><th>Knowledge Base</th><td><pre className="mb-0 small text-break" style={{ whiteSpace: "pre-wrap" }}>{String((viewBot.configuration as Record<string, unknown>).knowledge_base ?? "—")}</pre></td></tr>
-                      </tbody>
-                    </table>
-                  ) : <p className="text-muted mb-0">No configuration.</p>}
-                </Tab.Pane>
-                <Tab.Pane eventKey="voice">
-                  {viewBot.configuration && typeof viewBot.configuration === "object" ? (
-                    <table className="table table-sm table-bordered mb-0">
-                      <tbody>
-                        <tr><th style={{ width: "160px" }}>Voice</th><td>{String((viewBot.configuration as Record<string, unknown>).voice_name ?? "—")}</td></tr>
-                        <tr><th>Voice Model</th><td>{String((viewBot.configuration as Record<string, unknown>).voice_model ?? "—")}</td></tr>
-                        <tr><th>Voice Speed</th><td>{String((viewBot.configuration as Record<string, unknown>).voice_speed ?? "—")}</td></tr>
-                        <tr><th>Voice Instructions</th><td>{String((viewBot.configuration as Record<string, unknown>).voice_instructions ?? "—")}</td></tr>
-                        <tr><th>Greeting Message</th><td>{String((viewBot.configuration as Record<string, unknown>).greeting_message ?? "—")}</td></tr>
-                      </tbody>
-                    </table>
-                  ) : <p className="text-muted mb-0">No voice settings.</p>}
-                </Tab.Pane>
-                <Tab.Pane eventKey="llm">
-                  {viewBot.configuration && typeof viewBot.configuration === "object" ? (
-                    <table className="table table-sm table-bordered mb-0">
-                      <tbody>
-                        <tr><th style={{ width: "160px" }}>LLM Model</th><td>{String((viewBot.configuration as Record<string, unknown>).llm_model ?? "—")}</td></tr>
-                        <tr><th>Temperature</th><td>{String((viewBot.configuration as Record<string, unknown>).temperature ?? "—")}</td></tr>
-                        <tr><th>Max Tokens</th><td>{String((viewBot.configuration as Record<string, unknown>).max_tokens ?? "—")}</td></tr>
-                      </tbody>
-                    </table>
-                  ) : <p className="text-muted mb-0">No LLM settings.</p>}
-                </Tab.Pane>
-                <Tab.Pane eventKey="behavior">
-                  {viewBot.configuration && typeof viewBot.configuration === "object" ? (
-                    <table className="table table-sm table-bordered mb-0">
-                      <tbody>
-                        <tr><th style={{ width: "160px" }}>Transfer Enabled</th><td>{String((viewBot.configuration as Record<string, unknown>).transfer_enabled ?? false)}</td></tr>
-                        <tr><th>Transfer Number</th><td>{String((viewBot.configuration as Record<string, unknown>).transfer_number ?? "—")}</td></tr>
-                        <tr><th>Max Duration (s)</th><td>{String((viewBot.configuration as Record<string, unknown>).max_duration ?? "—")}</td></tr>
-                        <tr><th>Idle Timeout (s)</th><td>{String((viewBot.configuration as Record<string, unknown>).idle_timeout ?? "—")}</td></tr>
-                        <tr><th>Allow Interruptions</th><td>{String((viewBot.configuration as Record<string, unknown>).allow_interruptions ?? "—")}</td></tr>
-                        <tr><th>Noise Cancellation</th><td>{String((viewBot.configuration as Record<string, unknown>).noise_cancellation ?? "—")}</td></tr>
-                        <tr><th>Min Endpointing Delay</th><td>{String((viewBot.configuration as Record<string, unknown>).min_endpointing_delay ?? "—")}</td></tr>
-                      </tbody>
-                    </table>
-                  ) : <p className="text-muted mb-0">No behavior settings.</p>}
-                </Tab.Pane>
-                <Tab.Pane eventKey="sip">
-                  {viewBot.configuration && typeof viewBot.configuration === "object" ? (
-                    <table className="table table-sm table-bordered mb-0">
-                      <tbody>
-                        <tr><th style={{ width: "160px" }}>SIP Trunk ID</th><td>{String((viewBot.configuration as Record<string, unknown>).sip_trunk_id ?? "—")}</td></tr>
-                        <tr><th>Phone Number</th><td>{String((viewBot.configuration as Record<string, unknown>).phone_number ?? "—")}</td></tr>
-                      </tbody>
-                    </table>
-                  ) : <p className="text-muted mb-0">No SIP settings.</p>}
-                </Tab.Pane>
-              </Tab.Content>
-            </Tab.Container>
-          ) : (
-            <p className="text-muted mb-0">No details to show.</p>
-          )}
+          <BotViewModalBody
+            viewLoading={viewLoading}
+            viewBot={viewBot}
+            viewActiveTab={viewActiveTab}
+            onTabChange={setViewActiveTab}
+          />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => { setShowViewModal(false); setViewBotId(null); setViewBot(null); setViewActiveTab("basic"); }}>Close</Button>
@@ -613,65 +752,13 @@ const BotsPage = () => {
           <Modal.Title>Version history — {historyBotName || "Bot"}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {historyLoading ? (
-            <div className="d-flex justify-content-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : historyVersions.length === 0 ? (
-            <p className="text-muted mb-0">No version history.</p>
-          ) : (
-            <Accordion defaultActiveKey="">
-              {historyVersions.map((v) => (
-                <Accordion.Item key={v.id} eventKey={v.id}>
-                  <Accordion.Header>
-                    <span className="me-2">v{v.version}</span>
-                    <span className="text-muted  me-2">
-                      {v.created_at ? new Date(v.created_at).toLocaleString() : "—"}
-                    </span>
-                    {v.change_description && (
-                      <span className=" me-2">— {v.change_description}</span>
-                    )}
-                  </Accordion.Header>
-                  <Accordion.Body>
-                    {v.configuration_snapshot && typeof v.configuration_snapshot === "object" ? (
-                      <VersionConfigSnapshot config={v.configuration_snapshot as Record<string, unknown>} />
-                    ) : (
-                      <p className="text-muted mb-0 small">No configuration snapshot.</p>
-                    )}
-                    {historyBotId && (
-                      <div className="mt-3 d-flex justify-content-end">
-                        <Button
-                          size="sm"
-                          variant="outline-warning"
-                          onClick={() => {
-                            if (!historyBotId) return;
-                            setRollbackVersion(v.version);
-                            rollbackBot(historyBotId, { version: v.version })
-                              .then(() => {
-                                toast.success(`Rolled back to v${v.version}`);
-                                setShowHistoryModal(false);
-                                setHistoryBotId(null);
-                                setHistoryBotName("");
-                                setHistoryVersions([]);
-                                fetchBots();
-                              })
-                              .catch((err: any) => {
-                                toast.error(err?.response?.data?.detail || "Rollback failed");
-                              })
-                              .finally(() => setRollbackVersion(null));
-                          }}
-                          disabled={rollbackVersion !== null}
-                        >
-                          {rollbackVersion === v.version ? <Spinner animation="border" size="sm" className="me-1" /> : null}
-                          Rollback to v{v.version}
-                        </Button>
-                      </div>
-                    )}
-                  </Accordion.Body>
-                </Accordion.Item>
-              ))}
-            </Accordion>
-          )}
+          <BotHistoryModalBody
+            historyLoading={historyLoading}
+            historyVersions={historyVersions}
+            historyBotId={historyBotId}
+            rollbackVersion={rollbackVersion}
+            onRollback={handleRollback}
+          />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => { setShowHistoryModal(false); setHistoryBotId(null); setHistoryBotName(""); setHistoryVersions([]); setRollbackVersion(null); }}>Close</Button>

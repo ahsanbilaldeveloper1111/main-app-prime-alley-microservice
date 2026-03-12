@@ -1,7 +1,34 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
+import {
+  downloadInvoicePdf,
+  getInvoice,
+  getInvoices,
+} from "@utils/accounts";
+import type { InvoiceData } from "@utils/accounts";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import moment from "moment";
+import { useSession } from "next-auth/react";
+import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+
+const toInvoiceViewData = (invoice: InvoiceData): InvoiceViewData => ({
+  ...(invoice as unknown as InvoiceViewData),
+  company: {
+    ...(invoice.company as unknown as NonNullable<InvoiceViewData["company"]>),
+    crm_company_id: invoice.company?.crm_company_id ?? undefined,
+  },
+});
+
+const toggleStringSelection = (list: readonly string[], value: string): string[] => {
+  if (!list.includes(value)) return [...list, value];
+  const next: string[] = [];
+  for (const item of list) {
+    if (item !== value) next.push(item);
+  }
+  return next;
+};
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
@@ -208,9 +235,16 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 // ── Dropdown filter component ──────────────────────────────────────────────────
-function FilterDropdown({ label, options }: { label: string; options: string[] }) {
+function FilterDropdown({
+  label,
+  options,
+}: Readonly<{ label: string; options: readonly string[] }>) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+
+  const handleToggleOption = (opt: string) => {
+    setSelected((prev) => toggleStringSelection(prev, opt));
+  };
 
   return (
     <div style={{ position: "relative" as const }}>
@@ -237,9 +271,19 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
       </button>
       {open && (
         <>
-          <div
-            style={{ position: "fixed" as const, inset: 0, zIndex: 9 }}
+          <button
+            type="button"
+            aria-label="Close filter dropdown"
             onClick={() => setOpen(false)}
+            style={{
+              position: "fixed" as const,
+              inset: 0,
+              zIndex: 9,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "default",
+            }}
           />
           <div style={{
             position: "absolute" as const, top: "calc(100% + 4px)", left: 0, zIndex: 10,
@@ -248,15 +292,21 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
             minWidth: 180, padding: "6px 0",
           }}>
             {options.map(opt => (
-              <div
+              <button
                 key={opt}
+                type="button"
                 onClick={() => {
-                  setSelected(prev =>
-                    prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt]
-                  );
+                  handleToggleOption(opt);
                 }}
                 style={{
-                  padding: "8px 16px", cursor: "pointer", fontSize: 14, fontFamily: font,
+                  width: "100%",
+                  textAlign: "left",
+                  background: "none",
+                  border: "none",
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontFamily: font,
                   display: "flex", alignItems: "center", gap: 10,
                   backgroundColor: selected.includes(opt) ? "#f0fafa" : "transparent",
                   color: selected.includes(opt) ? "rgb(0,97,98)" : "#141414",
@@ -273,7 +323,7 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
                   )}
                 </span>
                 {opt}
-              </div>
+              </button>
             ))}
           </div>
         </>
@@ -283,20 +333,44 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
 }
 
 // ── Card: Invoice issued ───────────────────────────────────────────────────────
-function InvoiceCard({ id, product, amount, balance }: {
-  id: string; product: string; amount: string; balance: string;
-}) {
+function InvoiceCard({
+  invoiceNumber,
+  product,
+  amount,
+  balance,
+  onView,
+  onDownload,
+}: Readonly<{
+  invoiceNumber: string;
+  product: string;
+  amount: string;
+  balance: string;
+  onView: () => void;
+  onDownload: () => void;
+}>) {
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
         <div style={s.cardTitleRow}>
           <FileText size={22} color="#141414" />
-          <h3 style={s.cardTitle}>Invoice issued #{id}</h3>
+          <h3 style={s.cardTitle}>Invoice issued #{invoiceNumber}</h3>
         </div>
         <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
+          <button
+            type="button"
+            style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}
+            onClick={onView}
+          >
+            View
+          </button>
           <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
+          <button
+            type="button"
+            style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}
+            onClick={onDownload}
+          >
+            Download
+          </button>
         </div>
       </div>
       <div style={s.cardBody}>
@@ -323,10 +397,21 @@ function InvoiceCard({ id, product, amount, balance }: {
 }
 
 // ── Card: Payment processed ────────────────────────────────────────────────────
-function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }: {
-  id: string; product: string; invoiceRef: string;
-  cardLast4: string; cardHolder: string; amount: string;
-}) {
+function PaymentCard({
+  id,
+  product,
+  invoiceRef,
+  cardLast4,
+  cardHolder,
+  amount,
+}: Readonly<{
+  id: string;
+  product: string;
+  invoiceRef: string;
+  cardLast4: string;
+  cardHolder: string;
+  amount: string;
+}>) {
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
@@ -378,9 +463,11 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount }:
 }
 
 // ── Card: Order issued ─────────────────────────────────────────────────────────
-function OrderCard({ id, product, amount }: {
-  id: string; product: string; amount: string;
-}) {
+function OrderCard({
+  id,
+  product,
+  amount,
+}: Readonly<{ id: string; product: string; amount: string }>) {
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
@@ -415,7 +502,54 @@ function OrderCard({ id, product, amount }: {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function BillingHistoryPage() {
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
+
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(false);
+  }, []);
+
+  const handleViewInvoice = useCallback(async (invoiceId: number) => {
+    setShowViewInvoiceModal(true);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(true);
+    try {
+      const invoiceDetails = await getInvoice(invoiceId);
+      setSelectedInvoiceForView(toInvoiceViewData(invoiceDetails));
+    } catch (err) {
+      console.error("BillingHistoryPage view invoice error:", err);
+      closeViewInvoiceModal();
+    } finally {
+      setIsInvoiceLoading(false);
+    }
+  }, [closeViewInvoiceModal]);
+
+  const handleDownloadInvoice = useCallback(async (invoiceId: number) => {
+    try {
+      await downloadInvoicePdf(invoiceId);
+    } catch (err) {
+      console.error("BillingHistoryPage download invoice error:", err);
+    }
+  }, []);
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        const res = await getInvoices({ page: 1, per_page: 50, limit: 50 }) as any;
+        setInvoices(res?.data || []);
+        console.log("getInvoices response:", res);
+      } catch (err) {
+        console.error("BillingHistoryPage getInvoices error:", err);
+      }
+    };
+    fetchInvoices();
+  }, []);
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
@@ -451,28 +585,45 @@ export default function BillingHistoryPage() {
 
       {/* Content */}
       <div style={s.content}>
-        <div style={s.dateLabel}>11 Feb 2026</div>
 
-        <InvoiceCard
-          id="720886618"
-          product="Starter Customer Platform"
-          amount="£97.20"
-          balance="£0.00"
-        />
+        {invoices.map((invoice: any) => (
+          <div key={invoice.id}>
+            <div style={s.dateLabel}>{moment(invoice.created_at).format(GlobalDateTimeFormat)}</div>
+            <InvoiceCard
+              invoiceNumber={String(invoice.invoice_number ?? "")}
+              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
+              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+              balance={`${invoice.currency_code || "AED"} ${invoice.amount_due ?? 0}`}
+              onView={() => handleViewInvoice(Number(invoice.id))}
+              onDownload={() => handleDownloadInvoice(Number(invoice.id))}
+            />
+            
+            {Array.isArray(invoice.payments) && invoice.payments.map((payment: any) => (
+              <PaymentCard
+                key={payment.id}
+                id={String(payment.id)}
+                product={payment.notes}
+                invoiceRef={String(invoice.invoice_number ?? "")}
+                cardLast4={payment?.card_last4 ?? ""}
+                cardHolder={payment?.card_holder ?? ""}
+                amount={`${payment?.currency_code || "AED"} ${payment?.amount ?? 0}`}
+              />
+            ))}
 
-        <PaymentCard
-          id="43595815"
-          product="Starter Customer Platform"
-          invoiceRef="720886618"
-          cardLast4="5478"
-          cardHolder="RIZWAN HAIDER"
-          amount="£97.20"
-        />
+            <OrderCard
+              id="22970930"
+              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
+              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+            />
 
-        <OrderCard
-          id="22970930"
-          product="Starter Customer Platform"
-          amount="£97.20"
+          </div>
+        ))}
+        <InvoiceViewModal
+          show={showViewInvoiceModal}
+          onHide={closeViewInvoiceModal}
+          invoice={selectedInvoiceForView}
+          loading={isInvoiceLoading}
+          companyName={session?.user?.company_name || ""}
         />
       </div>
     </div>
