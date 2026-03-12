@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
-  X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -9,27 +8,12 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
-  Ticket,
-  Paperclip,
-  Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
   AlertCircle,
-  ShoppingCart,
 } from "lucide-react";
 import Layout from "@layout/index";
 import { getLead, deleteLead, type LeadData } from "@utils/crm";
@@ -198,7 +182,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
       }
     };
 
-    void fetchExtensions();
+    fetchExtensions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to fetch extensions:", error);
+    });
   }, []);
 
   // Close dropdowns when clicking outside
@@ -333,7 +320,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const handleOpenExport = useCallback(() => {
     if (!lead) return;
     // Directly export the currently opened lead
-    void handleLeadsExport();
+    handleLeadsExport();
   }, [lead, handleLeadsExport]);
 
   const toggleSection = (sectionId: string) => {

@@ -25,7 +25,6 @@ import {
   Sparkles,
   Maximize2,
   Bold,
-  Linkedin,
   Italic,
   Underline,
   List,
@@ -33,7 +32,6 @@ import {
   Image,
   Plus,
   Clock,
-  Repeat,
   MessageCircle,
   Search,
   FileText,
@@ -151,6 +149,8 @@ interface RecordSummaryDisplay {
   onAskQuestion?: () => void;
 }
 
+type CrmEntityType = "prospect" | "lead" | "deal" | "order";
+
 export interface GenericSidebarProps {
   isOpen: boolean;
   onClose?: () => void;
@@ -207,10 +207,10 @@ export interface GenericSidebarProps {
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
 
-  recordType?: "prospect" | "lead" | "deal" | "order" | "company" | "activity";
+  recordType?: CrmEntityType | "company" | "activity";
   recordId?: number;
   /** When recordType is "activity", the underlying entity type for fetching history chain (e.g. "lead", "deal"). */
-  activityEntityType?: "prospect" | "lead" | "deal" | "order";
+  activityEntityType?: CrmEntityType;
 
   /** Resolve user extension/id to display name (e.g. for Owner / contact_owner). When provided, prospect sidebar uses it for the Owner field. */
   resolveUserLabel?: (extensionOrId: string) => string;
@@ -498,7 +498,6 @@ const NotesModal: React.FC<NotesModalProps> = ({
 }) => {
   const [noteText, setNoteText] = useState("");
   const [createTask, setCreateTask] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -671,7 +670,8 @@ const NotesModal: React.FC<NotesModalProps> = ({
 
     const start = textarea.selectionStart;
     const lines = noteText.substring(0, start).split("\n");
-    const isAtLineStart = lines[lines.length - 1].trim() === "";
+    const lastLine = lines.at(-1) ?? "";
+    const isAtLineStart = lastLine.trim() === "";
 
     if (isAtLineStart) {
       insertText("- ");
@@ -1154,7 +1154,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
             >
               {attachments.map((file, index) => (
                 <div
-                  key={index}
+                  key={`${file.name}-${file.lastModified}-${index}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1884,7 +1884,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
     value: string;
     label: string;
   } | null>(null);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const [customDate, setCustomDate] = useState(() =>
     new Date().toISOString().slice(0, 10),
   );
@@ -2029,20 +2028,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
     setUrlModalType("image");
   };
 
-  const handleAttachment = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments((prev) => [...prev, ...files]);
-    e.target.value = "";
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
   // Keyboard shortcuts handler (Ctrl/Cmd+B, I, U, K)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.ctrlKey || e.metaKey) {
@@ -2105,7 +2090,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
     setQueue("None");
     setSelectedUserExtension(null);
     setNotes("");
-    setAttachments([]);
     setIsMaximized(false);
     onClose();
   };
@@ -5081,7 +5065,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
   const activityRecordTypeForModals =
     recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
-      ? (recordType as "prospect" | "lead" | "deal" | "order")
+      ? (recordType as CrmEntityType)
       : undefined;
   const activityRecordIdForModals =
     activityRecordTypeForModals &&
@@ -5185,7 +5169,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     //skip for activity
     if (recordType === "activity") return;
-    const rType = recordType as "prospect" | "lead" | "deal" | "order";
+    const rType = recordType as CrmEntityType;
     setSidebarNotesLoading(true);
     getCrmNotes(rType, Number(recordId))
       .then((res) => {
@@ -5234,20 +5218,24 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const targetNode = event.target as Node;
+
       if (
         dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        !dropdownRef.current.contains(targetNode)
       ) {
         setShowActionsDropdown(false);
         setOpenActionsSubMenuIndex(null);
         setActionsSubMenuSearch("");
       }
 
-      Object.entries(sectionDropdownRefs.current).forEach(([key, ref]) => {
-        if (ref && !ref.contains(event.target as Node)) {
+      const entries = Object.entries(sectionDropdownRefs.current);
+      for (const [key, ref] of entries) {
+        if (ref && !ref.contains(targetNode)) {
           setShowSectionActions((prev) => (prev === key ? null : prev));
+          break;
         }
-      });
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -5316,7 +5304,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     if (crmRecordType && recordId != null) {
       try {
         await createCrmNote({
-          record_type: crmRecordType as "prospect" | "lead" | "deal" | "order",
+          record_type: crmRecordType as CrmEntityType,
           record_id: Number(recordId),
           text,
           ...(attachments && attachments.length > 0 && { attachments }),
@@ -5326,7 +5314,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
         getCrmNotes(
-          crmRecordType as "prospect" | "lead" | "deal" | "order",
+          crmRecordType as CrmEntityType,
           Number(recordId),
         )
           .then((res) => setSidebarNotesList(res?.data ?? []))
@@ -5475,7 +5463,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           notes: taskData.notes?.trim()
             ? [{ note: taskData.notes.trim() }]
             : undefined,
-          record_type: recordType as "prospect" | "lead" | "deal" | "order",
+          record_type: recordType as CrmEntityType,
           record_id: Number(recordId),
         });
         setShowTaskModal(false);
@@ -5554,7 +5542,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
     const start_date_time = `${meeting_date}T${meeting_time}:00`;
     const end_date_time = `${meeting_date}T${end_time}:00`;
-    const recordType = record.type as "prospect" | "lead" | "deal" | "order";
+    const recordType = record.type as CrmEntityType;
     try {
       await createMeeting({
         name: meetingData.title.trim(),
@@ -5976,6 +5964,57 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     [],
   );
 
+  const isValidChangeValue = (
+    val: unknown,
+  ): val is { old?: unknown; new?: unknown } =>
+    !!val &&
+    typeof val === "object" &&
+    !Array.isArray(val) &&
+    (("old" in (val as Record<string, unknown>)) ||
+      ("new" in (val as Record<string, unknown>)));
+
+  const buildDataChangeLines = (
+    rawOld: unknown,
+    rawNew: unknown,
+    resolveFieldVal: (field: string, val: unknown) => string,
+    humanizeKey: (key: string) => string,
+  ): string[] => {
+    const oldObj =
+      rawOld &&
+      typeof rawOld === "object" &&
+      !Array.isArray(rawOld)
+        ? (rawOld as Record<string, unknown>)
+        : {};
+
+    let newObj: Record<string, unknown> = {};
+    if (typeof rawNew === "string") {
+      try {
+        newObj = JSON.parse(rawNew) as Record<string, unknown>;
+      } catch {
+        newObj = {};
+      }
+    } else if (
+      rawNew &&
+      typeof rawNew === "object" &&
+      !Array.isArray(rawNew)
+    ) {
+      newObj = rawNew as Record<string, unknown>;
+    }
+
+    const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+    const lines: string[] = [];
+
+    allKeys.forEach((key) => {
+      const o = resolveFieldVal(key, oldObj[key]);
+      const n = resolveFieldVal(key, newObj[key]);
+      if (o !== n) {
+        lines.push(`${humanizeKey(key)}: ${o} → ${n}`);
+      }
+    });
+
+    return lines;
+  };
+
   const buildAuditLinesForEntry = useCallback(
     (
       entry: AuditTrailEntry,
@@ -5985,58 +6024,34 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       const event = entry.event === "created" ? "created" : "updated";
       if (event === "created")
         return entry.description?.trim() || "Record created";
+
       const changes =
         entry.changes &&
         typeof entry.changes === "object" &&
         !Array.isArray(entry.changes)
           ? entry.changes
           : null;
+
       if (!changes) return entry.description?.trim() || "Record updated";
+
       const lines: string[] = [];
       Object.entries(changes).forEach(([field, val]) => {
-        if (
-          !val ||
-          typeof val !== "object" ||
-          (!("old" in val) && !("new" in val))
-        )
-          return;
-        const rawOld = (val as { old?: unknown }).old;
-        const rawNew = (val as { new?: unknown }).new;
+        if (!isValidChangeValue(val)) return;
+        const rawOld = val.old;
+        const rawNew = val.new;
+
         if (field === "data") {
-          const oldObj =
-            rawOld &&
-            typeof rawOld === "object" &&
-            !Array.isArray(rawOld)
-              ? (rawOld as Record<string, unknown>)
-              : {};
-          let newObj: Record<string, unknown> = {};
-          if (typeof rawNew === "string") {
-            try {
-              newObj = JSON.parse(rawNew) as Record<string, unknown>;
-            } catch {
-              newObj = {};
-            }
-          } else if (
-            rawNew &&
-            typeof rawNew === "object" &&
-            !Array.isArray(rawNew)
-          )
-            newObj = rawNew as Record<string, unknown>;
-          const allKeys = new Set([
-            ...Object.keys(oldObj),
-            ...Object.keys(newObj),
-          ]);
-          allKeys.forEach((key) => {
-            const o = resolveFieldVal(key, oldObj[key]);
-            const n = resolveFieldVal(key, newObj[key]);
-            if (o !== n) lines.push(`${humanizeKey(key)}: ${o} → ${n}`);
-          });
-        } else {
-          const o = resolveFieldVal(field, rawOld);
-          const n = resolveFieldVal(field, rawNew);
-          if (o !== n) lines.push(`${humanizeKey(field)}: ${o} → ${n}`);
+          lines.push(
+            ...buildDataChangeLines(rawOld, rawNew, resolveFieldVal, humanizeKey),
+          );
+          return;
         }
+
+        const o = resolveFieldVal(field, rawOld);
+        const n = resolveFieldVal(field, rawNew);
+        if (o !== n) lines.push(`${humanizeKey(field)}: ${o} → ${n}`);
       });
+
       return lines.length > 0
         ? lines.join("\n")
         : entry.description?.trim() || "Record updated";

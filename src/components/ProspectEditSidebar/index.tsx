@@ -52,6 +52,31 @@ export interface ProspectEditSidebarProps {
     | undefined;
 }
 
+interface ProspectRequiredFieldsSectionProps {
+  contactForm: ProspectFormState;
+  setContactForm: ProspectEditSidebarProps["setContactForm"];
+  parsePhoneNumberInput: ProspectEditSidebarProps["parsePhoneNumberInput"];
+}
+
+interface ProspectMetaSectionProps {
+  contactForm: ProspectFormState;
+  setContactForm: ProspectEditSidebarProps["setContactForm"];
+  availableCampaigns: ProspectEditSidebarProps["availableCampaigns"];
+  extensions: ProspectEditSidebarProps["extensions"];
+}
+
+interface ProspectAdditionalSectionProps {
+  contactForm: ProspectFormState;
+  setContactForm: ProspectEditSidebarProps["setContactForm"];
+  availableTags: ProspectEditSidebarProps["availableTags"];
+  updateCustomField: (
+    index: number,
+    key: "field_name" | "field_value",
+    value: string,
+  ) => void;
+  removeCustomField: (id: string) => void;
+}
+
 const getUpdatedFormForPhoneChange = (
   value: string | undefined,
   currentForm: ProspectFormState,
@@ -88,6 +113,179 @@ const getUpdatedFormForPhoneChange = (
     };
   }
 };
+
+const ProspectRequiredFieldsSection: React.FC<
+  ProspectRequiredFieldsSectionProps
+> = ({ contactForm, setContactForm, parsePhoneNumberInput }) => (
+  <div className="contact-form-section">
+    <div
+      className="contact-form-field"
+      style={{ marginBottom: "20px" }}
+    >
+      <label
+        htmlFor="prospect-first-name"
+        className="contact-form-label contact-form-label-required"
+        style={{
+          display: "block",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#141414",
+          marginBottom: "8px",
+        }}
+      >
+        First name <span style={{ color: "#f2545b" }}>*</span>
+      </label>
+      <input
+        id="prospect-first-name"
+        type="text"
+        data-test-id="firstname-input"
+        value={contactForm.firstName}
+        onChange={(e) =>
+          setContactForm({
+            ...contactForm,
+            firstName: e.target.value,
+          })
+        }
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          border: "1px solid #8a8a8a",
+          borderRadius: "4px",
+          fontSize: "14px",
+          outline: "none",
+        }}
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = "#0091ae")
+        }
+        onBlur={(e) =>
+          (e.currentTarget.style.borderColor = "#8a8a8a")
+        }
+      />
+    </div>
+    <div
+      className="contact-form-field"
+      style={{ marginBottom: "20px" }}
+    >
+      <label
+        className="contact-form-label contact-form-label-required"
+        style={{
+          display: "block",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#141414",
+          marginBottom: "8px",
+        }}
+      >
+        Last name <span style={{ color: "#f2545b" }}>*</span>
+      </label>
+      <input
+        type="text"
+        data-test-id="lastname-input"
+        value={contactForm.lastName}
+        onChange={(e) =>
+          setContactForm({
+            ...contactForm,
+            lastName: e.target.value,
+          })
+        }
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          border: "1px solid #8a8a8a",
+          borderRadius: "4px",
+          fontSize: "14px",
+          outline: "none",
+        }}
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = "#0091ae")
+        }
+        onBlur={(e) =>
+          (e.currentTarget.style.borderColor = "#8a8a8a")
+        }
+      />
+    </div>
+    <div
+      className="contact-form-field"
+      style={{ marginBottom: "20px" }}
+    >
+      <label
+        className="contact-form-label contact-form-label-required"
+        style={{
+          display: "block",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#141414",
+          marginBottom: "8px",
+        }}
+      >
+        Email <span style={{ color: "#f2545b" }}>*</span>
+      </label>
+      <input
+        type="email"
+        data-test-id="email-input"
+        value={contactForm.email}
+        onChange={(e) =>
+          setContactForm({
+            ...contactForm,
+            email: e.target.value,
+          })
+        }
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          border: "1px solid #8a8a8a",
+          borderRadius: "4px",
+          fontSize: "14px",
+          outline: "none",
+        }}
+        onFocus={(e) =>
+          (e.currentTarget.style.borderColor = "#0091ae")
+        }
+        onBlur={(e) =>
+          (e.currentTarget.style.borderColor = "#8a8a8a")
+        }
+      />
+    </div>
+    <div
+      className="contact-form-field"
+      style={{ marginBottom: "20px" }}
+    >
+      <label
+        className="contact-form-label contact-form-label-required"
+        style={{
+          display: "block",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#141414",
+          marginBottom: "8px",
+        }}
+      >
+        Phone <span style={{ color: "#f2545b" }}>*</span>
+      </label>
+      <div className="phone-input-wrapper contact-form-phone-input-wrapper">
+        <PhoneInput
+          international
+          defaultCountry="US"
+          value={
+            contactForm.phone_country_code && contactForm.phoneNumber
+              ? `${contactForm.phone_country_code}${contactForm.phoneNumber}`
+              : contactForm.phoneNumber || undefined
+          }
+          onChange={(value) =>
+            setContactForm((prev) =>
+              getUpdatedFormForPhoneChange(
+                value,
+                prev,
+                parsePhoneNumberInput,
+              ),
+            )
+          }
+          placeholder="Enter phone number"
+        />
+      </div>
+    </div>
+  </div>
+);
 
 const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
   isOpen,
@@ -127,6 +325,18 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
       ...prev,
       custom_fields: (prev.custom_fields ?? []).filter((cf) => cf.id !== id),
     }));
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (
+      !isFormValid ||
+      createContactLoading ||
+      (isEditing && contactFormLoading)
+    ) {
+      return;
+    }
+    onSubmitPrimary();
   };
 
   return (
@@ -199,17 +409,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
           </div>
 
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (
-                !isFormValid ||
-                createContactLoading ||
-                (isEditing && contactFormLoading)
-              ) {
-                return;
-              }
-              onSubmitPrimary();
-            }}
+            onSubmit={handleFormSubmit}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -891,7 +1091,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                           setContactForm({ ...contactForm, note: html })
                         }
                         placeholder="Notes about this contact"
-                        minHeight={80}
+        height={80}
                       />
                     </div>
 
