@@ -18,7 +18,7 @@ import {
   getDateKeysInRange,
   DURATION_BUCKETS,
   type BotPerformanceRow,
-} from "./partials";
+} from "@components/voicebot/inbound/analytics";
 import "@assets/scss/common.scss";
 
 interface StatsState {
