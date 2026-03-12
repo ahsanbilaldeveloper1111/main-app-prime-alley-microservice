@@ -1,54 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { GetCustomerStatements } from "@utils/accounting";
+import { useState } from "react";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
-
-function formatDate(value: string | undefined): string {
-  if (!value) return "—";
-  try {
-    const d = new Date(value);
-    const day = d.getDate();
-    const month = d.toLocaleDateString("en-GB", { month: "short" });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return String(value);
-  }
-}
-
-/** Map API transaction shape (type, date, reference, description, debit, credit, balance, currency) to table row */
-function mapStatementToRow(row: any, index: number) {
-  const dateIssued = formatDate(row.date ?? row.datetime ?? row.date_issued ?? row.created_at);
-  const detailsTitle = row.description ?? row.reference ?? row.details_title ?? row.invoice_number ?? `#${index + 1}`;
-  const detailsSub = row.type ? String(row.type).charAt(0).toUpperCase() + String(row.type).slice(1) : null;
-  const poNumber = row.po_number ?? row.po ?? "-";
-  const products = row.type ? String(row.type) : "";
-  const currency = row.currency ?? "USD";
-  const amounts: { label: string; value: string }[] = [];
-  if (row.debit != null && Number(row.debit) !== 0) {
-    amounts.push({ label: "Debit", value: `${currency} ${Number(row.debit).toFixed(2)}` });
-  }
-  if (row.credit != null && Number(row.credit) !== 0) {
-    amounts.push({ label: "Credit", value: `${currency} ${Number(row.credit).toFixed(2)}` });
-  }
-  if (row.balance != null) {
-    amounts.push({ label: "Balance", value: `${currency} ${Number(row.balance).toFixed(2)}` });
-  }
-  if (amounts.length === 0 && (row.amount != null || row.total != null)) {
-    amounts.push({ label: "Amount", value: `${currency} ${Number(row.amount ?? row.total ?? 0).toFixed(2)}` });
-  }
-  const status = row.status ?? "Processed";
-  return {
-    id: row.sort_order ?? index,
-    dateIssued,
-    detailsTitle: String(detailsTitle),
-    detailsSub: detailsSub != null ? String(detailsSub) : null,
-    poNumber: poNumber != null ? String(poNumber) : "-",
-    products,
-    amounts,
-    status: String(status),
-  };
-}
 
 const s: Record<string, React.CSSProperties> = {
   page: {
@@ -174,39 +126,48 @@ const s: Record<string, React.CSSProperties> = {
   },
 };
 
+// ── Transaction data ───────────────────────────────────────────────────────────
+const transactions = [
+  {
+    id: 1,
+    dateIssued: "11 Feb 2026",
+    detailsTitle: "Invoice #720886618",
+    detailsSub: "Last updated 11 Feb 2026",
+    poNumber: "-",
+    products: "Pro Plan",
+    amounts: [
+      { label: "Invoice amount", value: "AED 97.20" },
+      { label: "Invoice balance", value: "AED 0.00" },
+    ],
+    status: "Processed",
+  },
+  {
+    id: 2,
+    dateIssued: "11 Feb 2026",
+    detailsTitle: "Order #22970930",
+    detailsSub: null,
+    poNumber: "",
+    products: "",
+    amounts: [],
+    status: "Processed",
+  },
+  {
+    id: 3,
+    dateIssued: "11 Feb 2026",
+    detailsTitle: "Payment #43595815",
+    detailsSub: "Credit card",
+    poNumber: "",
+    products: "Pro Plan",
+    amounts: [
+      { label: "Payment amount", value: "AED 97.20" },
+    ],
+    status: "Processed",
+  },
+];
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<Array<{
-    id: number;
-    dateIssued: string;
-    detailsTitle: string;
-    detailsSub: string | null;
-    poNumber: string;
-    products: string;
-    amounts: Array<{ label: string; value: string }>;
-    status: string;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchStatements = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await GetCustomerStatements() as any;
-      const rawList = response?.transactions ?? response?.data?.transactions ?? (Array.isArray(response) ? response : []);
-      const mapped = (rawList || []).map((item: any, idx: number) => mapStatementToRow(item, idx));
-      setTransactions(mapped);
-    } catch (err) {
-      console.error("GetCustomerStatements error:", err);
-      setTransactions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStatements();
-  }, [fetchStatements]);
 
   return (
     <div style={s.page}>
@@ -226,20 +187,7 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} style={{ ...s.td, textAlign: "center", color: "#666", padding: 32 }}>
-                  Loading…
-                </td>
-              </tr>
-            ) : transactions.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ ...s.td, textAlign: "center", color: "#666", padding: 32 }}>
-                  No transactions found.
-                </td>
-              </tr>
-            ) : (
-            transactions.map((tx) => (
+            {transactions.map((tx) => (
               <tr
                 key={tx.id}
                 onMouseEnter={() => setHoveredRow(tx.id)}
@@ -295,8 +243,7 @@ export default function TransactionsPage() {
                 {/* Actions (empty col per design) */}
                 <td style={s.td} />
               </tr>
-            ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>

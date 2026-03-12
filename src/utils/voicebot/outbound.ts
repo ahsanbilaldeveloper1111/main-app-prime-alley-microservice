@@ -57,6 +57,7 @@ export const deleteTrunk = async (trunkId: string) => {
 export interface ListVoicebotsParams {
   company_id?: string;
   status?: string;
+  search?: string;
   page?: number;
   page_size?: number;
 }
@@ -65,6 +66,9 @@ export interface ListVoicebotsParams {
 export interface CreateVoicebotPayload {
   company_id: string;
   name: string;
+  trunk_id: string;
+  default_greeting: string;
+  default_system_prompt: string;
   description?: string;
   system_prompt?: string;
   first_message?: string;
@@ -85,6 +89,9 @@ export interface CreateVoicebotPayload {
 export interface UpdateVoicebotPayload {
   company_id?: string;
   name?: string;
+  trunk_id?: string;
+  default_greeting?: string;
+  default_system_prompt?: string;
   description?: string;
   system_prompt?: string;
   first_message?: string;
@@ -124,7 +131,7 @@ export const postVoicebots = async (payload: CreateVoicebotPayload) => {
 /** GET /voicebots/:bot_id/ - Get voicebot details */
 export const getVoicebot = async (botId: string, params?: { company_id?: string }) => {
   try {
-    const response = await axiosInstance.get(`${PREFIX_VOICEBOTS}/${botId}`);
+    const response = await axiosInstance.get(`${PREFIX_VOICEBOTS}/${botId}`, { params });
     return response.data;
   } catch (error) {
     throw error;
@@ -144,7 +151,7 @@ export const putVoicebot = async (botId: string, payload: UpdateVoicebotPayload)
 /** DELETE /voicebots/:bot_id/ - Delete voicebot */
 export const deleteVoicebot = async (botId: string, params?: { company_id?: string }) => {
   try {
-    const response = await axiosInstance.delete(`${PREFIX_VOICEBOTS}/${botId}`);
+    const response = await axiosInstance.delete(`${PREFIX_VOICEBOTS}/${botId}`, { params });
     return response.data;
   } catch (error) {
     throw error;
