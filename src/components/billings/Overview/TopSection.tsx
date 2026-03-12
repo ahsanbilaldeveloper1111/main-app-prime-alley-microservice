@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 export interface TopSectionStyles {
   label: React.CSSProperties;
@@ -75,7 +76,7 @@ const TopSection = ({
         ) : (
           <div style={styles.value}>No payment method</div>
         )}
-        <a style={{ ...styles.link, fontSize: 12 }}>Change</a>
+        <Link href="#" style={{ ...styles.link, fontSize: 12 }}>Change</Link>
       </div>
     </div>
   </div>

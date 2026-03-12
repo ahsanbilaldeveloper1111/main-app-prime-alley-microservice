@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Info, Plus } from "lucide-react";
 import { GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 const PLACEHOLDER = "—";
@@ -461,7 +462,7 @@ export default function CompanyInfoPage() {
       {/* ── Points of Contact ── */}
       <div style={{ ...s.sectionHeadingRow, marginTop: 8 }}>
         <h2 style={s.sectionHeading}>Points of Contact</h2>
-        <a style={s.link}>Looking for user permissions?</a>
+        <Link href="/settings" style={s.link}>Looking for user permissions?</Link>
       </div>
 
       {/* Primary + Billing contacts side by side */}

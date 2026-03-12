@@ -4,6 +4,7 @@ import {
   LineChart, Line,
 } from "recharts";
 import { RefreshCw, ExternalLink, Search, PlusCircle, ChevronDown, Info, Check } from "lucide-react";
+import Link from "next/link";
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
@@ -136,11 +137,11 @@ export default function UsageLimitsPage() {
                 <p style={{ fontSize: 13, color: "#141414", margin: "0 0 8px 0", lineHeight: "20px" }}>
                    Credits are a simple, flexible way to pay for what you use. Credits works across all usage-based features.
                 </p>
-                <a style={s.link}><span>Learn more</span><ExternalLink size={11} /></a>
+                <Link href="/settings" style={s.link}><span>Learn more</span><ExternalLink size={11} /></Link>
                 <p style={{ fontSize: 13, color: "#141414", margin: "10px 0 6px 0" }}>
                   Credits are managed by users with billing permissions or super admin access.
                 </p>
-                <a style={s.link}><span>Manage user permissions</span><ExternalLink size={11} /></a>
+                <Link href="/settings" style={s.link}><span>Manage user permissions</span><ExternalLink size={11} /></Link>
               </div>
             </div>
           </div>
@@ -254,7 +255,9 @@ export default function UsageLimitsPage() {
                       <tr key={f.name} style={{ backgroundColor: "#fff" }}>
                         <td style={s.tableCell}>
                           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" as const, gap: 4 }}>
-                            <a style={s.link}>{f.name}</a>
+                            <button type="button" style={{ ...s.link, background: "none", border: "none", padding: 0 }} onClick={() => {}}>
+                              {f.name}
+                            </button>
                             {f.tags.map(t => (
                               <span key={t.label} style={getTagStyle(t.color, t.bg)}>{t.label}</span>
                             ))}

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import {
   GetCompanyDetails,
   GetPaymentMethods,
@@ -314,9 +315,9 @@ const OverviewPage = () => {
               <div style={{ ...styles.value, marginBottom: 4 }}>Need help?</div>
               <p style={{ margin: 0, fontSize: 14 }}>
                 Visit the{" "}
-                <a style={styles.link}>Knowledge Base</a>
+                <Link href="/settings" style={styles.link}>Knowledge Base</Link>
                 {" "}for answers to FAQs or{" "}
-                <a style={styles.link}>contact us</a>
+                <Link href="/settings" style={styles.link}>contact us</Link>
                 {" "}for more support.
               </p>
             </div>
@@ -330,7 +331,7 @@ const OverviewPage = () => {
               {commonActions.map((action) => (
                 <div key={action.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <action.Icon size={16} strokeWidth={2} color="#141414" />
-                  <a style={styles.link}>{action.label}</a>
+                  <Link href="/billing/account-billing" style={styles.link}>{action.label}</Link>
                 </div>
               ))}
             </div>
@@ -365,7 +366,7 @@ const OverviewPage = () => {
             </div>
             <p style={{ fontSize: 13, margin: 0 }}>
               Explore features that use Credits in{" "}
-              <a style={styles.link}> Agents Marketplace</a>
+              <Link href="/settings" style={styles.link}> Agents Marketplace</Link>
             </p>
           </div>
         </div>
@@ -382,7 +383,7 @@ const OverviewPage = () => {
             </div>
             <p style={{ fontSize: 13, color: "#444", lineHeight: "20px", margin: 0 }}>
               Billed data for marketing contacts is updated once a day. Marketing contacts are updated to non-marketing once a month on the next update date. Go to{" "}
-              <a style={styles.link}>Usage &amp; Limits</a>
+              <Link href="/billing/account-billing" style={styles.link}>Usage &amp; Limits</Link>
               {" "}to set contacts as non-marketing.
             </p>
           </div>
@@ -468,10 +469,10 @@ const OverviewPage = () => {
                 </p>
                 <p style={{ fontSize: 13, color: "#666", margin: 0 }}>
                   Data hosting location:{" "}
-                  <a style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Link href="/settings" style={{ ...styles.link, display: "inline-flex", alignItems: "center", gap: 4 }}>
                     <span>Gulf Region</span>
                     <ExternalLink size={13} strokeWidth={2} />
-                  </a>
+                  </Link>
                 </p>
               </div>
               <button style={styles.btnLight}>View pricing</button>
@@ -508,14 +509,14 @@ const OverviewPage = () => {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 32px" }}>
             {billingHelpLinks.map((row) => (
               <div key={`${row[0]}|${row[1]}`} style={{ display: "contents" }}>
-                <a style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Link href="/settings" style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <span>{row[0]}</span>
                   <ExternalLink size={13} strokeWidth={2} />
-                </a>
-                <a style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                </Link>
+                <Link href="/settings" style={{ ...styles.link, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <span>{row[1]}</span>
                   <ExternalLink size={13} strokeWidth={2} />
-                </a>
+                </Link>
               </div>
             ))}
           </div>
