@@ -37,6 +37,23 @@ const PageHeader: React.FC<PageHeaderProps> = ({
 
             <Col md={7} className="d-flex justify-content-end">
               <div className="d-flex flex-wrap align-items-center gap-2 w-100 w-md-auto justify-content-start justify-content-md-end">
+             
+
+<Link href="/live-monitoring">
+  <Button
+    variant="outline-secondary"
+    size="sm"
+    className="d-flex align-items-center"
+    style={{ 
+      fontSize: '0.875rem',
+      fontWeight: 500,
+      whiteSpace: 'nowrap',
+      padding: '0.5rem 1rem'
+    }}
+  >
+    <span>New View (BETA)</span>
+  </Button>
+</Link>
                 <Button 
                    variant="outline-secondary" 
                   size="sm"
