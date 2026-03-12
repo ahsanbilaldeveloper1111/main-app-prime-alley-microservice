@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Info, ChevronDown } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { GetCompanyDetails, GetPaymentMethods } from "@utils/accounting";
+import TopSection from "../Overview/TopSection";
 
 const styles: Record<string, React.CSSProperties> = {
   body: {
@@ -155,139 +158,33 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-function SubscriptionTermCard({
-  title,
-  isAutoRenewal = false,
-  originalPrice,
-  discountLabel,
-  discountAmount,
-  finalPrice,
-  costForYear,
-  youSave,
-}: {
-  title: string;
-  isAutoRenewal?: boolean;
-  originalPrice: string;
-  discountLabel: string;
-  discountAmount: string;
-  finalPrice: string;
-  costForYear: string;
-  youSave: string;
-}) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div style={styles.card}>
-      <div style={styles.cardPadding}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                padding: 0, lineHeight: 1,
-                display: "flex", alignItems: "center",
-              }}
-            >
-              <ChevronDown
-                size={20}
-                strokeWidth={2}
-                color="#141414"
-                style={{
-                  transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
-                  transition: "transform 150ms ease-out",
-                }}
-              />
-            </button>
-            <h2 style={styles.sectionHeading}>{title}</h2>
-          </div>
-          {isAutoRenewal && (
-            <button style={styles.btnLight}>Cancel auto-renewal</button>
-          )}
-        </div>
-
-        {expanded && (
-          <>
-            {/* Pro Plan Row */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-              <h3 style={styles.subHeading}>Pro Plan</h3>
-              <div style={{ textAlign: "right" as const }}>
-                <div style={styles.strikethrough}>{originalPrice}</div>
-              </div>
-              {!isAutoRenewal && (
-                <button style={{ ...styles.btnLight, marginLeft: 32 }}>View pricing</button>
-              )}
-            </div>
-
-            {/* For auto-renewal, View pricing is inline right side */}
-            {isAutoRenewal && (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -28, marginBottom: 4 }}>
-                {/* no view pricing button in auto-renewal based on design */}
-              </div>
-            )}
-
-            {/* Discount row */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, paddingRight: isAutoRenewal ? 0 : 120 }}>
-              <span style={styles.discountText}>{discountLabel}</span>
-              <span style={{ ...styles.discountText, color: "#141414" }}>{discountAmount}</span>
-            </div>
-
-            {/* Final price row */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, paddingRight: isAutoRenewal ? 0 : 120 }}>
-              <span></span>
-              <span style={styles.finalPrice}>{finalPrice}</span>
-            </div>
-
-            {/* Includes list */}
-            <div style={{ paddingLeft: 16 }}>
-              <div style={{ ...styles.includedItem, color: "#666", marginBottom: 8 }}>Includes:</div>
-              {[
-                "Smart CRM ",
-  "Call Logs & Recordings",
-  "Planner",
-  "Pulse",
-  "Workforce",
-  "1 Core Seat",
-              ].map((item) => (
-                <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>{item}</span>
-                  <Info size={14} strokeWidth={2} color="#666" />
-                </div>
-              ))}
-            </div>
-
-            {/* Divider */}
-            <div style={{ borderTop: "1px solid #e5e5e5", margin: "20px 0" }} />
-
-            {/* Total Prime Alley Credits */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={styles.subHeading}>Total Prime Alley Credits</div>
-              <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>500 Included Prime Alley Credits</div>
-            </div>
-
-            {/* Cost summary - dashed divider */}
-            <div style={styles.divider} />
-
-            <div style={styles.costRow}>
-              <span style={styles.subHeading}>Cost for 1 year</span>
-              <span style={styles.finalPrice}>{costForYear}</span>
-            </div>
-            <div style={styles.costRow}>
-              <span style={styles.subHeading}>You Save:</span>
-              <span style={styles.finalPrice}>{youSave}</span>
-            </div>
-            <div style={{ textAlign: "right" as const, fontSize: 13, color: "#666", marginTop: 4 }}>
-              All costs exclude tax
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function SubscriptionsPage() {
+  const { data: session } = useSession();
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+  const [paymentMethods, setPaymentMethods] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [companyRes, paymentMethodsRes] = await Promise.all([
+          GetCompanyDetails({ crm_company_id: "" }),
+          GetPaymentMethods(),
+        ]);
+        setCompanyDetails(companyRes);
+        setPaymentMethods(paymentMethodsRes);
+      } catch (err) {
+        console.error("SubscriptionPage API error:", err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const paymentMethodsList = Array.isArray(paymentMethods)
+    ? paymentMethods
+    : paymentMethods?.data ?? paymentMethods?.payment_methods ?? [];
+  const displayPaymentMethod = paymentMethodsList.find((pm: any) => pm?.is_default) ?? paymentMethodsList[0];
+  const hasDefaultAccount = paymentMethodsList.some((pm: any) => pm?.is_default);
+
   return (
     <div style={styles.body}>
       <div style={{ maxWidth: "calc(1376px)", margin: "0 auto" }}>
@@ -303,43 +200,13 @@ export default function SubscriptionsPage() {
               </div>
             </div>
 
-            <div style={{ margin: 0, display: "flex", flexDirection: "row" as const, justifyContent: "space-between", gap: 24 }}>
-              {/* Hub ID */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={styles.label}>Tenant ID</div>
-                  <div style={styles.value}>147764492</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={styles.label}>Billing Frequency</div>
-                  <div style={styles.value}>Monthly</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={styles.label}>Subscription Term</div>
-                  <div style={styles.value}>1st Mar 2026 to 31st Mar 2026</div>
-                </div>
-
-              {/* Primary Contact */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Primary Contact</div>
-                <div style={styles.value}>Rizwan Haider</div>
-              </div>
-
-              {/* Payment Method */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={styles.label}>Payment Method</div>
-                <div style={{ display: "flex", flexDirection: "column" as const, gap: 2 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{
-                      background: "#1a1f71", color: "#fff", fontSize: 9, fontWeight: 700,
-                      padding: "2px 5px", borderRadius: 3, letterSpacing: 0.5,
-                    }}>VISA</div>
-                    <span style={styles.value}>ending in 5478</span>
-                  </div>
-                  <div style={{ ...styles.value, fontSize: 12 }}>RIZWAN HAIDER</div>
-                  <a style={{ ...styles.link, fontSize: 12 }}>Change</a>
-                </div>
-              </div>
-            </div>
+            <TopSection
+              companyDetails={companyDetails}
+              session={session}
+              displayPaymentMethod={displayPaymentMethod}
+              hasDefaultAccount={hasDefaultAccount}
+              styles={{ label: styles.label, value: styles.value, link: styles.link }}
+            />
           </div>
         </div>
 
@@ -357,9 +224,9 @@ export default function SubscriptionsPage() {
                 <h3 style={styles.subHeading}>Pro Plan</h3>
               </div>
               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
-                <span style={styles.strikethrough}>AED 216.00</span>
-                <span style={{ ...styles.discountText, marginTop: 4 }}>AED 118.80</span>
-                <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 97.20</span>
+                <span style={styles.strikethrough}>AED 0.00</span>
+                <span style={{ ...styles.discountText, marginTop: 4 }}>AED 0.80</span>
+                <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 0.00</span>
               </div>
               <div style={{ marginLeft: 32 }}>
                 <button style={styles.btnLight}>View pricing</button>
@@ -394,18 +261,18 @@ export default function SubscriptionsPage() {
             {/* Total Prime Alley Credits */}
             <div style={{ marginBottom: 20 }}>
               <div style={styles.subHeading}>Total Credits</div>
-              <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>500 Included Credits</div>
+              <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>0 Included Credits</div>
             </div>
 
             <div style={styles.divider} />
 
             <div style={styles.costRow}>
               <span style={styles.subHeading}>Cost for 1 year</span>
-              <span style={styles.finalPrice}>AED 97.20</span>
+              <span style={styles.finalPrice}>AED 0.00</span>
             </div>
             <div style={styles.costRow}>
               <span style={styles.subHeading}>You Save:</span>
-              <span style={styles.finalPrice}>AED 118.80</span>
+              <span style={styles.finalPrice}>AED 0.00</span>
             </div>
             <div style={{ textAlign: "right" as const, fontSize: 13, color: "#666", marginTop: 4 }}>
               All costs exclude tax
@@ -431,9 +298,9 @@ export default function SubscriptionsPage() {
                 <div style={{ fontSize: 13, color: "#141414", marginTop: 4 }}>Annual payment discount (25%)</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
-                <span style={styles.strikethrough}>AED 216.00</span>
-                <span style={{ ...styles.discountText, marginTop: 4 }}>-AED 54.00</span>
-                <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 162.00</span>
+                <span style={styles.strikethrough}>AED 0.00</span>
+                <span style={{ ...styles.discountText, marginTop: 4 }}>-AED 0.00</span>
+                <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 0.00</span>
               </div>
             </div>
 
@@ -458,18 +325,18 @@ export default function SubscriptionsPage() {
 
             <div style={{ marginBottom: 20 }}>
               <div style={styles.subHeading}>Total Credits</div>
-              <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>500 Included Credits</div>
+              <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>0 Included Credits</div>
             </div>
 
             <div style={styles.divider} />
 
             <div style={styles.costRow}>
               <span style={styles.subHeading}>Cost for 1 year</span>
-              <span style={styles.finalPrice}>AED 162.00</span>
+              <span style={styles.finalPrice}>AED 0.00</span>
             </div>
             <div style={styles.costRow}>
               <span style={styles.subHeading}>You Save:</span>
-              <span style={styles.finalPrice}>AED 54.00</span>
+              <span style={styles.finalPrice}>AED 0.00</span>
             </div>
             <div style={{ textAlign: "right" as const, fontSize: 13, color: "#666", marginTop: 4 }}>
               All costs exclude tax

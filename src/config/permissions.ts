@@ -282,7 +282,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/pitch-deck',permissions: [PERMISSIONS.VIEW_PITCH_DECK_AIML]},
             { path: '/live-monitoring',permissions: [PERMISSIONS.VIEW_LIVE_MONITORING_AIML]},
             { path: '/analytics',permissions: [PERMISSIONS.VIEW_ANALYTICS_AIML]},
-            { path: '/usage-reports',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+            
         ]
     },
     //virtual agents services end
@@ -690,37 +691,8 @@ export const routePermissions: RoutePermission[] = [
                 path: '/management',permissions: [PERMISSIONS.TMS_SERVICES],
                 children: [
                     { path: '/users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { 
-                        path: '/rank-permissions',permissions: [PERMISSIONS.TMS_SERVICES],
-                        children: [
-                            { path: '/',permissions: [PERMISSIONS.TMS_SERVICES]}
-                        ]
-                    },
                 ]
             },
-            {
-                path: '/cisco-pbx',permissions: [PERMISSIONS.TMS_SERVICES],
-                children: [
-                    { path: '/app-users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/users-directory',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/custom-users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/facilities-info',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/line',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/phone',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/sip-trunks',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/translation-patterns',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/device-pool',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/locations',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/route-partitions',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/css',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/regions',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/route-pattern',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/remote-destination',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/remote-destination/profile',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/recording-profile',permissions: [PERMISSIONS.TMS_SERVICES]},
-                ]
-            }
 
         ]
     },

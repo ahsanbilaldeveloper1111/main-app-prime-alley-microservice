@@ -1,4 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { GetPayments } from "@utils/accounting";
+import { GlobalDateFormat, GlobalDateTimeFormat } from "@utils/Helper";
+import { downloadInvoicePdf, getInvoice } from "@utils/accounts";
+import moment from "moment";
+import { useSession } from "next-auth/react";
+import InvoiceViewModal from "@components/billings/InvoiceViewModal";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -141,37 +147,74 @@ const transactions = [
     ],
     status: "Processed",
   },
-  {
-    id: 2,
-    dateIssued: "11 Feb 2026",
-    detailsTitle: "Order #22970930",
-    detailsSub: null,
-    poNumber: "",
-    products: "",
-    amounts: [],
-    status: "Processed",
-  },
-  {
-    id: 3,
-    dateIssued: "11 Feb 2026",
-    detailsTitle: "Payment #43595815",
-    detailsSub: "Credit card",
-    poNumber: "",
-    products: "Pro Plan",
-    amounts: [
-      { label: "Payment amount", value: "AED 97.20" },
-    ],
-    status: "Processed",
-  },
+  
 ];
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
+  const { data: session } = useSession();
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<any>(null);
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
+
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
+  }, []);
+
+  const handleViewInvoice = useCallback(async (payment: any) => {
+    const invoiceId = payment?.invoice?.id ?? payment?.invoice_id ?? payment?.invoice?.invoice_id;
+    if (!invoiceId) {
+      console.warn("No invoice id found for payment:", payment);
+      return;
+    }
+
+    setShowViewInvoiceModal(true);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(true);
+    try {
+      const invoiceDetails = await getInvoice(Number(invoiceId));
+      setSelectedInvoiceForView(invoiceDetails);
+    } catch (err) {
+      console.error("View invoice error:", err);
+    } finally {
+      setIsInvoiceLoading(false);
+    }
+  }, []);
+
+  const handleDownloadPDF = useCallback(async (payment: any) => {
+    const invoiceId = payment?.invoice?.id ?? payment?.invoice_id ?? payment?.invoice?.invoice_id;
+    if (!invoiceId) {
+      console.warn("No invoice id found for payment:", payment);
+      return;
+    }
+    try {
+      await downloadInvoicePdf(Number(invoiceId));
+    } catch (err) {
+      console.error("PDF download error:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const response = await GetPayments({ page: 1, per_page: 500 });
+        setPayments(response?.dataList || []);
+        console.log("GetPayments response:", response);
+      } catch (err) {
+        console.error("TransactionsPage GetPayments error:", err);
+      }
+    };
+    fetchPayments();
+  }, []);
 
   return (
     <div style={s.page}>
       <h1 style={s.pageHeading}>Transactions</h1>
+
+  
 
       <div style={s.tableWrapper}>
         <table style={s.table}>
@@ -187,57 +230,74 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {transactions.map((tx) => (
+            {payments.map((payment) => (
               <tr
-                key={tx.id}
-                onMouseEnter={() => setHoveredRow(tx.id)}
+                key={payment?.id}
+                onMouseEnter={() => setHoveredRow(payment?.id)}
                 onMouseLeave={() => setHoveredRow(null)}
                 style={{
-                  backgroundColor: hoveredRow === tx.id ? "#fafafa" : "#fff",
+                  backgroundColor: hoveredRow === payment.id ? "#fafafa" : "#fff",
                   transition: "background-color 100ms ease-out",
                 }}
               >
                 {/* Date Issued */}
                 <td style={{ ...s.td, ...s.dateCell }}>
-                  {tx.dateIssued}
+                  {payment?.invoice?.invoice_date ? moment(payment?.invoice?.invoice_date).format(GlobalDateFormat) : ""}
                 </td>
 
                 {/* Details */}
                 <td style={s.td}>
-                  <div style={s.detailsTitle}>{tx.detailsTitle}</div>
-                  {tx.detailsSub && (
-                    <div style={s.detailsSub}>{tx.detailsSub}</div>
-                  )}
+                  <div style={s.detailsTitle}>Invoice #{payment?.invoice?.invoice_number}</div>
+                 
+                    <div style={s.detailsSub}>{payment?.updated_at ? moment(payment?.updated_at).format(GlobalDateTimeFormat) : ""}</div>
+                  
                   <div style={s.actionLinks}>
-                    <a style={s.link}>View</a>
+                    <button
+                      type="button"
+                      style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+                      onClick={() => handleViewInvoice(payment)}
+                    >
+                      View
+                    </button>
                     <span style={s.divider}>|</span>
-                    <a style={s.link}>Download</a>
+                    <button
+                      type="button"
+                      style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+                      onClick={() => handleDownloadPDF(payment)}
+                    >
+                      Download
+                    </button>
                   </div>
                 </td>
 
                 {/* PO Number */}
-                <td style={{ ...s.td, color: tx.poNumber === "-" ? "#141414" : "#ccc" }}>
-                  {tx.poNumber || ""}
+                <td style={{ ...s.td }}>
+                  {payment?.invoice?.po_number || "-"}
                 </td>
 
                 {/* Products */}
                 <td style={s.td}>
-                  {tx.products || ""}
+                  <div style={{ whiteSpace: "pre-line" }}>
+                    {payment?.invoice?.items?.map((item: any) => item?.product?.name).join("\n") || ""}
+                  </div>
                 </td>
 
                 {/* Amount */}
                 <td style={s.td}>
-                  {tx.amounts.map((amt, i) => (
-                    <div key={i} style={{ marginBottom: i < tx.amounts.length - 1 ? 12 : 0 }}>
-                      <div style={s.amountLabel}>{amt.label}</div>
-                      <div style={s.amountValue}>{amt.value}</div>
+                  
+                    <div  style={{ marginBottom: 12 }}>
+                      <div style={s.amountLabel}>Invoice amount</div>
+                      <div style={s.amountValue}>{payment?.invoice?.currency_code || "AED"} {payment?.invoice?.total_amount??0}</div>
                     </div>
-                  ))}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={s.amountLabel}>Invoice Balance</div>
+                      <div style={s.amountValue}>{payment?.invoice?.currency_code || "AED"} {payment?.invoice?.amount_due??0}</div>
+                    </div>
                 </td>
 
                 {/* Status */}
                 <td style={s.td}>
-                  <span style={s.statusBadge}>{tx.status}</span>
+                  <span style={s.statusBadge}>{payment?.status}</span>
                 </td>
 
                 {/* Actions (empty col per design) */}
@@ -247,6 +307,15 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      <InvoiceViewModal
+        show={showViewInvoiceModal}
+        onHide={closeViewInvoiceModal}
+        invoice={selectedInvoiceForView}
+        loading={isInvoiceLoading}
+        companyName={session?.user?.company_name || ""}
+      />
+
     </div>
   );
 }

@@ -17,29 +17,57 @@ const STATUS_PARTIALLY_PAID = 'partially_paid';
 const STATUS_FAILED = 'failed';
 const STATUS_REFUNDED = 'refunded';
 const STATUS_PENDING = 'pending';
+const PAY_NOW_ELIGIBLE_STATUSES = new Set([STATUS_PENDING, STATUS_OVERDUE, STATUS_PARTIALLY_PAID]);
+const STRIPE_AUTH_SUCCESS_INTENT_STATUSES = new Set(["succeeded", "requires_confirmation"]);
 
-import PrimeAlleyLogo from "@assets/images/Prime3.png";
+function getStatusBadgeVariant(status: string): string {
+  switch (status) {
+    case STATUS_DRAFT: return "secondary";
+    case STATUS_SENT: return "info";
+    case STATUS_PAID: return "success";
+    case STATUS_OVERDUE: return "danger";
+    case STATUS_CANCELLED: return "dark";
+    case STATUS_PARTIALLY_PAID: return "warning";
+    case STATUS_FAILED: return "danger";
+    case STATUS_REFUNDED: return "danger";
+    case STATUS_PENDING: return "warning";
+    default: return "secondary";
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case STATUS_DRAFT: return "Draft";
+    case STATUS_SENT: return "Sent";
+    case STATUS_PAID: return "Paid";
+    case STATUS_OVERDUE: return "Overdue";
+    case STATUS_CANCELLED: return "Cancelled";
+    case STATUS_PARTIALLY_PAID: return "Partially Paid";
+    case STATUS_FAILED: return "Failed";
+    case STATUS_REFUNDED: return "Refunded";
+    case STATUS_PENDING: return "Pending";
+    default: return status || "Draft";
+  }
+}
+
 import Layout from "@layout/index";
 import GenericTable, { TableColumn, TableAction as GenericTableAction, FilterPill } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useRouter } from "next/router";
 import {
   getInvoices,
   getInvoice,
   getProductsWithCompanyPricing,
-  payInvoice,
   createDirectPayment,
   downloadInvoicePdf,
   InvoiceData,
   InvoiceCreateUpdatePayload,
-  InvoiceCreateUpdateAPIPayload,
   InvoiceItemCreateUpdatePayload,
   InvoiceItemAPIPayload,
-  InvoiceItemData,
   CompanyData,
   ProductData,
   CreateDirectPaymentData,
@@ -48,10 +76,9 @@ import {
 } from "@utils/accounts";
 import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
-import { formatNumber, GlobalDateFormat, getCompanyByCrmId } from "@utils/Helper";
+import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
 
-import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { Alert, Button, Col, Form, Modal, Row, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
@@ -67,9 +94,8 @@ import { FaShieldAlt, FaCreditCard } from "react-icons/fa";
 import "@assets/scss/common.scss";
 
 import "@assets/scss/tabs.scss";
-import TableAction, { Action } from "@components/TableAction";
-import { Spinner } from "react-bootstrap";
-import { Divide, DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter, Plus } from "lucide-react";
+import InvoiceViewModal, { InvoiceViewData } from "@components/billings/InvoiceViewModal";
+import { DollarSign, Download, FileText, Calendar, Eye, Receipt, CheckCircle, Clock, AlertCircle, Plus } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
@@ -237,6 +263,81 @@ interface ExchangeRate {
   timestamp: number;
 }
 
+const EXCHANGE_CURRENCIES = ["USD", "EUR", "GBP", "AED", "PKR"] as const;
+
+function buildExchangeRates(
+  base: string,
+  ratesByCurrency: Record<string, number>,
+  timestamp: number
+): ExchangeRate[] {
+  const pairs = EXCHANGE_CURRENCIES.flatMap((currency) => {
+    if (currency === base) return [];
+    const rate = ratesByCurrency[currency];
+    if (!rate) return [];
+    return [
+      { from: base, to: currency, rate, timestamp },
+      { from: currency, to: base, rate: 1 / rate, timestamp },
+    ];
+  });
+
+  return [...pairs, { from: base, to: base, rate: 1, timestamp }];
+}
+
+function dedupeExchangeRates(rates: ExchangeRate[]): ExchangeRate[] {
+  const seen = new Set<string>();
+  return rates.filter((r) => {
+    const key = `${r.from}|${r.to}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchExchangeRateApiRates(base: string): Promise<Record<string, number>> {
+  const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${base}`);
+  if (!response.ok) throw new Error(`Exchange rate API error: ${response.status}`);
+  const data = (await response.json()) as { rates?: Record<string, number> };
+  if (!data.rates) throw new Error("Exchange rate API missing rates");
+  return data.rates;
+}
+
+async function fetchFxRatesApiRates(base: string): Promise<Record<string, number>> {
+  const response = await fetch(`https://api.fxratesapi.com/latest?base=${base}`);
+  const data = (await response.json()) as { rates?: Record<string, number> };
+  if (!data.rates) throw new Error("FX rates API missing rates");
+  return data.rates;
+}
+
+function extractGatewayResponse(paymentResult: any): any {
+  return paymentResult?.payment?.gateway_response ?? paymentResult?.data?.payment?.gateway_response;
+}
+
+function extractClientSecret(paymentResult: any, gatewayResponse: any): string | undefined {
+  return (
+    paymentResult?.client_secret ??
+    paymentResult?.data?.client_secret ??
+    gatewayResponse?.client_secret ??
+    paymentResult?.payment_data?.client_secret
+  );
+}
+
+function extractPaymentId(paymentResult: any): string | number | undefined {
+  return (
+    paymentResult?.payment?.id ??
+    paymentResult?.payment_id ??
+    paymentResult?.data?.payment?.id ??
+    paymentResult?.data?.payment_id
+  );
+}
+
+async function safeCompleteStripePayment(paymentId: string | number): Promise<void> {
+  try {
+    await CompletePayment({ payment_id: paymentId, payment_method: "stripe" });
+  } catch (error) {
+    console.error("Failed to update payment status:", error);
+  }
+}
+
 
 
 // Custom hook for creating invoice payments
@@ -315,29 +416,6 @@ const DirectCardPaymentForm: React.FC<{
       },
     },
     hidePostalCode: true,
-  };
-
-  // Helper function to extract payment ID from payment result (handles both response structures)
-  const getPaymentId = (paymentResult: any): string | number | undefined => {
-    return paymentResult?.payment?.id || paymentResult?.data?.payment?.id;
-  };
-
-  // Helper function to mark payment as complete
-  const markPaymentComplete = async (paymentResult: any): Promise<void> => {
-    console.log('Marking payment as complete:', paymentResult);
-    const paymentId = getPaymentId(paymentResult);
-    if (paymentId) {
-      try {
-        await CompletePayment({
-          payment_id: paymentId,
-          payment_method: "stripe",
-        });
-      } catch (error: any) {
-        console.error('Error marking payment as complete:', error);
-        // Don't throw - payment succeeded on Stripe, just failed to update our DB
-        // The webhook or polling will eventually update the status
-      }
-    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -798,8 +876,6 @@ const InvoiceList = () => {
     date_from?: string;
     date_to?: string;
   }>({});
-  const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
-  const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState<boolean>(false);
   const [pendingFilters, setPendingFilters] = useState<{
     search?: string;
@@ -816,7 +892,7 @@ const InvoiceList = () => {
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
   const [isLoadingCompanyProducts, setIsLoadingCompanyProducts] = useState<boolean>(false);
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
@@ -829,49 +905,25 @@ const InvoiceList = () => {
   
   // View invoice modal states
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState<boolean>(false);
-  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<any | null>(null);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
   
   // Exchange rate states
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState<boolean>(false);
   const [baseCurrency, setBaseCurrency] = useState<string>("USD");
-  const [exchangeRateTimeout, setExchangeRateTimeout] = useState<NodeJS.Timeout | null>(null);
-  
   // Custom VAT states
-  const [showCustomVatRate, setShowCustomVatRate] = useState<boolean>(false);
-  const [showEditCustomVatRate, setShowEditCustomVatRate] = useState<boolean>(false);
-  const [loadedCurrencies, setLoadedCurrencies] = useState<Set<string>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
-  const [processedInvoiceItems, setProcessedInvoiceItems] = useState<any[]>([]);
 
-  const getStatusBadgeVariant = (status: string): string => {
-    switch (status) {
-      case STATUS_DRAFT: return "secondary";
-      case STATUS_SENT: return "info";
-      case STATUS_PAID: return "success";
-      case STATUS_OVERDUE: return "danger";
-      case STATUS_CANCELLED: return "dark";
-      case STATUS_PARTIALLY_PAID: return "warning";
-      case STATUS_FAILED: return "danger";
-      case STATUS_REFUNDED: return "danger";
-      case STATUS_PENDING: return "warning";
-      default: return "secondary";
-    }
-  };
-  const getStatusLabel = (status: string): string => {
-    switch (status) {
-      case STATUS_DRAFT: return "Draft";
-      case STATUS_SENT: return "Sent";
-      case STATUS_PAID: return "Paid";
-      case STATUS_OVERDUE: return "Overdue";
-      case STATUS_CANCELLED: return "Cancelled";
-      case STATUS_PARTIALLY_PAID: return "Partially Paid";
-      case STATUS_FAILED: return "Failed";
-      case STATUS_REFUNDED: return "Refunded";
-      case STATUS_PENDING: return "Pending";
-      default: return status || "Draft";
-    }
-  };
+  const toInvoiceViewData = useCallback((invoice: InvoiceData): InvoiceViewData => {
+    const view = invoice as unknown as InvoiceViewData;
+    const company = view.company;
+    return {
+      ...view,
+      company: company
+        ? { ...company, crm_company_id: company.crm_company_id ?? undefined }
+        : undefined,
+    };
+  }, []);
 
   const openInvoiceSidebar = useCallback((row: InvoiceData) => {
     setSelectedInvoiceSidebar(row);
@@ -884,9 +936,9 @@ const InvoiceList = () => {
 
   const handleViewInvoice = useCallback(async (invoice: InvoiceData) => {
     const invoiceDetails = await getInvoice(invoice.id);
-    setSelectedInvoiceForView(invoiceDetails);
+    setSelectedInvoiceForView(toInvoiceViewData(invoiceDetails));
     setShowViewInvoiceModal(true);
-  }, []);
+  }, [toInvoiceViewData]);
 
   const closeViewInvoiceModal = useCallback(() => {
     setShowViewInvoiceModal(false);
@@ -923,7 +975,7 @@ const InvoiceList = () => {
         sortable: true,
         render: (row) => (
           <span>
-            {row.currency_code || "AED"} {formatNumber(parseFloat(row?.total_amount || "0"))}
+            {row.currency_code || "AED"} {formatNumber(Number.parseFloat(row?.total_amount || "0"))}
           </span>
         ),
       },
@@ -933,7 +985,7 @@ const InvoiceList = () => {
         sortable: true,
         render: (row) => (
           <span>
-            {row.currency_code || "AED"} {formatNumber(parseFloat(row?.amount_due || "0"))}
+            {row.currency_code || "AED"} {formatNumber(Number.parseFloat(row?.amount_due || "0"))}
           </span>
         ),
       },
@@ -1148,8 +1200,8 @@ const InvoiceList = () => {
       
       // Use effective_price from the API response, which already handles company-specific pricing
       // If effective_price is different from base_price, it likely includes VAT
-      const basePrice = parseFloat(companyProduct.base_price || "0");
-      const effectivePrice = parseFloat(companyProduct.effective_price || "0");
+      const basePrice = Number.parseFloat(companyProduct.base_price || "0");
+      const effectivePrice = Number.parseFloat(companyProduct.effective_price || "0");
       const includesVat = effectivePrice > basePrice && basePrice > 0;
       
       console.log("Using effective price:", companyProduct.effective_price, "includesVat:", includesVat);
@@ -1173,188 +1225,55 @@ const InvoiceList = () => {
 
   // Load exchange rates directly from free API
   const loadExchangeRates = useCallback(async (invoiceCurrency: string) => {
-    
-    // If we already have rates loaded for this currency, don't reload
-    if (exchangeRates.length > 0 && baseCurrency === invoiceCurrency && !isInitialLoad) {
-      return;
-    }
+    if (exchangeRates.length > 0 && baseCurrency === invoiceCurrency && !isInitialLoad) return;
 
-    console.log('Fetching exchange rates from free API...');
+    console.log("Fetching exchange rates from free API...");
     setIsLoadingExchangeRates(true);
-    
+
+    const timestamp = Date.now();
+
     try {
-      const rates: ExchangeRate[] = [];
-      const currencies = ['USD', 'EUR', 'GBP', 'AED', 'PKR'];
-      
-      // Use free exchange rate API with the selected currency as base
-      console.log('Fetching exchange rates from free API with base:', invoiceCurrency);
-      const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${invoiceCurrency}`);
-      
-      if (!response.ok) {
-        throw new Error(`Exchange rate API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Process all currency pairs from the API response
-      if (data.rates) {
-        for (const currency of currencies) {
-          if (currency !== invoiceCurrency && data.rates[currency]) {
-            // Selected currency to other currencies
-            rates.push({
-              from: invoiceCurrency,
-              to: currency,
-              rate: data.rates[currency],
-              timestamp: Date.now()
-            });
-            
-            // Other currencies to selected currency (inverse)
-            rates.push({
-              from: currency,
-              to: invoiceCurrency,
-              rate: 1 / data.rates[currency],
-              timestamp: Date.now()
-            });
-          }
-        }
-        
-        // Add self-conversion rate
-        rates.push({
-          from: invoiceCurrency,
-          to: invoiceCurrency,
-          rate: 1,
-          timestamp: Date.now()
-        });
-        
-        // If the selected currency is not USD, also load USD-based rates for better coverage
-        if (invoiceCurrency !== 'USD') {
-          try {
-            console.log('Loading USD-based rates for better coverage...');
-            const usdResponse = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-            if (usdResponse.ok) {
-              const usdData = await usdResponse.json();
-              if (usdData.rates) {
-                // Add USD to selected currency rate
-                if (usdData.rates[invoiceCurrency]) {
-                  rates.push({
-                    from: 'USD',
-                    to: invoiceCurrency,
-                    rate: usdData.rates[invoiceCurrency],
-                    timestamp: Date.now()
-                  });
-                  
-                  // Add selected currency to USD rate (inverse)
-                  rates.push({
-                    from: invoiceCurrency,
-                    to: 'USD',
-                    rate: 1 / usdData.rates[invoiceCurrency],
-                    timestamp: Date.now()
-                  });
-                }
-                
-                // Add other currencies to USD rates for cross-conversion
-                for (const currency of currencies) {
-                  if (currency !== 'USD' && currency !== invoiceCurrency && usdData.rates[currency]) {
-                    // Only add if we don't already have this rate
-                    const existingRate = rates.find(r => r.from === currency && r.to === 'USD');
-                    if (!existingRate) {
-                      rates.push({
-                        from: currency,
-                        to: 'USD',
-                        rate: 1 / usdData.rates[currency],
-                        timestamp: Date.now()
-                      });
-                    }
-                    
-                    const existingRateReverse = rates.find(r => r.from === 'USD' && r.to === currency);
-                    if (!existingRateReverse) {
-                      rates.push({
-                        from: 'USD',
-                        to: currency,
-                        rate: usdData.rates[currency],
-                        timestamp: Date.now()
-                      });
-                    }
-                  }
-                }
-              }
-            }
-          } catch (usdError) {
-            console.warn('Failed to load USD-based rates:', usdError);
-          }
+      const baseRatesByCurrency = await fetchExchangeRateApiRates(invoiceCurrency);
+      const baseRates = buildExchangeRates(invoiceCurrency, baseRatesByCurrency, timestamp);
+
+      let allRates = baseRates;
+      if (invoiceCurrency !== "USD") {
+        try {
+          const usdRatesByCurrency = await fetchExchangeRateApiRates("USD");
+          const usdRates = buildExchangeRates("USD", usdRatesByCurrency, timestamp);
+          allRates = dedupeExchangeRates([...baseRates, ...usdRates]);
+        } catch (usdError) {
+          console.warn("Failed to load USD-based rates for better coverage:", usdError);
         }
       }
-      
-      
-      // Update state with all rates
-      setExchangeRates(rates);
-      setLoadedCurrencies(new Set(currencies));
+
+      setExchangeRates(allRates);
       setBaseCurrency(invoiceCurrency);
       setIsInitialLoad(false);
     } catch (error) {
       console.error("Error loading exchange rates:", error);
-      
-      // Fallback to another free API
+
       try {
-        console.log('Falling back to alternative exchange rate API');
-        const fallbackResponse = await fetch(`https://api.fxratesapi.com/latest?base=${invoiceCurrency}`);
-        const fallbackData = await fallbackResponse.json();
-        
-        const fallbackRates: ExchangeRate[] = [];
-        const currencies = ['USD', 'EUR', 'GBP', 'AED', 'PKR'];
-        
-        if (fallbackData.rates) {
-          for (const currency of currencies) {
-            if (currency !== invoiceCurrency && fallbackData.rates[currency]) {
-              // Selected currency to other currencies
-              fallbackRates.push({
-                from: invoiceCurrency,
-                to: currency,
-                rate: fallbackData.rates[currency],
-                timestamp: Date.now()
-              });
-              
-              // Other currencies to selected currency (inverse)
-              fallbackRates.push({
-                from: currency,
-                to: invoiceCurrency,
-                rate: 1 / fallbackData.rates[currency],
-                timestamp: Date.now()
-              });
-            }
-          }
-          
-          // Add self-conversion rate
-          fallbackRates.push({
-            from: invoiceCurrency,
-            to: invoiceCurrency,
-            rate: 1,
-            timestamp: Date.now()
-          });
-        }
-        
-        console.log('Fallback rates loaded for base currency:', invoiceCurrency, fallbackRates);
-        
-        // Update state with fallback rates
+        console.log("Falling back to alternative exchange rate API");
+        const fallbackRatesByCurrency = await fetchFxRatesApiRates(invoiceCurrency);
+        const fallbackRates = buildExchangeRates(invoiceCurrency, fallbackRatesByCurrency, timestamp);
         setExchangeRates(fallbackRates);
-        setLoadedCurrencies(new Set(currencies));
         setBaseCurrency(invoiceCurrency);
         setIsInitialLoad(false);
       } catch (fallbackError) {
-        console.error('Fallback exchange rate API also failed:', fallbackError);
-        // Set default rates if all APIs fail
+        console.error("Fallback exchange rate API also failed:", fallbackError);
+
         const defaultRates: ExchangeRate[] = [
-          { from: 'USD', to: 'EUR', rate: 0.85, timestamp: Date.now() },
-          { from: 'EUR', to: 'USD', rate: 1.18, timestamp: Date.now() },
-          { from: 'USD', to: 'GBP', rate: 0.73, timestamp: Date.now() },
-          { from: 'GBP', to: 'USD', rate: 1.37, timestamp: Date.now() },
-          { from: 'USD', to: 'AED', rate: 3.67, timestamp: Date.now() },
-          { from: 'AED', to: 'USD', rate: 0.27, timestamp: Date.now() },
-          { from: 'USD', to: 'PKR', rate: 280, timestamp: Date.now() },
-          { from: 'PKR', to: 'USD', rate: 0.0036, timestamp: Date.now() },
+          { from: "USD", to: "EUR", rate: 0.85, timestamp },
+          { from: "EUR", to: "USD", rate: 1.18, timestamp },
+          { from: "USD", to: "GBP", rate: 0.73, timestamp },
+          { from: "GBP", to: "USD", rate: 1.37, timestamp },
+          { from: "USD", to: "AED", rate: 3.67, timestamp },
+          { from: "AED", to: "USD", rate: 0.27, timestamp },
+          { from: "USD", to: "PKR", rate: 280, timestamp },
+          { from: "PKR", to: "USD", rate: 0.0036, timestamp },
         ];
         setExchangeRates(defaultRates);
-        setLoadedCurrencies(new Set(['USD', 'EUR', 'GBP', 'AED', 'PKR']));
         setBaseCurrency(invoiceCurrency);
         setIsInitialLoad(false);
       }
@@ -1362,21 +1281,6 @@ const InvoiceList = () => {
       setIsLoadingExchangeRates(false);
     }
   }, [exchangeRates.length, isInitialLoad, baseCurrency]);
-
-  // Debounced version to prevent too many API calls
-  const debouncedLoadExchangeRates = useCallback((invoiceCurrency: string) => {
-    // Clear existing timeout
-    if (exchangeRateTimeout) {
-      clearTimeout(exchangeRateTimeout);
-    }
-    
-    // Set new timeout
-    const timeout = setTimeout(() => {
-      loadExchangeRates(invoiceCurrency);
-    }, 300); // Reduced timeout for better UX
-    
-    setExchangeRateTimeout(timeout);
-  }, [loadExchangeRates, exchangeRateTimeout]);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -1386,11 +1290,6 @@ const InvoiceList = () => {
         });
         setCompanies(companiesData.data || []);
         
-        // Load products for the first company if available
-        if (companiesData.data && companiesData.data.length > 0) {
-          const firstCompany = companiesData.data[0];
-         // await loadCompanyProducts(firstCompany.id);
-        }
       } catch (error) {
         console.error("Error fetching companies:", error);
       }
@@ -1412,7 +1311,14 @@ const InvoiceList = () => {
     loadExchangeRates('USD'); // Load exchange rates with USD as base initially
   }, [loadStripePublishableKey, loadExchangeRates, loadCompanyProducts]);
 
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  type PaymentMethod = {
+    id: string;
+    type?: string;
+    is_default?: boolean;
+    card?: { brand?: string; last4?: string; exp_month?: number; exp_year?: number };
+    billing_details?: { name?: string };
+  };
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   useEffect(() => {
     getPaymentMethods();
   }, []);
@@ -1451,18 +1357,13 @@ const InvoiceList = () => {
     isCreateInvoicePaymentPending 
   } = useCreateInvoicePayment();
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (exchangeRateTimeout) {
-        clearTimeout(exchangeRateTimeout);
-      }
-    };
-  }, [exchangeRateTimeout]);
-
-
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-  const [summary, setSummary] = useState<any | null>(null);
+  type InvoiceSummary = {
+    paid_count?: number;
+    pending_count?: number;
+    overdue_count?: number;
+  };
+  const [summary, setSummary] = useState<InvoiceSummary | null>(null);
 
   const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -1477,6 +1378,11 @@ const InvoiceList = () => {
   const invoiceRequestIdRef = React.useRef(0);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [totalAllInvoices, setTotalAllInvoices] = useState(0);
+  const canPayInvoices = !!session?.user?.permissions?.includes("pay-invoices-billing");
+  const canPaySelectedInvoice =
+    !!selectedInvoiceSidebar &&
+    canPayInvoices &&
+    PAY_NOW_ELIGIBLE_STATUSES.has(selectedInvoiceSidebar.status ?? "");
 
   const loadInvoices = useCallback(async () => {
     invoiceRequestIdRef.current += 1;
@@ -1518,41 +1424,6 @@ const InvoiceList = () => {
     loadInvoices();
   }, [loadInvoices]);
 
-  const fetchInvoices = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      try {
-        const response = await getInvoices({
-          page,
-          per_page: perPage,
-          search,
-          ...memoizedFilters,
-          ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-        });
-
-        const summary = response?.summary;
-        setSummary(summary);
-
-        // The getInvoices function returns PaginationWrapper<InvoiceData>
-        // which has the structure: { data: InvoiceData[], pagination: {...} }
-        return {
-          data: response?.data, // The actual invoice array
-          total: response?.pagination?.total,
-          page: response?.pagination?.current_page || response?.pagination?.page,
-          per_page: response?.pagination?.per_page || response?.pagination?.limit,
-          last_page: response?.pagination?.last_page,
-        };
-      } catch (error) {
-        console.error("Error fetching invoices:", error);
-        throw error;
-      }
-    },
-    [memoizedFilters, selectedCompanyId]
-  );
-
-  const handleFiltersChange = useCallback((filters: any) => {
-    setCurrentFilters(filters);
-  }, []);
-
   // Edit Invoice Modal
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceFormData | null>(
     null
@@ -1579,7 +1450,7 @@ const InvoiceList = () => {
       // Recalculate new invoice totals if currency is not USD
       if (newInvoice.currency_code && newInvoice.currency_code !== 'USD' && newInvoice.items.length > 0) {
         const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-        const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+        const companyVatRate = selectedCompany?.profile?.vat_rate ? Number.parseFloat(selectedCompany.profile.vat_rate) : 0;
         const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
         const totals = calculateTotals(newInvoice.items, companyVatRate, isVatExempt, newInvoice.currency_code, newInvoice.company_id);
         
@@ -1592,7 +1463,7 @@ const InvoiceList = () => {
       // Recalculate selected invoice totals if currency is not USD
       if (selectedInvoice?.currency_code && selectedInvoice.currency_code !== 'USD' && selectedInvoice.items.length > 0) {
         const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-        const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
+        const companyVatRate = selectedCompany?.profile?.vat_rate ? Number.parseFloat(selectedCompany.profile.vat_rate) : 0;
         const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
         const totals = calculateTotals(selectedInvoice.items, companyVatRate, isVatExempt, selectedInvoice.currency_code, selectedInvoice.company_id);
         
@@ -1606,20 +1477,6 @@ const InvoiceList = () => {
     }
   }, [exchangeRates, isLoadingExchangeRates, newInvoice.currency_code, newInvoice.company_id, newInvoice.items, selectedInvoice?.currency_code, selectedInvoice?.company_id, selectedInvoice?.items, companies]);
 
-  // Helper function to transform invoice data for API (map tax_rate to vat_rate for items)
-  const transformInvoiceForAPI = (invoice: InvoiceCreateUpdatePayload): InvoiceCreateUpdateAPIPayload => {
-    return {
-      ...invoice,
-      items: invoice.items.map(item => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        vat_rate: item.tax_rate, // Map tax_rate to vat_rate for API
-        tax_amount: item.tax_amount,
-      }))
-    };
-  };
-
   // Helper function to calculate totals using per-product VAT rates
   const calculateTotals = (items: InvoiceItemCreateUpdatePayload[], companyVatRate: number = 0, isVatExempt: boolean = false, toCurrency: string = 'USD', companyId?: string) => {
     let subtotal = 0;
@@ -1627,8 +1484,8 @@ const InvoiceList = () => {
     
     // Process each item individually to calculate VAT per product
     const processedItems = items.map(item => {
-      const quantity = parseFloat(item.quantity) || 0;
-      const unitPrice = parseFloat(item.unit_price) || 0;
+      const quantity = Number.parseFloat(item.quantity) || 0;
+      const unitPrice = Number.parseFloat(item.unit_price) || 0;
       
       // Get the product's original currency with company context
       const productInfo = getEffectiveProductPrice(item.product_id, companyId);
@@ -1646,13 +1503,13 @@ const InvoiceList = () => {
       let effectiveVatRate = companyVatRate;
       
       // Use the tax_rate from the item if it's already set
-      if (item.tax_rate && parseFloat(item.tax_rate) >= 0) {
-        effectiveVatRate = parseFloat(item.tax_rate);
+      if (item.tax_rate && Number.parseFloat(item.tax_rate) >= 0) {
+        effectiveVatRate = Number.parseFloat(item.tax_rate);
       } else if (item.product_id) {
         // Fallback to product-specific VAT rate if item tax_rate is not set
         const product = companyProducts.find(p => p.id.toString() === item.product_id);
         if (product?.vat_rate) {
-          effectiveVatRate = parseFloat(product.vat_rate);
+          effectiveVatRate = Number.parseFloat(product.vat_rate);
         }
       }
       
@@ -1698,9 +1555,9 @@ const InvoiceList = () => {
     const totalAmount = subtotal + totalTaxAmount;
     
     return {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      tax_amount: parseFloat(totalTaxAmount.toFixed(2)),
-      total_amount: parseFloat(totalAmount.toFixed(2)),
+      subtotal: Number.parseFloat(subtotal.toFixed(2)),
+      tax_amount: Number.parseFloat(totalTaxAmount.toFixed(2)),
+      total_amount: Number.parseFloat(totalAmount.toFixed(2)),
       processedItems // Return processed items with individual VAT calculations
     };
   };
@@ -1723,8 +1580,6 @@ const InvoiceList = () => {
 
   // Direct payment handlers
   const handleDirectPaymentSuccess = useCallback(() => {
-    //toast.success("Payment processed successfully");
-    
     // Close modal and reset state
     setShowPaymentModal(false);
     setSelectedInvoiceForPayment(null);
@@ -1738,6 +1593,81 @@ const InvoiceList = () => {
     toast.error(error);
   }, []);
 
+  const handleSavedCardPaymentSuccess = useCallback(async (paymentResult: any) => {
+    if (paymentResult?.already_completed) {
+      setIsProcessingPayment(false);
+      handleDirectPaymentSuccess();
+      toast.success("Payment was already completed successfully!");
+      return;
+    }
+
+    const gatewayResponse = extractGatewayResponse(paymentResult);
+    const clientSecret = extractClientSecret(paymentResult, gatewayResponse);
+    const paymentStatus = gatewayResponse?.status ?? paymentResult?.status;
+
+    if (!clientSecret) {
+      setIsProcessingPayment(false);
+      handleDirectPaymentSuccess();
+      toast.success("Payment processed successfully!");
+      return;
+    }
+
+    if (!stripePublishableKey) {
+      handleDirectPaymentError("Stripe is not initialized");
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const stripeInstance = await loadStripe(stripePublishableKey);
+    if (!stripeInstance) {
+      handleDirectPaymentError("Failed to load Stripe");
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const confirmationMethod = gatewayResponse?.confirmation_method;
+    const requiresAction = paymentStatus === "requires_action";
+    if (confirmationMethod === "manual" && !requiresAction) {
+      setIsProcessingPayment(false);
+      handleDirectPaymentSuccess();
+      toast.info("Payment is being processed by the backend. Please wait...", { autoClose: 3000 });
+      return;
+    }
+
+    let authResult: any;
+    if (confirmationMethod === "manual" && requiresAction) {
+      authResult = await stripeInstance.handleCardAction(clientSecret);
+    } else {
+      let confirmOptions: { payment_method: string } | undefined;
+      if (selectedCardId) confirmOptions = { payment_method: selectedCardId };
+      authResult = await stripeInstance.confirmCardPayment(clientSecret, confirmOptions);
+    }
+
+    if (authResult?.error) {
+      setIsProcessingPayment(false);
+      toast.error(authResult.error.message || "Authentication failed. Please try again or use a different card.");
+      return;
+    }
+
+    const paymentIntent = authResult?.paymentIntent;
+    const paymentId = extractPaymentId(paymentResult);
+
+    const intentStatus = paymentIntent?.status;
+    if (STRIPE_AUTH_SUCCESS_INTENT_STATUSES.has(intentStatus ?? "")) {
+      if (paymentId) {
+        await safeCompleteStripePayment(paymentId);
+      }
+
+      setIsProcessingPayment(false);
+      handleDirectPaymentSuccess();
+      toast.success("Payment authenticated and processed successfully!");
+      return;
+    }
+
+    setIsProcessingPayment(false);
+    toast.error("Payment authentication incomplete. Please try again.");
+  }, [handleDirectPaymentError, handleDirectPaymentSuccess, selectedCardId, stripePublishableKey]);
+
   // Payment with saved card handler
   const handlePaymentWithSavedCard = useCallback(async () => {
     if (!selectedCardId || !selectedInvoiceForPayment) {
@@ -1747,668 +1677,25 @@ const InvoiceList = () => {
 
     setIsProcessingPayment(true);
     createInvoicePayment({
-      amount: parseFloat(selectedInvoiceForPayment.total_amount || '0'),
+      amount: Number.parseFloat(selectedInvoiceForPayment.total_amount || "0"),
       currency: (selectedInvoiceForPayment.currency_code || 'USD').toLowerCase(),
       payment_method_id: selectedCardId,
       invoice_id: selectedInvoiceForPayment.id,
-      customer_id: parseInt(selectedInvoiceForPayment.company_id || '0'),
+      customer_id: Number.parseInt(selectedInvoiceForPayment.company_id || "0", 10),
     }, {
-      onSuccess: async (paymentResult: any) => {
-        // Check if payment was already completed
-        if (paymentResult?.already_completed) {
+      onSuccess: (paymentResult: any) => {
+        handleSavedCardPaymentSuccess(paymentResult).catch((err) => {
+          console.error("Saved-card payment success handler failed:", err);
+          handleDirectPaymentError("Payment processing failed");
           setIsProcessingPayment(false);
-          handleDirectPaymentSuccess();
-          toast.success("Payment was already completed successfully!");
-          return;
-        }
-
-        // Helper function to extract payment ID from payment result (handles both response structures)
-        const getPaymentId = (result: any): string | number | undefined => {
-          return result?.payment?.id || result?.data?.payment?.id || result?.payment_id || result?.data?.payment_id;
-        };
-
-        // Helper function to mark payment as complete
-        const markPaymentComplete = async (result: any): Promise<void> => {
-          console.log('Marking payment as complete:', result);
-          const paymentId = getPaymentId(result);
-          if (paymentId) {
-            try {
-              await CompletePayment({
-                payment_id: paymentId,
-                payment_method: "stripe",
-              });
-            } catch (error: any) {
-              console.error('Error marking payment as complete:', error);
-              // Don't throw - payment succeeded on Stripe, just failed to update our DB
-              // The webhook or polling will eventually update the status
-            }
-          }
-        };
-
-        // Extract payment intent from nested structure
-        // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
-        const gatewayResponse = paymentResult?.payment?.gateway_response || paymentResult?.data?.payment?.gateway_response;
-        const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret || paymentResult?.payment_data?.client_secret;
-        const paymentStatus = gatewayResponse?.status || paymentResult?.status;
-        
-        // Check if this is a duplicate/reused payment
-        if (paymentResult?.duplicate) {
-          // This is a reused existing payment - extract client_secret and handle 3D Secure
-          if (clientSecret) {
-            // Load Stripe to confirm payment
-            if (!stripePublishableKey) {
-              handleDirectPaymentError('Stripe is not initialized');
-              setIsProcessingPayment(false);
-              return;
-            }
-
-            const stripeInstance = await loadStripe(stripePublishableKey);
-            if (!stripeInstance) {
-              handleDirectPaymentError('Failed to load Stripe');
-              setIsProcessingPayment(false);
-              return;
-            }
-
-            // Check if confirmation_method is manual AND status is requires_action
-            // handleCardAction can only be used when payment is in requires_action state
-            const confirmationMethod = gatewayResponse?.confirmation_method;
-            const requiresAction = paymentStatus === 'requires_action';
-            
-            // Handle 3D Secure for the reused payment
-            try {
-              let paymentIntent;
-              let confirmError;
-              
-              if (confirmationMethod === 'manual' && requiresAction) {
-                // For manual confirmation with requires_action status, use handleCardAction
-                console.log('Using handleCardAction for duplicate payment (manual confirmation, requires_action)...');
-                const result = await stripeInstance.handleCardAction(clientSecret);
-                confirmError = result.error;
-                paymentIntent = result.paymentIntent;
-              } else if (confirmationMethod === 'manual' && !requiresAction) {
-                // Manual confirmation but not in requires_action state
-                // Backend will handle confirmation, just wait and refresh
-                console.log('Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.');
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.info('Payment is being processed by the backend. Please wait...', {
-                  autoClose: 3000
-                });
-                return;
-              } else {
-                // For automatic confirmation, use confirmCardPayment
-                const result = await stripeInstance.confirmCardPayment(clientSecret);
-                confirmError = result.error;
-                paymentIntent = result.paymentIntent;
-              }
-              
-              if (confirmError) {
-                setIsProcessingPayment(false);
-                toast.error(
-                  confirmError.message || 
-                  'Authentication failed. Please try again or use a different card.'
-                );
-                return;
-              }
-              
-              // Check payment intent status
-              if (paymentIntent?.status === 'succeeded') {
-                // Payment succeeded, update status
-                const paymentId = getPaymentId(paymentResult);
-                if (paymentId) {
-                  try {
-                    await CompletePayment({
-                      payment_id: paymentId,
-                      payment_method: "stripe",
-                    });
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success("Payment authenticated and processed successfully!");
-                  } catch (error: any) {
-                    console.error('Failed to update payment status:', error);
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success("Payment authenticated successfully! Status update may be delayed.");
-                  }
-                } else {
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success("Payment authenticated and processed successfully!");
-                }
-              } else if (paymentIntent?.status === 'requires_confirmation') {
-                // 3D Secure completed successfully, but payment needs backend confirmation
-                // Challenge is complete, so we should call CompletePayment
-                console.log('Payment requires backend confirmation after 3D Secure (duplicate payment - saved card)');
-                
-                const paymentId = getPaymentId(paymentResult);
-                
-                if (paymentId) {
-                  try {
-                    await CompletePayment({
-                      payment_id: paymentId,
-                      payment_method: "stripe",
-                    });
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.success("3D Secure authentication completed! Payment is being processed...");
-                  } catch (error: any) {
-                    console.error('Failed to update payment status:', error);
-                    setIsProcessingPayment(false);
-                    handleDirectPaymentSuccess();
-                    toast.info('3D Secure authentication completed! Payment is being processed...', {
-                      autoClose: 3000
-                    });
-                  }
-                } else {
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.info('3D Secure authentication completed! Payment is being processed...', {
-                    autoClose: 3000
-                  });
-                }
-              } else {
-                setIsProcessingPayment(false);
-                toast.error("Payment authentication incomplete. Please try again.");
-              }
-            } catch (authError: any) {
-              setIsProcessingPayment(false);
-              toast.error(
-                authError.message ||
-                'Authentication process failed. Please try again.'
-              );
-            }
-          } else {
-            // No client_secret for duplicate payment, just refresh
-            setIsProcessingPayment(false);
-            handleDirectPaymentSuccess();
-            toast.success("Payment processed successfully!");
-          }
-          return; // Exit early for duplicate payments
-        }
-        
-        // Check if payment requires 3D Secure authentication
-        if (clientSecret) {
-          // Load Stripe to confirm payment
-          if (!stripePublishableKey) {
-            handleDirectPaymentError('Stripe is not initialized');
-            setIsProcessingPayment(false);
-            return;
-          }
-
-          const stripeInstance = await loadStripe(stripePublishableKey);
-          if (!stripeInstance) {
-            handleDirectPaymentError('Failed to load Stripe');
-            setIsProcessingPayment(false);
-            return;
-          }
-
-          try {
-            // Check if confirmation_method is manual AND status is requires_action
-            // handleCardAction can only be used when payment is in requires_action state
-            const confirmationMethod = gatewayResponse?.confirmation_method;
-            const requiresAction = paymentStatus === 'requires_action';
-            
-            let paymentIntent;
-            let confirmError;
-            
-            if (confirmationMethod === 'manual' && requiresAction) {
-              // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
-              console.log('Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...');
-              
-              const result = await stripeInstance.handleCardAction(clientSecret);
-              confirmError = result.error;
-              paymentIntent = result.paymentIntent;
-            } else if (confirmationMethod === 'manual' && !requiresAction) {
-              // Manual confirmation but not in requires_action state
-              // Backend will handle confirmation, just wait and refresh
-              console.log('Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.');
-              setIsProcessingPayment(false);
-              handleDirectPaymentSuccess();
-              toast.info('Payment is being processed by the backend. Please wait...', {
-                autoClose: 3000
-              });
-              return;
-            } else {
-              // For automatic confirmation or when not manual, use confirmCardPayment
-              const result = await stripeInstance.confirmCardPayment(
-                clientSecret,
-                {
-                  payment_method: selectedCardId
-                }
-              );
-              confirmError = result.error;
-              paymentIntent = result.paymentIntent;
-            }
-            
-            if (confirmError) {
-              setIsProcessingPayment(false);
-              toast.error(
-                confirmError.message || 
-                'Authentication failed. Please try again or use a different card.'
-              );
-              return;
-            }
-            
-            // Check payment intent status
-            if (paymentIntent?.status === 'succeeded') {
-              // Payment succeeded on Stripe, now update our database
-              // Extract payment ID from response (could be nested)
-              const paymentId = getPaymentId(paymentResult);
-              
-              if (paymentId) {
-                try {
-                  await CompletePayment({
-                    payment_id: paymentId,
-                    payment_method: "stripe",
-                  });
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success("Payment authenticated and processed successfully!");
-                } catch (error: any) {
-                  // Even if completePayment fails, payment succeeded on Stripe
-                  // Log error but still show success to user
-                  console.error('Failed to update payment status:', error);
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success("Payment authenticated successfully! Status update may be delayed.");
-                }
-              } else {
-                // No payment ID found, just refresh and let webhook handle it
-                console.warn('Payment ID not found in response, webhook will update status');
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.success("Payment authenticated successfully! Status will be updated shortly.");
-              }
-            } else if (paymentIntent?.status === 'requires_confirmation') {
-              // 3D Secure completed successfully, but payment needs backend confirmation
-              // Challenge is complete, so we should call CompletePayment
-              console.log('Payment requires backend confirmation after 3D Secure (saved card)');
-              
-              const paymentId = getPaymentId(paymentResult);
-              
-              if (paymentId) {
-                try {
-                  await CompletePayment({
-                    payment_id: paymentId,
-                    payment_method: "stripe",
-                  });
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.success("3D Secure authentication completed! Payment is being processed...");
-                } catch (error: any) {
-                  console.error('Failed to update payment status:', error);
-                  setIsProcessingPayment(false);
-                  handleDirectPaymentSuccess();
-                  toast.info('3D Secure authentication completed! Payment is being processed...', {
-                    autoClose: 3000
-                  });
-                }
-              } else {
-                setIsProcessingPayment(false);
-                handleDirectPaymentSuccess();
-                toast.info('3D Secure authentication completed! Payment is being processed...', {
-                  autoClose: 3000
-                });
-              }
-            } else if (paymentIntent?.status === 'requires_action') {
-              // Should not happen after confirmCardPayment/handleCardAction, but handle just in case
-              setIsProcessingPayment(false);
-              toast.error("Payment requires additional authentication. Please try again.");
-            } else {
-              setIsProcessingPayment(false);
-              handleDirectPaymentSuccess();
-              toast.success("Payment processed successfully!");
-            }
-          } catch (authError: any) {
-            setIsProcessingPayment(false);
-            toast.error(
-              authError.message ||
-              'Authentication process failed. Please try again.'
-            );
-          }
-        } else {
-          // No 3D Secure required, payment completed
-          setIsProcessingPayment(false);
-          handleDirectPaymentSuccess();
-          toast.success("Payment processed successfully!");
-        }
+        });
       },
       onError: (error) => {
         handleDirectPaymentError(error.message || 'Payment processing failed');
         setIsProcessingPayment(false);
       }
     });
-  }, [selectedCardId, selectedInvoiceForPayment, createInvoicePayment, handleDirectPaymentSuccess, handleDirectPaymentError, stripePublishableKey]);
-
-
-  const generateInvoiceHTML = useCallback((invoice: InvoiceData) => {
-    // Get company VAT rate
-    const companyVatRate = invoice.company?.profile?.vat_rate ? parseFloat(invoice.company.profile.vat_rate) : 0;
-    const isVatExempt = invoice.company?.profile?.vat_exemption;
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice ${invoice.invoice_number}</title>
-        <style>
-          * { box-sizing: border-box; }
-          body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            background-color: #f8f9fa;
-            color: #333;
-          }
-          .invoice-container {
-            max-width: 800px;
-            margin: 20px auto;
-            background: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          .invoice-header {
-            background: linear-gradient(135deg, #4285f4, #34a853);
-            color: white;
-            padding: 30px;
-            position: relative;
-          }
-          .invoice-title {
-            font-size: 32px;
-            font-weight: bold;
-            margin: 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          }
-          .invoice-details {
-            position: absolute;
-            left: 30px;
-            top: 30px;
-            text-align: left;
-          }
-          .invoice-number {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-          }
-          .invoice-meta {
-            font-size: 14px;
-            opacity: 0.9;
-          }
-          .invoice-meta div {
-            margin-bottom: 5px;
-          }
-          .invoice-body {
-            padding: 30px;
-          }
-          .bill-to-section {
-            margin-bottom: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-            border-left: 4px solid #4285f4;
-          }
-          .bill-to-title {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #2c3e50;
-          }
-          .company-name {
-            font-size: 18px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-          }
-          .vat-info {
-            background-color: #e8f4fd;
-            border: 1px solid #bee5eb;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-          }
-          .vat-info strong {
-            color: #0c5460;
-          }
-          .invoice-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-            border-radius: 6px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          .invoice-table th {
-            background: linear-gradient(135deg, #34495e, #2c3e50);
-            color: white;
-            padding: 15px 12px;
-            text-align: left;
-            font-weight: bold;
-            font-size: 14px;
-          }
-          .invoice-table th:first-child { text-align: left; }
-          .invoice-table th:not(:first-child) { text-align: right; }
-          .invoice-table td {
-            padding: 12px;
-            border-bottom: 1px solid #e9ecef;
-            font-size: 14px;
-          }
-          .invoice-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-          }
-          .invoice-table tr:hover {
-            background-color: #e3f2fd;
-          }
-          .invoice-table td:not(:first-child) {
-            text-align: right;
-          }
-          .totals-section {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 6px;
-            margin-bottom: 30px;
-          }
-          .totals {
-            display: flex;
-            justify-content: flex-start;
-          }
-          .totals-content {
-            width: 300px;
-          }
-          .totals-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            padding: 5px 0;
-          }
-          .totals-row.total-final {
-            border-top: 2px solid #4285f4;
-            padding-top: 10px;
-            margin-top: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #2c3e50;
-          }
-          .totals-label {
-            font-weight: 500;
-          }
-          .totals-amount {
-            font-weight: 600;
-          }
-          .notes-section {
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-          }
-          .notes-section h4 {
-            margin-bottom: 15px;
-            color: #2c3e50;
-            font-size: 16px;
-          }
-          .notes-content {
-            line-height: 1.6;
-            color: #555;
-          }
-          .footer {
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px 30px;
-            text-align: left;
-            font-size: 14px;
-          }
-          .footer-content {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 5px;
-          }
-          @media print {
-            body { 
-              background: white; 
-              margin: 0; 
-              padding: 0; 
-            }
-            .invoice-container {
-              box-shadow: none;
-              margin: 0;
-              max-width: none;
-            }
-            .no-print { display: none; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-container">
-          <div class="invoice-header">
-            <h1 class="invoice-title">INVOICE</h1>
-            <div class="invoice-details">
-              <div class="invoice-number">#${invoice.invoice_number}</div>
-              <div class="invoice-meta">
-                <div><strong>Date:</strong> ${moment(invoice.invoice_date).format('DD/MM/YYYY')}</div>
-                <div><strong>Due Date:</strong> ${invoice.due_date ? moment(invoice.due_date).format('DD/MM/YYYY') : 'N/A'}</div>
-                <div><strong>Currency:</strong> ${invoice.currency_code || 'USD'}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="invoice-body">
-            <div class="bill-to-section">
-              <div class="bill-to-title">Bill To:</div>
-              <div class="company-name">${invoice.company?.name || 'N/A'}</div>
-              ${invoice.company?.profile?.tax_id ? `<div style="color: #666; margin-top: 5px;"><strong>Tax ID:</strong> ${invoice.company.profile.tax_id}</div>` : ''}
-            </div>
-
-            <div class="vat-info">
-              <strong>VAT Information:</strong> ${isVatExempt ? 'VAT Exempt' : `VAT Rate: ${companyVatRate}%`}
-            </div>
-
-            <table class="invoice-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Qty</th>
-                  <th>Unit Price</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${invoice.items.map(item => {
-                  const product = companyProducts.find(p => p.id.toString() === item.product_id.toString());
-                  const productInfo = getEffectiveProductPrice(item.product_id.toString(), invoice.company_id);
-                  const productCurrency = productInfo.currency;
-                  const lineTotalUSD = parseFloat(item.quantity) * parseFloat(item.unit_price);
-                  const exchangeRate = getExchangeRate(productCurrency, invoice.currency_code || 'USD');
-                  const lineTotal = lineTotalUSD * exchangeRate;
-                  return `
-                    <tr>
-                      <td>${product?.name || 'Unknown Product'}</td>
-                      <td>${item.quantity}</td>
-                      <td>${(parseFloat(item.unit_price) * exchangeRate).toFixed(2)}</td>
-                      <td>${lineTotal.toFixed(2)}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-
-            <div class="totals-section">
-              <div class="totals">
-                <div class="totals-content">
-                  <div class="totals-row">
-                    <span class="totals-label">Subtotal:</span>
-                    <span class="totals-amount">${invoice.currency_code || 'AED'} ${parseFloat(invoice.subtotal || '0').toFixed(2)}</span>
-                  </div>
-                  <div class="totals-row">
-                    <span class="totals-label">VAT (${isVatExempt ? 'Exempt' : companyVatRate + '%'}):</span>
-                    <span class="totals-amount">${invoice.currency_code || 'AED'} ${parseFloat(invoice.tax_amount || '0').toFixed(2)}</span>
-                  </div>
-                  <div class="totals-row total-final">
-                    <span class="totals-label">Total Amount:</span>
-                    <span class="totals-amount">${invoice.currency_code || 'USD'} ${parseFloat(invoice.total_amount || '0').toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            ${invoice.notes ? `
-              <div class="notes-section">
-                <h4>Notes:</h4>
-                <div class="notes-content">${invoice.notes}</div>
-              </div>
-            ` : ''}
-
-            ${invoice.terms_conditions ? `
-              <div class="notes-section">
-                <h4>Terms & Conditions:</h4>
-                <div class="notes-content">${invoice.terms_conditions
-                  .split('\n')
-                  .map(line => {
-                    const trimmedLine = line.trim();
-                    
-                    // Handle bullet points
-                    if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
-                      return `<div class="d-flex align-items-start mb-1"><span class="me-2 text-primary">•</span><span>${trimmedLine.substring(1).trim()}</span></div>`;
-                    }
-                    
-                    // Handle numbered lists
-                    if (/^\d+\./.test(trimmedLine)) {
-                      const match = trimmedLine.match(/^(\d+\.)\s*(.*)/);
-                      if (match) {
-                        return `<div class="d-flex align-items-start mb-1"><span class="me-2 text-primary fw-bold">${match[1]}</span><span>${match[2]}</span></div>`;
-                      }
-                      return `<div class="mb-1">${trimmedLine}</div>`;
-                    }
-                    
-                    // Handle empty lines
-                    if (trimmedLine === '') {
-                      return '<div class="mb-2">&nbsp;</div>';
-                    }
-                    
-                    // Regular lines
-                    return `<div class="mb-1">${trimmedLine}</div>`;
-                  })
-                  .join('')}</div>
-              </div>
-            ` : ''}
-          </div>
-
-          <div class="footer">
-            <div class="footer-content">
-              <div>Thank you for your business!</div>
-              <div>Generated on ${moment().format('DD/MM/YYYY HH:mm')}</div>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-  }, [companyProducts]);
-
-  // Print and PDF functions
-  
-
+  }, [selectedCardId, selectedInvoiceForPayment, createInvoicePayment, handleSavedCardPaymentSuccess, handleDirectPaymentError]);
   const handleDownloadPDF = useCallback(async (invoice: InvoiceData) => {
     try {
       await downloadInvoicePdf(invoice.id);
@@ -2522,7 +1809,6 @@ const InvoiceList = () => {
     >
       <button
         onClick={() => {
-          // window.location.href = "/billing/create-invoice";
           router.push('/billing/create-invoice');
         }}
         style={{
@@ -2686,13 +1972,13 @@ const InvoiceList = () => {
               {
                 label: "Total Amount",
                 value: selectedInvoiceSidebar
-                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.total_amount || "0"))}`
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(Number.parseFloat(selectedInvoiceSidebar?.total_amount || "0"))}`
                   : "N/A",
               },
               {
                 label: "Amount Due",
                 value: selectedInvoiceSidebar
-                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.amount_due || "0"))}`
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(Number.parseFloat(selectedInvoiceSidebar?.amount_due || "0"))}`
                   : "N/A",
               },
               {
@@ -2726,7 +2012,7 @@ const InvoiceList = () => {
             variant: "primary",
             onClick: () => {
               if (selectedInvoiceSidebar) {
-                setSelectedInvoiceForView(selectedInvoiceSidebar);
+                setSelectedInvoiceForView(toInvoiceViewData(selectedInvoiceSidebar));
                 setShowViewInvoiceModal(true);
                 closeInvoiceSidebar();
               }
@@ -2736,7 +2022,7 @@ const InvoiceList = () => {
             label: "Pay Now",
             icon: DollarSign,
             variant: "success",
-            show: !!(selectedInvoiceSidebar && (selectedInvoiceSidebar.status === STATUS_PENDING || selectedInvoiceSidebar.status === STATUS_OVERDUE || selectedInvoiceSidebar.status === STATUS_PARTIALLY_PAID) && session?.user?.permissions?.includes("pay-invoices-billing")),
+            show: canPaySelectedInvoice,
             onClick: () => {
               if (selectedInvoiceSidebar) {
                 handlePayInvoice(selectedInvoiceSidebar);
@@ -2768,13 +2054,11 @@ const InvoiceList = () => {
           setCurrentFilters({ ...pendingFilters });
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((prev) => prev + 1);
-          setActiveStatusTab(pendingFilters.status ?? null);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
           setPendingFilters({});
           setCurrentFilters({});
-          setActiveStatusTab(null);
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
@@ -2808,24 +2092,10 @@ const InvoiceList = () => {
                     <p><strong>Due Date:</strong> {selectedInvoiceForPayment.due_date ? moment(selectedInvoiceForPayment.due_date).format('DD-MMM-YYYY') : 'N/A'}</p>
                   </div>
                   <div className="col-md-6">
-                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0'))}</p>
-                    <p><strong>TAX Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0'))}</p>
-                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0'))}</p>
+                    <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(Number.parseFloat(selectedInvoiceForPayment.subtotal || '0'))}</p>
+                    <p><strong>TAX Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(Number.parseFloat(selectedInvoiceForPayment.tax_amount || '0'))}</p>
+                    <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(Number.parseFloat(selectedInvoiceForPayment.total_amount || '0'))}</p>
                     
-                    {/* Currency Conversion Display */}
-                    {/* {exchangeRates.length > 0 && baseCurrency !== (selectedInvoiceForPayment.currency_code || 'USD') && (
-                      <div className="mt-3 p-2 bg-light rounded">
-                        <small className="text-muted">Converted to {baseCurrency}:</small>
-                        <div className="mt-1">
-                          <div><strong>Subtotal:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                          <div><strong>VAT Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                          <div><strong className="text-primary">Total Amount:</strong> {baseCurrency} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0') * getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))}</div>
-                        </div>
-                        <small className="text-muted">
-                          Exchange Rate: 1 {selectedInvoiceForPayment.currency_code || 'USD'} = {formatNumber(getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))} {baseCurrency}
-                        </small>
-                      </div>
-                    )} */}
                   </div>
                 </div>
               </div>
@@ -2836,23 +2106,21 @@ const InvoiceList = () => {
               <h6 className="mb-3">Payment Method</h6>
 
               {/* Tabs */}
-              <ul className="nav nav-tabs mb-3" role="tablist">
-                <li className="nav-item" role="presentation">
+              <ul className="nav nav-tabs mb-3">
+                <li className="nav-item">
                   <button
                     className={`nav-link ${activePaymentTab === 'saved-cards' ? 'active' : ''}`}
                     onClick={() => setActivePaymentTab('saved-cards')}
                     type="button"
-                    role="tab"
                   >
                     Saved Cards
                   </button>
                 </li>
-                <li className="nav-item" role="presentation">
+                <li className="nav-item">
                   <button
                     className={`nav-link ${activePaymentTab === 'direct-payment' ? 'active' : ''}`}
                     onClick={() => setActivePaymentTab('direct-payment')}
                     type="button"
-                    role="tab"
                   >
                     Direct Payment
                   </button>
@@ -2947,10 +2215,10 @@ const InvoiceList = () => {
                     {stripePublishableKey ? (
                       <Elements stripe={loadStripe(stripePublishableKey)}>
                         <DirectCardPaymentForm
-                          amount={parseFloat(selectedInvoiceForPayment.total_amount || '0')}
+                          amount={Number.parseFloat(selectedInvoiceForPayment.total_amount || "0")}
                           currency={selectedInvoiceForPayment.currency_code || 'USD'}
                           invoiceId={selectedInvoiceForPayment.id}
-                          customerId={parseInt(selectedInvoiceForPayment.company_id || '0')}
+                          customerId={Number.parseInt(selectedInvoiceForPayment.company_id || "0", 10)}
                           onPaymentSuccess={handleDirectPaymentSuccess}
                           onPaymentError={handleDirectPaymentError}
                         />
@@ -2988,377 +2256,13 @@ const InvoiceList = () => {
       )}
 
       {/* View Invoice Modal */}
-      {showViewInvoiceModal && (
-        <Modal
-          show={showViewInvoiceModal}
-          onHide={closeViewInvoiceModal}
-          size="xl"
-          centered
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Invoice Details
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {selectedInvoiceForView ? (
-              <>
-
-              <Row>
-                <Col md={6}>
-                  <h3 className="mb-2">{session?.user?.company_name || ''}</h3>
-                    
-                    {selectedInvoiceForView?.company?.reseller?.profile?.tax_id && selectedInvoiceForView?.company?.reseller?.profile?.tax_id > 0 && (
-                    <h5 className="mb-3 fw-bold" style={{ color: '#14509e' }}>TAX INVOICE {selectedInvoiceForView?.company?.reseller?.profile?.tax_id || ''}</h5>
-                    )}
-                    
-                  <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.address || ''}</p>
-                    {selectedInvoiceForView?.company?.reseller?.profile?.city && selectedInvoiceForView?.company?.reseller?.profile?.city > 0 && (
-                    <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.city || ''}, {selectedInvoiceForView?.company?.reseller?.profile?.country || ''}</p>
-                    )}
-                    
-                  <p className="mb-2"><b>Phone:</b>{selectedInvoiceForView?.company?.reseller?.phone || ''}</p>
-                  <p className="mb-3"><b>Email:</b> {selectedInvoiceForView?.company?.reseller?.email || ''}</p>
-                </Col>
-                <Col md={6}>
-                  <div>
-                  <img src={selectedInvoiceForView?.company?.reseller?.profile?.logo_url || PrimeAlleyLogo.src} alt="Logo" className="img-fluid" style={{maxWidth: '60%',float:"right"}} />
-                    </div>
-                  {Number(selectedInvoiceForView.amount_due) > 0 && (
-                        <>
-                        <div className="text-end mt-3" style={{float:"right",clear:"both",fontSize:"1.2rem",}}>Due Amount: 
-                          <span className="fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</span>
-                        </div>
-                        </>
-                    )}
-                </Col>
-              </Row>
-
-              <Row>
-                <Col md={6}>
-                <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Bill To</h5>
-                  <div className="border p-3 rounded bg-light mb-3">
-                    <p className="mb-2 fw-bold">{getCompanyByCrmId(selectedInvoiceForView?.company?.crm_company_id, companyOptions) ?? ''}</p>
-                    <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
-                    <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
-
-                    {selectedInvoiceForView?.company?.profile?.tax_id && selectedInvoiceForView?.company?.profile?.tax_id > 0 && (
-                    <p className="mb-0 fw-bold"><b>TRN No.:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
-                    )}
-
-                  </div>
-                </Col>
-                <Col md={6}>
-                <table className="table table-borderless">
-                      <tbody>
-                      
-                        <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
-                          <td className="p-2">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Date:</td>
-                          <td className="p-2">{selectedInvoiceForView.invoice_date
-                              ? moment(selectedInvoiceForView.invoice_date).format(GlobalDateFormat)
-                              : 'N/A'}</td>
-                        </tr>
-                        
-                        <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Period:</td>
-                          <td className="p-2">
-                            {selectedInvoiceForView.invoice_date
-                              ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
-                              : 'N/A'} - {(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format('DD MMM YYYY') : 'N/A'}
-                          </td>
-                        </tr>
-
-                        {/* <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
-                          <td className="p-2">{(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
-                        </tr> */}
-                        
-                        <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Terms:</td>
-                          <td className="p-2">{selectedInvoiceForView?.company?.reseller?.profile?.payment_terms+ ' days'}</td>
-                        </tr>
-                        
-                        
-
-                        <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Due Date:</td>
-                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
-                        </tr>
-
-                      </tbody>
-                    </table>
-                </Col>
-              </Row>
-              
-              
-              <div>
-                {/* Invoice Header */}
-                {/* <div className="row mb-4">
-                  <div className="col-md-6">
-                    <h5 className="mb-3 alert alert-info">Invoice Information</h5>
-                    <table className="table table-borderless">
-                      <tbody>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
-                          <td>{selectedInvoiceForView.invoice_number || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
-                          <td>
-                            {selectedInvoiceForView.invoice_date
-                              ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
-                              : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Due Date:</td>
-                          <td>
-                            {selectedInvoiceForView.due_date
-                              ? moment(selectedInvoiceForView.due_date).format('DD MMM YYYY')
-                              : 'N/A'}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Status:</td>
-                          <td>
-                            <Badge
-                              bg={
-                                selectedInvoiceForView.status === STATUS_PAID
-                                  ? 'success'
-                                  : selectedInvoiceForView.status === STATUS_OVERDUE
-                                  ? 'danger'
-                                  : selectedInvoiceForView.status === STATUS_PARTIALLY_PAID
-                                  ? 'warning'
-                                  : selectedInvoiceForView.status === STATUS_PENDING
-                                  ? 'info'
-                                  : 'secondary'
-                              }
-                            >
-                              {selectedInvoiceForView.status?.toUpperCase() || 'N/A'}
-                            </Badge>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Payment Mode:</td>
-                          <td style={{ textTransform: 'uppercase' }}>{selectedInvoiceForView.payment_mode || 'N/A'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="col-md-6">
-                    <h5 className="mb-3 alert alert-info">Company Information</h5>
-                    {selectedInvoiceForView.company ? (
-                      <table className="table table-borderless">
-                        <tbody>
-                          <tr>
-                            <td style={{ verticalAlign: 'top', width: '40%' }} className="fw-bold" >Company Name:</td>
-                            <td>{selectedInvoiceForView.company.name || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Country:</td>  
-                            <td>{selectedInvoiceForView.company.country || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Phone:</td>
-                            <td>{selectedInvoiceForView.company.phone || 'N/A'}</td>
-                          </tr>
-                          <tr>
-                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Email:</td>
-                            <td className="text-lowercase">{selectedInvoiceForView.company.email || 'N/A'}</td>
-                          </tr>
-                          {selectedInvoiceForView.company.profile?.address && (
-                            <tr>
-                              <td style={{ verticalAlign: 'top' }} className="fw-bold">Address:</td>
-                              <td className="text-capitalize">{selectedInvoiceForView.company.profile.address}</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p className="text-muted">No company information available</p>
-                    )}
-                  </div>
-                </div> */}
-
-                {/* Invoice Items */}
-                <div className="mb-4">
-                  {/* <h5 className="mb-3">Invoice Items</h5> */}
-                  {selectedInvoiceForView.items && selectedInvoiceForView.items.length > 0 ? (
-                    <div className="">
-                      <table className="table table-bordered table-sm">
-                        <thead className="table-dark" style={{backgroundColor: '#0f3b66', color: 'white'}}>
-                          <tr>
-                            <th className="text-uppercase">Product Name</th>
-                            <th className="text-uppercase text-start">Product Description</th>
-                            <th className="text-uppercase text-end">QTY</th>
-                            <th className="text-uppercase text-end">Unit Price ({selectedInvoiceForView.currency_code || 'AED'})</th>
-                            <th className="text-uppercase text-end">Tax ({selectedInvoiceForView.currency_code || 'AED'})</th>
-                            <th className="text-uppercase text-end">Amount ({selectedInvoiceForView.currency_code || 'AED'})</th>
-                            <th className="text-uppercase text-end">Total Price ({selectedInvoiceForView.currency_code || 'AED'})</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedInvoiceForView.items.map((item: any, index: number) => (
-                            
-                            <tr key={item.id || index}>
-                              <td className="text-capitalize">{item.product?.name}</td>
-                              <td className="text-start" style={{whiteSpace: 'wrap'}}>
-                              <p className="mb-0">{item.description}</p>
-                                {/* <div>
-                                  <strong>{item.product?.name || item.description || 'N/A'}</strong>
-                                  {(() => {
-                                    // Use item.description if available, otherwise use item.product.description
-                                    const description = item.description || item.product?.description || '';
-                                    const productName = item.product?.name || '';
-                                    // Only show description if it exists and is different from the product name
-                                    if (description && description !== productName) {
-                                      return (
-                                        <div className="text-muted small">
-                                          {description.length > 50 ? (
-                                            <>
-                                              {description.substring(0, 50)}...
-                                              <button
-                                                className="btn btn-link p-0 ms-1 text-decoration-none"
-                                                style={{ fontSize: '0.875rem' }}
-                                                onClick={() => {
-                                                  setSelectedDescription(description);
-                                                  setShowDescriptionModal(true);
-                                                }}
-                                              >
-                                                Show more
-                                              </button>
-                                            </>
-                                          ) : (
-                                            description
-                                          )}
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div> */}
-                              </td>
-                              <td className="text-end">{item.quantity}</td>
-                              <td className="text-end">
-                                 {formatNumber(parseFloat(item.unit_price || '0'))}
-                              </td>
-                              
-                              {/* <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td> */}
-                              <td className="text-end">
-                                 {formatNumber(parseFloat(item.tax_amount || '0'))}
-                              </td>
-
-
-                              <td className="text-end">
-                                 {formatNumber(parseFloat(item.line_total || '0'))}
-                              </td>
-                              
-                              <td className="text-end">
-                                <strong>
-                                  {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
-                                </strong>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      <Row>
-                        <Col md={6}>
-                          {/* <Card>
-                            <Card.Body>
-                              <Card.Title>Notes & Terms</Card.Title>
-                              <p>{selectedInvoiceForView.notes}</p>
-                              <p>{selectedInvoiceForView.terms_conditions}</p>
-                              <p>{!selectedInvoiceForView.notes && !selectedInvoiceForView.terms_conditions && 'No notes or terms provided'}</p>
-                            </Card.Body>
-                          </Card> */}
-                          <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Terms & Conditions</h5>
-                          <ol style={{paddingLeft: '15px'}}>
-                            <li><p className="mb-1 text-muted">Payment can be made as bank transfer or direct deposit</p></li>
-                            <li><p className="mb-1 text-muted">Cheque can be issued in favor of {selectedInvoiceForView?.company?.reseller?.name || 'N/A'}.</p></li>
-                            <li><p className="mb-1 text-muted">Services may be disconnected after the due date without further notice.</p></li>
-                            <li><p className="mb-1 text-muted">Value Added Tax (VAT) 5% will be applicable to this invoice.</p></li>
-                          </ol>
-                        </Col>
-                        <Col md={6}>
-                        <table className="table table-borderless table-sm">
-                                <tr> <td className="p-0 fw-bold">Subtotal</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.subtotal || '0'))}</td> </tr>
-                                <tr> <td className="p-0 fw-bold">Vat Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.tax_amount || '0'))}</td> </tr>
-                                <tr> <td className="p-0 fw-bold">Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.total_amount || '0'))}</td> </tr>
-                                
-
-                                {Number(selectedInvoiceForView.paid_amount) >= 0 && (
-                                <tr style={{borderTop: '2px #000 solid'}}>
-                                  <td className="p-0 fw-bold text-uppercase">Paid Amount</td>
-                                  <td className="text-end fw-bold text-success">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.paid_amount ?? 0)))}</td>
-                                </tr>
-                                )}
-                                {Number(selectedInvoiceForView.amount_due) >= 0 && (
-                                <tr >
-                                  <td className="p-0 fw-bold text-uppercase">Due Amount</td>
-                                  <td className="text-end fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</td>
-                                </tr>
-                                )}
-
-
-                           </table>
-                        </Col>
-                      </Row>
-                    </div>
-                  ) : (
-                    <Alert variant="info">No items found for this invoice</Alert>
-                  )}
-                </div>
-
-                 {/* Notes */}
-                 <div className="mb-3 alert alert-info">
-                    <h6>Bank Accounts</h6>
-                    
-                   
-                 {selectedInvoiceForView?.company?.reseller?.bank_accounts && selectedInvoiceForView?.company?.reseller?.bank_accounts.length > 0 && (
-                   
-                      <>
-                      <Row>
-                        {selectedInvoiceForView?.company?.reseller?.bank_accounts?.map((bankAccount: any) => (
-                        
-                          <Col md={4}>
-                            <p className="mb-1"><b>Bank Name:</b> {bankAccount.bank_name}</p>
-                            <p className="mb-1"><b>Account Holder Name:</b> {bankAccount.account_holder_name}</p>
-                            <p className="mb-1"><b>Account Number:</b> {bankAccount.account_number}</p>
-                            <p className="mb-1"><b>Currency:</b> {bankAccount.currency}</p>
-                            <p className="mb-1"><b>Routing Number:</b> {bankAccount.routing_number}</p>
-                            <p className="mb-1"><b>Swift Code:</b> {bankAccount.swift_code}</p>
-                            <p className="mb-1"><b>IBAN:</b> {bankAccount.iban}</p>
-                          </Col>
-                          
-                        ))}
-                         </Row>
-                       
-                   </>
-                )}
-               
-                 
-                  </div>
-              </div>
-
-              </>
-
-            ) : (
-              <Alert variant="warning">No invoice data available</Alert>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeViewInvoiceModal}>
-              Close
-            </Button>
-            
-          </Modal.Footer>
-        </Modal>
-      )}
+      <InvoiceViewModal
+        show={showViewInvoiceModal}
+        onHide={closeViewInvoiceModal}
+        invoice={selectedInvoiceForView}
+        companyName={session?.user?.company_name || ""}
+        companyOptions={companyOptions}
+      />
 
       {/* Description Modal */}
       <Modal
