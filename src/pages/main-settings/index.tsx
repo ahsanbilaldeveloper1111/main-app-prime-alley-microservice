@@ -1,4 +1,4 @@
-import React, { ReactElement, useState, useRef, useMemo, useCallback, useEffect } from 'react'
+import React, { ReactElement, useState, useRef, useMemo, useEffect } from 'react'
 import { Clock } from 'lucide-react'
 import { useRouter } from 'next/router'
 import Layout from '@layout/index'
@@ -13,7 +13,6 @@ import Stages from '@pages/crm/stages'
 import DealTemplates from '@pages/crm/deal-templates'
 import BusinessTypes from '@pages/crm/business-types'
 import ManageExtensions from '@pages/ai-ml/manage-extensions'
-import BackendOperations from '@pages/ai-ml/backend-operations'
 import ManualAnalysis from '@pages/ai-ml/analysis'
 import WorkPlannerStatuses from '@pages/planner/statuses'
 import OutboundTrunkProfiles from '@pages/ai-agent/outbound/trunk-profiles'
@@ -25,7 +24,6 @@ import Hosts from '@pages/pulse/hosts'
 import HostGroups from '@pages/pulse/host-groups'
 import Events from '@pages/pulse/events'
 import RequestCategories from '@pages/workforce/request-categories'
-import RequestSubCategories from '@pages/workforce/sub-categories'
 import PaymentMethods from '@pages/billing/payment-methods'
 import TicketStatuses from '@pages/tickets/statuses'
 import TicketModules from '@pages/tickets/modules'
@@ -44,7 +42,6 @@ import GsmAssign from '@pages/gsm/assign'
 import GsmSync from '@pages/gsm/sync'
 import CompanyPO from '@pages/gsm/company/po'
 import UserDefaults from '@components/UserDefaults'
-import GenericTable from '@components/GenericTable'
 import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -61,6 +58,33 @@ type Tab = {
 type ControlledTabsProps = {
   activeTab?: string
   onTabChange?: (tabId: string) => void
+}
+
+function getUserPermissions(session: unknown): string[] {
+  const perms = (session as { user?: { permissions?: unknown } } | null | undefined)?.user?.permissions
+  if (Array.isArray(perms)) return perms.map((p) => String(p))
+  if (typeof perms === 'string') {
+    return perms
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function filterTabsByPermission(tabs: Tab[], userPermissions: string[]): Tab[] {
+  return tabs.filter((t) => !t.permission || userPermissions.includes(t.permission))
+}
+
+function resolveAllowedActiveTabId(routeActiveTab: string | undefined, activeTab: string, allowedTabs: Tab[]): string {
+  const allowedIds = new Set(allowedTabs.map((t) => t.id))
+  const requested = routeActiveTab
+  return (
+    (requested && allowedIds.has(requested) ? requested : null) ??
+    (allowedIds.has(activeTab) ? activeTab : null) ??
+    allowedTabs[0]?.id ??
+    ''
+  )
 }
 
 const accountDefaultsTabs: Tab[] = [
@@ -1071,11 +1095,15 @@ const usersTeamsTabs: Tab[] = [
 ]
 
 const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(usersTeamsTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('user-directory')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'user-directory': <Users />,
@@ -1107,9 +1135,9 @@ const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
           overflow: 'hidden',
         }}
       >
-        {usersTeamsTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === usersTeamsTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1140,7 +1168,13 @@ const UsersTeamsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1156,11 +1190,15 @@ const smartCrmTabs: Tab[] = [
 ]
 
 const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(smartCrmTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('stages')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     stages: <Stages />,
@@ -1193,9 +1231,9 @@ const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab
           overflow: 'hidden',
         }}
       >
-        {smartCrmTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === smartCrmTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1226,7 +1264,13 @@ const SmartCrmPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1238,11 +1282,21 @@ const communicationsTabs: Tab[] = [
 ]
 
 const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(communicationsTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('manage-extensions')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const allowedIds = new Set(allowedTabs.map((t) => t.id))
+    const requested = routeActiveTab
+    const next =
+      (requested && allowedIds.has(requested) ? requested : null) ??
+      (allowedIds.has(activeTab) ? activeTab : null) ??
+      allowedTabs[0]?.id ??
+      ''
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'manage-extensions': <ManageExtensions />,
@@ -1271,9 +1325,9 @@ const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAct
           overflow: 'hidden',
         }}
       >
-        {communicationsTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === communicationsTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1304,29 +1358,102 @@ const CommunicationsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAct
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
 
 // ─── Planner (from settings: Work Planner Statuses) ───────────────────────────
-const PlannerPage: React.FC = () => (
-  <div style={{ padding: '32px 40px', flex: 1 }}>
-    <h1
-      style={{
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
-        fontSize: '24px',
-        fontWeight: 'bold',
-        color: '#141414',
-        marginBottom: '24px',
-        letterSpacing: 0,
-      }}
-    >
-      Planner
-    </h1>
-    <WorkPlannerStatuses />
-  </div>
-)
+const plannerTabs: Tab[] = [
+  { id: 'statuses', label: 'Statuses', permission: PERMISSIONS.VIEW_STATUSES_WORK_PLANNER },
+]
+
+const PlannerPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(plannerTabs, userPermissions), [userPermissions])
+  const [activeTab, setActiveTab] = useState('statuses')
+
+  useEffect(() => {
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
+
+  const tabContentMap: Record<string, React.ReactNode> = {
+    statuses: <WorkPlannerStatuses />,
+  }
+
+  return (
+    <div style={{ padding: '32px 40px', flex: 1 }}>
+      <h1
+        style={{
+          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontSize: '24px',
+          fontWeight: 'bold',
+          color: '#141414',
+          marginBottom: '24px',
+          letterSpacing: 0,
+        }}
+      >
+        Planner
+      </h1>
+
+      <div
+        style={{
+          display: 'flex',
+          marginBottom: '32px',
+          overflow: 'hidden',
+        }}
+      >
+        {allowedTabs.map((tab, index) => {
+          const isActive = activeTab === tab.id
+          const isLast = index === allowedTabs.length - 1
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id)
+                onTabChange?.(tab.id)
+              }}
+              style={{
+                padding: '12px 28px',
+                background: isActive ? '#ffffff' : 'whitesmoke',
+                border: '1px solid #e0e0e0',
+                borderRight: isLast ? '1px solid #e0e0e0' : 'none',
+                borderBottom: isActive ? '2px solid #ffffff' : '2px solid #e0e0e0',
+                cursor: 'pointer',
+                fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+                fontSize: '14px',
+                fontWeight: 300,
+                color: '#141414',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+                position: 'relative',
+                top: '1px',
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ─── Workforce (from settings: Request Categories, Sub Categories) ────────────
 const workforceTabs: Tab[] = [
@@ -1335,11 +1462,15 @@ const workforceTabs: Tab[] = [
 ]
 
 const WorkforcePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(workforceTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('request-categories')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'request-categories': <RequestCategories />,
@@ -1368,9 +1499,9 @@ const WorkforcePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTa
           overflow: 'hidden',
         }}
       >
-        {workforceTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === workforceTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1401,7 +1532,13 @@ const WorkforcePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTa
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1412,11 +1549,15 @@ const billingTabs: Tab[] = [
 ]
 
 const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(billingTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('payment-methods')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'payment-methods': <PaymentMethods />,
@@ -1444,9 +1585,9 @@ const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
           overflow: 'hidden',
         }}
       >
-        {billingTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === billingTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1477,7 +1618,13 @@ const BillingPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1492,11 +1639,15 @@ const ticketsTabs: Tab[] = [
 ]
 
 const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(ticketsTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('statuses')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     statuses: <TicketStatuses />,
@@ -1509,9 +1660,9 @@ const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
     <div style={{ padding: '32px 40px', flex: 1 }}>
       <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Tickets</h1>
       <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
-        {ticketsTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === ticketsTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1541,7 +1692,13 @@ const TicketsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab,
           )
         })}
       </div>
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1555,11 +1712,15 @@ const helpCenterTabs: Tab[] = [
 ]
 
 const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(helpCenterTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('modules')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     modules: <FAQModules />,
@@ -1571,9 +1732,9 @@ const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
     <div style={{ padding: '32px 40px', flex: 1 }}>
       <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>Help Center</h1>
       <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
-        {helpCenterTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === helpCenterTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1603,7 +1764,13 @@ const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
           )
         })}
       </div>
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1617,11 +1784,15 @@ const aiChatTabs: Tab[] = [
 ]
 
 const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(aiChatTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('tools-profiles')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'tools-profiles': <ToolProfiles />,
@@ -1633,9 +1804,9 @@ const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, 
     <div style={{ padding: '32px 40px', flex: 1 }}>
       <h1 style={{ fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif', fontSize: '24px', fontWeight: 'bold', color: '#141414', marginBottom: '24px', letterSpacing: 0 }}>AI Chat</h1>
       <div style={{ display: 'flex', marginBottom: '32px', overflow: 'hidden' }}>
-        {aiChatTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === aiChatTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1665,7 +1836,13 @@ const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, 
           )
         })}
       </div>
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1681,11 +1858,15 @@ const virtualAgentsTabs: Tab[] = [
 ]
 
 const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(virtualAgentsTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('trunk-profiles')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'trunk-profiles': <OutboundTrunkProfiles />,
@@ -1717,9 +1898,9 @@ const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActi
           overflow: 'hidden',
         }}
       >
-        {virtualAgentsTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === virtualAgentsTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1750,7 +1931,13 @@ const VirtualAgentsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActi
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -1766,11 +1953,15 @@ const pulseTabs: Tab[] = [
 ]
 
 const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(pulseTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('host-groups')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     'hosts': <Hosts />,
@@ -1803,9 +1994,9 @@ const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, o
           overflow: 'hidden',
         }}
       >
-        {pulseTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id
-          const isLast = index === pulseTabs.length - 1
+          const isLast = index === allowedTabs.length - 1
           return (
             <button
               key={tab.id}
@@ -1836,7 +2027,13 @@ const PulsePage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, o
         })}
       </div>
 
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
