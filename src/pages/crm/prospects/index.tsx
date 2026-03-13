@@ -711,7 +711,7 @@ const CrmProspectsManagement = () => {
       setShowCreateContactSidebar(true);
       const rawEditId = router.query.editContactId;
       const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-      const editIdNum = editIdStr != null ? Number(editIdStr) : Number.NaN;
+      const editIdNum = Number(editIdStr);
       if (Number.isFinite(editIdNum) && editIdNum > 0) {
         setEditingContactId(editIdNum);
       }
@@ -1625,11 +1625,12 @@ const CrmProspectsManagement = () => {
       campaignIds.includes(c.value),
     );
 
-    const tagValues = Array.isArray(currentFilters.tags)
-      ? currentFilters.tags
-      : currentFilters.tags
-        ? [currentFilters.tags]
-        : [];
+    let tagValues: string[] = [];
+    if (Array.isArray(currentFilters.tags)) {
+      tagValues = currentFilters.tags;
+    } else if (currentFilters.tags) {
+      tagValues = [currentFilters.tags];
+    }
     const selectedTagOptions = availableTags.filter((t) =>
       tagValues.includes(t.value),
     );
@@ -1641,20 +1642,25 @@ const CrmProspectsManagement = () => {
     const nextCallLabel = (() => {
       if (!nextFrom && !nextTo) return undefined;
       if (nextFrom && nextTo && nextFrom === nextTo) {
-        return moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D, YYYY")
+        if (moment(nextFrom).isValid()) {
+          return moment(nextFrom).format("MMM D, YYYY");
+        }
+        return String(nextFrom);
+      }
+
+      let fromLabel = "…";
+      if (nextFrom) {
+        fromLabel = moment(nextFrom).isValid()
+          ? moment(nextFrom).format("MMM D")
           : String(nextFrom);
       }
-      const fromLabel = nextFrom
-        ? moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D")
-          : String(nextFrom)
-        : "…";
-      const toLabel = nextTo
-        ? moment(nextTo).isValid()
+
+      let toLabel = "…";
+      if (nextTo) {
+        toLabel = moment(nextTo).isValid()
           ? moment(nextTo).format("MMM D")
-          : String(nextTo)
-        : "…";
+          : String(nextTo);
+      }
       return `${fromLabel} – ${toLabel}`;
     })();
 
@@ -6272,41 +6278,35 @@ const CrmProspectsManagement = () => {
             itemType={
               deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
             }
-            additionalInfo={(() => {
-              if (deleteModalMode === "single" && itemToDelete) {
-                return (
-                  <div className="alert alert-warning mb-3">
-                    <strong>Entry ID:</strong> #{itemToDelete.id}
-                    <br />
-                    <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-                    <br />
-                    <strong>Assigned To:</strong>{" "}
-                    {itemToDelete.user_extension
-                      ? extensions.find(
-                          (extension: any) =>
-                            extension.id.toString() ===
-                            itemToDelete.user_extension?.toString(),
-                        )?.display_name || itemToDelete.user_extension
-                      : "Unassigned"}
-                    <br />
-                    <strong>Created:</strong>{" "}
-                    {moment(itemToDelete.created_at).format(
-                      "MMM DD, YYYY HH:mm",
-                    )}
-                  </div>
-                );
-              }
-              if (deleteModalMode === "bulk") {
-                return (
-                  <div className="alert alert-warning mb-3">
-                    <strong>Warning:</strong> This action cannot be undone. All{" "}
-                    {selectedItems.length} selected entries will be permanently
-                    deleted.
-                  </div>
-                );
-              }
-              return undefined;
-            })()}
+            additionalInfo={
+              deleteModalMode === "single" && itemToDelete ? (
+                <div className="alert alert-warning mb-3">
+                  <strong>Entry ID:</strong> #{itemToDelete.id}
+                  <br />
+                  <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+                  <br />
+                  <strong>Assigned To:</strong>{" "}
+                  {itemToDelete.user_extension
+                    ? extensions.find(
+                        (extension: any) =>
+                          extension.id.toString() ===
+                          itemToDelete.user_extension?.toString(),
+                      )?.display_name || itemToDelete.user_extension
+                    : "Unassigned"}
+                  <br />
+                  <strong>Created:</strong>{" "}
+                  {moment(itemToDelete.created_at).format(
+                    "MMM DD, YYYY HH:mm",
+                  )}
+                </div>
+              ) : deleteModalMode === "bulk" ? (
+                <div className="alert alert-warning mb-3">
+                  <strong>Warning:</strong> This action cannot be undone. All{" "}
+                  {selectedItems.length} selected entries will be permanently
+                  deleted.
+                </div>
+              ) : undefined
+            }
           />
 
           {/* Data Assignment Success Modal */}

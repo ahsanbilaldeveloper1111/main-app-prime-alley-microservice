@@ -478,15 +478,23 @@ const ContactRecordPage: NextPageWithLayout = () => {
       d && typeof d === "object"
         ? Object.entries(d)
             .filter(([k]) => !reservedDataKeys.has(k))
-            .map(([field_name, field_value]) => ({
-              id: `${Date.now()}-${Math.random()}-${field_name}`,
-              field_name,
-              field_value: Array.isArray(field_value)
-                ? (field_value as string[]).join(", ")
-                : typeof field_value === "object"
-                ? ""
-                : String(field_value ?? "").trim(),
-            }))
+            .map(([field_name, field_value]) => {
+              let normalizedValue = "";
+              if (Array.isArray(field_value)) {
+                normalizedValue = (field_value as string[]).join(", ");
+              } else if (
+                field_value != null &&
+                typeof field_value !== "object"
+              ) {
+                normalizedValue = String(field_value).trim();
+              }
+
+              return {
+                id: `${Date.now()}-${Math.random()}-${field_name}`,
+                field_name,
+                field_value: normalizedValue,
+              };
+            })
             .filter((f) => f.field_name || f.field_value)
         : [];
 
@@ -1696,7 +1704,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       ...prev,
                       data: {
                         crm_summary: refreshedSummary,
-                        ...(prev as any).data,
+                        ...prev.data,
                       },
                     };
                   });

@@ -2071,19 +2071,23 @@ const DealRecordPage: NextPageWithLayout = () => {
                 Attachments ({attachments.length})
               </h6>
 
-              {loadingAttachments ? (
+              {loadingAttachments && (
                 <div className="text-center py-5">
                   <output className="spinner-border text-primary">
                     <span className="visually-hidden">Loading...</span>
                   </output>
                 </div>
-              ) : attachments.length === 0 ? (
+              )}
+
+              {!loadingAttachments && attachments.length === 0 && (
                 <div className="text-center py-4 text-muted">
                   <Paperclip size={48} className="mb-3 opacity-25" />
                   <div>No attachments yet</div>
                   <small>Upload files using the form above</small>
                 </div>
-              ) : (
+              )}
+
+              {!loadingAttachments && attachments.length > 0 && (
                 <div className="d-flex flex-column gap-2 mb-4">
                   {attachments.map((attachment: any) => {
                     const backgroundColor = getAttachmentBackgroundColor(
@@ -2119,8 +2123,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                                 >
                                   {attachment.file_size == null
                                     ? null
-                                    : formatFileSize(attachment.file_size)
-                                    }
+                                    : formatFileSize(attachment.file_size)}
                                   {attachment.created_at
                                     ? ` • ${formatDateForTable(
                                         attachment.created_at
