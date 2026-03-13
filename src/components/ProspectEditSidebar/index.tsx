@@ -22,6 +22,7 @@ export interface ProspectFormState {
   tags: Array<{ value: string; label: string; id: number }>;
   note: string;
   source_file: string;
+  source_file: string;
   custom_fields: Array<{
     id: string;
     field_name: string;

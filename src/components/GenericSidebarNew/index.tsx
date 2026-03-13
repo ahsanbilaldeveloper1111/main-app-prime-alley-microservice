@@ -4713,6 +4713,8 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 );
               const currentDayDate = new Date(startOfWeek);
               currentDayDate.setDate(startOfWeek.getDate() + index);
+              const currentDayDate = new Date(startOfWeek);
+              currentDayDate.setDate(startOfWeek.getDate() + index);
 
               const isCurrentDay = isToday(currentDayDate);
               const isSelectedDay = isSelected(currentDayDate);
@@ -5811,14 +5813,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
   };
 
-  const goToRecordDetailActivity = (activityType?: string) => {
-    if (!recordType || recordId == null) return;
+  const goToRecordDetailActivity = useCallback(
+    (activityType?: string) => {
+      if (!recordType || recordId == null) return;
 
-    const baseUrl = buildActivitiesBaseUrl(
-      recordType,
-      recordId,
-      activityEntityType,
-    );
+      const baseUrl = buildActivitiesBaseUrl(
+        recordType,
+        recordId,
+        activityEntityType,
+      );
 
     if (!baseUrl) return;
 
@@ -6631,10 +6634,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             border: "none",
             outline: "none",
           }}
-          onClick={
-            section.collapsible ? () => toggleSection(section.id) : undefined
-          }
-          aria-expanded={section.collapsible ? !isCollapsed : undefined}
+          role={section.collapsible ? "button" : undefined}
+          tabIndex={section.collapsible ? 0 : undefined}
+          onClick={() => section.collapsible && toggleSection(section.id)}
+          onKeyDown={(e) => {
+            if (!section.collapsible) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection(section.id);
+            }
+          }}
         >
           <div
             style={{
@@ -8364,7 +8373,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   border: "none",
                   outline: "none",
                 }}
+                role="button"
+                tabIndex={0}
                 onClick={() => toggleSection("breeze-summary")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleSection("breeze-summary");
+                  }
+                }}
               >
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "10px" }}
