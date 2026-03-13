@@ -30,6 +30,45 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
   return next;
 };
 
+const LINK_BUTTON_RESET: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+};
+
+function LinkButton({
+  onClick,
+  style,
+  children,
+}: Readonly<{
+  onClick?: () => void;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}>) {
+  return (
+    <button type="button" onClick={onClick ?? (() => null)} style={{ ...style, ...LINK_BUTTON_RESET }}>
+      {children}
+    </button>
+  );
+}
+
+function CardActions({
+  onView,
+  onDownload,
+}: Readonly<{ onView?: () => void; onDownload?: () => void }>) {
+  return (
+    <div style={s.cardActions}>
+      <LinkButton onClick={onView} style={s.actionLink}>
+        View
+      </LinkButton>
+      <span style={s.divider}>|</span>
+      <LinkButton onClick={onDownload} style={s.actionLink}>
+        Download
+      </LinkButton>
+    </div>
+  );
+}
+
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
   page: {
@@ -355,23 +394,7 @@ function InvoiceCard({
           <FileText size={22} color="#141414" />
           <h3 style={s.cardTitle}>Invoice issued #{invoiceNumber}</h3>
         </div>
-        <div style={s.cardActions}>
-          <button
-            type="button"
-            style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}
-            onClick={onView}
-          >
-            View
-          </button>
-          <span style={s.divider}>|</span>
-          <button
-            type="button"
-            style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}
-            onClick={onDownload}
-          >
-            Download
-          </button>
-        </div>
+        <CardActions onView={onView} onDownload={onDownload} />
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
@@ -379,13 +402,9 @@ function InvoiceCard({
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
               {product}{" "}
-              <button
-                type="button"
-                onClick={() => null}
-                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
-              >
+              <LinkButton onClick={() => null} style={s.link}>
                 includes
-              </button>
+              </LinkButton>
             </div>
           </div>
           <div>
@@ -426,15 +445,7 @@ function PaymentCard({
           <Landmark size={22} color="#141414" />
           <h3 style={s.cardTitle}>Payment processed #{id}</h3>
         </div>
-        <div style={s.cardActions}>
-          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
-            View
-          </button>
-          <span style={s.divider}>|</span>
-          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
-            Download
-          </button>
-        </div>
+        <CardActions />
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
@@ -442,25 +453,17 @@ function PaymentCard({
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
               {product}{" "}
-              <button
-                type="button"
-                onClick={() => null}
-                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
-              >
+              <LinkButton onClick={() => null} style={s.link}>
                 includes
-              </button>
+              </LinkButton>
             </div>
           </div>
           <div>
             <div style={s.colLabel}>Paid for invoice</div>
             <div style={s.colValue}>
-              <button
-                type="button"
-                onClick={() => null}
-                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
-              >
+              <LinkButton onClick={() => null} style={s.link}>
                 #{invoiceRef}
-              </button>
+              </LinkButton>
             </div>
           </div>
           <div>
@@ -499,15 +502,7 @@ function OrderCard({
           <FileMinus size={22} color="#141414" />
           <h3 style={s.cardTitle}>Order issued #{id}</h3>
         </div>
-        <div style={s.cardActions}>
-          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
-            View
-          </button>
-          <span style={s.divider}>|</span>
-          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
-            Download
-          </button>
-        </div>
+        <CardActions />
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
@@ -515,13 +510,9 @@ function OrderCard({
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
               {product}{" "}
-              <button
-                type="button"
-                onClick={() => null}
-                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
-              >
+              <LinkButton onClick={() => null} style={s.link}>
                 includes
-              </button>
+              </LinkButton>
             </div>
           </div>
         </div>
