@@ -86,20 +86,13 @@ import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  ToolbarConfig,
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   getCrmDataById,
@@ -138,7 +131,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -146,10 +138,9 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import CrmActivitiesPanel, {
+import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
-import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // KPI Card Component (from crm-new.tsx design)
@@ -449,7 +440,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     placeholder={searchPlaceholder}
                     value={searchValue || ""}
                     onChange={(e) => onSearchChange?.(e.target.value)}
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter" && onSearch) {
                         onSearch();
                       }
@@ -501,8 +492,9 @@ const getInitials = (name: string): string => {
 
   if (hasSecondWord && secondWordHasLetter) {
     // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
+    const regex = /[a-z]/i;
+    const firstLetter1 = regex.exec(words[0])?.[0];
+    const firstLetter2 = regex.exec(words[1])?.[0];
 
     if (firstLetter1 && firstLetter2) {
       return (firstLetter1 + firstLetter2).toUpperCase();
@@ -715,19 +707,20 @@ const CrmProspectsManagement = () => {
 
   // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
   useEffect(() => {
-    if (!router.isReady || router.query.createContact !== "1") return;
-    setShowCreateContactSidebar(true);
-    const rawEditId = router.query.editContactId;
-    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr != null ? Number(editIdStr) : Number.NaN;
-    if (Number.isFinite(editIdNum) && editIdNum > 0) {
-      setEditingContactId(editIdNum);
-    }
+    if (router.isReady && router.query.createContact === "1") {
+      setShowCreateContactSidebar(true);
+      const rawEditId = router.query.editContactId;
+      const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
+      const editIdNum = editIdStr != null ? Number(editIdStr) : Number.NaN;
+      if (Number.isFinite(editIdNum) && editIdNum > 0) {
+        setEditingContactId(editIdNum);
+      }
 
-    const { createContact: _, editContactId: __, ...rest } = router.query;
-    router.replace({ pathname: router.pathname, query: rest }, undefined, {
-      shallow: true,
-    });
+      const { createContact: _, editContactId: __, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, {
+        shallow: true,
+      });
+    }
   }, [router.isReady, router.query.createContact, router.query.editContactId]);
 
   // Close Add Contacts dropdown when clicking outside
@@ -787,7 +780,7 @@ const CrmProspectsManagement = () => {
         let phoneNumber = item.phone ?? "";
         if (typeof item.phone === "string" && item.phone.trim()) {
           try {
-            const normalized = item.phone.replace(/\s/g, "");
+            const normalized = item.phone.replaceAll(" ", "");
             const parsed = parsePhoneNumberInput(normalized);
             if (parsed) {
               phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -1368,12 +1361,12 @@ const CrmProspectsManagement = () => {
     campaign_id: (row) => {
       const label = row?.campaign?.name;
       if (label != null) return label;
-      return row?.campaign_id != null ? String(row.campaign_id) : "";
+      return row?.campaign_id == null ? null : String(row.campaign_id);
     },
     company_name: (row) => {
       const name = row?.company?.name;
       if (name != null) return name;
-      return row?.company_name != null ? String(row.company_name) : "";
+      return row?.company_name == null ? null : String(row.company_name);
     },
     crm_summary: (row) => {
       const summary =
@@ -1407,7 +1400,8 @@ const CrmProspectsManagement = () => {
     try {
       return JSON.stringify(raw);
     } catch {
-      return String(raw);
+    // Fallback for non-serializable objects; avoid default [object Object] stringification.
+    return "";
     }
   };
 
@@ -1735,8 +1729,8 @@ const CrmProspectsManagement = () => {
                 }
                 return { value: sourceValue, label: String(sourceValue) };
               })()}
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
+              onChange={(selected: { value: string } | null) => {
+                const v = selected ? selected.value : null;
                 setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
                 applyTableFiltersPatch({ source_file: v });
               }}
@@ -2326,7 +2320,7 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  const openProspectSidebar = useCallback((item: CrmDataItem | any) => {
+  const openProspectSidebar = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
     setSelectedProspect(item);
     setShowProspectSidebar(true);
@@ -7373,7 +7367,7 @@ const CrmProspectsManagement = () => {
                   selectedProspect?.id ??
                     selectedProspect?.data?.id ??
                     (selectedProspect as any)?.data?.data?.id ??
-                    NaN,
+                    Number.NaN,
                 );
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
                 handleCloseProspectSidebar();
@@ -7808,8 +7802,8 @@ const CrmProspectsManagement = () => {
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
+          if (typeof globalThis !== "undefined" && globalThis.window) {
+            globalThis.window.localStorage.setItem(
               "crmDataSelectedColumns",
               JSON.stringify(keys),
             );

@@ -22,7 +22,6 @@ export interface ProspectFormState {
   tags: Array<{ value: string; label: string; id: number }>;
   note: string;
   source_file: string;
-  source_file: string;
   custom_fields: Array<{
     id: string;
     field_name: string;
@@ -154,11 +153,11 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           <Select
             inputId="prospect-campaign-select"
             value={
-              contactForm.campaign_id != null
-                ? campaignSelectOptions.find(
+              contactForm.campaign_id == null
+                ? null
+                : campaignSelectOptions.find(
                     (o) => o.value === String(contactForm.campaign_id),
                   ) ?? null
-                : null
             }
             onChange={(opt: any) =>
               setContactForm({
@@ -208,9 +207,9 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
               ext.extension ||
               String(ext.id || ""),
           }));
-          return contactForm.contact_owner != null
-            ? opts.find((o) => o.value === contactForm.contact_owner) || null
-            : null;
+          return contactForm.contact_owner == null
+            ? null
+            : opts.find((o) => o.value === contactForm.contact_owner) || null;
         })()}
         onChange={(opt: any) =>
           setContactForm({
@@ -279,6 +278,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-disposition-dropdown"
         className="contact-form-label"
         style={{
           display: "block",
@@ -327,7 +327,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
                 })
               }
             >
-              {d.replace(/_/g, " ")}
+              {d.replaceAll("_", " ")}
             </Dropdown.Item>
           ))}
         </Dropdown.Menu>
@@ -461,6 +461,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-scheduled-call-input"
         className="contact-form-label"
         style={{
           display: "block",

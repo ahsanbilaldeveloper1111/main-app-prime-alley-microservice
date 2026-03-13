@@ -38,6 +38,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
 
   const exec = useCallback(
     (cmd: string, value?: string) => {
+      // NOSONAR: document.execCommand is deprecated but still needed for this lightweight rich text editor.
       document.execCommand(cmd, false, value ?? undefined);
       editorRef.current?.focus();
       emitChange();
@@ -60,7 +61,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
 
   const handleImage = () => {
     const url = globalThis.prompt("Enter image URL:", "https://");
-    if (url == null || !url.trim()) return;
+    if (!url?.trim()) return;
     const imgUrl = url.startsWith("http") ? url : `https://${url}`;
     const alt = (globalThis.prompt("Image description (alt text):", "Image") ?? "Image").replaceAll('"', "&quot;");
     const html = `<img src="${imgUrl}" alt="${alt}" style="max-width:100%;height:auto;" />`;

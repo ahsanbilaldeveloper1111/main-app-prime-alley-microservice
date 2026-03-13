@@ -16,33 +16,14 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
   Ticket,
-  Paperclip,
-  Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
-  AlertCircle,
-  ShoppingCart,
-  Pencil,
-  Trash2,
-  MessageCircle,
-  Download as DownloadIcon,
+  AlertCircle
 } from "lucide-react";
-import parsePhoneNumber from "libphonenumber-js";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import Layout from "@layout/index";
 import {
@@ -53,7 +34,7 @@ import {
   deleteCrmData,
   type CrmDataItem,
 } from "@utils/crm";
-import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
+import { ModuleSlug } from "@utils/Helper";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -64,7 +45,6 @@ import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import RichNoteEditor from "@components/RichNoteEditor";
 import ProspectEditSidebar, {
   type ProspectFormState as ProspectSidebarFormState,
 } from "@components/ProspectEditSidebar";
@@ -72,9 +52,6 @@ import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
-import { Dropdown, Form } from "react-bootstrap";
-import CreatableSelect from "react-select/creatable";
-import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
@@ -333,7 +310,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const val = row[h];
             if (val == null) return "";
             if (typeof val === "object") return "";
-            const s = String(val).replace(/"/g, '""');
+            const s = String(val).replaceAll('"', '""');
             return s.includes(",") || s.includes('"') ? `"${s}"` : s;
           })
           .join(","),
@@ -341,15 +318,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
       const blob = new Blob([csvRows.join("\n")], {
         type: "text/csv;charset=utf-8;",
       });
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = name + ext;
       a.click();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
       toast.success("Exported prospect successfully!");
     } catch (err) {
       toast.error("Failed to export prospect");
+      console.error("Failed to export prospect:", err);
     } finally {
       setExporting(false);
     }
@@ -455,7 +433,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
     };
 
-    const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
+    const rawTags = item.tags ?? item?.data?.tags ?? d.tags ?? [];
     const tagsArray = Array.isArray(rawTags)
       ? rawTags.map((t: any) =>
           typeof t === "string"
@@ -473,7 +451,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     console.log("phone", item);
     if (typeof item.phone === "string" && item.phone.trim()) {
       try {
-        const normalized = item.phone.replace(/\s/g, "");
+        const normalized = item.phone.replaceAll(" ", "");
         const parsed = parsePhoneNumberInput(normalized);
         if (parsed) {
           phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -505,6 +483,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
               field_name,
               field_value: Array.isArray(field_value)
                 ? (field_value as string[]).join(", ")
+                : typeof field_value === "object"
+                ? ""
                 : String(field_value ?? "").trim(),
             }))
             .filter((f) => f.field_name || f.field_value)
@@ -513,29 +493,29 @@ const ContactRecordPage: NextPageWithLayout = () => {
     setProspectForm({
       firstName,
       lastName,
-      email: d.email ?? (item as any).email ?? "",
+      email: d.email ?? item.email ?? "",
       phone_country_code: phoneCountryCode,
       phoneNumber,
       campaign_id: item.campaign_id ?? d.campaign_id ?? null,
       contact_owner:
-        (item as any).user_extension ??
+        item.user_extension ??
         d.contact_owner ??
-        (item as any).contact_owner ??
+        item.contact_owner ??
         null,
       lifecycle_stage: d.lifecycle_stage ?? "",
-      disposition: d.disposition ?? (item as any).disposition ?? "",
+      disposition: d.disposition ?? item.disposition ?? "",
       legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
       company_domain:
-        (item as any).company_domain ?? d.company_domain ?? "",
+        item.company_domain ?? d.company_domain ?? "",
       scheduled_call_at: toDatetimeLocal(
         item.scheduled_call_at ?? d.scheduled_call_at,
       ),
       tags: tagsArray as Array<{ value: string; label: string; id: number }>,
       note: item.note ?? d.note ?? "",
       source_file:
-        (item as any).source_file ??
+        item.source_file ??
         d.source ??
-        (item as any).source ??
+        item.source ??
         "",
       custom_fields: customFieldsArray,
     });
@@ -588,7 +568,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           staticTags.map((tag) => ({
             value: tag.value,
             label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
+            id: Number.parseInt(tag.value.replace("tag-", "")) || 0,
           })),
         );
       }
@@ -1712,13 +1692,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     if (!prev) return refreshed;
                     const refreshedSummary = (refreshed as any)?.data?.crm_summary;
                     if (!refreshedSummary) return prev;
-                    return {
+                return {
                       ...prev,
                       data: {
                         crm_summary: refreshedSummary,
                         ...(prev as any).data,
                       },
-                    } as any;
+                    };
                   });
                   toast.success("Summary refreshed");
                 } catch {

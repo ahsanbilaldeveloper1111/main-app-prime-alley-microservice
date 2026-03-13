@@ -295,7 +295,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const val = row[h];
             if (val == null) return "";
             if (typeof val === "object") return "";
-            const s = String(val).replace(/"/g, '""');
+            const s = String(val).replaceAll('"', '""');
             return s.includes(",") || s.includes('"') ? `"${s}"` : s;
           })
           .join(","),
@@ -303,15 +303,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
       const blob = new Blob([csvRows.join("\n")], {
         type: "text/csv;charset=utf-8;",
       });
-      const url = window.URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = name + ext;
       a.click();
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
       toast.success("Exported lead successfully!");
     } catch (err) {
       toast.error("Failed to export lead");
+      console.error("Failed to export lead:", err);
     } finally {
       setExporting(false);
     }
@@ -698,7 +699,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           <button
-            onClick={() => window.history.back()}
+            onClick={() => globalThis.history.back()}
             style={{
               background: "transparent",
               border: "none",
@@ -962,7 +963,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const Icon = action.icon;
             return (
               <div
-                key={index}
+                key={action.label}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -1234,8 +1235,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {!collapsedSections.has("key-info") && (
           <div style={{ padding: "20px" , maxHeight: "480px",
             overflowY: "auto",}}>
-            {keyInfoFields.map((field, index) => (
-              <div key={index} style={{ marginBottom: "16px" }}>
+            {keyInfoFields.map((field) => (
+              <div key={field.label} style={{ marginBottom: "16px" }}>
                 <div
                   style={{
                     fontSize: "13px",

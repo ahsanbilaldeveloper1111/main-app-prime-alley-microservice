@@ -12,9 +12,6 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
   FileText,
   Ticket,
   Paperclip,
@@ -835,11 +832,11 @@ const DealRecordPage: NextPageWithLayout = () => {
             { icon: Phone, label: "Call", disabled: true },
             { icon: ClipboardList, label: "Task", disabled: true },
             { icon: Calendar, label: "Meeting", disabled: false },
-          ].map((action, index) => {
+          ].map((action) => {
             const Icon = action.icon;
             return (
               <div
-                key={index}
+                key={action.label}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -1036,8 +1033,8 @@ const DealRecordPage: NextPageWithLayout = () => {
         {!collapsedSections.has("key-info") && (
           <div style={{ padding: "20px" , maxHeight: "480px",
             overflowY: "auto",}}>
-            {keyInfoFields.map((field, index) => (
-              <div key={index} style={{ marginBottom: "16px" }}>
+            {keyInfoFields.map((field) => (
+              <div key={field.label} style={{ marginBottom: "16px" }}>
                 <div
                   style={{
                     fontSize: "13px",

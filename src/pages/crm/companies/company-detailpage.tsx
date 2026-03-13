@@ -11,13 +11,8 @@ import {
   ClipboardList,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
   Building2,
-  Link2,
   AlertCircle,
-  MessageCircle,
   FileText,
   ExternalLink,
 } from "lucide-react";

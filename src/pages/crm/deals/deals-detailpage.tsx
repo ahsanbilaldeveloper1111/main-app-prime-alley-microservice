@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import {
   ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
+  FileText, Paperclip,
   AlertCircle, ShoppingCart, Handshake, Download as DownloadIcon,
   Upload, Trash2
 } from 'lucide-react';
@@ -296,7 +296,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   const keyInfoFields: KeyInfoField[] = [
     { label: "Deal Value", value: formatDealAmount(deal), copyable: true },
     { label: "Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
-    { label: "Probability", value: deal != null ? `${deal.probability ?? 0}%` : "--" },
+    { label: "Probability", value: deal == null ? null : `${deal.probability ?? 0}%` },
     { label: "Expected Close Date", value: formatDate(deal?.expected_close_date) },
     {
       label: "Company Name",
@@ -452,113 +452,10 @@ const DealRecordPage: NextPageWithLayout = () => {
     if (attachment.original_name) return attachment.original_name;
     if (attachment.file_path) {
       const segments = String(attachment.file_path).split("/");
-      const lastSegment = segments[segments.length - 1];
+      const lastSegment = segments.at(-1);
       if (lastSegment) return lastSegment;
     }
     return `Attachment ${attachment.id}`;
-  };
-
-  const renderAttachmentsSectionContent = () => {
-    if (loadingAttachments) {
-      return (
-        <div className="text-center py-5">
-          <output className="spinner-border text-primary">
-            <span className="visually-hidden">Loading...</span>
-          </output>
-        </div>
-      );
-    }
-
-    if (attachments.length === 0) {
-      return (
-        <div className="text-center py-4 text-muted">
-          <Paperclip size={48} className="mb-3 opacity-25" />
-          <div>No attachments yet</div>
-          <small>Upload files using the form above</small>
-        </div>
-      );
-    }
-
-    return (
-      <div className="d-flex flex-column gap-2 mb-4">
-        {attachments.map((attachment: any) => {
-          const backgroundColor = getAttachmentBackgroundColor(
-            attachment.mime_type
-          );
-          const displayName = getAttachmentDisplayName(attachment);
-
-          return (
-            <Card key={attachment.id} className="border shadow-sm">
-              <Card.Body className="p-3">
-                <div className="d-flex align-items-center justify-content-between">
-                  <div className="d-flex align-items-center gap-3 flex-grow-1">
-                    <div
-                      className="rounded d-flex align-items-center justify-content-center"
-                      style={{
-                        width: "45px",
-                        height: "45px",
-                        background: backgroundColor,
-                        color: "white",
-                      }}
-                    >
-                      <FileText size={22} />
-                    </div>
-                    <div className="flex-grow-1">
-                      <div
-                        className="fw-semibold"
-                        style={{ fontSize: "14px" }}
-                      >
-                        {displayName}
-                      </div>
-                      <div
-                        style={{ fontSize: "12px", color: "#6c757d" }}
-                      >
-                        {attachment.file_size != null
-                          ? formatFileSize(attachment.file_size)
-                          : ""}
-                        {attachment.created_at
-                          ? ` • ${formatDateForTable(
-                              attachment.created_at
-                            )}`
-                          : ""}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="d-flex gap-1">
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-2 text-primary"
-                      title="Download"
-                      onClick={() =>
-                        handleDownloadAttachment(attachment.id)
-                      }
-                    >
-                      <DownloadIcon size={18} />
-                    </Button>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="p-2 text-danger"
-                      title="Delete"
-                      onClick={() => {
-                        setAttachmentToDelete({
-                          id: attachment.id,
-                          name: getAttachmentDisplayName(attachment),
-                        });
-                        setShowDeleteAttachmentModal(true);
-                      }}
-                    >
-                      <Trash2 size={18} />
-                    </Button>
-                  </div>
-                </div>
-              </Card.Body>
-            </Card>
-          );
-        })}
-      </div>
-    );
   };
 
   const handleDealFileUpload = async (file: File) => {
@@ -2220,9 +2117,10 @@ const DealRecordPage: NextPageWithLayout = () => {
                                 <div
                                   style={{ fontSize: "12px", color: "#6c757d" }}
                                 >
-                                  {attachment.file_size != null
-                                    ? formatFileSize(attachment.file_size)
-                                    : ""}
+                                  {attachment.file_size == null
+                                    ? null
+                                    : formatFileSize(attachment.file_size)
+                                    }
                                   {attachment.created_at
                                     ? ` • ${formatDateForTable(
                                         attachment.created_at
