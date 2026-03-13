@@ -1,4 +1,3 @@
-# Test Title
 
 # Global CTI Context Provider
 
