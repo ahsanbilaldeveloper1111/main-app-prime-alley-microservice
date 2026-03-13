@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
 import { FiSearch } from "react-icons/fi";
-import { Plus, X, ChevronDown, ExternalLink, Save, Filter } from "lucide-react";
+import { Plus, X, ChevronDown, Filter } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -108,15 +108,97 @@ const POSSIBLE_TABS = [
 const DEFAULT_VISIBLE_TAB_IDS = ["all", "due_today", "overdue", "upcoming"];
 const SAVED_VIEW_STORAGE_KEY = "planner_tasks_visible_tabs";
 
+function stripHtmlTags(input: string): string {
+  const out: string[] = [];
+  const tagBuffer: string[] = [];
+  let inTag = false;
+
+  for (const ch of input) {
+    if (!inTag) {
+      if (ch === "<") {
+        inTag = true;
+        tagBuffer.push(ch);
+      } else {
+        out.push(ch);
+      }
+      continue;
+    }
+
+    tagBuffer.push(ch);
+    if (ch === ">") {
+      inTag = false;
+      tagBuffer.length = 0; // drop tag content
+    }
+  }
+
+  // If we never closed the tag, keep the buffered text.
+  if (inTag && tagBuffer.length) out.push(...tagBuffer);
+  return out.join("");
+}
+
+function applyFiltersToParams(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+  allProjects: Array<{ id: number; name: string }>,
+  currentTasks: Task[]
+) {
+  if (filters.priority) {
+    const priorityMap: Record<string, string> = { low: "low", medium: "normal", high: "high" };
+    params.priority = priorityMap[String(filters.priority)] || "normal";
+  }
+  if (filters.due_date_from) params.due_date_from = filters.due_date_from;
+  if (filters.due_date_to) params.due_date_to = filters.due_date_to;
+
+  if (filters.project && filters.project !== "All Projects") {
+    const proj = allProjects.find((p) => p.name === filters.project);
+    if (proj) params.project_id = proj.id;
+  }
+
+  if (filters.assignee?.length) params.extension_numbers = filters.assignee;
+
+  if (filters.status && filters.status !== "All Status") {
+    const statusId = currentTasks.find((t) => t.rawData?.status?.name === filters.status)?.rawData?.status?.id;
+    if (statusId) params.status_id = statusId;
+  }
+}
+
+function applyTabToParams(
+  params: Record<string, any>,
+  activeTab: string,
+  dates: { today: string; yesterday: string; tomorrow: string }
+) {
+  if (activeTab === "due_today") {
+    params.due_date_from = dates.today;
+    params.due_date_to = dates.today;
+    return;
+  }
+  if (activeTab === "overdue") {
+    params.due_date_to = dates.yesterday;
+    params.is_completed = false;
+    return;
+  }
+  if (activeTab === "upcoming") {
+    params.due_date_from = dates.tomorrow;
+    return;
+  }
+  if (activeTab === "completed") {
+    params.is_completed = true;
+    return;
+  }
+  if (activeTab === "pending") {
+    params.is_completed = false;
+  }
+}
+
 function getInitialVisibleTabIds(): string[] {
-  if (typeof window === "undefined") return [...DEFAULT_VISIBLE_TAB_IDS];
+  if (globalThis.window === undefined) return [...DEFAULT_VISIBLE_TAB_IDS];
   try {
     const raw = localStorage.getItem(SAVED_VIEW_STORAGE_KEY);
     if (!raw) return [...DEFAULT_VISIBLE_TAB_IDS];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_TAB_IDS];
-    const validIds = POSSIBLE_TABS.map((t) => t.id);
-    const filtered = (parsed as string[]).filter((id) => validIds.includes(id as any));
+    const validIds = new Set<string>(POSSIBLE_TABS.map((t) => t.id));
+    const filtered = parsed.filter((id): id is string => typeof id === "string" && validIds.has(id));
     return filtered.length > 0 ? filtered : [...DEFAULT_VISIBLE_TAB_IDS];
   } catch {
     return [...DEFAULT_VISIBLE_TAB_IDS];
@@ -177,16 +259,17 @@ const CELL_STYLE: React.CSSProperties = {
       const assigned_to = firstExt || null;
       const assigned_to_name = firstExt ? findExtensionName(firstExt) : undefined;
 
-      const dueDate = apiTask.due_date
-        ? (apiTask.due_time
-            ? `${apiTask.due_date}T${apiTask.due_time}`
-            : apiTask.due_date)
-        : null;
+      let dueDate: string | null = null;
+      if (apiTask.due_date) {
+        dueDate = apiTask.due_time ? `${apiTask.due_date}T${apiTask.due_time}` : apiTask.due_date;
+      }
 
       const isCompleted = apiTask.is_completed === true;
       const dueMoment = dueDate ? moment(dueDate) : null;
       const isOverdue = dueMoment && dueMoment.isBefore(moment(), "day") && !isCompleted;
-      const status: Task["status"] = isCompleted ? "completed" : isOverdue ? "overdue" : "pending";
+      let status: Task["status"] = "pending";
+      if (isCompleted) status = "completed";
+      else if (isOverdue) status = "overdue";
 
       const taskTypeMap: Record<string, string> = {
         todo: "todo",
@@ -203,7 +286,7 @@ const CELL_STYLE: React.CSSProperties = {
         assigned_to_name,
         priority,
         due_date: dueDate,
-        notes: apiTask.description?.replace(/<[^>]*>/g, "") || null,
+        notes: apiTask.description ? stripHtmlTags(apiTask.description) : null,
         repeat_status: apiTask.type === "recurring" ? "repeat" : "no_repeat",
         status,
         rawData: apiTask,
@@ -257,6 +340,14 @@ const CELL_STYLE: React.CSSProperties = {
       setPager(p => ({ ...p, page: 1 }));
       router.push({ pathname: router.pathname, query: { ...router.query, tab: id } }, undefined, { shallow: true });
     }, [router]);
+
+    const toggleVisibleTab = useCallback((tabId: string, isVisible: boolean, isOnlyOne: boolean) => {
+      if (isVisible && isOnlyOne) return;
+      setVisibleTabIds((prev) => {
+        if (prev.includes(tabId)) return prev.filter((id) => id !== tabId);
+        return [...prev, tabId];
+      });
+    }, []);
   
     // ── Data ──────────────────────────────────────────────────────────────────────
     const [tasks, setTasks]           = useState<Task[]>([]);
@@ -264,7 +355,7 @@ const CELL_STYLE: React.CSSProperties = {
     const [loading, setLoading]       = useState(false);
     const [filters, setFilters]       = useState<Record<string, any>>({});
     const [search, setSearch]         = useState("");
-    const [hoveredId, setHoveredId]   = useState<number | null>(null);
+  
   
     const [pager, setPager] = useState({
       page: 1, perPage: 25,
@@ -278,7 +369,6 @@ const CELL_STYLE: React.CSSProperties = {
   
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
     const [showCreate, setShowCreate]   = useState(false);
-    const [editId, setEditId]           = useState<number | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
   
     // ── Delete confirmation ──────────────────────────────────────────────────────
@@ -320,38 +410,11 @@ const CELL_STYLE: React.CSSProperties = {
           withRelations: ["project", "status", "assignees"],
         };
 
-        if (filters.priority) {
-          const priorityMap: Record<string, string> = { low: "low", medium: "normal", high: "high" };
-          params.priority = priorityMap[String(filters.priority)] || "normal";
-        }
-        if (filters.due_date_from) params.due_date_from = filters.due_date_from;
-        if (filters.due_date_to) params.due_date_to = filters.due_date_to;
-        if (filters.project && filters.project !== "All Projects") {
-          const proj = allProjects.find(p => p.name === filters.project);
-          if (proj) params.project_id = proj.id;
-        }
-        if (filters.assignee?.length) params.extension_numbers = filters.assignee;
-        if (filters.status && filters.status !== "All Status") {
-          const statusId = tasksRef.current.find(t => t.rawData?.status?.name === filters.status)?.rawData?.status?.id;
-          if (statusId) params.status_id = statusId;
-        }
-
-        if (activeTab === "due_today") {
-          params.due_date_from = today;
-          params.due_date_to = today;
-        } else if (activeTab === "overdue") {
-          params.due_date_to = yesterday;
-          params.is_completed = false;
-        } else if (activeTab === "upcoming") {
-          params.due_date_from = tomorrow;
-        } else if (activeTab === "completed") {
-          params.is_completed = true;
-        } else if (activeTab === "pending") {
-          params.is_completed = false;
-        }
+        applyFiltersToParams(params, filters, allProjects, tasksRef.current);
+        applyTabToParams(params, activeTab, { today, yesterday, tomorrow });
 
         const res = await listTasks(params);
-        if (res && res.data) {
+        if (res?.data) {
           const mapped = (res.data as ApiTask[]).map(mapApiTaskToTask);
           setTasks(mapped);
           setTotal(res.pagination?.total ?? 0);
@@ -371,7 +434,6 @@ const CELL_STYLE: React.CSSProperties = {
     useEffect(() => { fetchTasks(); }, [fetchTasks]);
   
     const openEdit = (row: Task) => {
-      setEditId(row.id);
       setEditingTask(row);
       setShowCreate(true);
     };
@@ -393,10 +455,8 @@ const CELL_STYLE: React.CSSProperties = {
       try {
         if (row.status === "completed") {
           await incompleteTask(row.id);
-        //  toast.success("Task marked incomplete");
         } else {
           await completeTask(row.id);
-        //  toast.success("Task marked complete");
         }
         fetchTasks();
       } catch {
@@ -433,13 +493,10 @@ const CELL_STYLE: React.CSSProperties = {
       {
         key: "title", label: "Title", sortable: true, type: "custom",
         render: (row) => (
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}
-            onMouseEnter={() => setHoveredId(row.id)}
-            onMouseLeave={() => setHoveredId(null)}
-          >
-            <span
-              onClick={e => { e.stopPropagation(); router.push(`/planner/tasks/${row.id}`); }}
+          <div className="task-title-cell" style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden", minWidth: 0 }}>
+            <a
+              href={`/planner/tasks/${row.id}`}
+              onClick={e => { e.preventDefault(); e.stopPropagation(); router.push(`/planner/tasks/${row.id}`); }}
               title={row.title}
               style={{
                 color: "#2563eb", fontWeight: 400, fontSize: 13, cursor: "pointer",
@@ -448,15 +505,17 @@ const CELL_STYLE: React.CSSProperties = {
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 display: "block",
               }}
-            >{row.title}</span>
+            >
+              {row.title}
+            </a>
 
             <button
+              className="task-edit-btn"
               onClick={e => { e.stopPropagation(); openEdit(row); }}
               style={{
                 ...BTN_BASE,
                 paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
                 flexShrink: 0,
-                visibility: hoveredId === row.id ? "visible" : "hidden",
               }}
             >
               Edit
@@ -511,11 +570,9 @@ const CELL_STYLE: React.CSSProperties = {
           const overdue = moment(row.due_date).isBefore(moment()) && row.status !== "completed";
           const isToday    = moment(row.due_date).isSame(moment(), "day");
           const isTomorrow = moment(row.due_date).isSame(moment().add(1, "day"), "day");
-          const label = isToday
-            ? `Today at ${moment(row.due_date).format("HH:mm")}`
-            : isTomorrow
-              ? `Tomorrow at ${moment(row.due_date).format("HH:mm")}`
-              : moment(row.due_date).format("D MMMM YYYY HH:mm");
+          let label = moment(row.due_date).format("D MMMM YYYY HH:mm");
+          if (isToday) label = `Today at ${moment(row.due_date).format("HH:mm")}`;
+          else if (isTomorrow) label = `Tomorrow at ${moment(row.due_date).format("HH:mm")}`;
           return <span style={{ ...CELL_STYLE, color: overdue ? "#ef4444" : "#374151", fontWeight: overdue ? 500 : 300 }}>{label}</span>;
         },
       },
@@ -531,7 +588,7 @@ const CELL_STYLE: React.CSSProperties = {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
         render: (row) => <span style={CELL_STYLE}>{row.repeat_status || "—"}</span>,
       },
-    ], [hoveredId, fetchTasks, router, handleToggleComplete]);
+    ], [fetchTasks, router, handleToggleComplete]);
   
     const actions: TableAction<Task>[] = useMemo(() => [], []);
   
@@ -633,6 +690,9 @@ const CELL_STYLE: React.CSSProperties = {
   
           /* Kill GenericTable toolbar — we render our own */
           .tasks-page .gt-toolbar-container { display: none !important; }
+
+          .tasks-page .task-title-cell .task-edit-btn { visibility: hidden; }
+          .tasks-page .task-title-cell:hover .task-edit-btn { visibility: visible; }
   
           /* Flatten card so our sections sit flush */
           .tasks-page .generic-table-card,
@@ -678,10 +738,8 @@ const CELL_STYLE: React.CSSProperties = {
             </div>
   
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {/* <button style={BTN_BASE}>Manage queues</button>
-              <button style={BTN_BASE}>Import</button> */}
               <button
-                onClick={() => { setEditId(null); setEditingTask(null); setShowCreate(true); }}
+                onClick={() => { setEditingTask(null); setShowCreate(true); }}
                 style={{ 
                   ...BTN_BASE,
                   backgroundColor: "#000",
@@ -830,12 +888,7 @@ const CELL_STYLE: React.CSSProperties = {
                     checked={isVisible}
                     disabled={isVisible && isOnlyOne}
                     onChange={() => {
-                      if (isVisible && isOnlyOne) return;
-                      setVisibleTabIds((prev) =>
-                        prev.includes(tab.id)
-                          ? prev.filter((id) => id !== tab.id)
-                          : [...prev, tab.id]
-                      );
+                      toggleVisibleTab(tab.id, isVisible, isOnlyOne);
                     }}
                     className="mb-2"
                   />
@@ -893,34 +946,6 @@ const CELL_STYLE: React.CSSProperties = {
             </div>
   
             {/* RIGHT */}
-            {/* <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-              <Button
-                variant="outline-secondary"
-                style={{
-                  ...BTN_BASE, fontSize: 12,
-                  backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
-                }}
-                onClick={() => {
-                  try {
-                    localStorage.setItem(SAVED_VIEW_STORAGE_KEY, JSON.stringify(visibleTabIds));
-                    toast.success("View saved. Your tab selection will be restored next time.");
-                  } catch {
-                    toast.error("Could not save view");
-                  }
-                }}
-              >
-                <Save size={13} /> Save view
-              </Button>
-              <Button
-                variant="outline-secondary"
-                style={{
-                  ...BTN_BASE, fontSize: 12,
-                  backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
-                }}
-              >
-                Start {total} tasks
-              </Button>
-            </div> */}
           </div>
   
           {/* ══════════════════════════════════════════════════════
@@ -1082,12 +1107,10 @@ const CELL_STYLE: React.CSSProperties = {
           isOpen={showCreate}
           onClose={() => {
             setShowCreate(false);
-            setEditId(null);
             setEditingTask(null);
           }}
           onCreate={async () => {
             setShowCreate(false);
-            setEditId(null);
             setEditingTask(null);
             await fetchTasks();
           }}
