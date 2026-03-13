@@ -44,9 +44,11 @@ import CompanyPO from '@pages/gsm/company/po'
 import UserDefaults from '@components/UserDefaults'
 import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
-const { PERMISSIONS } = HEADER_CONSTANTS;
-import {useSession} from 'next-auth/react'
+import { HEADER_CONSTANTS } from '@constants/headerConstants'
+import { useSession } from 'next-auth/react'
+
+const { PERMISSIONS } = HEADER_CONSTANTS
+const BASE_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
 
 // ─── Tab Definitions ──────────────────────────────────────────────────────────
 type Tab = {
@@ -62,7 +64,7 @@ type ControlledTabsProps = {
 
 function getUserPermissions(session: unknown): string[] {
   const perms = (session as { user?: { permissions?: unknown } } | null | undefined)?.user?.permissions
-  if (Array.isArray(perms)) return perms.map((p) => String(p))
+  if (Array.isArray(perms)) return perms.map(String)
   if (typeof perms === 'string') {
     return perms
       .split(',')
@@ -110,7 +112,7 @@ const InputField: React.FC<{ label: string; value?: string; helpIcon?: boolean }
         alignItems: 'center',
         gap: '6px',
         marginBottom: '8px',
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+        fontFamily: BASE_FONT,
         fontSize: '14px',
         fontWeight: 600,
         color: '#141414',
@@ -146,7 +148,7 @@ const InputField: React.FC<{ label: string; value?: string; helpIcon?: boolean }
         maxWidth: '100%',
         padding: '8px 12px',
         fontSize: '14px',
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+        fontFamily: BASE_FONT,
         color: '#141414',
         border: '1px solid #d0d0d0',
         borderRadius: '4px',
@@ -173,7 +175,7 @@ const SelectField: React.FC<{ label: string; value?: string; options: string[]; 
         alignItems: 'center',
         gap: '6px',
         marginBottom: '8px',
-        fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+        fontFamily: BASE_FONT,
         fontSize: '14px',
         fontWeight: 600,
         color: '#141414',
@@ -207,7 +209,7 @@ const SelectField: React.FC<{ label: string; value?: string; options: string[]; 
           width: '100%',
           padding: '8px 36px 8px 12px',
           fontSize: '14px',
-          fontFamily: 'Lexend Deca, Helvetica, Arial, sans-serif',
+          fontFamily: BASE_FONT,
           color: '#141414',
           border: '1px solid #d0d0d0',
           borderRadius: '4px',
@@ -252,25 +254,83 @@ const Divider = () => (
   />
 )
 
+const ExternalLinkIcon = () => (
+  <svg
+    width="11"
+    height="11"
+    viewBox="0 0 12 12"
+    fill="none"
+    style={{ flexShrink: 0, display: 'inline', marginLeft: '3px', verticalAlign: 'middle' }}
+  >
+    <path
+      d="M3.5 1H11M11 1V8.5M11 1L1 11"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
+const ChevronIcon: React.FC<{ expanded: boolean }> = ({ expanded }) => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 12 12"
+    fill="none"
+    stroke="#555"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{
+      transition: 'transform 0.2s',
+      transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+      flexShrink: 0,
+    }}
+  >
+    <polyline points="4,2 9,6 4,10" />
+  </svg>
+)
+
+const DATA_HOSTING_LOCATIONS = [
+  'United States',
+  'European Union (Germany)',
+  'Asia Pacific (Australia)',
+  'Asia Pacific (Singapore)',
+  'Canada',
+  'United Kingdom',
+] as const
+
+const FeatureSectionHeading: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div style={{ marginBottom: '20px' }}>
+    <h2 style={{ fontFamily: BASE_FONT, fontSize: '20px', fontWeight: 700, color: '#141414', marginBottom: '6px' }}>{title}</h2>
+    <p style={{ fontFamily: BASE_FONT, fontSize: '14px', fontWeight: 300, color: '#141414', lineHeight: '1.6', margin: 0 }}>
+      {children}
+    </p>
+  </div>
+)
+
 
 // ─── Notification Profiles Tab ────────────────────────────────────────────────
 const NotificationProfilesTabContent: React.FC = () => {
   const [showModal, setShowModal] = useState(false)
   const [profileName, setProfileName] = useState('')
-  const [profiles, setProfiles] = useState<string[]>([])
+  const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([])
+  const nextProfileId = useRef(1)
+
+  const removeProfile = (id: string) => {
+    setProfiles(prev => prev.filter(p => p.id !== id))
+  }
 
   const handleCreate = () => {
-    if (profileName.trim()) {
-      setProfiles(prev => [...prev, profileName.trim()])
-      setProfileName('')
-      setShowModal(false)
-    }
+    const name = profileName.trim()
+    if (!name) return
+    const id = String(nextProfileId.current++)
+    setProfiles(prev => [...prev, { id, name }])
+    setProfileName('')
+    setShowModal(false)
   }
-  const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
-
-const Divider = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
-)
+  const baseFont = BASE_FONT
 
   return (
     <div>
@@ -340,9 +400,9 @@ const Divider = () => (
       {/* Existing profiles list */}
       {profiles.length > 0 && (
         <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {profiles.map((name, idx) => (
+          {profiles.map(({ id, name }) => (
             <div
-              key={idx}
+              key={id}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -359,7 +419,7 @@ const Divider = () => (
             >
               <span>{name}</span>
               <button
-                onClick={() => setProfiles(prev => prev.filter((_, i) => i !== idx))}
+                onClick={() => removeProfile(id)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -385,16 +445,30 @@ const Divider = () => (
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.35)',
+            zIndex: 1000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
+            padding: '24px',
+            boxSizing: 'border-box',
           }}
-          onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}
         >
+          <button
+            type="button"
+            aria-label="Close modal"
+            onClick={() => setShowModal(false)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(0,0,0,0.35)',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          />
           <div
             style={{
+              position: 'relative',
               background: '#fff',
               borderRadius: '6px',
               width: '480px',
@@ -420,6 +494,7 @@ const Divider = () => (
             {/* Profile name field */}
             <div style={{ marginBottom: '24px' }}>
               <label
+                htmlFor="notification-profile-name"
                 style={{
                   display: 'block',
                   fontFamily: baseFont,
@@ -432,6 +507,7 @@ const Divider = () => (
                 Profile name
               </label>
               <input
+                id="notification-profile-name"
                 type="text"
                 placeholder="e.g. Sales Team Default"
                 value={profileName}
@@ -504,32 +580,12 @@ const Divider = () => (
 
 // ─── Data Hosting Tab ─────────────────────────────────────────────────────────
 const DataHostingTabContent: React.FC = () => {
-  const [currentLocation] = useState('European Union (Germany)')
+  const currentLocation = 'European Union (Germany)'
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState('')
 
   const canSchedule = selectedLocation !== ''
-// ─── Shared primitives ────────────────────────────────────────────────────────
-const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
-
-const Divider = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
-)
-
-const ExternalLinkIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, display: 'inline', marginLeft: '3px', verticalAlign: 'middle' }}>
-    <path d="M3.5 1H11M11 1V8.5M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
-
-const locations = [
-  'United States',
-  'European Union (Germany)',
-  'Asia Pacific (Australia)',
-  'Asia Pacific (Singapore)',
-  'Canada',
-  'United Kingdom',
-]
+  const baseFont = BASE_FONT
   return (
     <>
       {/* ── Main content ── */}
@@ -558,7 +614,7 @@ const locations = [
               marginBottom: '10px',
             }}
           >
-            Your data hosting location
+            Your data hosting location{' '}
             <span
               title="The region where your account data is stored and processed."
               style={{
@@ -623,13 +679,18 @@ const locations = [
 
       {/* ── Overlay ── */}
       {sidebarOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="Close sidebar"
           onClick={() => setSidebarOpen(false)}
           style={{
             position: 'fixed',
             inset: 0,
-            
-            
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 99998,
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
           }}
         />
       )}
@@ -709,34 +770,83 @@ const locations = [
             }}
           >
             {[
-              <>
-                Your account will be <span style={{ color: '#0091ae' }}>unavailable during the migration</span>. Most finish within
-                24 hours; some can take up to 36. Your public content will remain online.
-              </>,
-              <>
-                After the migration completes, your data and settings will remain unchanged, but{' '}
-                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                  some steps<ExternalLinkIcon />
-                </a>{' '}
-                may be needed to keep everything running smoothly.
-              </>,
-              <>
-                If you have active Sandboxes, <span style={{ color: '#0091ae' }}>they'll be selected too, but only eligible ones will be migrated</span>—you may need to take action.
-              </>,
-              <>
-                For more details, check our{' '}
-                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                  FAQ<ExternalLinkIcon />
-                </a>{' '}
-                or{' '}
-                <a href="#" style={{ color: '#0091ae', fontWeight: 500, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                  contact support<ExternalLinkIcon />
-                </a>
-                .
-              </>,
-            ].map((item, i) => (
+              {
+                id: 'unavailable',
+                content: (
+                  <>
+                    Your account will be <span style={{ color: '#0091ae' }}>unavailable during the migration</span>. Most finish
+                    within 24 hours; some can take up to 36. Your public content will remain online.
+                  </>
+                ),
+              },
+              {
+                id: 'post-migration',
+                content: (
+                  <>
+                    After the migration completes, your data and settings will remain unchanged, but{' '}
+                    <a
+                      href="#"
+                      style={{
+                        color: '#0091ae',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      some steps<ExternalLinkIcon />
+                    </a>{' '}
+                    may be needed to keep everything running smoothly.
+                  </>
+                ),
+              },
+              {
+                id: 'sandboxes',
+                content: (
+                  <>
+                    If you have active Sandboxes,{' '}
+                    <span style={{ color: '#0091ae' }}>
+                      they&apos;ll be selected too, but only eligible ones will be migrated
+                    </span>—you may need to take action.
+                  </>
+                ),
+              },
+              {
+                id: 'details',
+                content: (
+                  <>
+                    For more details, check our{' '}
+                    <a
+                      href="#"
+                      style={{
+                        color: '#0091ae',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      FAQ<ExternalLinkIcon />
+                    </a>{' '}
+                    or{' '}
+                    <a
+                      href="#"
+                      style={{
+                        color: '#0091ae',
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      contact support<ExternalLinkIcon />
+                    </a>.
+                  </>
+                ),
+              },
+            ].map(({ id, content }) => (
               <li
-                key={i}
+                key={id}
                 style={{
                   fontFamily: baseFont,
                   fontSize: '14px',
@@ -746,7 +856,7 @@ const locations = [
                   listStyleType: 'disc',
                 }}
               >
-                {item}
+                {content}
               </li>
             ))}
           </ul>
@@ -765,7 +875,7 @@ const locations = [
                 marginBottom: '10px',
               }}
             >
-              New data hosting location
+              New data hosting location{' '}
               <span style={{ color: '#cc3300', marginLeft: '2px' }}>*</span>
             </div>
 
@@ -794,7 +904,7 @@ const locations = [
                 onBlur={e => (e.currentTarget.style.borderColor = '#d0d0d0')}
               >
                 <option value="" disabled>Choose a location</option>
-                {locations
+                {DATA_HOSTING_LOCATIONS
                   .filter(l => l !== currentLocation)
                   .map(loc => (
                     <option key={loc} value={loc}>{loc}</option>
@@ -877,23 +987,7 @@ const locations = [
 const FeatureReleasesTabContent: React.FC = () => {
   const [gradualRelease, setGradualRelease] = useState(false)
   const [emailNotifications, setEmailNotifications] = useState(true)
-// ─── Shared primitives ────────────────────────────────────────────────────────
-const baseFont = 'Lexend Deca, Helvetica, Arial, sans-serif'
-
-const Divider = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid #e8e8e8', margin: '28px 0' }} />
-)
-
-const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div style={{ marginBottom: '20px' }}>
-    <h2 style={{ fontFamily: baseFont, fontSize: '20px', fontWeight: 700, color: '#141414', marginBottom: '6px' }}>
-      {title}
-    </h2>
-    <p style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 300, color: '#141414', lineHeight: '1.6', margin: 0 }}>
-      {children}
-    </p>
-  </div>
-)
+  const baseFont = BASE_FONT
   return (
     <div>
       {/* Intro */}
@@ -904,7 +998,7 @@ const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = (
       <Divider />
 
       {/* ── Gradual Releases ── */}
-      <SectionHeading title="Gradual Releases">
+      <FeatureSectionHeading title="Gradual Releases">
         When new features and tools are released, you can opt in to get them at the end of the gradual release. This will give more
         time to test changes and prepare users. Upcoming release dates can be found in the{' '}
         <a
@@ -914,20 +1008,25 @@ const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = (
           onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
         >
           Product Updates page
-        </a>
-        .
-      </SectionHeading>
+        </a>.
+      </FeatureSectionHeading>
 
       {/* Gradual release checkbox */}
-      <div
+      <button
+        type="button"
+        aria-pressed={gradualRelease}
+        onClick={() => setGradualRelease(v => !v)}
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           gap: '10px',
           marginBottom: '32px',
           cursor: 'pointer',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          textAlign: 'left',
         }}
-        onClick={() => setGradualRelease(v => !v)}
       >
         <div
           style={{
@@ -958,22 +1057,28 @@ const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = (
             Note: Opting into this setting will <strong style={{ fontWeight: 700 }}>only</strong> apply to all future releases. Changes to this preference apply to the entire account.
           </div>
         </div>
-      </div>
+      </button>
 
       {/* ── Email Notifications ── */}
-      <SectionHeading title="Email Notifications">
+      <FeatureSectionHeading title="Email Notifications">
         Get weekly emails about the latest product updates. Changes to this preference will only apply to you.
-      </SectionHeading>
+      </FeatureSectionHeading>
 
       {/* Email notifications checkbox */}
-      <div
+      <button
+        type="button"
+        aria-pressed={emailNotifications}
+        onClick={() => setEmailNotifications(v => !v)}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
           cursor: 'pointer',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          textAlign: 'left',
         }}
-        onClick={() => setEmailNotifications(v => !v)}
       >
         <div
           style={{
@@ -998,7 +1103,7 @@ const SectionHeading: React.FC<{ title: string; children: React.ReactNode }> = (
         <span style={{ fontFamily: baseFont, fontSize: '14px', fontWeight: 400, color: '#141414' }}>
           Turn on email notifications
         </span>
-      </div>
+      </button>
     </div>
   )
 }
@@ -2199,15 +2304,34 @@ const getParentState = (
   channel: ChannelKey
 ): boolean | "indeterminate" | null => {
   if (!topic.subtopics || topic.subtopics.length === 0) {
-    return topic.channels[channel] === null ? null : (topic.channels[channel] as boolean);
+    return topic.channels[channel];
   }
   const vals = topic.subtopics.map((s) => s.channels[channel]);
   if (vals.every((v) => v === null)) return null;
-  const filtered = vals.filter((v) => v !== null) as boolean[];
+  const filtered = vals.filter((v): v is boolean => v !== null);
   if (filtered.every(Boolean)) return true;
   if (filtered.every((v) => !v)) return false;
   return "indeterminate";
 };
+
+const turnOffChannels = (channels: Record<ChannelKey, boolean | null>): Record<ChannelKey, boolean | null> => ({
+  popup: channels.popup === null ? null : false,
+  browser: channels.browser === null ? null : false,
+  bell: channels.bell === null ? null : false,
+  email: channels.email === null ? null : false,
+})
+
+function turnOffTopic(t: NotificationTopic): NotificationTopic {
+  const next: NotificationTopic = { ...t, channels: turnOffChannels(t.channels) }
+  if (!t.subtopics) return next
+
+  const nextSubs: NonNullable<NotificationTopic['subtopics']> = []
+  for (const s of t.subtopics) {
+    nextSubs.push({ ...s, channels: turnOffChannels(s.channels) })
+  }
+  next.subtopics = nextSubs
+  return next
+}
 
 const NotificationsSettingsNew: React.FC = () => {
   const [topics, setTopics] = React.useState<NotificationTopic[]>(defaultTopics);
@@ -2242,62 +2366,80 @@ const NotificationsSettingsNew: React.FC = () => {
   };
 
   const turnOffAll = () => {
-    setTopics((prev) =>
-      prev.map((t) => ({
-        ...t,
-        channels: {
-          popup: t.channels.popup === null ? null : false,
-          browser: t.channels.browser === null ? null : false,
-          bell: t.channels.bell === null ? null : false,
-          email: t.channels.email === null ? null : false,
-        },
-        subtopics: t.subtopics?.map((s) => ({
-          ...s,
-          channels: {
-            popup: s.channels.popup === null ? null : false,
-            browser: s.channels.browser === null ? null : false,
-            bell: s.channels.bell === null ? null : false,
-            email: s.channels.email === null ? null : false,
-          },
-        })),
-      }))
-    );
+    setTopics((prev) => prev.map(turnOffTopic));
   };
 
   const toggleTopicChannel = (topicId: string, channel: ChannelKey) => {
-    setTopics((prev) =>
-      prev.map((t) => {
-        if (t.id !== topicId) return t;
-        if (t.channels[channel] === null) return t;
-        const currentState = getParentState(t, channel);
-        const newVal = currentState === true ? false : true;
-        return {
-          ...t,
-          channels: { ...t.channels, [channel]: newVal },
-          subtopics: t.subtopics?.map((s) => ({
-            ...s,
-            channels: { ...s.channels, [channel]: s.channels[channel] === null ? null : newVal },
-          })),
-        };
-      })
-    );
+    setTopics((prev) => {
+      const next: NotificationTopic[] = [];
+      for (const t of prev) {
+        if (t.id !== topicId || t.channels[channel] === null) {
+          next.push(t);
+          continue;
+        }
+
+        const newVal = getParentState(t, channel) !== true;
+        const nextTopic: NotificationTopic = { ...t, channels: { ...t.channels, [channel]: newVal } };
+
+        if (t.subtopics) {
+          const nextSubs: NonNullable<NotificationTopic["subtopics"]> = [];
+          for (const s of t.subtopics) {
+            const cur = s.channels[channel];
+            if (cur === null) {
+              nextSubs.push(s);
+            } else {
+              nextSubs.push({ ...s, channels: { ...s.channels, [channel]: newVal } });
+            }
+          }
+          nextTopic.subtopics = nextSubs;
+        }
+
+        next.push(nextTopic);
+      }
+      return next;
+    });
   };
 
   const toggleSubtopicChannel = (topicId: string, subtopicId: string, channel: ChannelKey) => {
-    setTopics((prev) =>
-      prev.map((t) => {
-        if (t.id !== topicId) return t;
-        const updatedSubs = t.subtopics?.map((s) => {
-          if (s.id !== subtopicId) return s;
-          if (s.channels[channel] === null) return s;
-          return { ...s, channels: { ...s.channels, [channel]: !s.channels[channel] } };
-        });
-        const allTrue = updatedSubs?.every((s) => s.channels[channel] === null || s.channels[channel] === true);
-        const parentVal = t.channels[channel] === null ? null : (allTrue ? true : false);
-        return { ...t, channels: { ...t.channels, [channel]: parentVal }, subtopics: updatedSubs };
-      })
-    );
+    setTopics((prev) => {
+      const next: NotificationTopic[] = [];
+      for (const t of prev) {
+        if (t.id !== topicId || !t.subtopics) {
+          next.push(t);
+          continue;
+        }
+
+        const nextSubs: NonNullable<NotificationTopic["subtopics"]> = [];
+        for (const s of t.subtopics) {
+          if (s.id !== subtopicId || s.channels[channel] === null) {
+            nextSubs.push(s);
+            continue;
+          }
+          nextSubs.push({ ...s, channels: { ...s.channels, [channel]: !s.channels[channel] } });
+        }
+
+        const allTrue = nextSubs.every((s) => s.channels[channel] !== false);
+        const parentVal = t.channels[channel] === null ? null : allTrue;
+        next.push({ ...t, channels: { ...t.channels, [channel]: parentVal }, subtopics: nextSubs });
+      }
+      return next;
+    });
   };
+
+  const handleTopicCheckboxChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const topicId = e.currentTarget.dataset.topicId
+    const channel = e.currentTarget.dataset.channel as ChannelKey | undefined
+    if (!topicId || !channel) return
+    toggleTopicChannel(topicId, channel)
+  }
+
+  const handleSubtopicCheckboxChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const topicId = e.currentTarget.dataset.topicId
+    const subtopicId = e.currentTarget.dataset.subtopicId
+    const channel = e.currentTarget.dataset.channel as ChannelKey | undefined
+    if (!topicId || !subtopicId || !channel) return
+    toggleSubtopicChannel(topicId, subtopicId, channel)
+  }
 
   const notifChannels: Array<{ key: ChannelKey; label: string; description: string }> = [
     { key: "email", label: "Email", description: "Sent to your email address." },
@@ -2322,8 +2464,9 @@ const NotificationsSettingsNew: React.FC = () => {
 
   const renderTopicCheckbox = (
     value: boolean | "indeterminate" | null,
-    onChange: () => void,
-    id: string
+    onChange: React.ChangeEventHandler<HTMLInputElement>,
+    id: string,
+    inputProps?: Record<string, string>
   ) => {
     if (value === null) {
       return (
@@ -2335,6 +2478,7 @@ const NotificationsSettingsNew: React.FC = () => {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: colWidth }}>
         <input
+          {...(inputProps ?? {})}
           type="checkbox"
           id={id}
           checked={value === true}
@@ -2456,7 +2600,9 @@ const NotificationsSettingsNew: React.FC = () => {
   {notifChannels.map((ch) => (
     <div key={ch.key} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
       {/* Switch toggle — left cell is knob, right cell shows checkmark */}
-      <div
+      <button
+        type="button"
+        aria-pressed={channelEnabled[ch.key]}
         onClick={() => toggleChannelEnabled(ch.key)}
         style={{
           display: "inline-flex",
@@ -2469,6 +2615,8 @@ const NotificationsSettingsNew: React.FC = () => {
           cursor: "pointer",
           flexShrink: 0,
           userSelect: "none",
+          padding: 0,
+          background: "transparent",
         }}
       >
         {/* Left cell — knob (black when ON, light when OFF) */}
@@ -2501,7 +2649,7 @@ const NotificationsSettingsNew: React.FC = () => {
             />
           </svg>
         </div>
-      </div>
+      </button>
 
       <div>
         <div style={{ fontSize: "14px", fontWeight: 600, color: "#141414", fontFamily: baseFont, marginBottom: "2px" }}>
@@ -2680,21 +2828,6 @@ const NotificationsSettingsNew: React.FC = () => {
               });
             };
 
-            // Chevron SVG — rotates from > (collapsed) to v (expanded)
-            const ChevronIcon = () => (
-              <svg
-                width="12" height="12" viewBox="0 0 12 12" fill="none"
-                stroke="#555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={{
-                  transition: "transform 0.2s",
-                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                  flexShrink: 0,
-                }}
-              >
-                <polyline points="4,2 9,6 4,10" />
-              </svg>
-            );
-
             return (
               <div
                 key={topic.id}
@@ -2712,20 +2845,33 @@ const NotificationsSettingsNew: React.FC = () => {
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "20px",
-                    cursor: "pointer",
                     userSelect: "none",
                   }}
-                  onClick={toggleThisTopic}
                 >
                   {/* Left: chevron + label */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    onClick={toggleThisTopic}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      flex: 1,
+                      minWidth: 0,
+                      background: "transparent",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontFamily: baseFont,
+                    }}
+                  >
                     <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
-                      <ChevronIcon />
+                      <ChevronIcon expanded={isExpanded} />
                     </span>
-                    <span style={{ fontSize: "16px", fontWeight: 500, color: "#141414", fontFamily: baseFont }}>
-                      {topic.label}
-                    </span>
-                  </div>
+                    <span style={{ fontSize: "16px", fontWeight: 500, color: "#141414" }}>{topic.label}</span>
+                  </button>
 
                   {/* Middle: POP-UP SOUND label shown only when expanded */}
                   <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", paddingRight: "16px" }}>
@@ -2737,10 +2883,13 @@ const NotificationsSettingsNew: React.FC = () => {
                   </div>
 
                   {/* Right: channel checkboxes */}
-                  <div style={{ display: "flex", alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", alignItems: "center" }}>
                     {tableChannels.map((ch) => {
                       const state = getParentState(topic, ch.key);
-                      return renderTopicCheckbox(state, () => toggleTopicChannel(topic.id, ch.key), `${topic.id}-${ch.key}`);
+                      return renderTopicCheckbox(state, handleTopicCheckboxChange, `${topic.id}-${ch.key}`, {
+                        'data-topic-id': topic.id,
+                        'data-channel': ch.key,
+                      });
                     })}
                   </div>
                 </div>
@@ -2748,7 +2897,7 @@ const NotificationsSettingsNew: React.FC = () => {
                 {/* Subtopics — inside the same card, separated by dividers */}
                 {isExpanded && hasSubtopics && (
                   <div>
-                    {topic.subtopics!.map((sub, subIdx) => (
+                    {topic.subtopics!.map((sub) => (
                       <div
                         key={sub.id}
                         style={{
@@ -2826,11 +2975,11 @@ const NotificationsSettingsNew: React.FC = () => {
                         {/* Channel checkboxes */}
                         <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                           {tableChannels.map((ch) =>
-                            renderTopicCheckbox(
-                              sub.channels[ch.key] === null ? null : (sub.channels[ch.key] as boolean),
-                              () => toggleSubtopicChannel(topic.id, sub.id, ch.key),
-                              `${sub.id}-${ch.key}`
-                            )
+                            renderTopicCheckbox(sub.channels[ch.key], handleSubtopicCheckboxChange, `${sub.id}-${ch.key}`, {
+                              'data-topic-id': topic.id,
+                              'data-subtopic-id': sub.id,
+                              'data-channel': ch.key,
+                            })
                           )}
                         </div>
                       </div>
@@ -3099,11 +3248,16 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
       {/* Profile Image */}
       <div style={{ marginBottom: "24px" }}>
         <span style={s.label}>Profile Image</span>
-        <div style={s.profileImageBox} onClick={() => fileInputRef.current?.click()}>
+        <button
+          type="button"
+          aria-label="Change profile photo"
+          style={{ ...s.profileImageBox, border: s.profileImageBox.border as string, padding: 0 }}
+          onClick={() => fileInputRef.current?.click()}
+        >
           {profileImage
             ? <img src={profileImage} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : <span>{getInitials()}</span>}
-        </div>
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -3125,8 +3279,9 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* First name */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>Name</label>
+        <label htmlFor="general-profile-name" style={s.label}>Name</label>
         <input
+          id="general-profile-name"
           style={s.input}
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
@@ -3139,10 +3294,10 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* Language */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>
+        <label htmlFor="general-language" style={s.label}>
           Language <span style={s.helpIcon} title="Applies globally across all accounts">?</span>
         </label>
-        <select style={s.select} value={language} onChange={(e) => setLanguage(e.target.value)}>
+        <select id="general-language" style={s.select} value={language} onChange={(e) => setLanguage(e.target.value)}>
           <option>English</option>
           <option>French</option>
           <option>Spanish</option>
@@ -3154,13 +3309,13 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* Date, time, and number format */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>
+        <label htmlFor="general-date-format" style={s.label}>
           Date, time, and number format <span style={s.helpIcon} title="Sets date/time/number format based on locale">?</span>
         </label>
         <div style={{ fontSize: "13px", color: "#555", fontWeight: 300, marginBottom: "8px" }}>
           Format: 2 March 2026, 02/03/2026, 19:41 GMT, and 1,234.56
         </div>
-        <select style={s.select} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+        <select id="general-date-format" style={s.select} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
           <option>United Kingdom</option>
           <option>United States</option>
           <option>European Union</option>
@@ -3171,13 +3326,14 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* Phone number */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>Phone number</label>
+        <label htmlFor="general-phone-number" style={s.label}>Phone number</label>
         <div style={s.helpText}>
           We may use this phone number to contact you about security events. Please refer to our privacy policy for{" "}
           <a href="#" style={s.link}>more information ↗</a>
         </div>
         <div style={{ display: "flex", gap: "0px", marginTop: "10px" }}>
           <select
+            aria-label="Phone country"
             value={phoneCountry}
             onChange={(e) => setPhoneCountry(e.target.value)}
             style={{ padding: "8px", fontSize: "14px", border: "1px solid #d0d0d0", borderRadius: "0px", background: "#fff", fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", outline: "none", borderRight: "none" }}
@@ -3188,6 +3344,7 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
             <option value="AU">🇦🇺</option>
           </select>
           <input
+            id="general-phone-number"
             style={{ width: "260px", padding: "8px 12px", fontSize: "14px", color: "#141414", border: "1px solid #d0d0d0", borderRadius: "4px", background: "#fff", fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", outline: "none" }}
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
@@ -3203,7 +3360,7 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
       <div style={s.sectionTitle}>Defaults</div>
       <div style={s.sectionSubtitle}>This only applies to this account.</div>
       <div style={s.fieldGroup}>
-        <label style={s.label}>General working hours</label>
+        <div style={s.label}>General working hours</div>
         <a href="#" style={{ ...s.link, fontSize: "14px", fontWeight: 300 }}>Edit working hours ↗</a>
       </div>
 
@@ -3222,8 +3379,9 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
       <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", marginBottom: "20px" }}>
         {/* Due date */}
         <div style={s.fieldGroup}>
-          <label style={s.label}>Due date</label>
+          <label htmlFor="general-due-date" style={s.label}>Due date</label>
           <select
+            id="general-due-date"
             style={{ ...s.select, width: "240px", height: "40px", fontWeight: 300 }}
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
@@ -3239,10 +3397,11 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
         {/* Due time */}
         <div style={s.fieldGroup}>
-          <label style={s.label}>Due time</label>
+          <label htmlFor="general-due-time" style={s.label}>Due time</label>
           <div style={{ position: "relative" }}>
             <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#888", fontSize: "14px", pointerEvents: "none", zIndex: 1 }}><Clock size={14} /></span>
             <select
+              id="general-due-time"
               style={{ width: "240px", padding: "8px 12px 8px 34px", fontSize: "16px", height: "40px", fontWeight: 300, color: "#141414", border: "1px solid #d0d0d0", borderRadius: "4px", background: "#fff", fontFamily: "'Lexend Deca', Helvetica, Arial, sans-serif", outline: "none", appearance: "none" } as React.CSSProperties}
               value={dueTime}
               onChange={(e) => setDueTime(e.target.value)}
@@ -3260,8 +3419,8 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
 
       {/* Reminder */}
       <div style={s.fieldGroup}>
-        <label style={s.label}>Reminder</label>
-        <select style={s.select} value={reminder} onChange={(e) => setReminder(e.target.value)}>
+        <label htmlFor="general-reminder" style={s.label}>Reminder</label>
+        <select id="general-reminder" style={s.select} value={reminder} onChange={(e) => setReminder(e.target.value)}>
           <option>No reminder</option>
           <option>At time of task</option>
           <option>5 minutes before</option>
@@ -3343,7 +3502,7 @@ export type SectionRenderer = (opts: { subTab?: string; onSubTabChange?: (tabId:
 export const sectionPageMap: Record<string, SectionRenderer> = {
   'general-prefs': ({ subTab, onSubTabChange }) => (
     <GeneralSettings
-      activeTab={subTab === 'profile' || subTab === 'tasks' ? (subTab as 'profile' | 'tasks') : undefined}
+      activeTab={subTab === 'profile' || subTab === 'tasks' ? subTab : undefined}
       onTabChange={tabId => onSubTabChange?.(tabId)}
     />
   ),
