@@ -123,13 +123,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -763,6 +763,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
+                    disabled={action === "Export" && exporting}
             onClick={() => {
               setShowActionsDropdown(false);
               if (action === "Edit") {

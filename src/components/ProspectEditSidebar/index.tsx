@@ -132,6 +132,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
   <div className="contact-form-section" style={{ marginTop: "24px" }}>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-campaign-select"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
@@ -150,6 +151,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         }));
         return (
           <Select
+            inputId="prospect-campaign-select"
             value={
               contactForm.campaign_id != null
                 ? campaignSelectOptions.find(
@@ -182,6 +184,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-owner-select"
         className="contact-form-label"
         style={{
           display: "block",
@@ -194,6 +197,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         Owner
       </label>
       <Select
+        inputId="prospect-owner-select"
         value={(() => {
           const opts = extensions.map((ext: any) => ({
             value: String(ext.extension ?? ext.id ?? ""),
@@ -237,6 +241,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-source-input"
         className="contact-form-label"
         style={{
           display: "block",
@@ -249,6 +254,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         Source
       </label>
       <input
+        id="prospect-source-input"
         type="text"
         value={contactForm.source_file}
         onChange={(e) =>
@@ -285,6 +291,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
       </label>
       <Dropdown>
         <Dropdown.Toggle
+          id="prospect-disposition-dropdown"
           variant="outline-secondary"
           style={{
             width: "100%",
@@ -327,6 +334,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-legal-basis-dropdown"
         className="contact-form-label"
         style={{
           display: "block",
@@ -340,6 +348,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
       </label>
       <Dropdown>
         <Dropdown.Toggle
+          id="prospect-legal-basis-dropdown"
           variant="outline-secondary"
           style={{
             width: "100%",
@@ -383,6 +392,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
             >
               <Form.Check
                 type="checkbox"
+                id={`prospect-legal-basis-${option}`}
                 label={option}
                 checked={contactForm.legal_basis.includes(option)}
                 onChange={() => {}}
@@ -412,6 +422,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
   >
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-company-domain-input"
         className="contact-form-label"
         style={{
           display: "block",
@@ -424,6 +435,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         Company domain
       </label>
       <input
+        id="prospect-company-domain-input"
         type="text"
         value={contactForm.company_domain}
         onChange={(e) =>
@@ -460,6 +472,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         Scheduled call at
       </label>
       <input
+        id="prospect-scheduled-call-input"
         type="datetime-local"
         value={contactForm.scheduled_call_at}
         onChange={(e) =>
@@ -480,6 +493,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-tags-select"
         className="contact-form-label"
         style={{
           display: "block",
@@ -492,6 +506,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         Tags
       </label>
       <CreatableSelect
+        inputId="prospect-tags-select"
         isMulti
         value={contactForm.tags}
         onChange={(selected) =>
@@ -519,6 +534,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
+        htmlFor="prospect-note-editor"
         className="contact-form-label"
         style={{
           display: "block",
@@ -531,6 +547,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         Note
       </label>
       <RichNoteEditor
+        id="prospect-note-editor"
         value={contactForm.note ?? ""}
         onChange={(html) => setContactForm({ ...contactForm, note: html })}
         placeholder="Notes about this contact"
@@ -682,6 +699,13 @@ const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
 
   const canSecondaryActions = isFormValid && !createContactLoading;
 
+  let primaryButtonLabel: string;
+  if (createContactLoading) {
+    primaryButtonLabel = isEditing ? "Updating..." : "Creating...";
+  } else {
+    primaryButtonLabel = isEditing ? "Update" : "Create";
+  }
+
   return (
     <div
       className="contact-sidebar-footer"
@@ -718,13 +742,7 @@ const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
           }
         }}
       >
-        {createContactLoading
-          ? isEditing
-            ? "Updating..."
-            : "Creating..."
-          : isEditing
-            ? "Update"
-            : "Create"}
+        {primaryButtonLabel}
       </button>
       {!isEditing && onCreateAndAddAnother && (
         <button
@@ -837,6 +855,7 @@ const ProspectRequiredFieldsSection: React.FC<
       style={{ marginBottom: "20px" }}
     >
       <label
+        htmlFor="prospect-last-name"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
@@ -849,6 +868,7 @@ const ProspectRequiredFieldsSection: React.FC<
         Last name <span style={{ color: "#f2545b" }}>*</span>
       </label>
       <input
+        id="prospect-last-name"
         type="text"
         data-test-id="lastname-input"
         value={contactForm.lastName}
@@ -879,6 +899,7 @@ const ProspectRequiredFieldsSection: React.FC<
       style={{ marginBottom: "20px" }}
     >
       <label
+        htmlFor="prospect-email"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
@@ -891,6 +912,7 @@ const ProspectRequiredFieldsSection: React.FC<
         Email <span style={{ color: "#f2545b" }}>*</span>
       </label>
       <input
+        id="prospect-email"
         type="email"
         data-test-id="email-input"
         value={contactForm.email}
@@ -921,6 +943,7 @@ const ProspectRequiredFieldsSection: React.FC<
       style={{ marginBottom: "20px" }}
     >
       <label
+        htmlFor="prospect-phone"
         className="contact-form-label contact-form-label-required"
         style={{
           display: "block",
@@ -934,6 +957,7 @@ const ProspectRequiredFieldsSection: React.FC<
       </label>
       <div className="phone-input-wrapper contact-form-phone-input-wrapper">
         <PhoneInput
+          id="prospect-phone"
           international
           defaultCountry="US"
           value={
@@ -1019,7 +1043,15 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
           bottom: 0,
           zIndex: 1000,
         }}
+        role="button"
+        tabIndex={0}
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClose();
+          }
+        }}
       />
 
         <div

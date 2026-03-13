@@ -108,8 +108,6 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
 
-  // Exporting state (single deal export)
-  const [exporting, setExporting] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
 
@@ -123,13 +121,13 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "revenue", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "revenue", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -370,7 +368,6 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   const handleDealExport = useCallback(async () => {
     if (!dealRecordId) return;
-    setExporting(true);
     try {
       await PDFDownloadDeal(dealRecordId);
       toast.success("Exported deal successfully!");
@@ -378,8 +375,6 @@ const DealRecordPage: NextPageWithLayout = () => {
       // eslint-disable-next-line no-console
       console.error("Failed to export deal:", error);
       toast.error("Failed to export deal");
-    } finally {
-      setExporting(false);
     }
   }, [dealRecordId]);
 
@@ -436,6 +431,134 @@ const DealRecordPage: NextPageWithLayout = () => {
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  };
+
+  const getAttachmentBackgroundColor = (mimeType?: string | null): string => {
+    if (!mimeType) return "#6c757d";
+    if (mimeType.includes("pdf")) return "#dc3545";
+    if (
+      mimeType.includes("csv") ||
+      mimeType.includes("excel") ||
+      mimeType.includes("spreadsheet")
+    ) {
+      return "#198754";
+    }
+    if (mimeType.includes("image")) return "#0d6efd";
+    return "#6c757d";
+  };
+
+  const getAttachmentDisplayName = (attachment: any): string => {
+    if (attachment.name) return attachment.name;
+    if (attachment.original_name) return attachment.original_name;
+    if (attachment.file_path) {
+      const segments = String(attachment.file_path).split("/");
+      const lastSegment = segments[segments.length - 1];
+      if (lastSegment) return lastSegment;
+    }
+    return `Attachment ${attachment.id}`;
+  };
+
+  const renderAttachmentsSectionContent = () => {
+    if (loadingAttachments) {
+      return (
+        <div className="text-center py-5">
+          <output className="spinner-border text-primary">
+            <span className="visually-hidden">Loading...</span>
+          </output>
+        </div>
+      );
+    }
+
+    if (attachments.length === 0) {
+      return (
+        <div className="text-center py-4 text-muted">
+          <Paperclip size={48} className="mb-3 opacity-25" />
+          <div>No attachments yet</div>
+          <small>Upload files using the form above</small>
+        </div>
+      );
+    }
+
+    return (
+      <div className="d-flex flex-column gap-2 mb-4">
+        {attachments.map((attachment: any) => {
+          const backgroundColor = getAttachmentBackgroundColor(
+            attachment.mime_type
+          );
+          const displayName = getAttachmentDisplayName(attachment);
+
+          return (
+            <Card key={attachment.id} className="border shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className="d-flex align-items-center gap-3 flex-grow-1">
+                    <div
+                      className="rounded d-flex align-items-center justify-content-center"
+                      style={{
+                        width: "45px",
+                        height: "45px",
+                        background: backgroundColor,
+                        color: "white",
+                      }}
+                    >
+                      <FileText size={22} />
+                    </div>
+                    <div className="flex-grow-1">
+                      <div
+                        className="fw-semibold"
+                        style={{ fontSize: "14px" }}
+                      >
+                        {displayName}
+                      </div>
+                      <div
+                        style={{ fontSize: "12px", color: "#6c757d" }}
+                      >
+                        {attachment.file_size != null
+                          ? formatFileSize(attachment.file_size)
+                          : ""}
+                        {attachment.created_at
+                          ? ` • ${formatDateForTable(
+                              attachment.created_at
+                            )}`
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="d-flex gap-1">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-2 text-primary"
+                      title="Download"
+                      onClick={() =>
+                        handleDownloadAttachment(attachment.id)
+                      }
+                    >
+                      <DownloadIcon size={18} />
+                    </Button>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-2 text-danger"
+                      title="Delete"
+                      onClick={() => {
+                        setAttachmentToDelete({
+                          id: attachment.id,
+                          name: getAttachmentDisplayName(attachment),
+                        });
+                        setShowDeleteAttachmentModal(true);
+                      }}
+                    >
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          );
+        })}
+      </div>
+    );
   };
 
   const handleDealFileUpload = async (file: File) => {
@@ -2030,9 +2153,8 @@ const DealRecordPage: NextPageWithLayout = () => {
                 >
                   {uploadingFile ? (
                     <>
-                      <div
+                      <output
                         className="spinner-border spinner-border-sm"
-                        role="status"
                       />
                       Uploading...
                     </>
@@ -2054,9 +2176,9 @@ const DealRecordPage: NextPageWithLayout = () => {
 
               {loadingAttachments ? (
                 <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
+                  <output className="spinner-border text-primary">
                     <span className="visually-hidden">Loading...</span>
-                  </div>
+                  </output>
                 </div>
               ) : attachments.length === 0 ? (
                 <div className="text-center py-4 text-muted">
@@ -2066,87 +2188,82 @@ const DealRecordPage: NextPageWithLayout = () => {
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-2 mb-4">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes("pdf")
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes("spreadsheet")
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
-                            </div>
-                            <div className="flex-grow-1">
+                  {attachments.map((attachment: any) => {
+                    const backgroundColor = getAttachmentBackgroundColor(
+                      attachment.mime_type
+                    );
+                    const displayName = getAttachmentDisplayName(attachment);
+
+                    return (
+                      <Card key={attachment.id} className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
                               <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
+                                className="rounded d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: "45px",
+                                  height: "45px",
+                                  background: backgroundColor,
+                                  color: "white",
+                                }}
                               >
-                                {attachment.name ??
-                                  attachment.original_name ??
-                                  attachment.file_path?.split("/").pop() ??
-                                  `Attachment ${attachment.id}`}
+                                <FileText size={22} />
                               </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {attachment.file_size != null
-                                  ? formatFileSize(attachment.file_size)
-                                  : ""}
-                                {attachment.created_at
-                                  ? ` • ${formatDateForTable(attachment.created_at)}`
-                                  : ""}
+                              <div className="flex-grow-1">
+                                <div
+                                  className="fw-semibold"
+                                  style={{ fontSize: "14px" }}
+                                >
+                                  {displayName}
+                                </div>
+                                <div
+                                  style={{ fontSize: "12px", color: "#6c757d" }}
+                                >
+                                  {attachment.file_size != null
+                                    ? formatFileSize(attachment.file_size)
+                                    : ""}
+                                  {attachment.created_at
+                                    ? ` • ${formatDateForTable(
+                                        attachment.created_at
+                                      )}`
+                                    : ""}
+                                </div>
                               </div>
                             </div>
+                            <div className="d-flex gap-1">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-primary"
+                                title="Download"
+                                onClick={() =>
+                                  handleDownloadAttachment(attachment.id)
+                                }
+                              >
+                                <DownloadIcon size={18} />
+                              </Button>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-danger"
+                                title="Delete"
+                                onClick={() => {
+                                  setAttachmentToDelete({
+                                    id: attachment.id,
+                                    name: getAttachmentDisplayName(attachment),
+                                  });
+                                  setShowDeleteAttachmentModal(true);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-primary"
-                              title="Download"
-                              onClick={() =>
-                                handleDownloadAttachment(attachment.id)
-                              }
-                            >
-                              <DownloadIcon size={18} />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name:
-                                    attachment.name ??
-                                    attachment.original_name ??
-                                    `Attachment ${attachment.id}`,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>

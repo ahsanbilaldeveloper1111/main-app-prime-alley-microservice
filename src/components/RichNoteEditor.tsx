@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from "react";
 import { Bold, Italic, Underline, Link, Image } from "lucide-react";
 
 export interface RichNoteEditorProps {
+  id?: string;
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
@@ -10,6 +11,7 @@ export interface RichNoteEditorProps {
 }
 
 const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
+  id,
   value,
   onChange,
   placeholder = "Start typing…",
@@ -156,6 +158,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
       </div>
       <div
         ref={editorRef}
+        id={id}
         contentEditable={!disabled}
         role="textbox"
         aria-multiline="true"

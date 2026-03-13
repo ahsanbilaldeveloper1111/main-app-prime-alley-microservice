@@ -157,9 +157,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
       id: number;
     }>
   >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
   const [extensions, setExtensions] = useState<any[]>([]);
   const [prospectForm, setProspectForm] = useState<ProspectSidebarFormState>({
     firstName: "",
@@ -176,7 +173,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     scheduled_call_at: "",
     tags: [],
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [],
   });
   // Edit Prospect Sidebar States
@@ -430,13 +427,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
   }, []);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -535,7 +532,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       ),
       tags: tagsArray as Array<{ value: string; label: string; id: number }>,
       note: item.note ?? d.note ?? "",
-      source:
+      source_file:
         (item as any).source_file ??
         d.source ??
         (item as any).source ??
@@ -555,13 +552,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
       } catch (error) {
         console.error("Failed to load campaigns:", error);
         // Fallback to empty array
@@ -974,7 +964,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         phone: phoneForPayload,
         campaign_id: data.campaign_id ?? null,
         company_domain: data.company_domain?.trim() || undefined,
-        source: data.source?.trim() || undefined,
+        source: data.source_file?.trim() || undefined,
         scheduled_call_at: data.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: data.tags?.length
@@ -1133,6 +1123,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
+                    disabled={action === "Export" && exporting}
                     onClick={() => {
                       if (action === "Edit") {
                         setShowEditContactSidebar(true);
@@ -1161,7 +1152,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    {action}
+                    {action === "Export" && exporting ? "Exporting..." : action}
                   </button>
                 ))}
               </div>

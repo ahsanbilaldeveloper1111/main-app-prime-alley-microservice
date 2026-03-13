@@ -4716,11 +4716,12 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
               const isCurrentDay = isToday(currentDayDate);
               const isSelectedDay = isSelected(currentDayDate);
-              const dateCircleBackgroundColor = isCurrentDay
-                ? "#ff3842"
-                : isSelectedDay
-                  ? "#141414"
-                  : "transparent";
+              let dateCircleBackgroundColor = "transparent";
+              if (isCurrentDay) {
+                dateCircleBackgroundColor = "#ff3842";
+              } else if (isSelectedDay) {
+                dateCircleBackgroundColor = "#141414";
+              }
 
               return (
                   <div
@@ -5698,7 +5699,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     content_variables: Record<string, string>;
   }) => {
     const rawNumber =
-      (phoneList && phoneList[0]) ||
+      phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
     const number = rawNumber.replace(/\s/g, "");
@@ -5743,7 +5744,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     attachments: File[];
   }) => {
     const rawTo =
-      (phoneList && phoneList[0]) ||
+      phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
     const to = rawTo.replace(/\s/g, "");
@@ -5810,30 +5811,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
   };
 
-  const goToRecordDetailActivity = useCallback(
-    (activityType?: string) => {
-      if (!recordType || recordId == null) return;
+  const goToRecordDetailActivity = (activityType?: string) => {
+    if (!recordType || recordId == null) return;
 
-      const baseUrl = buildActivitiesBaseUrl(
-        recordType,
-        recordId,
-        activityEntityType,
-      );
+    const baseUrl = buildActivitiesBaseUrl(
+      recordType,
+      recordId,
+      activityEntityType,
+    );
 
-      if (!baseUrl) return;
+    if (!baseUrl) return;
 
-      let url = baseUrl;
-      if (activityType != null && activityType.trim()) {
-        const separator = baseUrl.includes("?") ? "&" : "?";
-        url = `${baseUrl}${separator}activityType=${encodeURIComponent(
-          activityType,
-        )}`;
-      }
+    let url = baseUrl;
+    if (activityType?.trim()) {
+      const separator = baseUrl.includes("?") ? "&" : "?";
+      url = `${baseUrl}${separator}activityType=${encodeURIComponent(
+        activityType,
+      )}`;
+    }
 
-      router.push(url);
-    },
-    [recordType, recordId, activityEntityType, router],
-  );
+    router.push(url);
+  };
 
   const handleMoreActionSelect = (actionId: string) => {
     switch (actionId) {
@@ -6604,6 +6602,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     const EmptyIcon = section.emptyState?.icon;
     const isCollapsed = collapsedSections.has(section.id);
     const showActions = showSectionActions === section.id;
+    let primaryContent: React.ReactNode | null = null;
 
     return (
       <div
@@ -6618,7 +6617,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         }}
       >
         {/* Section Header */}
-        <div
+        <button
+          type="button"
           style={{
             display: "flex",
             alignItems: "center",
@@ -6627,17 +6627,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             cursor: section.collapsible ? "pointer" : "default",
             backgroundColor: "#ffffff",
             borderBottom: isCollapsed ? "none" : "1px solid #eaf0f6",
+            width: "100%",
+            border: "none",
+            outline: "none",
           }}
-          role={section.collapsible ? "button" : undefined}
-          tabIndex={section.collapsible ? 0 : undefined}
-          onClick={() => section.collapsible && toggleSection(section.id)}
-          onKeyDown={(e) => {
-            if (!section.collapsible) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              toggleSection(section.id);
-            }
-          }}
+          onClick={
+            section.collapsible ? () => toggleSection(section.id) : undefined
+          }
+          aria-expanded={section.collapsible ? !isCollapsed : undefined}
         >
           <div
             style={{
@@ -6725,13 +6722,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               style={{ position: "relative" }}
               ref={(el) => {
                 sectionDropdownRefs.current[section.id] = el;
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            }}
+          >
               <button
-                onClick={() =>
-                  setShowSectionActions(showActions ? null : section.id)
-                }
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSectionActions(showActions ? null : section.id);
+              }}
                 style={{
                   background: "transparent",
                   border: "none",
@@ -6803,7 +6800,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               )}
             </div>
           )}
-        </div>
+        </button>
 
         {/* Section Content */}
         {!isCollapsed && (
@@ -6855,9 +6852,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                               marginBottom: "10px",
                             }}
                           >
-                            {note.text &&
-                            note.text.includes("<") &&
-                            note.text.includes(">") ? (
+                            {note.text?.includes("<") &&
+                            note.text?.includes(">") ? (
                               <div
                                 style={{
                                   fontSize: "14px",
@@ -7254,17 +7250,22 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                               rec.start_time ??
                               rec.created_at ??
                               "";
-                            const timestamp = dateStr
-                              ? dateStr.length > 10
-                                ? new Date(dateStr).toLocaleString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : dateStr
-                              : "—";
+                            let timestamp = "—";
+                            if (dateStr) {
+                              if (dateStr.length > 10) {
+                                timestamp = new Date(
+                                  dateStr,
+                                ).toLocaleString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                });
+                              } else {
+                                timestamp = dateStr;
+                              }
+                            }
                             const dir =
                               rec.Direction ??
                               rec.direction ??
@@ -7430,26 +7431,35 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             ) : section.customContent ? (
               section.customContent
             ) : section.fields && section.fields.length > 0 ? (
-              section.id === "about-prospect" ? (
-                <div
-                  style={{
-                    maxHeight: "280px",
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                    ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
-                  }}
-                >
-                  {section.fields.map((field, index) =>
-                    renderField(field, index),
-                  )}
-                </div>
-              ) : (
-                <div>
-                  {section.fields.map((field, index) =>
-                    renderField(field, index),
-                  )}
-                </div>
-              )
+              (() => {
+                if (section.id === "about-prospect") {
+                  return (
+                    <div
+                      style={{
+                        maxHeight: "280px",
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        ...( {
+                          scrollbarWidth: "thin",
+                          scrollbarColor: "#c8c8c8 transparent",
+                        } as any),
+                      }}
+                    >
+                      {section.fields.map((field, index) =>
+                        renderField(field, index),
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div>
+                    {section.fields.map((field, index) =>
+                      renderField(field, index),
+                    )}
+                  </div>
+                );
+              })()
             ) : section.emptyState ? (
               (() => {
                 const es = (section as SidebarSection).emptyState;
@@ -7691,25 +7701,30 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       />
 
       {/* Meeting Modal - Rendered as floating window (shared component, same as prospects) */}
-      {!activityModals && (
-        <MeetingModal
-          isOpen={showMeetingModal}
-          onClose={handleMeetingClose}
-          hostEmail={session?.user?.email ?? ""}
-          hostName={session?.user?.name ?? ""}
-          attendeeEmail={
-            Array.isArray(emailList)
-              ? emailList[0]
-              : typeof emailList === "string"
-                ? emailList
-                : ""
-          }
-          attendeeName={title}
-          recordType={record?.type as any}
-          recordId={record?.id}
-          onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
-        />
-      )}
+      {(() => {
+        let attendeeEmail = "";
+        if (Array.isArray(emailList)) {
+          attendeeEmail = emailList[0];
+        } else if (typeof emailList === "string") {
+          attendeeEmail = emailList;
+        }
+
+        return !activityModals ? (
+          <MeetingModal
+            isOpen={showMeetingModal}
+            onClose={handleMeetingClose}
+            hostEmail={session?.user?.email ?? ""}
+            hostName={session?.user?.name ?? ""}
+            attendeeEmail={attendeeEmail}
+            attendeeName={title}
+            recordType={record?.type as any}
+            recordId={record?.id}
+            onSchedule={(meetingData) =>
+              handleMeetingSchedule(meetingData, record)
+            }
+          />
+        ) : null;
+      })()}
 
       {/* More Actions Modal */}
       <MoreActionsModal
@@ -7903,19 +7918,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       }}
                     >
                       {actionsDropdown.items.map((item, index) => {
-                        const hasSubItems = "subItems" in item && item.subItems?.length;
+                        const hasSubItems =
+                          "subItems" in item && !!item.subItems?.length;
                         const isSubMenuOpen = openActionsSubMenuIndex === index;
-                        const searchLower = actionsSubMenuSearch.trim().toLowerCase();
-                        const filteredSubItems =
-                          hasSubItems && isSubMenuOpen && searchLower
-                            ? item.subItems.filter((sub) =>
-                                sub.label.toLowerCase().includes(searchLower),
-                              )
-                            : hasSubItems
-                              ? item.subItems
-                              : [];
+                        const searchLower =
+                          actionsSubMenuSearch.trim().toLowerCase();
+                        type ActionsSubItem = { label: string; value: string };
+                        let filteredSubItems: ActionsSubItem[] = [];
+                        if (hasSubItems) {
+                          const subItems = (
+                            item as { subItems: ActionsSubItem[] }
+                          ).subItems;
+                          if (isSubMenuOpen && searchLower) {
+                            filteredSubItems = subItems.filter((sub) =>
+                              sub.label.toLowerCase().includes(searchLower),
+                            );
+                          } else {
+                            filteredSubItems = subItems;
+                          }
+                        }
                         return (
-                          <div key={index} style={{ position: "relative" }}>
+                          <div key={item.label} style={{ position: "relative" }}>
                             <button
                               onClick={() => {
                                 if (hasSubItems) {
@@ -8328,7 +8351,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 border: "1px solid #cccccc",
               }}
             >
-              <div
+              <button
+                type="button"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -8336,16 +8360,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   padding: "14px 20px",
                   cursor: "pointer",
                   backgroundColor: "#ffffff",
+                  width: "100%",
+                  border: "none",
+                  outline: "none",
                 }}
-                role="button"
-                tabIndex={0}
                 onClick={() => toggleSection("breeze-summary")}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggleSection("breeze-summary");
-                  }
-                }}
               >
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "10px" }}
@@ -8386,7 +8405,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     AI
                   </div>
                 </div>
-              </div>
+              </button>
 
               {!collapsedSections.has("breeze-summary") && (
                 <div

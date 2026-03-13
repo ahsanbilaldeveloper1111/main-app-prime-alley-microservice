@@ -72,7 +72,6 @@ import {
   Eye,
   Trash2,
   MoreVertical,
-  MoreHorizontal,
   Phone as PhoneIcon,
   Phone,
   Mail,
@@ -81,7 +80,6 @@ import {
   FileText,
   Target,
   MessageCircle,
-  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
@@ -721,7 +719,7 @@ const CrmProspectsManagement = () => {
     setShowCreateContactSidebar(true);
     const rawEditId = router.query.editContactId;
     const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr != null ? Number(editIdStr) : NaN;
+    const editIdNum = editIdStr != null ? Number(editIdStr) : Number.NaN;
     if (Number.isFinite(editIdNum) && editIdNum > 0) {
       setEditingContactId(editIdNum);
     }
@@ -1168,86 +1166,6 @@ const CrmProspectsManagement = () => {
     onMeetingScheduled: () =>
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
   });
-
-  const sidebarQuickActions = useMemo(() => {
-    const hasPhone = !!String(sidebarRecordPhone || "").trim();
-    const hasEmail = !!String(sidebarRecordEmail || "").trim();
-    return [
-      {
-        id: "qa-call",
-        label: "Call",
-        icon: Phone,
-        onClick: () => {
-          const phone = String(sidebarRecordPhone || "").trim();
-          if (!phone) {
-            toast.error("No phone number available for this entry");
-            return;
-          }
-          if (!isInitialized) {
-            toast.error("CTI not initialized. Please wait...");
-            return;
-          }
-          dialNumber(phone)
-            .then((result) => {
-              if (result.success) {
-                toast.success(`Calling ${sidebarRecordName || phone}...`);
-              } else {
-                toast.error(result.error || "Failed to make call");
-              }
-            })
-            .catch((error) => {
-              console.error("Call error:", error);
-              toast.error("Failed to make call");
-            });
-        },
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-whatsapp",
-        label: "WhatsApp",
-        icon: MessageCircle,
-        onClick: () => sidebarActivityModals.openWhatsApp(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-sms",
-        label: "SMS",
-        icon: MessageSquare,
-        onClick: () => sidebarActivityModals.openSms(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-meeting",
-        label: "Meeting",
-        icon: Calendar,
-        onClick: () => sidebarActivityModals.openMeeting(),
-      },
-      {
-        id: "qa-email",
-        label: "Email",
-        icon: Mail,
-        onClick: () => sidebarActivityModals.openEmail(),
-        disabled: !hasEmail,
-      },
-      {
-        id: "more",
-        label: "More",
-        icon: MoreHorizontal,
-        onClick: () => {
-          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
-        },
-        disabled: false,
-      },
-    ];
-  }, [
-    sidebarRecordPhone,
-    sidebarRecordEmail,
-    sidebarActivityModals,
-    dialNumber,
-    isInitialized,
-    sidebarRecordName,
-    sidebarRecordId,
-  ]);
 
   const buildCrmDataParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
@@ -1702,11 +1620,12 @@ const CrmProspectsManagement = () => {
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
   const advancedFilterPills = useMemo<FilterPill[]>(() => {
-    const campaignIds = Array.isArray(currentFilters.campaign_id)
-      ? currentFilters.campaign_id
-      : currentFilters.campaign_id
-        ? [currentFilters.campaign_id]
-        : [];
+    const campaignIds: string[] = [];
+    if (Array.isArray(currentFilters.campaign_id)) {
+      campaignIds.push(...currentFilters.campaign_id);
+    } else if (currentFilters.campaign_id) {
+      campaignIds.push(currentFilters.campaign_id);
+    }
 
     const selectedCampaignOptions = availableCampaigns.filter((c) =>
       campaignIds.includes(c.value),
@@ -1796,7 +1715,12 @@ const CrmProspectsManagement = () => {
         label: "Source",
         showDropdown: true,
         active: !!sourceValue,
-        activeLabel: sourceValue ? String(sourceValue) : undefined,
+        activeLabel: (() => {
+          if (!sourceValue) {
+            return undefined;
+          }
+          return String(sourceValue);
+        })(),
         onClear: () => {
           setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
           applyTableFiltersPatch({ source_file: undefined });
@@ -1805,11 +1729,12 @@ const CrmProspectsManagement = () => {
           <div style={{ minWidth: 280 }}>
             <CreatableSelect
               options={uniqueSources}
-              value={
-                sourceValue
-                  ? { value: sourceValue, label: String(sourceValue) }
-                  : null
-              }
+              value={(() => {
+                if (!sourceValue) {
+                  return null;
+                }
+                return { value: sourceValue, label: String(sourceValue) };
+              })()}
               onChange={(selected) => {
                 const v = selected ? (selected as any).value : null;
                 setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
@@ -1839,10 +1764,12 @@ const CrmProspectsManagement = () => {
         label: "Tags",
         showDropdown: true,
         active: tagValues.length > 0,
-        activeLabel:
-          tagValues.length > 1
-            ? `${tagValues.length} selected`
-            : selectedTagOptions[0]?.label,
+        activeLabel: (() => {
+          if (tagValues.length > 1) {
+            return `${tagValues.length} selected`;
+          }
+          return selectedTagOptions[0]?.label;
+        })(),
         onClear: () => {
           setProspectsFilters((prev) => ({ ...prev, tags: null }));
           applyTableFiltersPatch({ tags: undefined });
@@ -2999,41 +2926,6 @@ const CrmProspectsManagement = () => {
     setSelectedProspect(null);
   }, []);
 
-  // Handle owner change from prospect sidebar (Update owner dropdown)
-  const handleProspectOwnerSelect = useCallback(
-    async (ownerValue: string) => {
-      const prospect = selectedProspect;
-      if (!prospect?.id) return;
-      const name = prospect.name ?? "";
-      const phone = prospect.phone ?? "";
-      const campaignId =
-        prospect.campaign_id ?? prospect.campaign?.id ?? null;
-      const existingData = (prospect.data as Record<string, unknown>) ?? {};
-      try {
-        await updateCrmData(prospect.id, {
-          name,
-          phone,
-          campaign_id: campaignId,
-          data: { ...existingData, contact_owner: ownerValue || undefined },
-        });
-        fetchCrmData();
-        setSelectedProspect((prev: CrmDataItem | null) =>
-          prev
-            ? {
-                ...prev,
-                data: {
-                  ...(prev.data as Record<string, unknown>),
-                  contact_owner: ownerValue || null,
-                },
-              }
-            : null,
-        );
-      } catch {
-        // Error already shown by updateCrmData
-      }
-    },
-    [selectedProspect, fetchCrmData],
-  );
 
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -6374,43 +6266,53 @@ const CrmProspectsManagement = () => {
             onConfirm={
               deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
             }
-            itemName={
-              deleteModalMode === "single" && itemToDelete
-                ? `prospect entry #${itemToDelete.id}`
-                : deleteModalMode === "bulk"
-                  ? `${selectedItems.length} selected prospects`
-                  : undefined
-            }
+            itemName={(() => {
+              if (deleteModalMode === "single" && itemToDelete) {
+                return `prospect entry #${itemToDelete.id}`;
+              }
+              if (deleteModalMode === "bulk") {
+                return `${selectedItems.length} selected prospects`;
+              }
+              return undefined;
+            })()}
             itemType={
               deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
             }
-            additionalInfo={
-              deleteModalMode === "single" && itemToDelete ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Entry ID:</strong> #{itemToDelete.id}
-                  <br />
-                  <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-                  <br />
-                  <strong>Assigned To:</strong>{" "}
-                  {itemToDelete.user_extension
-                    ? extensions.find(
-                        (extension: any) =>
-                          extension.id.toString() ===
-                          itemToDelete.user_extension?.toString(),
-                      )?.display_name || itemToDelete.user_extension
-                    : "Unassigned"}
-                  <br />
-                  <strong>Created:</strong>{" "}
-                  {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
-                </div>
-              ) : deleteModalMode === "bulk" ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Warning:</strong> This action cannot be undone. All{" "}
-                  {selectedItems.length} selected entries will be permanently
-                  deleted.
-                </div>
-              ) : undefined
-            }
+            additionalInfo={(() => {
+              if (deleteModalMode === "single" && itemToDelete) {
+                return (
+                  <div className="alert alert-warning mb-3">
+                    <strong>Entry ID:</strong> #{itemToDelete.id}
+                    <br />
+                    <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+                    <br />
+                    <strong>Assigned To:</strong>{" "}
+                    {itemToDelete.user_extension
+                      ? extensions.find(
+                          (extension: any) =>
+                            extension.id.toString() ===
+                            itemToDelete.user_extension?.toString(),
+                        )?.display_name || itemToDelete.user_extension
+                      : "Unassigned"}
+                    <br />
+                    <strong>Created:</strong>{" "}
+                    {moment(itemToDelete.created_at).format(
+                      "MMM DD, YYYY HH:mm",
+                    )}
+                  </div>
+                );
+              }
+              if (deleteModalMode === "bulk") {
+                return (
+                  <div className="alert alert-warning mb-3">
+                    <strong>Warning:</strong> This action cannot be undone. All{" "}
+                    {selectedItems.length} selected entries will be permanently
+                    deleted.
+                  </div>
+                );
+              }
+              return undefined;
+            })()}
           />
 
           {/* Data Assignment Success Modal */}
