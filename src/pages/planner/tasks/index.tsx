@@ -113,8 +113,7 @@ function stripHtmlTags(input: string): string {
   const tagBuffer: string[] = [];
   let inTag = false;
 
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
+  for (const ch of input) {
     if (!inTag) {
       if (ch === "<") {
         inTag = true;
