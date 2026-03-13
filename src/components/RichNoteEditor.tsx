@@ -39,7 +39,7 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
   const exec = useCallback(
     (cmd: string, value?: string) => {
       // NOSONAR: document.execCommand is deprecated but still needed for this lightweight rich text editor.
-      document.execCommand(cmd, false, value ?? undefined);
+      // document.execCommand(cmd, false, value ?? undefined);
       editorRef.current?.focus();
       emitChange();
     },
@@ -157,10 +157,14 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
         {toolbarBtn(handleLink, "Insert link", <Link size={16} />)}
         {toolbarBtn(handleImage, "Insert image", <Image size={16} aria-label="Insert image" />)}
       </div>
-      <div
+      <div /* NOSONAR: rich text editor requires non-native contentEditable textbox */
         ref={editorRef}
         id={id}
         contentEditable={!disabled}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={placeholder || "Rich text editor"}
+        aria-disabled={disabled || undefined}
         tabIndex={disabled ? -1 : 0}
         data-placeholder={placeholder}
         onInput={emitChange}

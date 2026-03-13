@@ -154,6 +154,55 @@ interface KPICardData {
   onClick?: () => void;
 }
 
+interface DeleteModalAdditionalInfoProps {
+  mode: "single" | "bulk" | null;
+  itemToDelete: CrmDataItem | null;
+  selectedCount: number;
+  extensions: any[];
+}
+
+const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
+  mode,
+  itemToDelete,
+  selectedCount,
+  extensions,
+}) => {
+  if (mode === "single" && itemToDelete) {
+    const assignedTo =
+      itemToDelete.user_extension
+        ? extensions.find(
+            (extension: any) =>
+              extension.id.toString() ===
+              itemToDelete.user_extension?.toString(),
+          )?.display_name || itemToDelete.user_extension
+        : "Unassigned";
+
+    return (
+      <div className="alert alert-warning mb-3">
+        <strong>Entry ID:</strong> #{itemToDelete.id}
+        <br />
+        <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+        <br />
+        <strong>Assigned To:</strong> {assignedTo}
+        <br />
+        <strong>Created:</strong>{" "}
+        {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
+      </div>
+    );
+  }
+
+  if (mode === "bulk") {
+    return (
+      <div className="alert alert-warning mb-3">
+        <strong>Warning:</strong> This action cannot be undone. All{" "}
+        {selectedCount} selected entries will be permanently deleted.
+      </div>
+    );
+  }
+
+  return null;
+};
+
 const PhoneContainer = ({
   phone,
   onClick,
@@ -6278,43 +6327,14 @@ const CrmProspectsManagement = () => {
             itemType={
               deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
             }
-            additionalInfo={(() => {
-              if (deleteModalMode === "single" && itemToDelete) {
-                return (
-                  <div className="alert alert-warning mb-3">
-                    <strong>Entry ID:</strong> #{itemToDelete.id}
-                    <br />
-                    <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-                    <br />
-                    <strong>Assigned To:</strong>{" "}
-                    {itemToDelete.user_extension
-                      ? extensions.find(
-                          (extension: any) =>
-                            extension.id.toString() ===
-                            itemToDelete.user_extension?.toString(),
-                        )?.display_name || itemToDelete.user_extension
-                      : "Unassigned"}
-                    <br />
-                    <strong>Created:</strong>{" "}
-                    {moment(itemToDelete.created_at).format(
-                      "MMM DD, YYYY HH:mm",
-                    )}
-                  </div>
-                );
-              }
-
-              if (deleteModalMode === "bulk") {
-                return (
-                  <div className="alert alert-warning mb-3">
-                    <strong>Warning:</strong> This action cannot be undone. All{" "}
-                    {selectedItems.length} selected entries will be permanently
-                    deleted.
-                  </div>
-                );
-              }
-
-              return undefined;
-            })()}
+            additionalInfo={
+              <DeleteModalAdditionalInfo
+                mode={deleteModalMode}
+                itemToDelete={itemToDelete}
+                selectedCount={selectedItems.length}
+                extensions={extensions}
+              />
+            }
           />
 
           {/* Data Assignment Success Modal */}
