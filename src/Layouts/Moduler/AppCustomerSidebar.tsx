@@ -495,7 +495,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: ''
         },
         {
-          id: 'crm-company',
+          id: 'crm-contacts',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.CONTACTS,
           icon: <Book size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
