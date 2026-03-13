@@ -3520,7 +3520,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
   const parseDateInputToLocalDate = (value: string) => {
     // value format: YYYY-MM-DD
-    const [y, m, d] = value.split("-").map((p) => Number(p));
+    const [y, m, d] = value.split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d);
   };
@@ -3548,7 +3548,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     if (!el) return;
     if ("showPicker" in el && typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
       (el as HTMLInputElement & { showPicker: () => void }).showPicker();
-      return;
     }
     else el.click();
   };
@@ -3650,7 +3649,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
       const parts = formatter.formatToParts(new Date());
       const offsetPart = parts.find((p) => p.type === "timeZoneName");
       const offset = offsetPart?.value ?? "";
-      const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+      const city = tz.split("/").pop()?.replaceAll("_", " ") ?? tz;
       return offset ? `${offset} ${city}` : tz;
     } catch {
       return tz;
@@ -4908,11 +4907,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     contextPayload && typeof contextPayload === "object"
       ? {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          lead: (contextPayload as any).lead,
+          lead: contextPayload.lead,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          deal: (contextPayload as any).deal,
+          deal: contextPayload.deal,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          order: (contextPayload as any).order,
+          order: contextPayload.order,
         }
       : undefined;
   const { data: session } = useSession();
@@ -5702,8 +5701,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
-    const number = rawNumber.replace(/\s/g, "");
-    if (!number) {
+      const number = rawNumber.replaceAll(" ", "");
+      if (!number) {
       toast.error("No phone number available for this record.");
       return;
     }
@@ -5747,7 +5746,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
-    const to = rawTo.replace(/\s/g, "");
+    const to = rawTo.replaceAll(" ", "");
     const body = smsData.message?.trim() || "";
     if (!to || !body) {
       if (!to) toast.error("No phone number available for this record.");
@@ -5991,7 +5990,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Humanize data key for display (e.g. "contact_owner" -> "Contact Owner")
   const humanizeDataKey = (key: string) =>
-    key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    key.replaceAll("_", " ").replaceAll(/\b\w/g, (c) => c.toUpperCase());
 
   // --- Recent Activities (audit trail) shared helpers ---
   type AuditTrailEntry = {
@@ -6023,7 +6022,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     const fmt = (v: unknown): string => {
       if (v == null) return "—";
       if (typeof v === "string") return v;
+      if (
+        typeof v === "number" ||
+        typeof v === "boolean" ||
+        typeof v === "bigint"
+      ) {
+        return String(v);
+      }
       if (typeof v === "object") return JSON.stringify(v);
+      if (typeof v === "symbol") return v.toString();
+      if (typeof v === "function") return v.name || "[function]";
       return String(v);
     };
     const record = (rawData?.data as Record<string, unknown>) ?? rawData ?? {};
@@ -6036,8 +6044,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           field === "contact_owner" ||
           field === "user_extension") &&
         resolveUser
-      )
-        return resolveUser(String(val ?? ""));
+      ) {
+        const id =
+          typeof val === "string" || typeof val === "number" ? String(val) : "";
+        return resolveUser(id);
+      }
       if (
         field === "campaign_id" &&
         campaign?.name &&
@@ -6047,6 +6058,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         return campaign.name;
       if (field === "scheduled_call_at" && val) {
         try {
+          if (typeof val !== "string" && typeof val !== "number") {
+            return fmt(val);
+          }
           return new Date(String(val)).toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -6197,13 +6211,16 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               : null,
           detailPath: (id: number) => {
             const entityType = activityEntityType ?? "lead";
-            if (entityType === "prospect")
-              return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
-            if (entityType === "lead")
-              return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
-            if (entityType === "deal")
-              return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
-            return `/crm/orders/${id}/order-detailpage?section=activities`;
+            switch (entityType) {
+              case "prospect":
+                return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
+              case "lead":
+                return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
+              case "deal":
+                return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
+              default:
+                return `/crm/orders/${id}/order-detailpage?section=activities`;
+            }
           },
         };
       default:
@@ -6334,8 +6351,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       if (value === null || value === undefined || value === "") return;
 
       const label = key
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+        .replaceAll("_", " ")
+        .replaceAll(/\b\w/g, (c) => c.toUpperCase());
 
       if (Array.isArray(value)) {
         if (value.length === 0) return;
@@ -6346,9 +6363,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           type: "tags",
         });
       } else {
+        let displayValue: string;
+        if (
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean" ||
+          typeof value === "bigint"
+        ) {
+          displayValue = String(value);
+        } else if (value && typeof value === "object") {
+          displayValue = JSON.stringify(value);
+        } else {
+          displayValue = "";
+        }
+
         fields.push({
           label,
-          value: String(value),
+          value: displayValue,
         });
       }
     });
@@ -7371,7 +7402,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   );
                 }
 
-                if (section.emptyState) {
+        if (section.emptyState) {
                   const es = (section as SidebarSection).emptyState;
                   return (
                     <div style={{ padding: "24px 16px", textAlign: "center" }}>
@@ -7716,7 +7747,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           attendeeEmail = emailList;
         }
 
-        return !activityModals ? (
+        return activityModals ? null : (
           <MeetingModal
             isOpen={showMeetingModal}
             onClose={handleMeetingClose}
@@ -7724,13 +7755,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             hostName={session?.user?.name ?? ""}
             attendeeEmail={attendeeEmail}
             attendeeName={title}
-            recordType={record?.type as any}
+            recordType={record?.type}
             recordId={record?.id}
             onSchedule={(meetingData) =>
               handleMeetingSchedule(meetingData, record)
             }
           />
-        ) : null;
+        );
       })()}
 
       {/* More Actions Modal */}
@@ -8371,7 +8402,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   border: "none",
                   outline: "none",
                 }}
-                role="button"
                 tabIndex={0}
                 onClick={() => toggleSection("breeze-summary")}
                 onKeyDown={(e) => {
