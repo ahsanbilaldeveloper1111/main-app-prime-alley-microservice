@@ -355,8 +355,9 @@ const NotificationProfilesTabContent: React.FC = () => {
       </h2>
       <p style={{ fontFamily: baseFont, fontSize: '14px', color: '#555', fontWeight: 300, marginBottom: '20px' }}>
         Set notification defaults for a group of users within a preset. To add or edit Presets go to{' '}
-        <a
-          href="#"
+        <button
+          type="button"
+          onClick={() => null}
           style={{
             color: '#0091ae',
             textDecoration: 'none',
@@ -364,13 +365,17 @@ const NotificationProfilesTabContent: React.FC = () => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
           }}
         >
           Presets
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
             <path d="M3.5 1H11M11 1V8.5M11 1L1 11" stroke="#0091ae" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </a>
+        </button>
       </p>
 
       {/* Create button */}
@@ -784,18 +789,23 @@ const DataHostingTabContent: React.FC = () => {
                 content: (
                   <>
                     After the migration completes, your data and settings will remain unchanged, but{' '}
-                    <a
-                      href="#"
+                    <button
+                      type="button"
+                      onClick={() => null}
                       style={{
                         color: '#0091ae',
                         fontWeight: 500,
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
                       }}
                     >
                       some steps<ExternalLinkIcon />
-                    </a>{' '}
+                    </button>{' '}
                     may be needed to keep everything running smoothly.
                   </>
                 ),
@@ -816,31 +826,41 @@ const DataHostingTabContent: React.FC = () => {
                 content: (
                   <>
                     For more details, check our{' '}
-                    <a
-                      href="#"
+                    <button
+                      type="button"
+                      onClick={() => null}
                       style={{
                         color: '#0091ae',
                         fontWeight: 500,
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
                       }}
                     >
                       FAQ<ExternalLinkIcon />
-                    </a>{' '}
+                    </button>{' '}
                     or{' '}
-                    <a
-                      href="#"
+                    <button
+                      type="button"
+                      onClick={() => null}
                       style={{
                         color: '#0091ae',
                         fontWeight: 500,
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
                       }}
                     >
                       contact support<ExternalLinkIcon />
-                    </a>.
+                    </button>.
                   </>
                 ),
               },
@@ -1002,7 +1022,7 @@ const FeatureReleasesTabContent: React.FC = () => {
         When new features and tools are released, you can opt in to get them at the end of the gradual release. This will give more
         time to test changes and prepare users. Upcoming release dates can be found in the{' '}
         <a
-          href="#"
+          href="/main-settings/product-updates"
           style={{ color: '#0091ae', fontWeight: 600, textDecoration: 'none' }}
           onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
           onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
@@ -2511,7 +2531,13 @@ const NotificationsSettingsNew: React.FC = () => {
             <strong style={{ fontWeight: 600 }}>Want to create your own notification?</strong>
             <span style={{ color: "#555" }}>
               You can create custom notifications in{" "}
-              <a href="#" style={{ color: "#006162", textDecoration: "underline" }}>workflows.</a>
+              <button
+                type="button"
+                onClick={() => null}
+                style={{ color: "#006162", textDecoration: "underline", background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                workflows.
+              </button>
             </span>
             <button style={{
               marginLeft: "8px",
@@ -3329,7 +3355,9 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
         <label htmlFor="general-phone-number" style={s.label}>Phone number</label>
         <div style={s.helpText}>
           We may use this phone number to contact you about security events. Please refer to our privacy policy for{" "}
-          <a href="#" style={s.link}>more information ↗</a>
+          <button type="button" onClick={() => null} style={{ ...s.link, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}>
+            more information ↗
+          </button>
         </div>
         <div style={{ display: "flex", gap: "0px", marginTop: "10px" }}>
           <select
@@ -3361,7 +3389,13 @@ const GeneralSettings: React.FC<{ activeTab?: 'profile' | 'tasks'; onTabChange?:
       <div style={s.sectionSubtitle}>This only applies to this account.</div>
       <div style={s.fieldGroup}>
         <div style={s.label}>General working hours</div>
-        <a href="#" style={{ ...s.link, fontSize: "14px", fontWeight: 300 }}>Edit working hours ↗</a>
+        <button
+          type="button"
+          onClick={() => null}
+          style={{ ...s.link, fontSize: "14px", fontWeight: 300, background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+        >
+          Edit working hours ↗
+        </button>
       </div>
 
       {/* <button style={s.saveButton}>Save</button> */}
