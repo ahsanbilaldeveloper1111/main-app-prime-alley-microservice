@@ -2704,7 +2704,7 @@ const CreateUsersPage = () => {
             onMouseEnter={(e) => { if (!submitting) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#374151"; }}
             onMouseLeave={(e) => { if (!submitting) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#111827"; }}
           >
-            {submitting ? "Saving…" : "Save"}
+            {submitting ? "Saving…." : "Save"}
           </button>
         ) : (
           <button
