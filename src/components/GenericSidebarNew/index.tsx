@@ -133,6 +133,222 @@ export interface QuickAction {
   disabled?: boolean;
 }
 
+interface RecentActivitiesSectionProps {
+  recentActivitiesState: any;
+  recordType: string | null | undefined;
+  recordId: number | string | null | undefined;
+  section: SidebarSection;
+  EmptyIcon?: LucideIcon;
+  humanizeDataKey: (key: string) => string;
+  resolveUserLabel?: (user: any) => string;
+  router: any;
+  getAuditTrailFromRecord?: (data: any, type?: any) => any[];
+  createResolveFieldVal?: (...args: any[]) => any;
+  buildAuditLinesForEntry?: (
+    entry: any,
+    resolveFieldVal: (fieldKey: string) => any,
+    humanizeDataKey: (key: string) => string,
+  ) => string;
+}
+
+const RecentActivitiesSection = ({
+  recentActivitiesState,
+  recordType,
+  recordId,
+  section,
+  EmptyIcon,
+  humanizeDataKey,
+  resolveUserLabel,
+  router,
+  getAuditTrailFromRecord,
+  createResolveFieldVal,
+  buildAuditLinesForEntry,
+}: RecentActivitiesSectionProps) => {
+  if (recentActivitiesState.loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (!recentActivitiesState.data) {
+    return null;
+  }
+
+  const handleEmptyActionClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    section.emptyState?.action?.onClick();
+  };
+
+  const handleViewMoreClick = () => {
+    if (recordId == null) {
+      return;
+    }
+
+    router.push(recentActivitiesState.detailPath(Number(recordId)));
+  };
+
+  const safeGetAuditTrailFromRecord =
+    getAuditTrailFromRecord ?? (() => [] as any[]);
+  const safeCreateResolveFieldVal =
+    createResolveFieldVal ?? (() => () => undefined);
+
+  const auditTrail = safeGetAuditTrailFromRecord(
+    recentActivitiesState.data,
+    recordType ?? undefined,
+  );
+  const resolveFieldVal = safeCreateResolveFieldVal(
+    recordType ?? undefined,
+    recentActivitiesState.data,
+    resolveUserLabel,
+  );
+
+  if (auditTrail.length === 0) {
+    return (
+      <div style={{ padding: "24px 16px", textAlign: "center" }}>
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {section.emptyState?.message ?? "No recent activities."}
+        </p>
+        {section.emptyState?.action && (
+          <button
+            onClick={handleEmptyActionClick}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {section.emptyState.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const isActivityRecordType = recordType === "activity";
+  const displayTrail = isActivityRecordType
+    ? auditTrail
+    : auditTrail.slice(0, 5);
+  const hasMore = !isActivityRecordType && auditTrail.length > 5;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          maxHeight: "280px",
+          overflowY: "auto",
+          overflowX: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0",
+          minWidth: 0,
+          ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
+        }}
+      >
+        {displayTrail.map((entry: any, index: number) => {
+          const timestamp = entry.created_at
+            ? new Date(entry.created_at).toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "—";
+          const description = buildAuditLinesForEntry
+            ? buildAuditLinesForEntry(entry, resolveFieldVal, humanizeDataKey)
+            : "";
+          return (
+            <div
+              key={entry.id ?? index}
+              style={{
+                padding: "10px 0",
+                marginBottom: index < displayTrail.length - 1 ? "10px" : 0,
+                minWidth: 0,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#141414",
+                  margin: "0 0 8px 0",
+                  lineHeight: "1.6",
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                }}
+                dangerouslySetInnerHTML={{ __html: description }}
+              />
+              <span style={{ fontSize: "12px", color: "#718096" }}>
+                {timestamp}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {recordId != null && hasMore && (
+        <button
+          onClick={handleViewMoreClick}
+          style={{
+            marginTop: "8px",
+            padding: "8px 16px",
+            backgroundColor: "#0091ae",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: "pointer",
+            width: "100%",
+          }}
+        >
+          View more
+        </button>
+      )}
+    </div>
+  );
+};
+
 /** CRM summary from API (lead, prospect, deal, order, etc.) */
 export interface CrmSummary {
   id: number;
@@ -5810,20 +6026,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
   };
 
-  const goToRecordDetailActivity = useCallback(
-    (activityType?: string) => {
-      if (!recordType || recordId == null) return;
+  const goToRecordDetailActivity = (activityType?: string) => {
+    if (!recordType || recordId == null) return;
 
-      const baseUrl = buildActivitiesBaseUrl(
-        recordType,
-        recordId,
-        activityEntityType,
-      );
+    const baseUrl = buildActivitiesBaseUrl(
+      recordType,
+      recordId,
+      activityEntityType,
+    );
 
     if (!baseUrl) return;
 
     let url = baseUrl;
-    if (activityType?.trim()) {
+    if (typeof activityType === "string" && activityType.trim()) {
       const separator = baseUrl.includes("?") ? "&" : "?";
       url = `${baseUrl}${separator}activityType=${encodeURIComponent(
         activityType,
@@ -5831,7 +6046,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
 
     router.push(url);
-  }, [recordType, recordId, activityEntityType, router]);
+  };
 
   const handleMoreActionSelect = (actionId: string) => {
     switch (actionId) {
@@ -6234,23 +6449,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       count: sidebarNotesList.length,
     };
 
-    if (!section.emptyState?.action) {
-      return updatedSection;
-    }
-
-    return {
-      ...updatedSection,
-      emptyState: {
-        ...section.emptyState,
-        action: {
-          ...section.emptyState.action,
-          onClick: () => {
-            handleNoteClick();
-            section.emptyState?.action?.onClick?.();
+    if (section.emptyState?.action) {
+      return {
+        ...updatedSection,
+        emptyState: {
+          ...section.emptyState,
+          action: {
+            ...section.emptyState.action,
+            onClick: () => {
+              handleNoteClick();
+              section.emptyState?.action?.onClick?.();
+            },
           },
         },
-      },
-    };
+      };
+    }
+
+    return updatedSection;
   };
 
   const buildProspectAboutFields = (
@@ -6975,225 +7190,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 return null;
               })()
             ) : section.id === "recent-activities" && recentActivitiesState ? (
-              (() => {
-                if (recentActivitiesState.loading) {
-                  return (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "24px",
-                        color: "#141414",
-                      }}
-                    >
-                      <RefreshCw
-                        size={16}
-                        className="spin"
-                        style={{ marginRight: "8px" }}
-                      />
-                      Loading...
-                    </div>
-                  );
-                }
-
-                if (recentActivitiesState.data) {
-                  return (() => {
-                    const auditTrail = getAuditTrailFromRecord(
-                      recentActivitiesState.data,
-                      recordType ?? undefined,
-                    );
-                    const resolveFieldVal = createResolveFieldVal(
-                      recordType ?? undefined,
-                      recentActivitiesState.data,
-                      resolveUserLabel,
-                    );
-
-                    if (auditTrail.length > 0) {
-                      const isActivityRecordType = recordType === "activity";
-                      const displayTrail = isActivityRecordType
-                        ? auditTrail
-                        : auditTrail.slice(0, 5);
-                      const hasMore =
-                        !isActivityRecordType && auditTrail.length > 5;
-                      return (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0",
-                            minWidth: 0,
-                          }}
-                        >
-                          <div
-                            style={{
-                              maxHeight: "280px",
-                              overflowY: "auto",
-                              overflowX: "hidden",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "0",
-                              minWidth: 0,
-                              ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
-                            }}
-                          >
-                            {displayTrail.map((entry, index) => {
-                              const timestamp = entry.created_at
-                                ? new Date(entry.created_at).toLocaleString(
-                                    "en-US",
-                                    {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    },
-                                  )
-                                : "—";
-                              const description = buildAuditLinesForEntry(
-                                entry,
-                                resolveFieldVal,
-                                humanizeDataKey,
-                              );
-                              return (
-                                <div
-                                  key={entry.id ?? index}
-                                  style={{
-                                    padding: "10px 0",
-                                    marginBottom:
-                                      index < displayTrail.length - 1
-                                        ? "10px"
-                                        : 0,
-                                    minWidth: 0,
-                                  }}
-                                >
-                                  <p
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#141414",
-                                      margin: "0 0 8px 0",
-                                      lineHeight: "1.6",
-                                      whiteSpace: "pre-wrap",
-                                      overflowWrap: "break-word",
-                                      wordBreak: "break-word",
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: description }}
-                                  />
-                                  <span
-                                    style={{ fontSize: "12px", color: "#718096" }}
-                                  >
-                                    {timestamp}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {recordId != null && hasMore && (
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  recentActivitiesState.detailPath(
-                                    Number(recordId),
-                                  ),
-                                )
-                              }
-                              style={{
-                                marginTop: "8px",
-                                padding: "8px 16px",
-                                backgroundColor: "#0091ae",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                fontWeight: "500",
-                                cursor: "pointer",
-                                width: "100%",
-                              }}
-                            >
-                              View more
-                            </button>
-                          )}
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div
-                        style={{ padding: "24px 16px", textAlign: "center" }}
-                      >
-                        {EmptyIcon && (
-                          <EmptyIcon
-                            size={40}
-                            style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                          />
-                        )}
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            color: "#718096",
-                            margin: 0,
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {section.emptyState?.message ??
-                            "No recent activities."}
-                        </p>
-                        {section.emptyState?.action && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              section.emptyState?.action?.onClick();
-                            }}
-                            style={{
-                              marginTop: "12px",
-                              padding: "8px 16px",
-                              backgroundColor: "#0091ae",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                            }}
-                          >
-                            {section.emptyState?.action.label}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })();
-                }
-
-                return (
-                  <div
-                    style={{
-                      padding: "24px 16px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {EmptyIcon && (
-                      <EmptyIcon
-                        size={40}
-                        style={{
-                          color: "#cbd5e0",
-                          marginBottom: "12px",
-                        }}
-                      />
-                    )}
-                    <p
-                      style={{
-                        fontSize: "14px",
-                        color: "#718096",
-                        margin: 0,
-                        lineHeight: "1.6",
-                      }}
-                    >
-                      {section.emptyState?.message ??
-                        "No recent activities."}
-                    </p>
-                  </div>
-                );
-              })()
+              <RecentActivitiesSection
+                recentActivitiesState={recentActivitiesState}
+                recordType={recordType}
+                recordId={recordId}
+                section={section}
+                EmptyIcon={EmptyIcon}
+                humanizeDataKey={humanizeDataKey}
+                resolveUserLabel={resolveUserLabel}
+                router={router}
+                getAuditTrailFromRecord={getAuditTrailFromRecord}
+                createResolveFieldVal={createResolveFieldVal}
+                buildAuditLinesForEntry={buildAuditLinesForEntry}
+              />
             ) : section.emptyState ? (
               <div style={{ padding: "24px 16px", textAlign: "center" }}>
                 {EmptyIcon && (
@@ -7403,7 +7412,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 }
 
         if (section.emptyState) {
-                  const es = (section as SidebarSection).emptyState;
+                  const es: SidebarSection["emptyState"] | undefined =
+                    (section as SidebarSection).emptyState;
                   return (
                     <div style={{ padding: "24px 16px", textAlign: "center" }}>
                       {EmptyIcon && (
@@ -7500,7 +7510,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })()
             ) : section.emptyState ? (
               (() => {
-                const es = (section as SidebarSection).emptyState;
+                const es: SidebarSection["emptyState"] | undefined =
+                  (section as SidebarSection).emptyState;
                 return (
                   <div
                     style={{
