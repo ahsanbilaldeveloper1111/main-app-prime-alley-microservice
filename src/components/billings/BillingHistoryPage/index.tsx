@@ -378,7 +378,14 @@ function InvoiceCard({
           <div>
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
+              {product}{" "}
+              <button
+                type="button"
+                onClick={() => null}
+                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+              >
+                includes
+              </button>
             </div>
           </div>
           <div>
@@ -420,9 +427,13 @@ function PaymentCard({
           <h3 style={s.cardTitle}>Payment processed #{id}</h3>
         </div>
         <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
+          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
+            View
+          </button>
           <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
+          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
+            Download
+          </button>
         </div>
       </div>
       <div style={s.cardBody}>
@@ -430,13 +441,26 @@ function PaymentCard({
           <div>
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
+              {product}{" "}
+              <button
+                type="button"
+                onClick={() => null}
+                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+              >
+                includes
+              </button>
             </div>
           </div>
           <div>
             <div style={s.colLabel}>Paid for invoice</div>
             <div style={s.colValue}>
-              <a style={s.link}>#{invoiceRef}</a>
+              <button
+                type="button"
+                onClick={() => null}
+                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+              >
+                #{invoiceRef}
+              </button>
             </div>
           </div>
           <div>
@@ -476,9 +500,13 @@ function OrderCard({
           <h3 style={s.cardTitle}>Order issued #{id}</h3>
         </div>
         <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
+          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
+            View
+          </button>
           <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
+          <button type="button" onClick={() => null} style={{ ...s.actionLink, background: "none", border: "none", padding: 0 }}>
+            Download
+          </button>
         </div>
       </div>
       <div style={s.cardBody}>
@@ -486,7 +514,14 @@ function OrderCard({
           <div>
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
+              {product}{" "}
+              <button
+                type="button"
+                onClick={() => null}
+                style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+              >
+                includes
+              </button>
             </div>
           </div>
         </div>
