@@ -6247,7 +6247,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       if (typeof v === "object") return JSON.stringify(v);
       if (typeof v === "symbol") return v.toString();
       if (typeof v === "function") return v.name || "[function]";
-      return String(v);
+      return "—";
     };
     const record = (rawData?.data as Record<string, unknown>) ?? rawData ?? {};
     const campaign = record.campaign as
@@ -6418,12 +6418,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         return {
           loading: activityHistoryChainLoading,
           data:
-            activityHistoryChain != null
-              ? ({ audit_trail: activityHistoryChain } as Record<
+            activityHistoryChain == null
+              ? null
+              : ({ audit_trail: activityHistoryChain } as Record<
                   string,
                   unknown
-                >)
-              : null,
+                >),
           detailPath: (id: number) => {
             const entityType = activityEntityType ?? "lead";
             switch (entityType) {
@@ -7412,8 +7412,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 }
 
         if (section.emptyState) {
-                  const es: SidebarSection["emptyState"] | undefined =
-                    (section as SidebarSection).emptyState;
+                  const es = (section as any).emptyState as {
+                    message: string;
+                    action?: { label: string; onClick: () => void };
+                  };
                   return (
                     <div style={{ padding: "24px 16px", textAlign: "center" }}>
                       {EmptyIcon && (
@@ -7430,9 +7432,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           lineHeight: "1.6",
                         }}
                       >
-                        {es?.message}
+                        {es.message}
                       </p>
-                      {es?.action && (
+                      {es.action && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -7510,8 +7512,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               })()
             ) : section.emptyState ? (
               (() => {
-                const es: SidebarSection["emptyState"] | undefined =
-                  (section as SidebarSection).emptyState;
+                if (!section.emptyState) {
+                  return null;
+                }
+                const es = (section as any).emptyState as {
+                  message: string;
+                  action?: { label: string; onClick: () => void };
+                };
                 return (
                   <div
                     style={{
@@ -7529,13 +7536,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       style={{
                         fontSize: "14px",
                         color: "#718096",
-                        margin: es?.action ? "0 0 20px 0" : 0,
+                        margin: es.action ? "0 0 20px 0" : 0,
                         lineHeight: "1.6",
                       }}
                     >
-                      {es?.message}
+                      {es.message}
                     </p>
-                    {es?.action && (
+                    {es.action && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -7559,7 +7566,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           e.currentTarget.style.backgroundColor = "#0091ae";
                         }}
                       >
-                        {es.action.label}
+                        {es.action?.label}
                       </button>
                     )}
                   </div>
