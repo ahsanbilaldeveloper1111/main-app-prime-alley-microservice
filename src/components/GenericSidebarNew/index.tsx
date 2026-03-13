@@ -349,6 +349,399 @@ const RecentActivitiesSection = ({
   );
 };
 
+function renderCallsSection(
+  section: any,
+  sidebarCallRecordingsLoading: boolean,
+  sidebarCallRecordings: any[],
+  recordType: string | null | undefined,
+  recordId: string | number | null | undefined,
+  router: any,
+  EmptyIcon: React.ComponentType<any> | null | undefined,
+) {
+  if (sidebarCallRecordingsLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (sidebarCallRecordings.length > 0) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            maxHeight: "280px",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            ...( {
+              scrollbarWidth: "thin",
+              scrollbarColor: "#c8c8c8 transparent",
+            } as any),
+          }}
+        >
+          {sidebarCallRecordings
+            .slice(0, 5)
+            .map((rec: any, index: number) => {
+              const dateStr =
+                rec.DateTime ??
+                rec.start_time ??
+                rec.created_at ??
+                "";
+              let timestamp = "—";
+              if (dateStr) {
+                if (dateStr.length > 10) {
+                  timestamp = new Date(
+                    dateStr,
+                  ).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                } else {
+                  timestamp = dateStr;
+                }
+              }
+              const dir =
+                rec.Direction ??
+                rec.direction ??
+                rec.CallDirection ??
+                "";
+              const direction =
+                dir.includes("INBOUND") ||
+                dir === "Inbound" ||
+                dir === "CALL_INCOMING"
+                  ? "Incoming"
+                  : "Outgoing";
+              const rawDuration =
+                rec.Duration ??
+                rec.duration ??
+                rec.CallDuration ??
+                0;
+              const durationSec =
+                Number.parseInt(String(rawDuration), 10) / 10000000 ||
+                0;
+              const roundedSec =
+                Math.round(durationSec * 10) / 10;
+              let durationStr = "";
+              if (durationSec >= 60) {
+                durationStr = `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}`;
+              } else if (roundedSec > 0) {
+                durationStr = `${roundedSec}s`;
+              }
+              return (
+                <div
+                  key={rec.Id ?? rec.id ?? index}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    background: "#f9fafb",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: "#1f2937",
+                      }}
+                    >
+                      {timestamp}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#6b7280",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {durationStr ? `${durationStr} · ` : ""}
+                      {direction}
+                    </div>
+                  </div>
+                  <Phone
+                    size={16}
+                    style={{ color: "#718096", flexShrink: 0 }}
+                  />
+                </div>
+              );
+            })}
+        </div>
+        {recordType === "prospect" &&
+          recordId != null &&
+          sidebarCallRecordings.length > 5 && (
+            <button
+              onClick={() =>
+                router.push(
+                  `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                )
+              }
+              style={{
+                marginTop: "8px",
+                padding: "8px 16px",
+                backgroundColor: "#0091ae",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              View more
+            </button>
+          )}
+      </div>
+    );
+  }
+
+  if (section.emptyState) {
+    const es = (section as any).emptyState as {
+      message: string;
+      action?: { label: string; onClick: () => void };
+    };
+    return (
+      <div
+        style={{ padding: "24px 16px", textAlign: "center" }}
+      >
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {es.message}
+        </p>
+        {es.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              es.action?.onClick();
+            }}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {es.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function renderGenericSectionContent(
+  section: any,
+  EmptyIcon: React.ComponentType<any> | null | undefined,
+  renderField: (field: SidebarField, index: number) => React.ReactNode,
+) {
+  if (section.emptyState) {
+    return (
+      <div style={{ padding: "24px 16px", textAlign: "center" }}>
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {section.emptyState.message}
+        </p>
+        {section.emptyState.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              section.emptyState?.action?.onClick();
+            }}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {section.emptyState.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (section.isLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (section.customContent) {
+    return section.customContent;
+  }
+
+  if (section.fields && section.fields.length > 0) {
+    if (section.id === "about-prospect") {
+      return (
+        <div
+          style={{
+            maxHeight: "280px",
+            overflowY: "auto",
+            overflowX: "hidden",
+            ...( {
+              scrollbarWidth: "thin",
+              scrollbarColor: "#c8c8c8 transparent",
+            } as any),
+          }}
+        >
+          {section.fields.map((field: SidebarField, index: number) =>
+            renderField(field, index),
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {section.fields.map((field: SidebarField, index: number) =>
+          renderField(field, index),
+        )}
+      </div>
+    );
+  }
+
+  if (section.emptyState) {
+    const es = (section as any).emptyState as {
+      message: string;
+      action?: { label: string; onClick: () => void };
+    };
+    return (
+      <div
+        style={{
+          padding: "32px 20px",
+          textAlign: "center",
+        }}
+      >
+        {EmptyIcon && (
+          <EmptyIcon
+            size={48}
+            style={{ color: "#cbd5e0", marginBottom: "16px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: es.action ? "0 0 20px 0" : 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {es.message}
+        </p>
+        {es.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              es.action?.onClick();
+            }}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#007a8c";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#0091ae";
+            }}
+          >
+            {es.action?.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 /** CRM summary from API (lead, prospect, deal, order, etc.) */
 export interface CrmSummary {
   id: number;
@@ -7208,384 +7601,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   );
                 }
 
-                if (section.emptyState) {
-                  return (
-                    <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                      {EmptyIcon && (
-                        <EmptyIcon
-                          size={40}
-                          style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                        />
-                      )}
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          color: "#718096",
-                          margin: 0,
-                          lineHeight: "1.6",
-                        }}
-                      >
-                        {section.emptyState.message}
-                      </p>
-                      {section.emptyState.action && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            section.emptyState?.action?.onClick();
-                          }}
-                          style={{
-                            marginTop: "12px",
-                            padding: "8px 16px",
-                            backgroundColor: "#0091ae",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {section.emptyState.action.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                }
-
                 if (section.id === "calls" || section.id === "call-recordings") {
-                  if (sidebarCallRecordingsLoading) {
-                    return (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: "24px",
-                          color: "#141414",
-                        }}
-                      >
-                        <RefreshCw
-                          size={16}
-                          className="spin"
-                          style={{ marginRight: "8px" }}
-                        />
-                        Loading...
-                      </div>
-                    );
-                  }
-
-                  if (sidebarCallRecordings.length > 0) {
-                    return (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            maxHeight: "280px",
-                            overflowY: "auto",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
-                            ...( {
-                              scrollbarWidth: "thin",
-                              scrollbarColor: "#c8c8c8 transparent",
-                            } as any),
-                          }}
-                        >
-                          {sidebarCallRecordings
-                            .slice(0, 5)
-                            .map((rec: any, index: number) => {
-                              const dateStr =
-                                rec.DateTime ??
-                                rec.start_time ??
-                                rec.created_at ??
-                                "";
-                              let timestamp = "—";
-                              if (dateStr) {
-                                if (dateStr.length > 10) {
-                                  timestamp = new Date(
-                                    dateStr,
-                                  ).toLocaleString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  });
-                                } else {
-                                  timestamp = dateStr;
-                                }
-                              }
-                              const dir =
-                                rec.Direction ??
-                                rec.direction ??
-                                rec.CallDirection ??
-                                "";
-                              const direction =
-                                dir.includes("INBOUND") ||
-                                dir === "Inbound" ||
-                                dir === "CALL_INCOMING"
-                                  ? "Incoming"
-                                  : "Outgoing";
-                              const rawDuration =
-                                rec.Duration ??
-                                rec.duration ??
-                                rec.CallDuration ??
-                                0;
-                              const durationSec =
-                                Number.parseInt(String(rawDuration), 10) /
-                                  10000000 || 0;
-                              const roundedSec =
-                                Math.round(durationSec * 10) / 10;
-                              let durationStr = "";
-                              if (durationSec >= 60) {
-                                durationStr = `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}`;
-                              } else if (roundedSec > 0) {
-                                durationStr = `${roundedSec}s`;
-                              }
-                              return (
-                                <div
-                                  key={rec.Id ?? rec.id ?? index}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "10px 12px",
-                                    background: "#f9fafb",
-                                    borderRadius: "8px",
-                                    border: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: "#1f2937",
-                                      }}
-                                    >
-                                      {timestamp}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                        marginTop: "2px",
-                                      }}
-                                    >
-                                      {durationStr ? `${durationStr} · ` : ""}
-                                      {direction}
-                                    </div>
-                                  </div>
-                                  <Phone
-                                    size={16}
-                                    style={{ color: "#718096", flexShrink: 0 }}
-                                  />
-                                </div>
-                              );
-                            })}
-                        </div>
-                        {recordType === "prospect" &&
-                          recordId != null &&
-                          sidebarCallRecordings.length > 5 && (
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
-                                )
-                              }
-                              style={{
-                                marginTop: "8px",
-                                padding: "8px 16px",
-                                backgroundColor: "#0091ae",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                fontWeight: "500",
-                                cursor: "pointer",
-                                width: "100%",
-                              }}
-                            >
-                              View more
-                            </button>
-                          )}
-                      </div>
-                    );
-                  }
-
-                  if (section.emptyState) {
-                    const es = (section as any).emptyState as {
-                      message: string;
-                      action?: { label: string; onClick: () => void };
-                    };
-                    return (
-                      <div
-                        style={{ padding: "24px 16px", textAlign: "center" }}
-                      >
-                        {EmptyIcon && (
-                          <EmptyIcon
-                            size={40}
-                            style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                          />
-                        )}
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            color: "#718096",
-                            margin: 0,
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {es.message}
-                        </p>
-                        {es.action && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              es.action?.onClick();
-                            }}
-                            style={{
-                              marginTop: "12px",
-                              padding: "8px 16px",
-                              backgroundColor: "#0091ae",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                            }}
-                          >
-                            {es.action.label}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  return null;
-                }
-
-                if (section.isLoading) {
-                  return (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "24px",
-                        color: "#141414",
-                      }}
-                    >
-                      <RefreshCw
-                        size={16}
-                        className="spin"
-                        style={{ marginRight: "8px" }}
-                      />
-                      Loading...
-                    </div>
+                  return renderCallsSection(
+                    section,
+                    sidebarCallRecordingsLoading,
+                    sidebarCallRecordings,
+                    recordType,
+                    recordId,
+                    router,
+                    EmptyIcon,
                   );
                 }
 
-                if (section.customContent) {
-                  return section.customContent;
-                }
-
-                if (section.fields && section.fields.length > 0) {
-                  if (section.id === "about-prospect") {
-                    return (
-                      <div
-                        style={{
-                          maxHeight: "280px",
-                          overflowY: "auto",
-                          overflowX: "hidden",
-                          ...( {
-                            scrollbarWidth: "thin",
-                            scrollbarColor: "#c8c8c8 transparent",
-                          } as any),
-                        }}
-                      >
-                        {section.fields.map((field, index) =>
-                          renderField(field, index),
-                        )}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div>
-                      {section.fields.map((field, index) =>
-                        renderField(field, index),
-                      )}
-                    </div>
-                  );
-                }
-
-                if (section.emptyState) {
-                  const es = (section as any).emptyState as {
-                    message: string;
-                    action?: { label: string; onClick: () => void };
-                  };
-                  return (
-                    <div
-                      style={{
-                        padding: "32px 20px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {EmptyIcon && (
-                        <EmptyIcon
-                          size={48}
-                          style={{ color: "#cbd5e0", marginBottom: "16px" }}
-                        />
-                      )}
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          color: "#718096",
-                          margin: es.action ? "0 0 20px 0" : 0,
-                          lineHeight: "1.6",
-                        }}
-                      >
-                        {es.message}
-                      </p>
-                      {es.action && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            es.action?.onClick();
-                          }}
-                          style={{
-                            padding: "8px 16px",
-                            backgroundColor: "#0091ae",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                            transition: "background-color 0.2s",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "#007a8c";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "#0091ae";
-                          }}
-                        >
-                          {es.action?.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                }
-
-                return null;
+                return renderGenericSectionContent(
+                  section,
+                  EmptyIcon,
+                  renderField,
+                );
               })()}
           </div>
         )}
