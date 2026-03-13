@@ -579,7 +579,7 @@ function renderGenericSectionContent(
   renderField: (field: SidebarField, index: number) => React.ReactNode,
 ) {
   if (section.emptyState) {
-    const es = section.emptyState!;
+    const es = section.emptyState;
     return (
       <div style={{ padding: "24px 16px", textAlign: "center" }}>
         {EmptyIcon && (
