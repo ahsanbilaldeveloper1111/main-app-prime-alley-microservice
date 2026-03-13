@@ -4713,9 +4713,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 );
               const currentDayDate = new Date(startOfWeek);
               currentDayDate.setDate(startOfWeek.getDate() + index);
-              const currentDayDate = new Date(startOfWeek);
-              currentDayDate.setDate(startOfWeek.getDate() + index);
-
+            
               const isCurrentDay = isToday(currentDayDate);
               const isSelectedDay = isSelected(currentDayDate);
               let dateCircleBackgroundColor = "transparent";
@@ -5834,7 +5832,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
 
     router.push(url);
-  };
+  }, [recordType, recordId, activityEntityType, router]);
 
   const handleMoreActionSelect = (actionId: string) => {
     switch (actionId) {
