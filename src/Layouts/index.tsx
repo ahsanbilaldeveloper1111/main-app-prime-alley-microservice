@@ -2,11 +2,9 @@ import React, { ReactNode, useMemo, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationCustomerSidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Moduler/AppCustomerSidebar';
-import { useSession, signOut } from "next-auth/react";
-import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
+import { useSession } from "next-auth/react";
 import { useNotifications, NotificationItem } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
-import ProfileSidebar from '@components/profile-sidebar';
 import { useDialerModal } from '../contexts/DialerModalContext';
 import NotificationsSidebar from '@components/Notificationssidebar';
 import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
@@ -14,31 +12,19 @@ import { getCurrentUserCompanyImage } from "@utils/company";
 import { useAuth } from '../hooks/useAuth';
 
 import { 
-	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
-  Link,
+	Bell, ChevronLeft, ChevronRight,ChevronDown,
   Phone,
   Search,
   X,
-  PhoneCall,
   User,
   HelpCircle,
   Settings,
-  Eye,
   ExternalLink,
-  LogOut,
-  Shield,
-  BookOpen,
-  GraduationCap,
-  Briefcase,
-  FileText,
-  CreditCard,
   Sparkles,
-  MessageCircle,
   Plus,
-  Ticket,
   MonitorCheck,
     } from 'lucide-react';
-import { Badge, Button, Dropdown } from 'react-bootstrap';
+import {Button} from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
@@ -57,12 +43,35 @@ interface LayoutProps {
 
 const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
 
+function findMatchingActiveCall(activeCalls: Map<any, any>, incomingCall: any) {
+	const calls = Array.from(activeCalls.values());
+	return calls.find((call: any) =>
+		call.callId === incomingCall.callId ||
+		(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
+	);
+}
+
+function getUserDevicesFromDnsMap(dnsMap: any, userAddress: string | undefined | null): any[] {
+	const userDeviceInfo = dnsMap?.[userAddress || ''];
+	if (!userDeviceInfo?.devices) return [];
+	return Object.values(userDeviceInfo.devices);
+}
+
+function pickControllerDevice(userDevices: any[], preferredDeviceName?: string | null): any {
+	if (!userDevices.length) return null;
+	if (preferredDeviceName) {
+		const match = userDevices.find((device: any) => device.deviceName === preferredDeviceName);
+		if (match) return match;
+	}
+	return userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0] || null;
+}
+
 const Layout = ({ children }: LayoutProps) => {
 
 	const router = useRouter();
 	const { data: session, status } = useSession();
   const { logout } = useAuth();
-	const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+	const { notifications, unreadCount } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
   const { 
 		isInitialized, 
@@ -72,18 +81,15 @@ const Layout = ({ children }: LayoutProps) => {
 		endCall,
 		getUserDataExtensions,
 		activeCalls,
-		formatDuration,
 		makeCall,
 		dialNumber,
-		getAllUserDevices,
-		getAvailableExtensions
+		getAllUserDevices
 	} = useCti();
 	const { incomingCall, showIncomingCallModal, setIncomingCall, setShowIncomingCallModal } = useIncomingCall();
 	const { hasPermission } = usePermissions();
 	const [isDialing, setIsDialing] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-	const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
@@ -158,8 +164,6 @@ const Layout = ({ children }: LayoutProps) => {
 			.then((blob) => {
 				if (cancelled) return;
 				if (blob && blob.size > 0) {
-					// const url = URL.createObjectURL(blob);
-					// headerLogoUrlRef.current = url; //
 					setHeaderLogoUrl('');
 				} else {
 					setHeaderLogoUrl(null);
@@ -456,6 +460,11 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	}, [showIncomingCallModal, incomingCall, activeCalls, setShowIncomingCallModal, setIncomingCall]);
 
+	const closeIncomingCallModal = () => {
+		setShowIncomingCallModal(false);
+		setIncomingCall(null);
+	};
+
 	const handleAttendCall = async () => {
 		if (!hasPermission("dial-call-cti")) {
 			return;
@@ -465,26 +474,9 @@ const Layout = ({ children }: LayoutProps) => {
 			return;
 		}
 
-		const userDeviceInfo = dnsMap?.[userAddress || ''];
-		if (!userDeviceInfo || !userDeviceInfo.devices) {
-			return;
-		}
-
-		const userDevices = Object.values(userDeviceInfo.devices);
-		if (userDevices.length === 0) {
-			return;
-		}
-
-		let activeDevice: any = null;
-		if (incomingCall.controllerDeviceName) {
-			activeDevice = userDevices.find((device: any) => 
-				device.deviceName === incomingCall.controllerDeviceName
-			);
-		}
-
-		if (!activeDevice) {
-			activeDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
-		}
+		const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
+		const activeDevice = pickControllerDevice(userDevices, incomingCall.controllerDeviceName);
+		if (!activeDevice) return;
 
 		setIsDialing(true);
 		try {
@@ -498,8 +490,7 @@ const Layout = ({ children }: LayoutProps) => {
 			});
 
 			if (result.success) {
-				setShowIncomingCallModal(false);
-				setIncomingCall(null);
+				closeIncomingCallModal();
 			}
 		} catch (error) {
 			// Silent
@@ -509,55 +500,32 @@ const Layout = ({ children }: LayoutProps) => {
 	};
 
 	const handleRejectCall = async () => {
-		if (!incomingCall) {
-			setShowIncomingCallModal(false);
-			setIncomingCall(null);
-			return;
-		}
+		if (!incomingCall) return closeIncomingCallModal();
 
 		try {
-			const matchingActiveCall = Array.from(activeCalls.values()).find((call: any) => 
-				call.callId === incomingCall.callId ||
-				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
-			);
+			const matchingActiveCall = findMatchingActiveCall(activeCalls, incomingCall);
+			const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
+			const controllerDevice = pickControllerDevice(userDevices, incomingCall.controllerDeviceName);
 
-			const userDeviceInfo = dnsMap?.[userAddress || ''];
-			if (userDeviceInfo && userDeviceInfo.devices) {
-				const userDevices = Object.values(userDeviceInfo.devices);
-				if (userDevices.length > 0) {
-					let controllerDevice: any = null;
-					if (incomingCall.controllerDeviceName) {
-						controllerDevice = userDevices.find((device: any) => 
-							device.deviceName === incomingCall.controllerDeviceName
-						);
-					}
+			if (!controllerDevice || !incomingCall.callId) return;
 
-					if (!controllerDevice) {
-						controllerDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
-					}
+			const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
+			const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
 
-					const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
-					const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
-
-					if (controllerDevice && incomingCall.callId) {
-						await endCall({
-							callId: incomingCall.callId,
-							callingAddress: incomingCall.callingAddress,
-							calledAddress: incomingCall.calledAddress,
-							callingDeviceType: callingDeviceType,
-							callingDeviceName: callingDeviceName,
-							controllerAddress: userAddress || '',
-							controllerDeviceName: controllerDevice.deviceName || '',
-							controllerDeviceType: controllerDevice.deviceType || ''
-						} as any).catch(() => {});
-					}
-				}
-			}
+			await endCall({
+				callId: incomingCall.callId,
+				callingAddress: incomingCall.callingAddress,
+				calledAddress: incomingCall.calledAddress,
+				callingDeviceType,
+				callingDeviceName,
+				controllerAddress: userAddress || '',
+				controllerDeviceName: controllerDevice.deviceName || '',
+				controllerDeviceType: controllerDevice.deviceType || ''
+			} as any).catch(() => {});
 		} catch (error) {
 			console.error("Unable to reject call");
 		} finally {
-			setShowIncomingCallModal(false);
-			setIncomingCall(null);
+			closeIncomingCallModal();
 		}
 	};
 
@@ -1571,8 +1539,8 @@ font-weight:600;
 
                       {/* Footer with Sign out and Privacy */}
                       <div className="user-dropdown-footer">
-                        <a
-                        //   type="button"
+                        <button
+                          type="button"
                           className="user-dropdown-footer-link"
                           onClick={() => {
                             setShowUserDropdown(false);
@@ -1580,10 +1548,14 @@ font-weight:600;
                           }}
                         >
                           Sign out
-                        </a>
-                        <a href="#" className="user-dropdown-footer-link">
+                        </button>
+                        <button
+                          type="button"
+                          className="user-dropdown-footer-link"
+                          onClick={() => router.push('/main-settings/privacy-consent')}
+                        >
                           Privacy policy
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </>
