@@ -524,10 +524,7 @@ function renderCallsSection(
   }
 
   if (section.emptyState) {
-    const es = (section as any).emptyState as {
-      message: string;
-      action?: { label: string; onClick: () => void };
-    };
+    const es: NonNullable<SidebarSection["emptyState"]> = section.emptyState;
     return (
       <div
         style={{ padding: "24px 16px", textAlign: "center" }}
@@ -577,11 +574,12 @@ function renderCallsSection(
 }
 
 function renderGenericSectionContent(
-  section: any,
+  section: SidebarSection,
   EmptyIcon: React.ComponentType<any> | null | undefined,
   renderField: (field: SidebarField, index: number) => React.ReactNode,
 ) {
   if (section.emptyState) {
+    const es = section.emptyState!;
     return (
       <div style={{ padding: "24px 16px", textAlign: "center" }}>
         {EmptyIcon && (
@@ -598,13 +596,13 @@ function renderGenericSectionContent(
             lineHeight: "1.6",
           }}
         >
-          {section.emptyState.message}
+          {es.message}
         </p>
-        {section.emptyState.action && (
+        {es.action && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              section.emptyState?.action?.onClick();
+              es.action?.onClick();
             }}
             style={{
               marginTop: "12px",
@@ -618,7 +616,7 @@ function renderGenericSectionContent(
               cursor: "pointer",
             }}
           >
-            {section.emptyState.action.label}
+            {es.action.label}
           </button>
         )}
       </div>
@@ -681,10 +679,7 @@ function renderGenericSectionContent(
   }
 
   if (section.emptyState) {
-    const es = (section as any).emptyState as {
-      message: string;
-      action?: { label: string; onClick: () => void };
-    };
+    const es: NonNullable<SidebarSection["emptyState"]> = section.emptyState;
     return (
       <div
         style={{
