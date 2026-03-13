@@ -1035,7 +1035,8 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         className="contact-sidebar-overlay"
         style={{
           position: "fixed",
@@ -1044,16 +1045,13 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
           right: 0,
           bottom: 0,
           zIndex: 1000,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
         }}
-        role="button"
-        tabIndex={0}
         onClick={onClose}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onClose();
-          }
-        }}
+        aria-label="Close prospect sidebar"
       />
 
         <div

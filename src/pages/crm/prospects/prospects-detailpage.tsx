@@ -482,11 +482,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
               let normalizedValue = "";
               if (Array.isArray(field_value)) {
                 normalizedValue = (field_value as string[]).join(", ");
-              } else if (
-                field_value != null &&
-                typeof field_value !== "object"
-              ) {
-                normalizedValue = String(field_value).trim();
+              } else if (field_value != null) {
+                if (typeof field_value === "string") {
+                  normalizedValue = field_value.trim();
+                } else if (
+                  typeof field_value === "number" ||
+                  typeof field_value === "boolean"
+                ) {
+                  normalizedValue = String(field_value);
+                }
               }
 
               return {
