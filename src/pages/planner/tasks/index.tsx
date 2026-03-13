@@ -108,6 +108,35 @@ const POSSIBLE_TABS = [
 const DEFAULT_VISIBLE_TAB_IDS = ["all", "due_today", "overdue", "upcoming"];
 const SAVED_VIEW_STORAGE_KEY = "planner_tasks_visible_tabs";
 
+function stripHtmlTags(input: string): string {
+  const out: string[] = [];
+  const tagBuffer: string[] = [];
+  let inTag = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (!inTag) {
+      if (ch === "<") {
+        inTag = true;
+        tagBuffer.push(ch);
+      } else {
+        out.push(ch);
+      }
+      continue;
+    }
+
+    tagBuffer.push(ch);
+    if (ch === ">") {
+      inTag = false;
+      tagBuffer.length = 0; // drop tag content
+    }
+  }
+
+  // If we never closed the tag, keep the buffered text.
+  if (inTag && tagBuffer.length) out.push(...tagBuffer);
+  return out.join("");
+}
+
 function applyFiltersToParams(
   params: Record<string, any>,
   filters: Record<string, any>,
@@ -258,7 +287,7 @@ const CELL_STYLE: React.CSSProperties = {
         assigned_to_name,
         priority,
         due_date: dueDate,
-        notes: apiTask.description?.replaceAll(/<[^>]*>/g, "") || null,
+        notes: apiTask.description ? stripHtmlTags(apiTask.description) : null,
         repeat_status: apiTask.type === "recurring" ? "repeat" : "no_repeat",
         status,
         rawData: apiTask,
