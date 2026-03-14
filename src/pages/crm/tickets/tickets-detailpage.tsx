@@ -54,6 +54,21 @@ import React, {
   import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
   import SuccessfulModal from "@pages/partial/SuccessfulModal";
   
+  let fallbackIdCounter = 0;
+  const createNonPrngId = (scope: string) => {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    if (uuid) return `${uuid}-${scope}`;
+  
+    const buf = globalThis.crypto?.getRandomValues?.(new Uint8Array(16));
+    if (buf) {
+      const hex = Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+      return `${hex}-${scope}`;
+    }
+  
+    fallbackIdCounter += 1;
+    return `${Date.now()}-${fallbackIdCounter}-${scope}`;
+  };
+  
   // ============================================================================
   // TYPE DEFINITIONS
   // ============================================================================
@@ -720,7 +735,7 @@ import React, {
           ? Object.entries(d)
               .filter(([k]) => !reservedDataKeys.has(k))
               .map(([field_name, field_value]) => ({
-                id: `${Date.now()}-${Math.random()}-${field_name}`,
+                id: createNonPrngId(field_name),
                 field_name,
                 field_value: Array.isArray(field_value)
                   ? field_value.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ")

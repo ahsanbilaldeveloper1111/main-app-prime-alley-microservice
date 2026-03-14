@@ -17,6 +17,12 @@ import { Calendar, AlertCircle, User, Layers, Tag, History, FileText } from "luc
 
 type TicketStatus = "Open" | "In Progress" | "Resolved";
 type TicketPriority = "Low" | "Medium" | "High";
+type TicketFilters = {
+  ticketOwner: string;
+  createDate: string;
+  lastActivityDate: string;
+  priority: TicketPriority | "All Priorities";
+};
 
 type CrmSummary = {
   id: number;
@@ -105,6 +111,13 @@ const ALL_COLUMNS = [
   "last_activity_date",
 ];
 
+const DEFAULT_TICKET_FILTERS: TicketFilters = {
+  ticketOwner: "All Owners",
+  createDate: "",
+  lastActivityDate: "",
+  priority: "All Priorities",
+};
+
 const CrmTicketsPage = () => {
   const router = useRouter();
 
@@ -160,18 +173,26 @@ const CrmTicketsPage = () => {
     [],
   );
 
-  const [filterForm, setFilterForm] = useState({
-    ticketOwner: "All Owners",
-    createDate: "",
-    lastActivityDate: "",
-    priority: "All Priorities",
+  const [filterForm, setFilterForm] = useState<TicketFilters>({ ...DEFAULT_TICKET_FILTERS });
+  const [appliedFilters, setAppliedFilters] = useState<TicketFilters>({
+    ...DEFAULT_TICKET_FILTERS,
   });
-  const [appliedFilters, setAppliedFilters] = useState({
-    ticketOwner: "All Owners",
-    createDate: "",
-    lastActivityDate: "",
-    priority: "All Priorities",
-  });
+
+  const handleCloseFilterSidebar = useCallback(() => {
+    setShowFilterSidebar(false);
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(filterForm);
+    setShowFilterSidebar(false);
+  }, [filterForm]);
+
+  const handleResetFilters = useCallback(() => {
+    const reset = { ...DEFAULT_TICKET_FILTERS };
+    setFilterForm(reset);
+    setAppliedFilters(reset);
+    setShowFilterSidebar(false);
+  }, []);
 
   const filteredData = useMemo(() => {
     let list = [...tickets];
@@ -745,25 +766,12 @@ const CrmTicketsPage = () => {
 
       <GenericFilterSidebar
         isOpen={showFilterSidebar}
-        onClose={() => setShowFilterSidebar(false)}
+        onClose={handleCloseFilterSidebar}
         title="Filters"
         subtitle="Filter tickets"
         filters={advancedFilterFields}
-        onApply={() => {
-          setAppliedFilters(filterForm);
-          setShowFilterSidebar(false);
-        }}
-        onReset={() => {
-          const reset = {
-            ticketOwner: "All Owners",
-            createDate: "",
-            lastActivityDate: "",
-            priority: "All Priorities",
-          };
-          setFilterForm(reset);
-          setAppliedFilters(reset);
-          setShowFilterSidebar(false);
-        }}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
         width="400px"
         showApplyButton
         showResetButton
