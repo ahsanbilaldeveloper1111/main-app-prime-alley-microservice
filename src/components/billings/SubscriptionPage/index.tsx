@@ -4,6 +4,16 @@ import { useSession } from "next-auth/react";
 import { GetCompanyDetails, GetPaymentMethods } from "@utils/accounting";
 import TopSection from "../Overview/TopSection";
 import { BILLING_PAGE, billingSharedStyles } from "@components/billings/shared/styles";
+import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
+
+const PRO_PLAN_INCLUDES = [
+  "Smart CRM ",
+  "Call Logs & Recordings",
+  "Planner",
+  "Pulse",
+  "Workforce",
+  "1 Core Seat",
+] as const;
 
 const styles: Record<string, React.CSSProperties> = {
   body: BILLING_PAGE,
@@ -43,6 +53,19 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
+function IncludesList({ items }: Readonly<{ items: readonly string[] }>) {
+  return (
+    <>
+      {items.map((item) => (
+        <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
+          <span>{item}</span>
+          <Info size={14} strokeWidth={2} color="#666" />
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function SubscriptionsPage() {
   const { data: session } = useSession();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
@@ -64,11 +87,9 @@ export default function SubscriptionsPage() {
     fetchData();
   }, []);
 
-  const paymentMethodsList = Array.isArray(paymentMethods)
-    ? paymentMethods
-    : paymentMethods?.data ?? paymentMethods?.payment_methods ?? [];
-  const displayPaymentMethod = paymentMethodsList.find((pm: any) => pm?.is_default) ?? paymentMethodsList[0];
-  const hasDefaultAccount = paymentMethodsList.some((pm: any) => pm?.is_default);
+  const paymentMethodsList = normalizePaymentMethods(paymentMethods);
+  const displayPaymentMethod = pickDisplayPaymentMethod(paymentMethodsList);
+  const hasDefaultAccount = hasDefaultPaymentMethod(paymentMethodsList);
 
   return (
     <div style={styles.body}>
@@ -126,19 +147,7 @@ export default function SubscriptionsPage() {
             {/* Includes */}
             <div style={{ paddingLeft: 16 }}>
               <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Includes:</div>
-              {[
-                "Smart CRM ",
-  "Call Logs & Recordings",
-  "Planner",
-  "Pulse",
-  "Workforce",
-  "1 Core Seat",
-              ].map((item) => (
-                <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>{item}</span>
-                  <Info size={14} strokeWidth={2} color="#666" />
-                </div>
-              ))}
+              <IncludesList items={PRO_PLAN_INCLUDES} />
             </div>
 
             <div style={{ borderTop: "1px solid #e5e5e5", margin: "20px 0" }} />
@@ -191,19 +200,7 @@ export default function SubscriptionsPage() {
 
             <div style={{ paddingLeft: 16, marginTop: 20 }}>
               <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Includes:</div>
-              {[
-               "Smart CRM ",
-  "Call Logs & Recordings",
-  "Planner",
-  "Pulse",
-  "Workforce",
-  "1 Core Seat",
-              ].map((item) => (
-                <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>{item}</span>
-                  <Info size={14} strokeWidth={2} color="#666" />
-                </div>
-              ))}
+              <IncludesList items={PRO_PLAN_INCLUDES} />
             </div>
 
             <div style={{ borderTop: "1px solid #e5e5e5", margin: "20px 0" }} />

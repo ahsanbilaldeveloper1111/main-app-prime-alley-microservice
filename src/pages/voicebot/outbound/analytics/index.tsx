@@ -9,6 +9,7 @@ import moment from "moment";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3 } from "lucide-react";
 import { getCompanies } from "@utils/voicebot/inbound";
+import { formatFixed, formatPercent, toYmd } from "@utils/voicebot/outbound/formatters";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -23,10 +24,6 @@ const TIME_PERIOD_OPTIONS: TimePeriodOption[] = [
   { value: "60", label: "Last 60 days" },
   { value: "90", label: "Last 90 days" },
 ];
-
-function toYmd(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
 
 type DashboardToday = {
   calls?: number;
@@ -131,25 +128,8 @@ type AnalyticsTrendsResponse = {
   detail?: string;
 };
 
-function formatPercent(value: unknown): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "0.00%";
-  return `${n.toFixed(2)}%`;
-}
-
 function formatAed(value: unknown): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "0.0000";
-  return `${n.toFixed(4)}`;
-}
-
-function formatDurationSeconds(value: unknown): string {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return "0:00";
-  const total = Math.floor(n);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return formatFixed(value, 4, "0.0000");
 }
 
 function ymdStartIso(ymd: string): string {

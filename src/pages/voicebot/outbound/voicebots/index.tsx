@@ -41,6 +41,13 @@ interface VoicebotRow {
   [key: string]: unknown;
 }
 
+function listFromResponse<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const r = res as { results?: unknown; data?: unknown } | null | undefined;
+  const list = r?.results ?? r?.data;
+  return Array.isArray(list) ? (list as T[]) : [];
+}
+
 const VoicebotsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
@@ -63,8 +70,8 @@ const VoicebotsPage = () => {
   const fetchTrunks = useCallback(async () => {
     try {
       const res = await getTrunks();
-      const list = Array.isArray(res) ? res : (res as { results?: { trunk_id?: string; id?: string; name?: string }[] })?.results ?? (res as { data?: { trunk_id?: string; id?: string; name?: string }[] })?.data ?? [];
-      const rows = (Array.isArray(list) ? list : []).map((r, i) => ({
+      const list = listFromResponse<{ trunk_id?: string; id?: string; name?: string }>(res);
+      const rows = list.map((r, i) => ({
         id: r.trunk_id ?? r.id ?? `trunk-${i}`,
         trunk_id: r.trunk_id ?? r.id,
         name: (r as { name?: string }).name ?? r.trunk_id ?? r.id ?? "",
@@ -97,8 +104,7 @@ const VoicebotsPage = () => {
       if (statusFilter) params.status = statusFilter;
       if (search?.trim()) params.search = search.trim();
       const res = await getVoicebots(params);
-      const list = Array.isArray(res) ? res : (res as { results?: VoicebotRow[] })?.results ?? (res as { data?: VoicebotRow[] })?.data ?? [];
-      const rawList = Array.isArray(list) ? list : [];
+      const rawList = listFromResponse<VoicebotRow>(res);
       setTotalRows((res as { count?: number })?.count ?? rawList.length);
       const rows = rawList.map((r, i) => ({
         ...r,

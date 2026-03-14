@@ -8,6 +8,7 @@ import { ACCESS_METHODS, ALL_TEMPLATE_ITEMS, SEAT_OPTIONS, SELECTABLE_USERS, STE
 import { IconKeys, IconLock, IconPencil, IconRuler, MagnifyPlaceholder } from "./icons";
 import { BASE_BUTTON, FONT, PRIMARY_TEXT } from "./styles";
 import type { AccessMethod, PermCategory, PermStatus } from "./types";
+import { LinkButton } from "@components/shared/LinkButton";
 
 function useClickOutside({
   open,
@@ -759,23 +760,15 @@ function AccessCard({ method, selected, onSelect }: Readonly<{ method: AccessMet
   );
 }
 
-function LinkButton({ children, onClick }: Readonly<{ children: JSX.Element | string; onClick: () => void }>): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{ color: "#0d6efd", textDecoration: "none", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "3px", background: "none", border: "none", padding: 0, cursor: "pointer" }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.textDecoration = "none";
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+const INLINE_LINK_STYLE: React.CSSProperties = {
+  color: "#0d6efd",
+  textDecoration: "none",
+  fontWeight: 400,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "3px",
+  cursor: "pointer",
+};
 
 function StepAccess({
   emails,
@@ -840,7 +833,16 @@ function StepAccess({
               <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY_TEXT, marginBottom: "3px", marginTop: 0 }}>Seat assignment</p>
               <p style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 300, color: "#374151", marginBottom: "14px", marginTop: 0, lineHeight: "20px" }}>
                 Seats give users access to features.{" "}
-                <LinkButton onClick={() => toast.info("Learn more about seats: coming soon.")}>
+                <LinkButton
+                  onClick={() => toast.info("Learn more about seats: coming soon.")}
+                  style={INLINE_LINK_STYLE}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.textDecoration = "none";
+                  }}
+                >
                   <>
                     Learn more about seats <ExternalLink size={11} />
                   </>
@@ -851,7 +853,16 @@ function StepAccess({
               </div>
               <p style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 300, color: "#374151", marginTop: "16px", marginBottom: 0, lineHeight: "20px" }}>
                 Visit{" "}
-                <LinkButton onClick={() => toast.info("Products & Services Catalog: coming soon.")}>
+                <LinkButton
+                  onClick={() => toast.info("Products & Services Catalog: coming soon.")}
+                  style={INLINE_LINK_STYLE}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.textDecoration = "underline";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.textDecoration = "none";
+                  }}
+                >
                   <>
                     Products &amp; Services Catalog <ExternalLink size={11} />
                   </>

@@ -101,46 +101,52 @@ const accountDefaultsTabs: Tab[] = [
 
 // ─── Tab Content Components ───────────────────────────────────────────────────
 
+const HelpDot: React.FC = () => (
+  <span
+    title="Help"
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '16px',
+      height: '16px',
+      borderRadius: '50%',
+      border: '1.5px solid #888',
+      fontSize: '10px',
+      color: '#888',
+      cursor: 'default',
+      lineHeight: 1,
+    }}
+  >
+    i
+  </span>
+)
+
+const FieldLabelRow: React.FC<{ label: string; helpIcon?: boolean }> = ({ label, helpIcon }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      marginBottom: '8px',
+      fontFamily: BASE_FONT,
+      fontSize: '14px',
+      fontWeight: 600,
+      color: '#141414',
+    }}
+  >
+    {label}
+    {helpIcon ? <HelpDot /> : null}
+  </div>
+)
+
 const InputField: React.FC<{ label: string; value?: string; helpIcon?: boolean }> = ({
   label,
   value = '',
   helpIcon,
 }) => (
   <div style={{ marginBottom: '24px' }}>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontFamily: BASE_FONT,
-        fontSize: '14px',
-        fontWeight: 600,
-        color: '#141414',
-      }}
-    >
-      {label}
-      {helpIcon && (
-        <span
-          title="Help"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: '1.5px solid #888',
-            fontSize: '10px',
-            color: '#888',
-            cursor: 'default',
-            lineHeight: 1,
-          }}
-        >
-          i
-        </span>
-      )}
-    </div>
+    <FieldLabelRow label={label} helpIcon={helpIcon} />
     <input
       type="text"
       defaultValue={value}
@@ -170,39 +176,7 @@ const SelectField: React.FC<{ label: string; value?: string; options: string[]; 
   helpIcon,
 }) => (
   <div style={{ marginBottom: '24px' }}>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontFamily: BASE_FONT,
-        fontSize: '14px',
-        fontWeight: 600,
-        color: '#141414',
-      }}
-    >
-      {label}
-      {helpIcon && (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: '1.5px solid #888',
-            fontSize: '10px',
-            color: '#888',
-            cursor: 'default',
-            lineHeight: 1,
-          }}
-        >
-          i
-        </span>
-      )}
-    </div>
+    <FieldLabelRow label={label} helpIcon={helpIcon} />
     <div style={{ position: 'relative', width: '340px', maxWidth: '100%' }}>
       <select
         defaultValue={value}

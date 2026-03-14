@@ -1,53 +1,13 @@
 import { toast } from "react-toastify";
 import { reportApiErrorFromCatch } from "./sentryLogger";
 import axiosInstance from "./axios";
-
-interface PaginationParams {
-  page?: number;
-  perPage?: number;
-  search?: string;
-  draw?: number;
-  filters?: any;
-  isExport?: boolean;
-  exportType?: string;
-}
+import { postPagedList, type PaginationParams } from "./paginatedList";
 
 export const getAllUsers = async (params: PaginationParams = {}) => {
-  try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
-
-    const response = await axiosInstance.post(
-      `users/list`,
-      {
-        page,
-        perPage,
-        search,
-        draw,
-        ...filters,
-        isExport,
-        exportType
-      },
-      {
-        responseType: isExport ? 'blob' : 'json',
-        headers: isExport ? {
-          'Accept': '*/*',
-          'Content-Type': 'application/json'
-        } : undefined
-      }
-    );
-    
-    
-
-    if(isExport){
-      toast.success(`${exportType.toUpperCase()} export - comming soon`);
-    }
-    
-    return response?.data?.data;
-  } catch (error) {
-    reportApiErrorFromCatch(error, 'users');
-    console.error('API Error:', error);
-    throw error;
-  }
+  return await postPagedList(`users/list`, params, {
+    context: "users",
+    onError: (error) => reportApiErrorFromCatch(error, "users"),
+  });
 };
 
 export const getParentUsers = async () => {
