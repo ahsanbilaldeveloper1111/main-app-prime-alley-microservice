@@ -21,28 +21,10 @@ import React, {
     ExternalLink,
     Copy,
     RefreshCw,
-    ThumbsUp,
-    ThumbsDown,
-    Sparkles,
-    User,
-    Building2,
-    Briefcase,
-    FileText,
     Ticket,
-    Paperclip,
-    Link2,
-    Tag,
-    DollarSign,
     Search,
-    Filter,
     AlertCircle,
-    ShoppingCart,
-    Pencil,
-    Trash2,
-    MessageCircle,
-    Download as DownloadIcon,
   } from "lucide-react";
-  import parsePhoneNumber from "libphonenumber-js";
   import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
   import Layout from "@layout/index";
   import {
@@ -53,18 +35,14 @@ import React, {
     deleteCrmData,
     type CrmDataItem,
   } from "@utils/crm";
-  import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
+  import { ModuleSlug } from "@utils/Helper";
   import moment from "moment-timezone";
   import { usePermissions } from "@utils/permissionUtils";
   import { HEADER_CONSTANTS } from "@constants/headerConstants";
   import CrmActivitiesPanel, {
     type CrmActivitiesPanelRef,
   } from "@components/CrmActivitiesPanel";
-  import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
   import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
-  import CrmProfileSection from "@components/CrmProfileSection";
-  import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-  import RichNoteEditor from "@components/RichNoteEditor";
   import ProspectEditSidebar, {
     type ProspectFormState as ProspectSidebarFormState,
   } from "@components/ProspectEditSidebar";
@@ -72,12 +50,10 @@ import React, {
   import { useCti } from "@hooks/useCti";
   import DeviceSelectionModal from "@components/DeviceSelectionModal";
   import { toast } from "react-toastify";
-  import { Dropdown, Form } from "react-bootstrap";
-  import CreatableSelect from "react-select/creatable";
-  import Select from "react-select";
   import { GetHierarchyData } from "@utils/users";
   import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
   import SuccessfulModal from "@pages/partial/SuccessfulModal";
+  import { createNonPrngId } from "@utils/id";
   
   // ============================================================================
   // TYPE DEFINITIONS
@@ -116,6 +92,252 @@ import React, {
     onAddClick?: () => void;
   }
   
+  const CARD_STYLE: React.CSSProperties = {
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "8px",
+    marginBottom: "12px",
+    overflow: "hidden",
+  };
+
+  const SECTION_HEADER_STYLE: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "14px 20px",
+  };
+
+  const SECTION_TITLE_STYLE: React.CSSProperties = {
+    fontSize: "15px",
+    fontWeight: "600",
+    color: "#141414",
+    margin: 0,
+  };
+
+  const EMPTY_TEXT_STYLE: React.CSSProperties = {
+    fontSize: "13px",
+    color: "#718096",
+    margin: 0,
+    padding: "0 20px 16px",
+  };
+
+  const GearButton = () => (
+    <button
+      type="button"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "transparent",
+        border: "1px solid #e2e8f0",
+        borderRadius: "5px",
+        width: "28px",
+        height: "28px",
+        cursor: "pointer",
+        color: "#718096",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#f5f8fa";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+    </button>
+  );
+
+  const AddButton = () => (
+    <button
+      type="button"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        backgroundColor: "transparent",
+        border: "none",
+        fontSize: "14px",
+        color: "#141414",
+        cursor: "pointer",
+        padding: "4px 8px",
+        borderRadius: "4px",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#f5f8fa";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      <span style={{ fontSize: "16px", lineHeight: 1 }}>+</span>&nbsp;Add
+    </button>
+  );
+
+  const AssociatedCard = ({ title, items }: { title: string; items: any[] }) => (
+    <div style={CARD_STYLE}>
+      <div style={SECTION_HEADER_STYLE}>
+        <span style={SECTION_TITLE_STYLE}>{title}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <AddButton />
+          <GearButton />
+        </div>
+      </div>
+      <p style={EMPTY_TEXT_STYLE}>
+        {items.length === 0
+          ? "No associated objects of this type exist or you don’t have permission to view them."
+          : null}
+      </p>
+    </div>
+  );
+
+  const ActivitiesToolbar = ({
+    filterLabel = "All time so far",
+    activityLabel = "Activity (5/9)",
+  }: {
+    filterLabel?: string;
+    activityLabel?: string;
+  }) => (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "12px",
+          gap: "8px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              border: "1px solid #cbd5e0",
+              borderRadius: "5px",
+              padding: "6px 10px",
+              backgroundColor: "#ffffff",
+              minWidth: "160px",
+            }}
+          >
+            <Search size={14} color="#718096" />
+            <input
+              placeholder="Search activities"
+              style={{
+                border: "none",
+                outline: "none",
+                fontSize: "13px",
+                color: "#141414",
+                backgroundColor: "transparent",
+                width: "100%",
+              }}
+            />
+          </div>
+
+          <button
+            type="button"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              border: "1px solid #cbd5e0",
+              borderRadius: "5px",
+              padding: "6px 12px",
+              backgroundColor: "#ffffff",
+              fontSize: "13px",
+              color: "#141414",
+              cursor: "pointer",
+            }}
+          >
+            Add activities
+            <ChevronDown size={13} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            backgroundColor: "transparent",
+            border: "none",
+            fontSize: "13px",
+            color: "#141414",
+            cursor: "pointer",
+            fontWeight: "500",
+          }}
+        >
+          Collapse all
+          <ChevronDown size={13} />
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            border: "1px solid #cbd5e0",
+            borderRadius: "5px",
+            padding: "4px 10px",
+            backgroundColor: "#ffffff",
+            fontSize: "13px",
+            color: "#141414",
+            cursor: "pointer",
+          }}
+        >
+          {filterLabel}
+          <ChevronDown size={12} />
+        </button>
+
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            border: "1px solid #cbd5e0",
+            borderRadius: "5px",
+            padding: "4px 10px",
+            backgroundColor: "#edf2f7",
+            fontSize: "13px",
+            color: "#141414",
+            cursor: "pointer",
+            fontWeight: "500",
+          }}
+        >
+          {activityLabel}
+          <ChevronDown size={12} />
+          <X size={12} />
+        </button>
+      </div>
+    </>
+  );
+
   // ============================================================================
   // MAIN COMPONENT
   // ============================================================================
@@ -157,9 +379,6 @@ import React, {
         id: number;
       }>
     >([]);
-    const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-      {},
-    );
     const [extensions, setExtensions] = useState<any[]>([]);
     const [prospectForm, setProspectForm] = useState<ProspectSidebarFormState>({
       firstName: "",
@@ -182,7 +401,6 @@ import React, {
     // Edit Prospect Sidebar States
     const [showEditContactSidebar, setShowEditContactSidebar] = useState(false);
     const [editContactLoading, setEditContactLoading] = useState(false);
-    const [exporting, setExporting] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [prospectToDelete, setProspectToDelete] = useState<{
       id: number;
@@ -234,7 +452,6 @@ import React, {
       useState(false);
     const [availableDevices, setAvailableDevices] = useState<any[]>([]);
     const [pendingDialedNumber, setPendingDialedNumber] = useState("");
-    const [isDialing, setIsDialing] = useState(false);
   
     // Static tags data
     const staticTags = [
@@ -262,7 +479,6 @@ import React, {
           setShowDeviceSelectionModal(true);
           return;
         }
-        setIsDialing(true);
         try {
           const result = await ctiDialNumber(numberToDial);
           if (result?.error) {
@@ -270,8 +486,6 @@ import React, {
           }
         } catch {
           toast.error("Failed to make call");
-        } finally {
-          setIsDialing(false);
         }
       },
       [ctiDialNumber, getAllUserDevices],
@@ -290,7 +504,6 @@ import React, {
           selectedAt: new Date().toISOString(),
         };
         localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-        setIsDialing(true);
         try {
           const result = await makeCall({
             callingAddress: ctiUserAddress ?? "",
@@ -303,8 +516,6 @@ import React, {
           }
         } catch {
           toast.error("Failed to make call");
-        } finally {
-          setIsDialing(false);
         }
       },
       [pendingDialedNumber, ctiUserAddress, makeCall],
@@ -330,7 +541,6 @@ import React, {
       const id = prospect.data.id ?? prospectRecordId;
       const name = `ticket_${id}.csv`;
       const ext = name.endsWith(".csv") ? "" : ".csv";
-      setExporting(true);
       try {
         const row = prospect.data as any;
         const headers = Object.keys(row).filter(
@@ -343,7 +553,7 @@ import React, {
               const val = row[h];
               if (val == null) return "";
               if (typeof val === "object") return "";
-              const s = String(val).replace(/"/g, '""');
+              const s = String(val).replaceAll('"', '""');
               return s.includes(",") || s.includes('"') ? `"${s}"` : s;
             })
             .join(","),
@@ -351,17 +561,17 @@ import React, {
         const blob = new Blob([csvRows.join("\n")], {
           type: "text/csv;charset=utf-8;",
         });
-        const url = window.URL.createObjectURL(blob);
+        const url = globalThis.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = name + ext;
         a.click();
-        window.URL.revokeObjectURL(url);
+        globalThis.URL.revokeObjectURL(url);
         toast.success("Exported ticket successfully!");
       } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("Export ticket error:", err);
         toast.error("Failed to export ticket");
-      } finally {
-        setExporting(false);
       }
     }, [prospect, prospectRecordId]);
   
@@ -437,13 +647,13 @@ import React, {
     }, []);
   
     // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-    const validTabIds = ["overview", "activities"];
+    const validTabIds = new Set(["overview", "activities"]);
     useEffect(() => {
       if (!router.isReady) return;
       const section = router.query.section;
       const tabId =
         typeof section === "string" ? section.toLowerCase().trim() : null;
-      if (tabId && validTabIds.includes(tabId)) {
+      if (tabId && validTabIds.has(tabId)) {
         setActiveTab(tabId);
       }
     }, [router.isReady, router.query.section]);
@@ -465,8 +675,8 @@ import React, {
         return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
       };
   
-      const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-      const tagsArray = Array.isArray(rawTags)
+      const rawTags = item.tags ?? item?.data?.tags ?? d.tags ?? [];
+      const tagsArray: Array<{ value: string; label: string; id: number }> = Array.isArray(rawTags)
         ? rawTags.map((t: any) =>
             typeof t === "string"
               ? { value: t, label: t, id: 0 }
@@ -483,7 +693,7 @@ import React, {
       console.log("phone", item);
       if (typeof item.phone === "string" && item.phone.trim()) {
         try {
-          const normalized = item.phone.replace(/\s/g, "");
+          const normalized = item.phone.replaceAll(/\s/g, "");
           const parsed = parsePhoneNumberInput(normalized);
           if (parsed) {
             phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -511,10 +721,10 @@ import React, {
           ? Object.entries(d)
               .filter(([k]) => !reservedDataKeys.has(k))
               .map(([field_name, field_value]) => ({
-                id: `${Date.now()}-${Math.random()}-${field_name}`,
+                id: createNonPrngId(field_name),
                 field_name,
                 field_value: Array.isArray(field_value)
-                  ? (field_value as string[]).join(", ")
+                  ? field_value.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ")
                   : String(field_value ?? "").trim(),
               }))
               .filter((f) => f.field_name || f.field_value)
@@ -523,29 +733,29 @@ import React, {
       setProspectForm({
         firstName,
         lastName,
-        email: d.email ?? (item as any).email ?? "",
+        email: d.email ?? item.email ?? "",
         phone_country_code: phoneCountryCode,
         phoneNumber,
         campaign_id: item.campaign_id ?? d.campaign_id ?? null,
         contact_owner:
-          (item as any).user_extension ??
+          item.user_extension ??
           d.contact_owner ??
-          (item as any).contact_owner ??
+          item.contact_owner ??
           null,
         lifecycle_stage: d.lifecycle_stage ?? "",
-        disposition: d.disposition ?? (item as any).disposition ?? "",
+        disposition: d.disposition ?? item.disposition ?? "",
         legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
         company_domain:
-          (item as any).company_domain ?? d.company_domain ?? "",
+          item.company_domain ?? d.company_domain ?? "",
         scheduled_call_at: toDatetimeLocal(
           item.scheduled_call_at ?? d.scheduled_call_at,
         ),
-        tags: tagsArray as Array<{ value: string; label: string; id: number }>,
+        tags: tagsArray,
         note: item.note ?? d.note ?? "",
         source:
-          (item as any).source_file ??
+          item.source_file ??
           d.source ??
-          (item as any).source ??
+          item.source ??
           "",
         custom_fields: customFieldsArray,
       });
@@ -562,13 +772,6 @@ import React, {
             id: campaign.id,
           }));
           setAvailableCampaigns(campaignOptions);
-  
-          // Also populate the campaignsById map
-          const campaignsMap: Record<number, string> = {};
-          campaignsResponse.data.forEach((campaign: any) => {
-            campaignsMap[campaign.id] = campaign.name;
-          });
-          setCampaignsById(campaignsMap);
         } catch (error) {
           console.error("Failed to load campaigns:", error);
           // Fallback to empty array
@@ -605,7 +808,7 @@ import React, {
             staticTags.map((tag) => ({
               value: tag.value,
               label: tag.label,
-              id: parseInt(tag.value.replace("tag-", "")) || 0,
+              id: Number.parseInt(tag.value.replace("tag-", ""), 10) || 0,
             })),
           );
         }
@@ -638,111 +841,6 @@ import React, {
       { id: "overview", label: "Overview" },
       { id: "activities", label: "Activities" },
     ];
-
-    /** Renders one associated-objects card */
-    const renderAssociatedCard = (
-      title: string,
-      items: any[],
-      renderItem?: (item: any) => React.ReactNode,
-    ) => (
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          border: "1px solid #e2e8f0",
-          borderRadius: "8px",
-          marginBottom: "12px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 20px",
-            borderBottom: items.length > 0 ? "1px solid #e2e8f0" : "none",
-          }}
-        >
-          <span style={{ fontSize: "15px", fontWeight: "600", color: "#141414" }}>
-            {title}
-          </span>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                color: "#141414",
-                cursor: "pointer",
-                padding: "4px 8px",
-                borderRadius: "4px",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f5f8fa";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-              }}
-            >
-              <span style={{ fontSize: "16px", lineHeight: 1 }}>+</span> Add
-            </button>
-
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "transparent",
-                border: "1px solid #e2e8f0",
-                borderRadius: "5px",
-                width: "28px",
-                height: "28px",
-                cursor: "pointer",
-                color: "#718096",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f5f8fa";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {items.length === 0 ? (
-          <div style={{ padding: "16px 20px" }}>
-            <p style={{ fontSize: "13px", color: "#718096", margin: 0 }}>
-              No associated objects of this type exist or you don&apos;t have permission to view them.
-            </p>
-          </div>
-        ) : (
-          <div style={{ padding: "16px 20px" }}>
-            {items.map((item, i) => (
-              <div key={i}>{renderItem ? renderItem(item) : null}</div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
   
     // Key Information Fields (from prospect + tickets/leads)
     const firstTicket = prospect?.data?.tickets?.[0];
@@ -787,244 +885,6 @@ import React, {
       },
     ];
   
-    const renderRevenueSection = (section: RevenueSection) => {
-      return (
-        <div
-          key={section.id}
-          style={{
-            backgroundColor: "#ffffff",
-            border: "1px solid #eaf0f6",
-            borderRadius: "5px",
-            padding: "20px",
-            marginBottom: "16px",
-          }}
-        >
-          {/* Section Header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: section.items ? "16px" : "12px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "600",
-                color: "#141414",
-                margin: 0,
-              }}
-            >
-              {section.title} ({section.count})
-            </h3>
-            {section.addButtonText && (
-              <button
-                onClick={section.onAddClick}
-                style={{
-                  padding: "6px 12px",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: "#006162",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = "underline";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = "none";
-                }}
-              >
-                +{section.addButtonText}
-                <ChevronDown size={14} />
-              </button>
-            )}
-          </div>
-  
-          {/* Section Content */}
-          {section.items && section.items.length > 0 ? (
-            <>
-              {/* Subscription Items */}
-              {section.items.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    padding: "16px",
-                    backgroundColor: "#f7fafc",
-                    border: "1px solid #eaf0f6",
-                    borderRadius: "5px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: "10px",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <FileText size={18} color="#141414" />
-                    <a
-                      href={item.link}
-                      style={{
-                        fontSize: "15px",
-                        fontWeight: "600",
-                        color: "#006162",
-                        textDecoration: "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = "underline";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = "none";
-                      }}
-                    >
-                      {item.name}
-                    </a>
-                  </div>
-  
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "12px",
-                      fontSize: "14px",
-                    }}
-                  >
-                    <div>
-                      <span style={{ color: "#141414" }}>Status: </span>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          color: "#141414",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            backgroundColor:
-                              item.status === "active" ? "#10b981" : "#ef4444",
-                            display: "inline-block",
-                          }}
-                        />
-                        {item.status.charAt(0).toUpperCase() +
-                          item.status.slice(1)}
-                      </span>
-                    </div>
-                    <div style={{ color: "#141414" }}>
-                      Next billing date: {item.nextBillingDate}
-                    </div>
-                    <div style={{ color: "#141414" }}>
-                      Next payment amount: {item.nextPaymentAmount}
-                    </div>
-                    <div>
-                      <span style={{ color: "#141414" }}>Contact email: </span>
-                      <a
-                        href={`mailto:${item.contactEmail}`}
-                        style={{
-                          color: "#006162",
-                          textDecoration: "none",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.textDecoration = "underline";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.textDecoration = "none";
-                        }}
-                      >
-                        {item.contactEmail}
-                      </a>
-                      <ExternalLink
-                        size={12}
-                        style={{ marginLeft: "4px", display: "inline" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-  
-              {/* View All Link */}
-              <button
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: "#141414",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                View all associated {section.title}
-                <ExternalLink size={14} />
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Empty State */}
-              <p
-                style={{
-                  fontSize: "14px",
-                  color: "#141414",
-                  lineHeight: "1.6",
-                  marginBottom: "16px",
-                }}
-              >
-                {section.description}
-              </p>
-  
-              {section.buttonText && (
-                <button
-                  onClick={section.onButtonClick}
-                  style={{
-                    padding: "8px 16px",
-                    backgroundColor: "transparent",
-                    border: "1px solid #cbd5e0",
-                    borderRadius: "4px",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    color: "#141414",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f7fafc";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
-                >
-                  {section.buttonIcon && <section.buttonIcon size={16} />}
-                  {section.buttonText}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      );
-    };
     // ============================================================================
     // LEFT SIDEBAR (Contact Info)
     // ============================================================================
@@ -1178,7 +1038,7 @@ import React, {
             }}
           >
             <button
-              onClick={() => window.history.back()}
+              onClick={() => router.back()}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1448,7 +1308,7 @@ import React, {
               const Icon = action.icon;
               return (
                 <div
-                  key={index}
+                  key={action.label}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -1589,7 +1449,8 @@ import React, {
             border: "1px solid #cccccc",
           }}
         >
-          <div
+          <button
+            type="button"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1597,6 +1458,9 @@ import React, {
               padding: "14px 20px",
               cursor: "pointer",
               backgroundColor: "#ffffff",
+              width: "100%",
+              border: "none",
+              textAlign: "left",
               borderBottom: collapsedSections.has("key-info")
                 ? "none"
                 : "1px solid #cccccc",
@@ -1626,6 +1490,7 @@ import React, {
               </h3>
             </div>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
               }}
@@ -1649,12 +1514,12 @@ import React, {
             >
               Actions
             </button>
-          </div>
+          </button>
   
           {!collapsedSections.has("key-info") && (
             <div style={{ padding: "20px" }}>
-              {keyInfoFields.map((field, index) => (
-                <div key={index} style={{ marginBottom: "16px" }}>
+              {keyInfoFields.map((field) => (
+                <div key={field.label} style={{ marginBottom: "16px" }}>
                   <div
                     style={{
                       fontSize: "13px",
@@ -1780,245 +1645,8 @@ import React, {
       const associatedPayments: any[] = [];
       const associatedProjects: any[] = [];
 
-      const cardStyle: React.CSSProperties = {
-        backgroundColor: "#ffffff",
-        border: "1px solid #e2e8f0",
-        borderRadius: "8px",
-        marginBottom: "12px",
-        overflow: "hidden",
-      };
-
-      const sectionHeaderStyle: React.CSSProperties = {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "14px 20px",
-      };
-
-      const sectionTitleStyle: React.CSSProperties = {
-        fontSize: "15px",
-        fontWeight: "600",
-        color: "#141414",
-        margin: 0,
-      };
-
-      const emptyTextStyle: React.CSSProperties = {
-        fontSize: "13px",
-        color: "#718096",
-        margin: 0,
-        padding: "0 20px 16px",
-      };
-
-      const GearButton = () => (
-        <button
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "transparent",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            width: "28px",
-            height: "28px",
-            cursor: "pointer",
-            color: "#718096",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f5f8fa";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-      );
-
-      const AddButton = () => (
-        <button
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            backgroundColor: "transparent",
-            border: "none",
-            fontSize: "14px",
-            color: "#141414",
-            cursor: "pointer",
-            padding: "4px 8px",
-            borderRadius: "4px",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#f5f8fa";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent";
-          }}
-        >
-          <span style={{ fontSize: "16px", lineHeight: 1 }}>+</span>&nbsp;Add
-        </button>
-      );
-
-      const AssociatedCard = ({ title, items }: { title: string; items: any[] }) => (
-        <div style={cardStyle}>
-          <div style={sectionHeaderStyle}>
-            <span style={sectionTitleStyle}>{title}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <AddButton />
-              <GearButton />
-            </div>
-          </div>
-          <p style={emptyTextStyle}>
-            {items.length === 0
-              ? "No associated objects of this type exist or you don’t have permission to view them."
-              : null}
-          </p>
-        </div>
-      );
-
-      const ActivitiesToolbar = ({
-        filterLabel = "All time so far",
-        activityLabel = "Activity (5/9)",
-      }: {
-        filterLabel?: string;
-        activityLabel?: string;
-      }) => (
-        <>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "12px",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "5px",
-                  padding: "6px 10px",
-                  backgroundColor: "#ffffff",
-                  minWidth: "160px",
-                }}
-              >
-                <Search size={14} color="#718096" />
-                <input
-                  placeholder="Search activities"
-                  style={{
-                    border: "none",
-                    outline: "none",
-                    fontSize: "13px",
-                    color: "#141414",
-                    backgroundColor: "transparent",
-                    width: "100%",
-                  }}
-                />
-              </div>
-
-              <button
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "5px",
-                  padding: "6px 12px",
-                  backgroundColor: "#ffffff",
-                  fontSize: "13px",
-                  color: "#141414",
-                  cursor: "pointer",
-                }}
-              >
-                Add activities
-                <ChevronDown size={13} />
-              </button>
-            </div>
-
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "13px",
-                color: "#141414",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              Collapse all
-              <ChevronDown size={13} />
-            </button>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "16px",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                border: "1px solid #cbd5e0",
-                borderRadius: "5px",
-                padding: "4px 10px",
-                backgroundColor: "#ffffff",
-                fontSize: "13px",
-                color: "#141414",
-                cursor: "pointer",
-              }}
-            >
-              {filterLabel}
-              <ChevronDown size={12} />
-            </button>
-
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                border: "1px solid #cbd5e0",
-                borderRadius: "5px",
-                padding: "4px 10px",
-                backgroundColor: "#edf2f7",
-                fontSize: "13px",
-                color: "#141414",
-                cursor: "pointer",
-                fontWeight: "500",
-              }}
-            >
-              {activityLabel}
-              <ChevronDown size={12} />
-              <X size={12} />
-            </button>
-          </div>
-        </>
-      );
+      const cardStyle = CARD_STYLE;
+      const sectionTitleStyle = SECTION_TITLE_STYLE;
 
       return (
         <div
@@ -2185,9 +1813,9 @@ import React, {
                             {monthLabel}
                           </p>
 
-                          {activities.map((activity, i) => (
+                          {activities.map((activity) => (
                             <div
-                              key={i}
+                              key={`${activity.label}-${activity.rawDate ?? activity.date}`}
                               style={{
                                 display: "flex",
                                 gap: "12px",
@@ -2545,7 +2173,8 @@ import React, {
                       border: "1px solid #cccccc",
                     }}
                   >
-                    <div
+                    <button
+                      type="button"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -2553,6 +2182,9 @@ import React, {
                         padding: "14px 20px 0",
                         cursor: "pointer",
                         backgroundColor: "#ffffff",
+                        width: "100%",
+                        border: "none",
+                        textAlign: "left",
                       }}
                       onClick={() => toggleSection("deals")}
                     >
@@ -2586,7 +2218,7 @@ import React, {
                           Deals ({dealsCount})
                         </h3>
                       </div>
-                    </div>
+                    </button>
   
                     {!collapsedSections.has("deals") && (
                       <div style={{ padding: "20px" }}>
@@ -2664,7 +2296,7 @@ import React, {
                                       String(id),
                                     )}`
                                   : "/crm/deals";
-                                window.open(href, "_blank", "noopener,noreferrer");
+                                globalThis.window?.open(href, "_blank", "noopener,noreferrer");
                               }}
                               style={{
                                 fontSize: "13px",
@@ -2702,7 +2334,8 @@ import React, {
                       border: "1px solid #cccccc",
                     }}
                   >
-                    <div
+                    <button
+                      type="button"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -2710,6 +2343,9 @@ import React, {
                         padding: "14px 20px 0",
                         cursor: "pointer",
                         backgroundColor: "#ffffff",
+                        width: "100%",
+                        border: "none",
+                        textAlign: "left",
                       }}
                       onClick={() => toggleSection("tickets")}
                     >
@@ -2743,7 +2379,7 @@ import React, {
                           Leads ({leadsCount})
                         </h3>
                       </div>
-                    </div>
+                    </button>
   
                     {!collapsedSections.has("tickets") && (
                       <div style={{ padding: "20px" }}>

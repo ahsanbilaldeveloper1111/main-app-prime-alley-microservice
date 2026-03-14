@@ -7,7 +7,6 @@ import {
   getVoicebot,
   postVoicebots,
   putVoicebot,
-  type CreateVoicebotPayload,
   type UpdateVoicebotPayload,
 } from "@utils/voicebot/outbound";
 import { toFormString, firstString } from "@utils/voicebot/formDisplay";
@@ -17,15 +16,12 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
-import { FileText, Mic, MessageSquare, Phone, Check } from "lucide-react";
+import { FileText, Mic, MessageSquare, Phone } from "lucide-react";
+import { TabsNavigation } from "@components/voicebot/TabsNavigation";
+import { CompanyOptions, type CompanyOption } from "@components/voicebot/CompanyOptions";
+import { ValidationChecklist } from "@components/voicebot/ValidationChecklist";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 /** Form state (UI uses first_message/system_prompt; API expects default_greeting/default_system_prompt) */
 interface OutboundVoicebotFormState {
@@ -115,6 +111,148 @@ const TABS = [
   { id: TAB_KEYS.call, label: "Call Settings", icon: Phone },
 ];
 
+function getPageCopy(isEditMode: boolean) {
+  return {
+    breadcrumbSubTitle: isEditMode
+      ? "Voicebot Outbound - Voice Bots - Edit"
+      : "Voicebot Outbound - Voice Bots - Create",
+    title: isEditMode ? "Edit Voice Bot" : "Create Voice Bot",
+    finalActionLabel: isEditMode ? "Update Voice Bot" : "Create Voice Bot",
+  };
+}
+
+function getVoicebotDetail(res: Record<string, unknown>): Record<string, unknown> {
+  return ((res as { data?: unknown }).data ?? res) as Record<string, unknown>;
+}
+
+function getSubmitError(form: OutboundVoicebotFormState): string | null {
+  if (!form.company_id || !form.name?.trim()) return "Company and Bot Name are required";
+  if (!form.trunk_id?.trim()) return "Select Trunk is required";
+  if (!form.first_message?.trim()) return "Default Greeting is required";
+  if (!form.system_prompt?.trim()) return "Default System Prompt is required";
+  return null;
+}
+
+function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayload {
+  return {
+    company_id: form.company_id || undefined,
+    name: form.name,
+    trunk_id: form.trunk_id || undefined,
+    default_greeting: form.first_message?.trim() ?? "",
+    default_system_prompt: form.system_prompt?.trim() ?? "",
+    description: form.description || undefined,
+    system_prompt: form.system_prompt || undefined,
+    first_message: form.first_message || undefined,
+    llm_model: form.llm_model || undefined,
+    tts_model: form.tts_model || undefined,
+    stt_model: form.stt_model || undefined,
+    voice: form.voice || undefined,
+    temperature: form.temperature,
+    max_tokens: form.max_tokens,
+    transfer_number: form.transfer_number || undefined,
+    enable_transfer: form.enable_transfer,
+    idle_timeout_seconds: form.idle_timeout_seconds,
+    max_call_duration_seconds: form.max_call_duration_seconds,
+    status: form.status || undefined,
+  };
+}
+
+async function submitOutboundVoicebot(
+  form: OutboundVoicebotFormState,
+  isEditMode: boolean,
+  botId: string | undefined,
+): Promise<"updated" | "created"> {
+  if (isEditMode && botId) {
+    await putVoicebot(botId, buildUpdatePayload(form));
+    return "updated";
+  }
+
+  await postVoicebots({
+    company_id: form.company_id,
+    name: form.name,
+    trunk_id: form.trunk_id?.trim() ?? "",
+    default_greeting: form.first_message?.trim() ?? "",
+    default_system_prompt: form.system_prompt?.trim() ?? "",
+    description: form.description || undefined,
+    system_prompt: form.system_prompt || undefined,
+    first_message: form.first_message || undefined,
+    llm_model: form.llm_model || undefined,
+    tts_model: form.tts_model || undefined,
+    stt_model: form.stt_model || undefined,
+    voice: form.voice || undefined,
+    temperature: form.temperature,
+    max_tokens: form.max_tokens,
+    transfer_number: form.transfer_number || undefined,
+    enable_transfer: form.enable_transfer,
+    idle_timeout_seconds: form.idle_timeout_seconds,
+    max_call_duration_seconds: form.max_call_duration_seconds,
+    status: form.status || undefined,
+  });
+  return "created";
+}
+
+// company options rendering extracted to `CompanyOptions`
+
+const LoadingVoicebotPlaceholder = ({ pageCopy }: { pageCopy: ReturnType<typeof getPageCopy> }) => (
+  <React.Fragment>
+    <BreadcrumbItem mainTitle="" mainLink="" subTitle={pageCopy.breadcrumbSubTitle} />
+    <PageHeader title={pageCopy.title} showSearch={false} />
+    <div className="d-flex justify-content-center align-items-center p-5">
+      <Spinner animation="border" />
+    </div>
+  </React.Fragment>
+);
+
+// local versions of TabsNavigation/ValidationChecklist/CompanyOption were extracted to shared components
+
+const BottomActionBar = ({
+  isFirstTab,
+  isLastTab,
+  submitting,
+  onCancel,
+  onPrev,
+  onNext,
+  onFinalSubmit,
+  finalActionLabel,
+  canSubmitFinal,
+}: {
+  isFirstTab: boolean;
+  isLastTab: boolean;
+  submitting: boolean;
+  onCancel: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onFinalSubmit: () => void;
+  finalActionLabel: string;
+  canSubmitFinal: boolean;
+}) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
+    <div>
+      {isFirstTab ? (
+        <Button type="button" variant="outline-secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+      ) : (
+        <Button type="button" variant="outline-secondary" onClick={onPrev}>
+          Previous
+        </Button>
+      )}
+    </div>
+    <div style={{ display: "flex", gap: "12px" }}>
+      {isLastTab ? (
+        <Button type="button" variant="primary" disabled={submitting || !canSubmitFinal} onClick={onFinalSubmit}>
+          {submitting ? <Spinner animation="border" size="sm" className="me-1" /> : null}
+          {finalActionLabel}
+        </Button>
+      ) : (
+        <Button type="button" variant="primary" onClick={onNext}>
+          Next
+        </Button>
+      )}
+    </div>
+  </div>
+);
+
 const VoicebotOutboundCreate = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -123,6 +261,7 @@ const VoicebotOutboundCreate = () => {
   const userCompanyName = (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
   const botId = typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
+  const pageCopy = getPageCopy(isEditMode);
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [trunks, setTrunks] = useState<Array<{ id: string; trunk_id?: string; name?: string }>>([]);
@@ -189,8 +328,7 @@ const VoicebotOutboundCreate = () => {
     const companyId = typeof router.query.company_id === "string" ? router.query.company_id : undefined;
     getVoicebot(botId, companyId ? { company_id: companyId } : undefined)
       .then((res: Record<string, unknown>) => {
-        const detail = (res?.data != null ? res.data : res) as Record<string, unknown>;
-        const d = detail;
+        const d = getVoicebotDetail(res);
         setForm({
           company_id: toFormString(d.company_id),
           name: toFormString(d.name),
@@ -220,81 +358,30 @@ const VoicebotOutboundCreate = () => {
       .finally(() => setLoadingBot(false));
   }, [isEditMode, botId, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.company_id || !form.name?.trim()) {
-      toast.error("Company and Bot Name are required");
+  const handleSubmit = () => {
+    const err = getSubmitError(form);
+    if (err) {
+      toast.error(err);
       return;
     }
-    if (!form.trunk_id?.trim()) {
-      toast.error("Select Trunk is required");
-      return;
-    }
-    if (!form.first_message?.trim()) {
-      toast.error("Default Greeting is required");
-      return;
-    }
-    if (!form.system_prompt?.trim()) {
-      toast.error("Default System Prompt is required");
-      return;
-    }
+
     setSubmitting(true);
-    try {
-      if (isEditMode && botId) {
-        const payload: UpdateVoicebotPayload = {
-          company_id: form.company_id || undefined,
-          name: form.name,
-          trunk_id: form.trunk_id || undefined,
-          default_greeting: form.first_message?.trim() ?? "",
-          default_system_prompt: form.system_prompt?.trim() ?? "",
-          description: form.description || undefined,
-          system_prompt: form.system_prompt || undefined,
-          first_message: form.first_message || undefined,
-          llm_model: form.llm_model || undefined,
-          tts_model: form.tts_model || undefined,
-          stt_model: form.stt_model || undefined,
-          voice: form.voice || undefined,
-          temperature: form.temperature,
-          max_tokens: form.max_tokens,
-          transfer_number: form.transfer_number || undefined,
-          enable_transfer: form.enable_transfer,
-          idle_timeout_seconds: form.idle_timeout_seconds,
-          max_call_duration_seconds: form.max_call_duration_seconds,
-          status: form.status || undefined,
-        };
-        await putVoicebot(botId, payload);
-        toast.success("Voice bot updated");
-      } else {
-        await postVoicebots({
-          company_id: form.company_id,
-          name: form.name,
-          trunk_id: form.trunk_id?.trim() ?? "",
-          default_greeting: form.first_message?.trim() ?? "",
-          default_system_prompt: form.system_prompt?.trim() ?? "",
-          description: form.description || undefined,
-          system_prompt: form.system_prompt || undefined,
-          first_message: form.first_message || undefined,
-          llm_model: form.llm_model || undefined,
-          tts_model: form.tts_model || undefined,
-          stt_model: form.stt_model || undefined,
-          voice: form.voice || undefined,
-          temperature: form.temperature,
-          max_tokens: form.max_tokens,
-          transfer_number: form.transfer_number || undefined,
-          enable_transfer: form.enable_transfer,
-          idle_timeout_seconds: form.idle_timeout_seconds,
-          max_call_duration_seconds: form.max_call_duration_seconds,
-          status: form.status || undefined,
-        });
-        toast.success("Voice bot created");
-      }
-      router.push("/voicebot/outbound/voicebots");
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || e?.message || (isEditMode ? "Update failed" : "Create failed"));
-    } finally {
-      setSubmitting(false);
-    }
+    submitOutboundVoicebot(form, isEditMode, botId)
+      .then((result) => {
+        toast.success(result === "updated" ? "Voice bot updated" : "Voice bot created");
+        router.push("/voicebot/outbound/voicebots");
+      })
+      .catch((err: unknown) => {
+        const e = err as { response?: { data?: { detail?: string } }; message?: string };
+        toast.error(
+          e?.response?.data?.detail ||
+            e?.message ||
+            (isEditMode ? "Update failed" : "Create failed"),
+        );
+      })
+      .finally(() => {
+        setSubmitting(false);
+      });
   };
 
   const handleCancel = () => {
@@ -322,53 +409,15 @@ const VoicebotOutboundCreate = () => {
   const labelStyle = { display: "block" as const, fontSize: "13px", fontWeight: 500 as const, color: "#6b7280", marginBottom: "6px" };
 
   if (loadingBot) {
-    return (
-      <React.Fragment>
-        <BreadcrumbItem mainTitle="" mainLink="" subTitle={isEditMode ? "Voicebot Outbound - Voice Bots - Edit" : "Voicebot Outbound - Voice Bots - Create"} />
-        <PageHeader title={isEditMode ? "Edit Voice Bot" : "Create Voice Bot"} showSearch={false} />
-        <div className="d-flex justify-content-center align-items-center p-5">
-          <Spinner animation="border" />
-        </div>
-      </React.Fragment>
-    );
+    return <LoadingVoicebotPlaceholder pageCopy={pageCopy} />;
   }
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle={isEditMode ? "Voicebot Outbound - Voice Bots - Edit" : "Voicebot Outbound - Voice Bots - Create"} />
-      <PageHeader title={isEditMode ? "Edit Voice Bot" : "Create Voice Bot"} showSearch={false} />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle={pageCopy.breadcrumbSubTitle} />
+      <PageHeader title={pageCopy.title} showSearch={false} />
 
-      <div style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb" }}>
-        <div style={{ maxWidth: "1600px", margin: "0 auto", display: "flex", gap: "8px", overflowX: "auto" }}>
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 20px",
-                border: "none",
-                backgroundColor: "transparent",
-                color: activeTab === tab.id ? "#667eea" : "#9ca3af",
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                fontSize: "14px",
-                cursor: "pointer",
-                borderBottom: activeTab === tab.id ? "3px solid #667eea" : "3px solid transparent",
-                transition: "all 0.2s",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <div style={{ width: "24px", height: "24px", borderRadius: "50%", backgroundColor: activeTab === tab.id ? "#667eea" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <tab.icon size={14} color={activeTab === tab.id ? "white" : "#9ca3af"} />
-              </div>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TabsNavigation tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <Form
         onSubmit={(e) => e.preventDefault()}
@@ -404,9 +453,12 @@ const VoicebotOutboundCreate = () => {
                               style={inputStyle}
                             >
                               <option value="">Select company</option>
-                              {isAdmin
-                                ? companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)
-                                : userCompanyIdentifier ? <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option> : null}
+                              <CompanyOptions
+                                isAdmin={isAdmin}
+                                companies={companies}
+                                userCompanyIdentifier={userCompanyIdentifier}
+                                userCompanyName={userCompanyName}
+                              />
                             </Form.Select>
                           </Form.Group>
                           <Form.Group className="mb-3">
@@ -507,49 +559,27 @@ const VoicebotOutboundCreate = () => {
               </div>
             </div>
             <div style={{ position: "sticky", top: "24px" }}>
-              <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>Validation Checklist</h6>
-                  <span style={{ fontSize: "12px", color: "#6b7280" }}>{validationItems.filter((i) => i.checked).length}/{validationItems.length} Complete</span>
-                </div>
-                {validationItems.map((item, index) => (
-                  <div key={item.id} style={{ borderBottom: index < validationItems.length - 1 ? "1px solid #f3f4f6" : "none", paddingBottom: "12px", paddingTop: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "20px", height: "20px", borderRadius: "50%", backgroundColor: item.checked ? "#10b981" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {item.checked ? <Check size={12} color="white" /> : null}
-                      </div>
-                      <span style={{ fontSize: "13px", color: "#374151" }}>{item.label}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ValidationChecklist items={validationItems} />
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
-            <div>
-              {!isFirstTab ? (
-                <Button type="button" variant="outline-secondary" onClick={goPrev}>Previous</Button>
-              ) : (
-                <Button type="button" variant="outline-secondary" onClick={handleCancel}>Cancel</Button>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: "12px" }}>
-              {isLastTab ? (
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={submitting || !form.company_id || !form.name?.trim() || !form.trunk_id?.trim() || !form.first_message?.trim() || !form.system_prompt?.trim()}
-                  onClick={(e) => { e.preventDefault(); handleSubmit(e as unknown as React.FormEvent); }}
-                >
-                  {submitting ? <Spinner animation="border" size="sm" className="me-1" /> : null}
-                  {isEditMode ? "Update Voice Bot" : "Create Voice Bot"}
-                </Button>
-              ) : (
-                <Button type="button" variant="primary" onClick={goNext}>Next</Button>
-              )}
-            </div>
-          </div>
+          <BottomActionBar
+            isFirstTab={isFirstTab}
+            isLastTab={isLastTab}
+            submitting={submitting}
+            onCancel={handleCancel}
+            onPrev={goPrev}
+            onNext={goNext}
+            onFinalSubmit={handleSubmit}
+            finalActionLabel={pageCopy.finalActionLabel}
+            canSubmitFinal={Boolean(
+              form.company_id &&
+                form.name?.trim() &&
+                form.trunk_id?.trim() &&
+                form.first_message?.trim() &&
+                form.system_prompt?.trim(),
+            )}
+          />
         </div>
       </Form>
 
