@@ -425,7 +425,7 @@ const CELL_STYLE: React.CSSProperties = {
 
         const res = await listTasks(params);
         if (res?.data) {
-          const mapped = (res.data as ApiTask[]).map(mapApiTaskToTask);
+          const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
           setTasks(mapped);
           setTotal(res.pagination?.total ?? 0);
         } else {
