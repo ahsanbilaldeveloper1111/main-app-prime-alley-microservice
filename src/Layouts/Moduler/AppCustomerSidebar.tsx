@@ -408,9 +408,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'compliance',
     'workforce',
     'unified-reports',
-    'audit-logs',
-    'voicebot-inbound-platform',
-    'voicebot-outbound-platform'
+    'audit-logs'
   ]);
 
   const mainMenuItems: MainMenuItem[] = [
@@ -664,20 +662,101 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Virtual Agents",
       url: '',
       subItems: [
+      
+        //outbound start
         {
-          id: 'virtual-agents-outbound-agent',
-          title: 'Outbound Agent',
-          icon: <User size={16} />,
+          id: 'voicebot-outbound-trunks',
+          title: 'Trunks',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/trunks'
+        },
+        {
+          id: 'voicebot-outbound-voicebots',
+          title: 'Bots',
+          icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
-          url: '/agents/outbound-agent'
+          url: '/voicebot/outbound/voicebots'
+        },
+        
+        {
+          id: 'voicebot-outbound-campaigns',
+          title: 'Campaigns',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
+          url: '/voicebot/outbound/campaigns'
         },
         {
-          id: 'virtual-agents-inbound-agent',
-          title: 'Inbound Agent',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
-          url: '/agents/inbound-agent'
+          id: 'voicebot-outbound-reports',
+          title: 'Reports',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/reports'
         },
+        {
+          id: 'voicebot-outbound-analytics',
+          title: 'Analytics',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/outbound/analytics'
+        },
+        //outbound end
+
+        {
+          id: 'virtual-agents-separator-1',
+          title: '---',
+          icon: null,
+          url: ''
+        },
+
+        //inbound start
+        {
+          id: 'voicebot-inbound-dashboard',
+          title: 'Dashboard',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/dashboard'
+        },
+        {
+          id: 'voicebot-inbound-companies',
+          title: 'Companies',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/companies'
+        },
+        {
+          id: 'voicebot-inbound-bots',
+          title: 'Bots',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
+          url: '/voicebot/inbound/bots'
+        },
+        
+        {
+          id: 'voicebot-inbound-calls',
+          title: 'Conversations',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/conversations'
+        },
+        {
+          id: 'voicebot-inbound-analytics',
+          title: 'Analytics',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.AI_ML_SERVICES,
+          url: '/voicebot/inbound/analytics'
+        },
+        //inbound end
+        {
+          id: 'virtual-agents-separator-2',
+          title: '---',
+          icon: null,
+          url: ''
+        },
+
+      //old
+       
+        
         {
           id: 'virtual-agents-agent-campaigns',
           title: 'Agent Campaigns',
@@ -1047,110 +1126,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }, 
     //finance services end
 
-    // voicebot inbound (platform) start
-    {
-      id: 'voicebot-inbound-platform',
-      key: 'voicebot-inbound-platform',
-      permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <PhoneCall size={16} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: 'Voicebot Inbound',
-      label: 'Voicebot Inbound',
-      url: '',
-      subItems: [
-        {
-          id: 'voicebot-inbound-dashboard',
-          title: 'Dashboard',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/dashboard'
-        },
-        {
-          id: 'voicebot-inbound-companies',
-          title: 'Companies',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/companies'
-        },
-        {
-          id: 'voicebot-inbound-bots',
-          title: 'Bots',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/bots'
-        },
-        
-        {
-          id: 'voicebot-inbound-calls',
-          title: 'Conversations',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/conversations'
-        },
-        {
-          id: 'voicebot-inbound-analytics',
-          title: 'Analytics',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/analytics'
-        },
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-    // voicebot inbound (platform) end
+    
 
-
-    // voicebot inbound (platform) start
-    {
-      id: 'voicebot-outbound-platform',
-      key: 'voicebot-outbound-platform',
-      permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <PhoneCall size={16} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: 'Voicebot Outbound',
-      label: 'Voicebot Outbound',
-      url: '',
-      subItems: [
-        {
-          id: 'voicebot-outbound-trunks',
-          title: 'Trunks',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/trunks'
-        },
-        {
-          id: 'voicebot-outbound-voicebots',
-          title: 'Bots',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/voicebots'
-        },
-        
-        {
-          id: 'voicebot-outbound-campaigns',
-          title: 'Campaigns',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/campaigns'
-        },
-        {
-          id: 'voicebot-outbound-reports',
-          title: 'Reports',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/reports'
-        },
-        {
-          id: 'voicebot-outbound-analytics',
-          title: 'Analytics',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/analytics'
-        },
-
-
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-    // voicebot inbound (platform) end
 
     //reports and audit services start
     {
