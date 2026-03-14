@@ -130,25 +130,30 @@ const s: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     backgroundColor: "#fff",
   },
+  statusBadgeSuccess: {
+    border: "1px solid #16a34a",
+    color: "#166534",
+    backgroundColor: "#dcfce7",
+  },
+  statusBadgeDanger: {
+    border: "1px solid #ef4444",
+    color: "#991b1b",
+    backgroundColor: "#fee2e2",
+  },
 };
 
-// ── Transaction data ───────────────────────────────────────────────────────────
-const transactions = [
-  {
-    id: 1,
-    dateIssued: "11 Feb 2026",
-    detailsTitle: "Invoice #720886618",
-    detailsSub: "Last updated 11 Feb 2026",
-    poNumber: "-",
-    products: "Pro Plan",
-    amounts: [
-      { label: "Invoice amount", value: "AED 97.20" },
-      { label: "Invoice balance", value: "AED 0.00" },
-    ],
-    status: "Processed",
-  },
-  
-];
+function normalizeStatus(status: unknown): string {
+  if (status == null) return "";
+  return String(status).trim().toLowerCase();
+}
+
+function getPaymentStatusBadge(status: unknown): { label: string; style?: React.CSSProperties } {
+  const normalized = normalizeStatus(status);
+  if (normalized === "completed") return { label: "Processed", style: s.statusBadgeSuccess };
+  if (normalized === "failed") return { label: "Failed", style: s.statusBadgeDanger };
+  const label = String(status ?? "").trim();
+  return { label: label || "-", style: undefined };
+}
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
@@ -222,12 +227,12 @@ export default function TransactionsPage() {
             <tr>
               <th style={{ ...s.th, width: 130 }}>Date Issued</th>
               <th style={{ ...s.th, width: 220 }}>Details</th>
-              <th style={{ ...s.th, width: 120 }}>PO Number</th>
-              <th style={{ ...s.th }}>Products</th>
+              <th style={{ ...s.th, width: 120 }}>Transaction Number</th>
+              <th style={{ ...s.th }}>Subscriptions</th>
+              <th style={{ ...s.th }}>Payment Method</th>
               <th style={{ ...s.th, width: 160 }}>Amount</th>
               <th style={{ ...s.th, width: 120 }}>Status</th>
-              <th style={{ ...s.th, width: 80 }}>Actions</th>
-            </tr>
+             </tr>
           </thead>
           <tbody>
             {payments.map((payment) => (
@@ -272,14 +277,20 @@ export default function TransactionsPage() {
 
                 {/* PO Number */}
                 <td style={{ ...s.td }}>
-                  {payment?.invoice?.po_number || "-"}
+                  #{payment?.id?.toString() || "-"}
                 </td>
 
+               
                 {/* Products */}
                 <td style={s.td}>
                   <div style={{ whiteSpace: "pre-line" }}>
                     {payment?.invoice?.items?.map((item: any) => item?.product?.name).join("\n") || ""}
                   </div>
+                </td>
+
+                {/* Payment Method */}
+                <td style={s.td}>
+                  {payment?.payment_method?.toUpperCase() || "-"}
                 </td>
 
                 {/* Amount */}
@@ -297,11 +308,16 @@ export default function TransactionsPage() {
 
                 {/* Status */}
                 <td style={s.td}>
-                  <span style={s.statusBadge}>{payment?.status}</span>
+                  {(() => {
+                    const badge = getPaymentStatusBadge(payment?.status);
+                    return (
+                      <span style={badge.style ? { ...s.statusBadge, ...badge.style } : s.statusBadge}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </td>
 
-                {/* Actions (empty col per design) */}
-                <td style={s.td} />
               </tr>
             ))}
           </tbody>

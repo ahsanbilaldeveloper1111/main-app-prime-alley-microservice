@@ -1,18 +1,19 @@
 import { useState, useEffect } from "react";
-import { Info, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { GetCompanyDetails, GetPaymentMethods } from "@utils/accounting";
 import TopSection from "../Overview/TopSection";
 import { BILLING_PAGE, billingSharedStyles } from "@components/billings/shared/styles";
 import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
+import InfoTooltip from "@components/billings/shared/InfoTooltip";
+import router from "next/router";
 
 const PRO_PLAN_INCLUDES = [
   "Smart CRM ",
-  "Call Logs & Recordings",
+  "Communications",
   "Planner",
   "Pulse",
   "Workforce",
-  "1 Core Seat",
 ] as const;
 
 const styles: Record<string, React.CSSProperties> = {
@@ -59,7 +60,7 @@ function IncludesList({ items }: Readonly<{ items: readonly string[] }>) {
       {items.map((item) => (
         <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{item}</span>
-          <Info size={14} strokeWidth={2} color="#666" />
+          <InfoTooltip message="Some features may not work." />
         </div>
       ))}
     </>
@@ -129,19 +130,21 @@ export default function SubscriptionsPage() {
               <div style={{ flex: 1 }}>
                 <h3 style={styles.subHeading}>Pro Plan</h3>
               </div>
-              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
+              {/* <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
                 <span style={styles.strikethrough}>AED 0.00</span>
                 <span style={{ ...styles.discountText, marginTop: 4 }}>AED 0.80</span>
                 <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 0.00</span>
-              </div>
+              </div> */}
               <div style={{ marginLeft: 32 }}>
-                <button style={styles.btnLight}>View pricing</button>
+                <button
+                  style={styles.btnLight}>View pricing</button>
               </div>
             </div>
 
             {/* Discount label */}
             <div style={{ fontSize: 13, color: "#141414", marginTop: 2, marginBottom: 20 }}>
-              New Pro Plan Promotion Annual Discount (55%)
+              {/* New Pro Plan Promotion Annual Discount (55%) */}
+              The current Pro Plan reflects an upward adjustment in the annual subscription cost.
             </div>
 
             {/* Includes */}
@@ -158,9 +161,9 @@ export default function SubscriptionsPage() {
               <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>0 Included Credits</div>
             </div>
 
-            <div style={styles.divider} />
+            {/* <div style={styles.divider} /> */}
 
-            <div style={styles.costRow}>
+            {/* <div style={styles.costRow}>
               <span style={styles.subHeading}>Cost for 1 year</span>
               <span style={styles.finalPrice}>AED 0.00</span>
             </div>
@@ -170,7 +173,7 @@ export default function SubscriptionsPage() {
             </div>
             <div style={{ textAlign: "right" as const, fontSize: 13, color: "#666", marginTop: 4 }}>
               All costs exclude tax
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -189,13 +192,16 @@ export default function SubscriptionsPage() {
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
               <div style={{ flex: 1 }}>
                 <h3 style={styles.subHeading}>Pro Plan</h3>
-                <div style={{ fontSize: 13, color: "#141414", marginTop: 4 }}>Annual payment discount (25%)</div>
+                <div style={{ fontSize: 13, color: "#141414", marginTop: 4 }}>
+                  {/* Annual payment discount (25%) */}
+                  The current Pro Plan reflects an upward adjustment in the annual subscription cost.
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
+              {/* <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>
                 <span style={styles.strikethrough}>AED 0.00</span>
                 <span style={{ ...styles.discountText, marginTop: 4 }}>-AED 0.00</span>
                 <span style={{ ...styles.finalPrice, marginTop: 4 }}>AED 0.00</span>
-              </div>
+              </div> */}
             </div>
 
             <div style={{ paddingLeft: 16, marginTop: 20 }}>
@@ -210,9 +216,9 @@ export default function SubscriptionsPage() {
               <div style={{ fontSize: 14, color: "#141414", marginTop: 6 }}>0 Included Credits</div>
             </div>
 
-            <div style={styles.divider} />
+            {/* <div style={styles.divider} /> */}
 
-            <div style={styles.costRow}>
+            {/* <div style={styles.costRow}>
               <span style={styles.subHeading}>Cost for 1 year</span>
               <span style={styles.finalPrice}>AED 0.00</span>
             </div>
@@ -222,7 +228,7 @@ export default function SubscriptionsPage() {
             </div>
             <div style={{ textAlign: "right" as const, fontSize: 13, color: "#666", marginTop: 4 }}>
               All costs exclude tax
-            </div>
+            </div> */}
           </div>
         </div>
 
