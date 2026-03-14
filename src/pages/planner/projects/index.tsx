@@ -17,7 +17,7 @@
  * - When a project row is expanded, call your real tasks API and store in `projectTasks`
  */
 
-import React, { ReactElement, useEffect, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -68,7 +68,6 @@ import {
   AlertCircle,
   CalendarDays,
   Users,
-  SlidersHorizontal,
   Palette,
   Smartphone,
   Megaphone,
@@ -1228,7 +1227,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           setShowCreateTaskSidebar(false);
           setEditingTask(null);
         }}
-        extensions={extensions as any}
+        extensions={extensions}
         labels={[]}
         task={editingTask}
         isEdit={!!editingTask}

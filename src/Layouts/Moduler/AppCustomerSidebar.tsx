@@ -675,7 +675,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'voicebot-outbound-voicebots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
           url: '/voicebot/outbound/voicebots'
         },
         
@@ -683,7 +683,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'voicebot-outbound-campaigns',
           title: 'Campaigns',
           icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
+          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
           url: '/voicebot/outbound/campaigns'
         },
         {
@@ -703,7 +703,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         //outbound end
 
         {
-          id: 'crm-separator-1',
+          id: 'virtual-agents-separator-1',
           title: '---',
           icon: null,
           url: ''
@@ -728,7 +728,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'voicebot-inbound-bots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/voicebot/inbound/bots'
         },
         
@@ -748,27 +748,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         //inbound end
         {
-          id: 'crm-separator-1',
+          id: 'virtual-agents-separator-2',
           title: '---',
           icon: null,
           url: ''
         },
 
       //old
-        {
-          id: 'virtual-agents-outbound-agent',
-          title: 'Outbound Agent',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
-          url: '/agents/outbound-agent'
-        },
-        {
-          id: 'virtual-agents-inbound-agent',
-          title: 'Inbound Agent',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
-          url: '/agents/inbound-agent'
-        },
+       
+        
         {
           id: 'virtual-agents-agent-campaigns',
           title: 'Agent Campaigns',

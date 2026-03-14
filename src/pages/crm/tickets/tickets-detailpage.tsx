@@ -716,6 +716,30 @@ import React, {
         "legal_basis",
       ]);
   
+      const normalizeCustomFieldValue = (value: unknown): string => {
+        if (value == null) return "";
+        if (Array.isArray(value)) {
+          return value
+            .map((v) => normalizeCustomFieldValue(v))
+            .map((v) => v.trim())
+            .filter(Boolean)
+            .join(", ");
+        }
+        if (value instanceof Date) return value.toISOString();
+        const t = typeof value;
+        if (t === "string" || t === "number" || t === "boolean" || t === "bigint") {
+          return String(value);
+        }
+        if (t === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return "";
+          }
+        }
+        return "";
+      };
+
       const customFieldsArray =
         d && typeof d === "object"
           ? Object.entries(d)
@@ -723,9 +747,7 @@ import React, {
               .map(([field_name, field_value]) => ({
                 id: createNonPrngId(field_name),
                 field_name,
-                field_value: Array.isArray(field_value)
-                  ? field_value.map((v) => String(v ?? "").trim()).filter(Boolean).join(", ")
-                  : String(field_value ?? "").trim(),
+                field_value: normalizeCustomFieldValue(field_value).trim(),
               }))
               .filter((f) => f.field_name || f.field_value)
           : [];
@@ -1109,7 +1131,7 @@ import React, {
                         } else if (action === "Delete") {
                           handleOpenDeleteProspect();
                         } else if (action === "Export") {
-                          void handleProspectExport();
+                          handleProspectExport();
                         }
                         setShowActionsDropdown(false);
                       }}
@@ -2285,10 +2307,9 @@ import React, {
                                 </p>
                               </div>
                             ))}
-                            <a
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const firstDeal = allDeals[0];
                                 const id = firstDeal?.id;
                                 const href = id
@@ -2306,11 +2327,15 @@ import React, {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "4px",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
                               }}
                             >
                               View all associated Deals
                               <ExternalLink size={12} />
-                            </a>
+                            </button>
                           </>
                         )}
                       </div>
@@ -2457,10 +2482,9 @@ import React, {
                                 )}
                               </div>
                             ))}
-                            <a
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
+                            <button
+                              type="button"
+                              onClick={() => {
                                 const firstLead = leads[0];
                                 const id = firstLead?.id;
                                 const href = id
@@ -2468,7 +2492,7 @@ import React, {
                                       String(id),
                                     )}`
                                   : "/crm/leads";
-                                window.open(href, "_blank", "noopener,noreferrer");
+                                globalThis.window?.open(href, "_blank", "noopener,noreferrer");
                               }}
                               style={{
                                 fontSize: "13px",
@@ -2478,11 +2502,15 @@ import React, {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "4px",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                cursor: "pointer",
                               }}
                             >
                               View all associated Leads
                               <ExternalLink size={12} />
-                            </a>
+                            </button>
                           </>
                         )}
                       </div>
