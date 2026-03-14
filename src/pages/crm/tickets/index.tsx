@@ -123,10 +123,14 @@ const CrmTicketsPage = () => {
 
   const openTicketDetailPage = useCallback(
     (ticketId: number) => {
-      void router.push({
-        pathname: "/crm/tickets/tickets-detailpage",
-        query: { id: String(ticketId) },
-      });
+      router
+        .push({
+          pathname: "/crm/tickets/tickets-detailpage",
+          query: { id: String(ticketId) },
+        })
+        .catch(() => {
+          // navigation errors can happen during rapid route changes
+        });
     },
     [router],
   );

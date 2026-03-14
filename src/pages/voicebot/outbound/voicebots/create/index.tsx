@@ -16,15 +16,12 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
-import { FileText, Mic, MessageSquare, Phone, Check } from "lucide-react";
+import { FileText, Mic, MessageSquare, Phone } from "lucide-react";
+import { TabsNavigation } from "@components/voicebot/TabsNavigation";
+import { CompanyOptions, type CompanyOption } from "@components/voicebot/CompanyOptions";
+import { ValidationChecklist } from "@components/voicebot/ValidationChecklist";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 /** Form state (UI uses first_message/system_prompt; API expects default_greeting/default_system_prompt) */
 interface OutboundVoicebotFormState {
@@ -194,93 +191,7 @@ async function submitOutboundVoicebot(
   return "created";
 }
 
-function renderCompanyOptions(
-  isAdmin: boolean,
-  companies: CompanyOption[],
-  userCompanyIdentifier: string,
-  userCompanyName: string,
-) {
-  if (isAdmin) {
-    return companies.map((c) => (
-      <option key={c.id} value={c.id}>
-        {c.name}
-      </option>
-    ));
-  }
-
-  if (userCompanyIdentifier) {
-    return (
-      <option value={userCompanyIdentifier}>
-        {userCompanyName || userCompanyIdentifier}
-      </option>
-    );
-  }
-
-  return null;
-}
-
-const TabsNavigation = ({
-  activeTab,
-  onTabChange,
-}: {
-  activeTab: string;
-  onTabChange: (tabId: string) => void;
-}) => (
-  <div style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb" }}>
-    <div
-      style={{
-        maxWidth: "1600px",
-        margin: "0 auto",
-        display: "flex",
-        gap: "8px",
-        overflowX: "auto",
-      }}
-    >
-      {TABS.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "12px 20px",
-              border: "none",
-              backgroundColor: "transparent",
-              color: isActive ? "#667eea" : "#9ca3af",
-              fontWeight: isActive ? 600 : 500,
-              fontSize: "14px",
-              cursor: "pointer",
-              borderBottom: isActive
-                ? "3px solid #667eea"
-                : "3px solid transparent",
-              transition: "all 0.2s",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <div
-              style={{
-                width: "24px",
-                height: "24px",
-                borderRadius: "50%",
-                backgroundColor: isActive ? "#667eea" : "#e5e7eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <tab.icon size={14} color={isActive ? "white" : "#9ca3af"} />
-            </div>
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-);
+// company options rendering extracted to `CompanyOptions`
 
 const LoadingVoicebotPlaceholder = ({ pageCopy }: { pageCopy: ReturnType<typeof getPageCopy> }) => (
   <React.Fragment>
@@ -292,43 +203,7 @@ const LoadingVoicebotPlaceholder = ({ pageCopy }: { pageCopy: ReturnType<typeof 
   </React.Fragment>
 );
 
-const ValidationChecklist = ({ items }: { items: Array<{ id: string; label: string; checked: boolean }> }) => (
-  <div style={{ backgroundColor: "white", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-      <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>Validation Checklist</h6>
-      <span style={{ fontSize: "12px", color: "#6b7280" }}>
-        {items.filter((i) => i.checked).length}/{items.length} Complete
-      </span>
-    </div>
-    {items.map((item, index) => (
-      <div
-        key={item.id}
-        style={{
-          borderBottom: index < items.length - 1 ? "1px solid #f3f4f6" : "none",
-          paddingBottom: "12px",
-          paddingTop: "12px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
-            style={{
-              width: "20px",
-              height: "20px",
-              borderRadius: "50%",
-              backgroundColor: item.checked ? "#10b981" : "#e5e7eb",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {item.checked ? <Check size={12} color="white" /> : null}
-          </div>
-          <span style={{ fontSize: "13px", color: "#374151" }}>{item.label}</span>
-        </div>
-      </div>
-    ))}
-  </div>
-);
+// local versions of TabsNavigation/ValidationChecklist/CompanyOption were extracted to shared components
 
 const BottomActionBar = ({
   isFirstTab,
@@ -542,7 +417,7 @@ const VoicebotOutboundCreate = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle={pageCopy.breadcrumbSubTitle} />
       <PageHeader title={pageCopy.title} showSearch={false} />
 
-      <TabsNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabsNavigation tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <Form
         onSubmit={(e) => e.preventDefault()}
@@ -578,7 +453,12 @@ const VoicebotOutboundCreate = () => {
                               style={inputStyle}
                             >
                               <option value="">Select company</option>
-                              {renderCompanyOptions(isAdmin, companies, userCompanyIdentifier, userCompanyName)}
+                              <CompanyOptions
+                                isAdmin={isAdmin}
+                                companies={companies}
+                                userCompanyIdentifier={userCompanyIdentifier}
+                                userCompanyName={userCompanyName}
+                              />
                             </Form.Select>
                           </Form.Group>
                           <Form.Group className="mb-3">

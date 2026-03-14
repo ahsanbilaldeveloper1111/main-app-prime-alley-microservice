@@ -1783,6 +1783,12 @@ const WorkPlannerProjects = () => {
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [detailTab, setDetailTab] = useState("Activity");
 
+  const resetProjectModalState = useCallback(() => {
+    setShowProjectModal(false);
+    setEditingProject(null);
+    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+  }, []);
+
   useEffect(() => {
     if (!hierarchyLoading) {
       fetchProjects({ search: searchTerm, status: filterStatus, owner: filterOwner });
@@ -1912,9 +1918,7 @@ const WorkPlannerProjects = () => {
         : await createProject(projectData);
       if (result) {
         await fetchProjects(appliedFilters);
-        setShowProjectModal(false);
-        setEditingProject(null);
-        setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+        resetProjectModalState();
       }
     } catch (error) {
       console.error("Error saving project:", error);
@@ -2242,7 +2246,7 @@ const WorkPlannerProjects = () => {
         />
 
         {/* Project Form Modal */}
-        <Modal show={showProjectModal} onHide={() => { setShowProjectModal(false); setEditingProject(null); setProjectFormData({ name: "", description: "", color: "#3b82f6" }); }} centered size="lg">
+        <Modal show={showProjectModal} onHide={resetProjectModalState} centered size="lg">
           <Modal.Header closeButton>
             <Modal.Title>{editingProject ? "Edit Project" : "Create New Project"}</Modal.Title>
           </Modal.Header>
@@ -2264,7 +2268,7 @@ const WorkPlannerProjects = () => {
                 </div>
               </Form.Group>
               <div className="d-flex justify-content-end gap-2">
-                <Button variant="secondary" onClick={() => { setShowProjectModal(false); setEditingProject(null); setProjectFormData({ name: "", description: "", color: "#3b82f6" }); }} disabled={submitting}>Cancel</Button>
+                <Button variant="secondary" onClick={resetProjectModalState} disabled={submitting}>Cancel</Button>
                 <Button variant="primary" type="submit" disabled={submitting || !projectFormData.name.trim()}>
                   {submitting ? (
                     <>

@@ -53,21 +53,7 @@ import React, {
   import { GetHierarchyData } from "@utils/users";
   import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
   import SuccessfulModal from "@pages/partial/SuccessfulModal";
-  
-  let fallbackIdCounter = 0;
-  const createNonPrngId = (scope: string) => {
-    const uuid = globalThis.crypto?.randomUUID?.();
-    if (uuid) return `${uuid}-${scope}`;
-  
-    const buf = globalThis.crypto?.getRandomValues?.(new Uint8Array(16));
-    if (buf) {
-      const hex = Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
-      return `${hex}-${scope}`;
-    }
-  
-    fallbackIdCounter += 1;
-    return `${Date.now()}-${fallbackIdCounter}-${scope}`;
-  };
+  import { createNonPrngId } from "@utils/id";
   
   // ============================================================================
   // TYPE DEFINITIONS

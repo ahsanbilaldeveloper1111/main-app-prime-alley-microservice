@@ -17,9 +17,12 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
-import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone, Check, ChevronDown } from "lucide-react";
+import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone } from "lucide-react";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
+import { TabsNavigation } from "@components/voicebot/TabsNavigation";
+import { type CompanyOption } from "@components/voicebot/CompanyOptions";
+import { ValidationChecklist } from "@components/voicebot/ValidationChecklist";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
@@ -61,11 +64,7 @@ const defaultConfig: BotConfiguration = {
   phone_number: "",
 };
 
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
+// CompanyOption extracted to `CompanyOptions` component module
 
 const TAB_KEYS = {
   basic: "basic",
@@ -110,69 +109,6 @@ function getPageCopy(isEditMode: boolean) {
     finalActionLabel: isEditMode ? "Update Bot" : "Create Bot",
   };
 }
-
-const TabsNavigation = ({
-  activeTab,
-  onTabChange,
-}: {
-  activeTab: string;
-  onTabChange: (tabId: string) => void;
-}) => (
-  <div style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb" }}>
-    <div
-      style={{
-        maxWidth: "1600px",
-        margin: "0 auto",
-        display: "flex",
-        gap: "8px",
-        overflowX: "auto",
-      }}
-    >
-      {TABS.map((tab) => {
-        const isActive = activeTab === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "12px 20px",
-              border: "none",
-              backgroundColor: "transparent",
-              color: isActive ? "#667eea" : "#9ca3af",
-              fontWeight: isActive ? 600 : 500,
-              fontSize: "14px",
-              cursor: "pointer",
-              borderBottom: isActive
-                ? "3px solid #667eea"
-                : "3px solid transparent",
-              transition: "all 0.2s",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <div
-              style={{
-                width: "24px",
-                height: "24px",
-                borderRadius: "50%",
-                backgroundColor: isActive ? "#667eea" : "#e5e7eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <tab.icon size={14} color={isActive ? "white" : "#9ca3af"} />
-            </div>
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  </div>
-);
 
 const BasicInfoPane = ({
   form,
@@ -376,95 +312,7 @@ const BottomActionBar = ({
   </div>
 );
 
-const ValidationChecklist = ({
-  items,
-  expandedId,
-  onToggle,
-}: {
-  items: ValidationItemType[];
-  expandedId: string | null;
-  onToggle: (id: string | null) => void;
-}) => (
-  <div>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-      <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>Validation Checklist</h6>
-      <span style={{ fontSize: "12px", color: "#6b7280" }}>
-        {items.filter((item) => item.checked).length}/{items.length} Complete
-      </span>
-    </div>
-    {items.map((item, index) => (
-      <div
-        key={item.id}
-        style={{
-          borderBottom: index < items.length - 1 ? "1px solid #f3f4f6" : "none",
-          paddingBottom: expandedId === item.id ? "12px" : "0",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => onToggle(expandedId === item.id ? null : item.id)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 0",
-            cursor: "pointer",
-            transition: "all 0.2s",
-            width: "100%",
-            border: "none",
-            background: "none",
-            textAlign: "left",
-            font: "inherit",
-            color: "inherit",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div
-              style={{
-                width: "20px",
-                height: "20px",
-                borderRadius: "50%",
-                backgroundColor: item.checked ? "#d1fae5" : "#fee2e2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {item.checked ? (
-                <Check size={14} color="#059669" />
-              ) : (
-                <span style={{ fontSize: "12px", color: "#dc2626", fontWeight: "bold" }}>!</span>
-              )}
-            </div>
-            <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 500 }}>{item.label}</span>
-          </div>
-          <ChevronDown
-            size={16}
-            color="#9ca3af"
-            style={{
-              transform: expandedId === item.id ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
-            }}
-          />
-        </button>
-        {expandedId === item.id && (
-          <div
-            style={{
-              fontSize: "13px",
-              color: item.checked ? "#059669" : "#dc2626",
-              backgroundColor: item.checked ? "#f0fdf4" : "#fef2f2",
-              padding: "8px 12px 8px 30px",
-              borderRadius: "6px",
-              marginTop: "4px",
-            }}
-          >
-            {item.message}
-          </div>
-        )}
-      </div>
-    ))}
-  </div>
-);
+// TabsNavigation/ValidationChecklist extracted to shared components
 
 function getFirstValidationError(form: CreateBotPayload): string | null {
   if (!form.company) return "Please select a company";
@@ -767,7 +615,7 @@ const VoicebotInboundBotsCreate = () => {
       <PageHeader title={pageCopy.title} showSearch={false} />
 
       {/* Tab navigation */}
-      <TabsNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabsNavigation tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <Form
         onSubmit={handleSubmit}
