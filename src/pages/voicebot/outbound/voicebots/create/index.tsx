@@ -11,6 +11,7 @@ import {
 } from "@utils/voicebot/outbound";
 import { toFormString, firstString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse } from "@utils/companyOptions";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -278,12 +279,11 @@ const VoicebotOutboundCreate = () => {
         setCompanies([]);
         return;
       }
-      const list = Array.isArray(res) ? res : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ?? (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ?? [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        const id = item.company_id ?? item.identifier ?? item.id ?? "";
-        return { id, company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
-      });
+      const opts = normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c) => ({
+        id: c.id,
+        company_id: c.company_id ?? c.identifier ?? c.id,
+        name: c.name,
+      }));
       setCompanies(opts);
       if (opts.length && !form.company_id && !botId) setForm((f) => ({ ...f, company_id: opts[0].id }));
     } catch {

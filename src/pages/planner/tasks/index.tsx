@@ -273,7 +273,7 @@ const CELL_STYLE: React.CSSProperties = {
 
       const isCompleted = apiTask.is_completed === true;
       const dueMoment = dueDate ? moment(dueDate) : null;
-      const isOverdue = dueMoment && dueMoment.isBefore(moment(), "day") && !isCompleted;
+      const isOverdue = dueMoment?.isBefore(moment(), "day") && !isCompleted;
       let status: Task["status"] = "pending";
       if (isCompleted) status = "completed";
       else if (isOverdue) status = "overdue";

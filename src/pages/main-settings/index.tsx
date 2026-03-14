@@ -46,9 +46,10 @@ import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
 import { useSession } from 'next-auth/react'
+import { APP_FONT } from '../../styles/fonts'
 
 const { PERMISSIONS } = HEADER_CONSTANTS
-const BASE_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
+const BASE_FONT = APP_FONT
 
 // ─── Tab Definitions ──────────────────────────────────────────────────────────
 type Tab = {
