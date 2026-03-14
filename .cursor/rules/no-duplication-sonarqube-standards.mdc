@@ -1,0 +1,25 @@
+---
+description: Enforce no code duplication and SonarQube-friendly code standards
+alwaysApply: true
+---
+
+# No duplication + SonarQube-friendly standards
+
+## No code duplication (DRY)
+- Do not copy/paste logic across files/components. Prefer extracting reusable helpers, hooks, shared UI components, or moving logic to existing shared modules.
+- Before adding a new util/component, check for an existing equivalent and reuse/extend it.
+- Keep one source of truth for constants, types, schemas, selectors, and formatting helpers.
+- If duplication is truly unavoidable (e.g., framework constraints), isolate it behind a shared function and keep the duplicated surface minimal; explain the constraint in the PR/commit message (not as code narration comments).
+
+## SonarQube-compatible implementation style
+- Keep functions small and readable; reduce nesting with early returns and guard clauses.
+- Avoid high cognitive complexity: split complex flows into named helpers and prefer data-driven mappings over long `if/else` chains.
+- Prefer explicit error handling: never swallow errors; handle, log (where appropriate), and rethrow/return typed failures.
+- Avoid `any`, unsafe non-null assertions (`!`), and overly broad unions; use precise types and narrow safely.
+- Avoid duplicated conditions and boolean soup; name predicates and reuse them.
+- Do not suppress lint/quality rules unless absolutely necessary; if you must, scope it to the smallest surface area.
+
+## React/TS hygiene (common Sonar hotspots)
+- Keep components focused; extract repeated JSX into components.
+- Memoize only when needed; avoid creating new inline functions/objects in hot render paths unless harmless.
+- Use stable keys, avoid side effects in render, and keep hooks dependency arrays correct.

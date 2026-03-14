@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useMemo, useRef, useState } from "react";
+import React, { ReactElement, useEffect, useMemo, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Card, Col, Form, Row, Spinner } from "react-bootstrap";
@@ -423,8 +423,29 @@ function useOutboundCampaignPerformance(companyIdentifier: string, campaignId: s
   return { loading, rows, truncated };
 }
 
-function renderDashboardContent(companyIdentifier: string, dashboardLoading: boolean, dashboard: DashboardData | null): React.ReactNode {
-  if (!companyIdentifier) return <div className="text-muted">Company is missing in session.</div>;
+function renderCompanyEmptyState(args: { isAdmin: boolean }): React.ReactNode {
+  const { isAdmin } = args;
+  return (
+    <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "180px" }}>
+      <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
+      <p className="mb-1 fw-medium">
+        {isAdmin ? "Select company to load data" : "Company identifier not available"}
+      </p>
+      <p className="small mb-0 opacity-75">
+        {isAdmin ? "Choose a company from the Company dropdown above." : "Please contact your administrator to set your company in the session."}
+      </p>
+    </div>
+  );
+}
+
+function renderDashboardContent(args: {
+  companyIdentifier: string;
+  isAdmin: boolean;
+  dashboardLoading: boolean;
+  dashboard: DashboardData | null;
+}): React.ReactNode {
+  const { companyIdentifier, isAdmin, dashboardLoading, dashboard } = args;
+  if (!companyIdentifier) return renderCompanyEmptyState({ isAdmin });
   if (dashboardLoading) {
     return (
       <div className="d-flex align-items-center gap-2">
@@ -843,8 +864,20 @@ const OutboundAnalytics = () => {
   const effectiveCampaignId = selectedCampaignId;
 
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption["value"]>("7");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+
+  const todayYmd = useMemo(() => toYmd(new Date()), []);
+
+  const getDefaultDateRange = (period: TimePeriodOption["value"]) => {
+    const days = Number.parseInt(period, 10);
+    if (!Number.isFinite(days) || days <= 0) return { from: "", to: todayYmd };
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(start.getDate() - days);
+    return { from: toYmd(start), to: toYmd(end) };
+  };
+
+  const [fromDate, setFromDate] = useState<string>(() => getDefaultDateRange("7").from);
+  const [toDate, setToDate] = useState<string>(() => getDefaultDateRange("7").to);
   const { loading: dashboardLoading, dashboard } = useOutboundDashboard(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
   const { loading: volumeLoading, data: volumeData, truncated: volumeTruncated } = useOutboundCallVolume(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
   const { loading: costLoading, costs } = useOutboundCosts(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
@@ -855,9 +888,6 @@ const OutboundAnalytics = () => {
     fromDate,
     toDate
   );
-
-  const todayYmd = useMemo(() => toYmd(new Date()), []);
-  const skipAutoDateOnFirstRender = useRef(true);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -919,17 +949,10 @@ const OutboundAnalytics = () => {
   }, [selectedCompanyId, effectiveCompanyId]);
 
   useEffect(() => {
-    if (skipAutoDateOnFirstRender.current) {
-      skipAutoDateOnFirstRender.current = false;
-      return;
-    }
-    const days = Number.parseInt(timePeriod, 10);
-    if (!Number.isFinite(days) || days <= 0) return;
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - days);
-    setFromDate(toYmd(start));
-    setToDate(toYmd(end));
+    const next = getDefaultDateRange(timePeriod);
+    if (!next.from || !next.to) return;
+    setFromDate(next.from);
+    setToDate(next.to);
   }, [timePeriod]);
 
   const onFromDateChange = (value: string) => {
@@ -957,7 +980,12 @@ const OutboundAnalytics = () => {
     return name || (key ? `#${key}` : "—");
   };
 
-  const dashboardContent = renderDashboardContent(effectiveCompanyId, dashboardLoading, dashboard);
+  const dashboardContent = renderDashboardContent({
+    companyIdentifier: effectiveCompanyId,
+    isAdmin,
+    dashboardLoading,
+    dashboard,
+  });
   const volumeContent = renderVolumeContent({ companyIdentifier: effectiveCompanyId, fromDate, toDate, volumeLoading, volumeData });
   const successRateTrendContent = renderSuccessRateTrendContent({
     effectiveCompanyId,
