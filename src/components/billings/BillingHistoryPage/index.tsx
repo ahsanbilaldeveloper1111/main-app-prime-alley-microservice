@@ -11,6 +11,7 @@ import moment from "moment";
 import { useSession } from "next-auth/react";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
 import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
+import { LinkButton } from "@components/shared/LinkButton";
 
 const font = BILLING_FONT;
 
@@ -30,28 +31,6 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
   }
   return next;
 };
-
-const LINK_BUTTON_RESET: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: 0,
-};
-
-function LinkButton({
-  onClick,
-  style,
-  children,
-}: Readonly<{
-  onClick?: () => void;
-  style: React.CSSProperties;
-  children: React.ReactNode;
-}>) {
-  return (
-    <button type="button" onClick={onClick ?? (() => null)} style={{ ...style, ...LINK_BUTTON_RESET }}>
-      {children}
-    </button>
-  );
-}
 
 function CardActions({
   onView,

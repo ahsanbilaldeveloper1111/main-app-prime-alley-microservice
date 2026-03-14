@@ -1,106 +1,118 @@
-import type { PermCategory } from "./types";
+import type { PermCategory, PermStatus } from "./types";
+
+function category(
+  title: string,
+  itemNames: readonly string[],
+  defaultStatus: PermStatus,
+  overrides?: Partial<Record<string, PermStatus>>,
+): PermCategory {
+  return {
+    title,
+    items: itemNames.map((name) => ({
+      name,
+      status: overrides?.[name] ?? defaultStatus,
+    })),
+  };
+}
+
+const CRM_OBJECTS_VIEW_ONLY = [
+  "Contacts",
+  "Companies",
+  "Deals",
+  "Orders",
+  "Carts",
+  "Tickets",
+  "Tasks",
+  "CRM emails",
+  "Meetings",
+  "Calls",
+  "Notes",
+  "Projects",
+] as const;
+
+const CRM_OBJECTS_STANDARD = [
+  "Contacts",
+  "Companies",
+  "Deals",
+  "Orders",
+  "Tickets",
+  "Tasks",
+] as const;
+
+const CRM_TOOLS_ALL = [
+  "Communicate",
+  "Bulk delete",
+  "Import",
+  "Export",
+  "Edit associations",
+  "Custom views",
+  "Customize record page layout",
+  "View connected record data",
+] as const;
+
+const CRM_TOOLS_STANDARD = ["Communicate", "Import", "Export", "Custom views"] as const;
+
+const MARKETING_VIEW_ONLY = [
+  "Segments",
+  "Forms",
+  "Delete form submissions",
+  "Files",
+  "Marketing Access",
+  "Ads",
+  "Marketing email",
+  "CTA",
+  "SMS",
+  "Buyer Intent",
+  "Social",
+  "Marketing Events",
+  "Blog",
+  "Landing pages",
+  "Website pages",
+  "URL Redirects",
+] as const;
+
+const MARKETING_STANDARD = [
+  "Marketing Access",
+  "Marketing email",
+  "Blog",
+  "Landing pages",
+] as const;
+
+const SALES_VIEW_ONLY = [
+  "Sales Access",
+  "Templates",
+  "Meeting scheduling pages",
+  "Sales Starter",
+  "Forecasts",
+] as const;
+
+const SALES_STANDARD = ["Sales Access", "Templates", "Meeting scheduling pages"] as const;
 
 export const VIEW_ONLY_PERMISSIONS: PermCategory[] = [
-  {
-    title: "CRM objects",
-    items: [
-      { name: "Contacts", status: "green-circle" },
-      { name: "Companies", status: "green-circle" },
-      { name: "Deals", status: "green-circle" },
-      { name: "Orders", status: "green-circle" },
-      { name: "Carts", status: "green-circle" },
-      { name: "Tickets", status: "green-circle" },
-      { name: "Tasks", status: "green-circle" },
-      { name: "CRM emails", status: "green-circle" },
-      { name: "Meetings", status: "green-circle" },
-      { name: "Calls", status: "green-circle" },
-      { name: "Notes", status: "green-circle" },
-      { name: "Projects", status: "green-circle" },
-    ],
-  },
-  {
-    title: "CRM tools",
-    items: [
-      { name: "Communicate", status: "grey-dot" },
-      { name: "Bulk delete", status: "grey-dot" },
-      { name: "Import", status: "grey-dot" },
-      { name: "Export", status: "grey-dot" },
-      { name: "Edit associations", status: "grey-dot" },
-      { name: "Custom views", status: "grey-dot" },
-      { name: "Customize record page layout", status: "grey-dot" },
-      { name: "View connected record data", status: "grey-dot" },
-    ],
-  },
-  {
-    title: "Marketing",
-    items: [
-      { name: "Segments", status: "green-circle" },
-      { name: "Forms", status: "grey-dot" },
-      { name: "Delete form submissions", status: "grey-dot" },
-      { name: "Files", status: "grey-dot" },
-      { name: "Marketing Access", status: "green-dot" },
-      { name: "Ads", status: "green-circle" },
-      { name: "Marketing email", status: "green-circle" },
-      { name: "CTA", status: "green-circle" },
-      { name: "SMS", status: "green-circle" },
-      { name: "Buyer Intent", status: "green-circle" },
-      { name: "Social", status: "grey-dot" },
-      { name: "Marketing Events", status: "grey-dot" },
-      { name: "Blog", status: "green-circle" },
-      { name: "Landing pages", status: "green-circle" },
-      { name: "Website pages", status: "green-circle" },
-      { name: "URL Redirects", status: "green-circle" },
-    ],
-  },
-  {
-    title: "Sales",
-    items: [
-      { name: "Sales Access", status: "grey-dot" },
-      { name: "Templates", status: "grey-dot" },
-      { name: "Meeting scheduling pages", status: "grey-dot" },
-      { name: "Sales Starter", status: "grey-dot" },
-      { name: "Forecasts", status: "grey-dot" },
-    ],
-  },
+  category("CRM objects", CRM_OBJECTS_VIEW_ONLY, "green-circle"),
+  category("CRM tools", CRM_TOOLS_ALL, "grey-dot"),
+  category("Marketing", MARKETING_VIEW_ONLY, "grey-dot", {
+    Segments: "green-circle",
+    "Marketing Access": "green-dot",
+    Ads: "green-circle",
+    "Marketing email": "green-circle",
+    CTA: "green-circle",
+    SMS: "green-circle",
+    "Buyer Intent": "green-circle",
+    Blog: "green-circle",
+    "Landing pages": "green-circle",
+    "Website pages": "green-circle",
+    "URL Redirects": "green-circle",
+  }),
+  category("Sales", SALES_VIEW_ONLY, "grey-dot"),
 ];
 
 export const STANDARD_USER_PERMISSIONS: PermCategory[] = [
-  {
-    title: "CRM objects",
-    items: [
-      { name: "Contacts", status: "green-circle" },
-      { name: "Companies", status: "green-circle" },
-      { name: "Deals", status: "green-circle" },
-      { name: "Orders", status: "green-circle" },
-      { name: "Tickets", status: "green-circle" },
-      { name: "Tasks", status: "green-circle" },
-    ],
-  },
-  {
-    title: "CRM tools",
-    items: [
-      { name: "Communicate", status: "green-dot" },
-      { name: "Import", status: "green-dot" },
-      { name: "Export", status: "green-dot" },
-      { name: "Custom views", status: "green-dot" },
-    ],
-  },
-  {
-    title: "Marketing",
-    items: [
-      { name: "Marketing Access", status: "green-dot" },
-      { name: "Marketing email", status: "green-circle" },
-      { name: "Blog", status: "green-circle" },
-      { name: "Landing pages", status: "green-circle" },
-    ],
-  },
-  {
-    title: "Sales",
-    items: [
-      { name: "Sales Access", status: "green-dot" },
-      { name: "Templates", status: "green-dot" },
-      { name: "Meeting scheduling pages", status: "green-dot" },
-    ],
-  },
+  category("CRM objects", CRM_OBJECTS_STANDARD, "green-circle"),
+  category("CRM tools", CRM_TOOLS_STANDARD, "green-dot"),
+  category("Marketing", MARKETING_STANDARD, "green-circle", {
+    "Marketing Access": "green-dot",
+  }),
+  category("Sales", SALES_STANDARD, "green-dot"),
 ];
 

@@ -130,6 +130,32 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   boxSizing: "border-box",
 });
 
+const OVERLAY_BUTTON_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1000,
+  background: "transparent",
+  border: "none",
+  padding: 0,
+};
+
+const SIDEBAR_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+  zIndex: 1001,
+  display: "flex",
+  flexDirection: "column",
+  fontFamily: FF,
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
@@ -221,34 +247,12 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         type="button"
         aria-label="Close create ticket sidebar"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-          border: "none",
-          padding: 0,
-        }}
+        style={OVERLAY_BUTTON_STYLE}
       />
 
       {/* Sidebar */}
       <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-          zIndex: 1001,
-          display: "flex",
-          flexDirection: "column",
-          fontFamily: FF,
-        }}
+        style={SIDEBAR_STYLE}
       >
         {/* ── Header ── */}
         <div

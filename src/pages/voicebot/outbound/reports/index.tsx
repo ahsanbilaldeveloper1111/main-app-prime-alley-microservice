@@ -11,11 +11,10 @@ import { useSession } from "next-auth/react";
 import { formatDuration, GlobalDateTimeFormat } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import moment from "moment";
+import { formatFixed, formatPercent } from "@utils/voicebot/outbound/formatters";
 
 function formatCost(value: number): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "0.0000";
-  return n.toFixed(4);
+  return formatFixed(value, 4, "0.0000");
 }
 
 function displayText(value: unknown, fallback = "—"): string {
@@ -135,10 +134,8 @@ type ReportsSummary = {
   total_cost?: number | string;
 };
 
-function formatPercent(value: unknown): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "0.0%";
-  return `${n.toFixed(1)}%`;
+function formatPercent1(value: unknown): string {
+  return formatPercent(value, 1);
 }
 
 function formatUsd4(value: unknown): string {
@@ -400,7 +397,7 @@ const OutboundReportsPage = () => {
             <div className="border rounded p-3 bg-white h-100">
               <div className="text-muted small">Success Rate</div>
               <div style={{ fontSize: 34, fontWeight: 300, lineHeight: 1.1 }}>
-                {formatPercent(summary?.success_rate)}
+                {formatPercent1(summary?.success_rate)}
               </div>
             </div>
           </Col>

@@ -21,6 +21,7 @@ import {
 
 import TopSection from "./TopSection";
 import { BILLING_FONT, billingSharedStyles } from "@components/billings/shared/styles";
+import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
 
 /** Given an ISO invoice date (e.g. 2026-03-12), returns the same day next month formatted as "12 April 2026". */
 function formatNextChargeDate(invoiceDateIso: string | null | undefined): string {
@@ -137,11 +138,9 @@ const OverviewPage = () => {
     fetchData();
   }, []);
 
-  const paymentMethodsList = Array.isArray(paymentMethods)
-    ? paymentMethods
-    : paymentMethods?.data ?? paymentMethods?.payment_methods ?? [];
-  const displayPaymentMethod = paymentMethodsList.find((pm: any) => pm?.is_default) ?? paymentMethodsList[0];
-  const hasDefaultAccount = paymentMethodsList.some((pm: any) => pm?.is_default);
+  const paymentMethodsList = normalizePaymentMethods(paymentMethods);
+  const displayPaymentMethod = pickDisplayPaymentMethod(paymentMethodsList);
+  const hasDefaultAccount = hasDefaultPaymentMethod(paymentMethodsList);
 
   return (
     <>

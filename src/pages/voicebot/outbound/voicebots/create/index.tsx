@@ -158,6 +158,18 @@ function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayl
   };
 }
 
+function buildCreatePayload(form: OutboundVoicebotFormState) {
+  // For create, API payload matches update payload (with required fields kept required)
+  const base = buildUpdatePayload(form);
+  return {
+    ...base,
+    company_id: form.company_id,
+    trunk_id: form.trunk_id?.trim() ?? "",
+    default_greeting: form.first_message?.trim() ?? "",
+    default_system_prompt: form.system_prompt?.trim() ?? "",
+  };
+}
+
 async function submitOutboundVoicebot(
   form: OutboundVoicebotFormState,
   isEditMode: boolean,
@@ -168,27 +180,7 @@ async function submitOutboundVoicebot(
     return "updated";
   }
 
-  await postVoicebots({
-    company_id: form.company_id,
-    name: form.name,
-    trunk_id: form.trunk_id?.trim() ?? "",
-    default_greeting: form.first_message?.trim() ?? "",
-    default_system_prompt: form.system_prompt?.trim() ?? "",
-    description: form.description || undefined,
-    system_prompt: form.system_prompt || undefined,
-    first_message: form.first_message || undefined,
-    llm_model: form.llm_model || undefined,
-    tts_model: form.tts_model || undefined,
-    stt_model: form.stt_model || undefined,
-    voice: form.voice || undefined,
-    temperature: form.temperature,
-    max_tokens: form.max_tokens,
-    transfer_number: form.transfer_number || undefined,
-    enable_transfer: form.enable_transfer,
-    idle_timeout_seconds: form.idle_timeout_seconds,
-    max_call_duration_seconds: form.max_call_duration_seconds,
-    status: form.status || undefined,
-  });
+  await postVoicebots(buildCreatePayload(form));
   return "created";
 }
 

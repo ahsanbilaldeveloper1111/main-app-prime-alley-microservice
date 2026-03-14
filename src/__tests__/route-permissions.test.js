@@ -12,6 +12,107 @@
  */
 
 import fs from 'fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '..', '..');
+
+function extractBalanced(source, openIndex, openChar, closeChar) {
+  let depth = 0;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+
+  for (let i = openIndex; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    // Skip line comments
+    if (!inSingle && !inDouble && !inTemplate && ch === '/' && next === '/') {
+      i += 2;
+      while (i < source.length && source[i] !== '\n') i++;
+      continue;
+    }
+
+    // Skip block comments
+    if (!inSingle && !inDouble && !inTemplate && ch === '/' && next === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i++; // skip '/'
+      continue;
+    }
+
+    // Handle strings
+    if (!inDouble && !inTemplate && ch === "'" && source[i - 1] !== '\\') {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && !inTemplate && ch === '"' && source[i - 1] !== '\\') {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (!inSingle && !inDouble && ch === '`' && source[i - 1] !== '\\') {
+      inTemplate = !inTemplate;
+      continue;
+    }
+    if (inSingle || inDouble || inTemplate) continue;
+
+    if (ch === openChar) depth++;
+    if (ch === closeChar) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  throw new Error(`Unbalanced ${openChar}${closeChar} starting at index ${openIndex}`);
+}
+
+function extractObjectLiteralProperty(source, propertyName) {
+  const marker = `${propertyName}:`;
+  const idx = source.indexOf(marker);
+  if (idx === -1) throw new Error(`Could not find "${marker}"`);
+
+  const braceStart = source.indexOf('{', idx + marker.length);
+  if (braceStart === -1) throw new Error(`Could not find "{" after "${marker}"`);
+
+  const braceEnd = extractBalanced(source, braceStart, '{', '}');
+  return source.slice(braceStart, braceEnd + 1);
+}
+
+function extractArrayLiteralAfter(source, marker) {
+  const idx = source.indexOf(marker);
+  if (idx === -1) throw new Error(`Could not find marker: ${marker}`);
+
+  const bracketStart = source.indexOf('[', idx);
+  if (bracketStart === -1) throw new Error(`Could not find "[" after marker: ${marker}`);
+
+  const bracketEnd = extractBalanced(source, bracketStart, '[', ']');
+  return source.slice(bracketStart, bracketEnd + 1);
+}
+
+function loadPermissionsConstant() {
+  const headerPath = path.join(repoRoot, 'src/constants/headerConstants.ts');
+  const headerSource = fs.readFileSync(headerPath, 'utf8');
+  const permissionsObjectText = extractObjectLiteralProperty(headerSource, 'PERMISSIONS');
+  return vm.runInNewContext(`(${permissionsObjectText})`, {}, { timeout: 1000 });
+}
+
+function loadRoutePermissionsFromPermissionsTs() {
+  const permissionsTsPath = path.join(repoRoot, 'src/config/permissions.ts');
+  const permissionsTsSource = fs.readFileSync(permissionsTsPath, 'utf8');
+
+  const PERMISSIONS = loadPermissionsConstant();
+  const routePermissionsArrayText = extractArrayLiteralAfter(permissionsTsSource, 'export const routePermissions');
+
+  return vm.runInNewContext(
+    `(${routePermissionsArrayText})`,
+    { PERMISSIONS, HEADER_CONSTANTS: { PERMISSIONS } },
+    { timeout: 1000 }
+  );
+}
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
@@ -43,9 +144,12 @@ const sessionStore = {
   }
 };
 
-// Import route permissions (we'll need to parse the TypeScript file or use a simplified version)
-// For testing, we'll define the route structure directly based on permissions.ts
-const routePermissions = [
+// Import route permissions from the real TypeScript source (avoids copy/paste duplication with src/config/permissions.ts)
+const routePermissions = loadRoutePermissionsFromPermissionsTs();
+
+/*
+// Legacy hardcoded routes kept only for reference.
+const routePermissions_legacy = [
   {path: '/profile', permissions: ['']},
   {path: '/coming-soon', permissions: ['']},
   {path: '/plan-upgrade', permissions: ['']},
@@ -325,6 +429,7 @@ const routePermissions = [
     ]
   }
 ];
+*/
 
 // Function to extract all routes recursively with full paths and all required permissions
 function extractAllRoutes(routes, currentPath = '', parentPermissions = []) {
@@ -357,41 +462,8 @@ function extractAllRoutes(routes, currentPath = '', parentPermissions = []) {
   return allRoutes;
 }
 
-// Function to get required permissions for a path (simplified version of getRequiredPermissions)
-function getRequiredPermissions(path) {
-  const pathWithoutQuery = path.split('?')[0];
-  const normalizedPath = pathWithoutQuery.endsWith('/') && pathWithoutQuery.length > 1
-    ? pathWithoutQuery.slice(0, -1)
-    : pathWithoutQuery;
-  
-  let requiredPermissions = [];
-  let exactMatch = false;
-
-  function traverseRoutes(routes, currentPath = '') {
-    for (const route of routes) {
-      const fullPath = `${currentPath}${route.path}`;
-      const isExactMatch = normalizedPath === fullPath;
-      const hasChildRoute = route.children?.some(child => {
-        const childPath = `${fullPath}${child.path}`;
-        return normalizedPath === childPath || normalizedPath.startsWith(`${childPath}/`);
-      });
-
-      if (isExactMatch || hasChildRoute) {
-        exactMatch = true;
-        requiredPermissions = [...requiredPermissions, ...route.permissions];
-        if (route.children) {
-          traverseRoutes(route.children, fullPath);
-        }
-      }
-    }
-  }
-
-  traverseRoutes(routePermissions);
-  
-  // Filter out empty strings and return unique permissions
-  const uniquePermissions = Array.from(new Set(requiredPermissions.filter(p => p !== '')));
-  return exactMatch ? uniquePermissions : [];
-}
+// Note: this test relies on `extractAllRoutes()` output instead of re-implementing `getRequiredPermissions()` here,
+// which avoids duplicating logic from `src/config/permissions.ts`.
 
 // Function to check if user has required permissions
 function hasRequiredPermissions(userPermissions, requiredPermissions) {

@@ -58,90 +58,16 @@ import React, {
   // ============================================================================
   // TYPE DEFINITIONS
   // ============================================================================
-  
-  interface KeyInfoField {
-    label: string;
-    value: string;
-    copyable?: boolean;
-  }
-  
+
   type NextPageWithLayout = React.FC & {
     getLayout?: (page: ReactElement) => ReactElement;
-  };
-  
-  interface SubscriptionItem {
-    id: string;
-    name: string;
-    status: "active" | "inactive" | "cancelled";
-    nextBillingDate: string;
-    nextPaymentAmount: string;
-    contactEmail: string;
-    link: string;
-  }
-  
-  interface RevenueSection {
-    id: string;
-    title: string;
-    count: number;
-    description: string;
-    buttonText: string;
-    buttonIcon?: React.ComponentType<{ size?: number }>;
-    items?: SubscriptionItem[];
-    onButtonClick: () => void;
-    addButtonText?: string;
-    onAddClick?: () => void;
-  }
-  
-  const CARD_STYLE: React.CSSProperties = {
-    backgroundColor: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "8px",
-    marginBottom: "12px",
-    overflow: "hidden",
-  };
-
-  const SECTION_HEADER_STYLE: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "14px 20px",
-  };
-
-  const SECTION_TITLE_STYLE: React.CSSProperties = {
-    fontSize: "15px",
-    fontWeight: "600",
-    color: "#141414",
-    margin: 0,
-  };
-
-  const EMPTY_TEXT_STYLE: React.CSSProperties = {
-    fontSize: "13px",
-    color: "#718096",
-    margin: 0,
-    padding: "0 20px 16px",
   };
 
   const GearButton = () => (
     <button
       type="button"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "transparent",
-        border: "1px solid #e2e8f0",
-        borderRadius: "5px",
-        width: "28px",
-        height: "28px",
-        cursor: "pointer",
-        color: "#718096",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#f5f8fa";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "transparent";
-      }}
+      className="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center"
+      style={{ width: "28px", height: "28px", padding: 0 }}
     >
       <svg
         width="14"
@@ -162,39 +88,23 @@ import React, {
   const AddButton = () => (
     <button
       type="button"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "4px",
-        backgroundColor: "transparent",
-        border: "none",
-        fontSize: "14px",
-        color: "#141414",
-        cursor: "pointer",
-        padding: "4px 8px",
-        borderRadius: "4px",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#f5f8fa";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "transparent";
-      }}
+      className="btn btn-sm btn-link text-decoration-none d-flex align-items-center gap-1 p-0"
     >
-      <span style={{ fontSize: "16px", lineHeight: 1 }}>+</span>&nbsp;Add
+      <span className="fs-5 lh-1">+</span>
+      <span>Add</span>
     </button>
   );
 
   const AssociatedCard = ({ title, items }: { title: string; items: any[] }) => (
-    <div style={CARD_STYLE}>
-      <div style={SECTION_HEADER_STYLE}>
-        <span style={SECTION_TITLE_STYLE}>{title}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+    <div className="bg-white border rounded mb-3 overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
+      <div className="d-flex align-items-center justify-content-between px-4 py-3">
+        <h6 className="mb-0 fw-semibold">{title}</h6>
+        <div className="d-flex align-items-center gap-2">
           <AddButton />
           <GearButton />
         </div>
       </div>
-      <p style={EMPTY_TEXT_STYLE}>
+      <p className="mb-0 px-4 pb-3 text-muted small">
         {items.length === 0
           ? "No associated objects of this type exist or you don’t have permission to view them."
           : null}
@@ -864,7 +774,7 @@ import React, {
   
     // Key Information Fields (from prospect + tickets/leads)
     const firstTicket = prospect?.data?.tickets?.[0];
-    const keyInfoFields: KeyInfoField[] = [
+    const keyInfoFields = [
       {
         label: "Requester email",
         value: prospect?.data?.data?.email ?? "--",
@@ -1665,9 +1575,6 @@ import React, {
       const associatedPayments: any[] = [];
       const associatedProjects: any[] = [];
 
-      const cardStyle = CARD_STYLE;
-      const sectionTitleStyle = SECTION_TITLE_STYLE;
-
       return (
         <div
           style={{
@@ -1733,17 +1640,12 @@ import React, {
           <div style={{ padding: "14px 20px", flex: 1 }}>
             {activeTab === "overview" && (
               <>
-                <div style={{ ...cardStyle, marginBottom: "12px" }}>
+                <div className="bg-white border rounded mb-3 overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 20px",
-                      borderBottom: "1px solid #e2e8f0",
-                    }}
+                    className="d-flex align-items-center justify-content-between px-4 py-3 border-bottom"
+                    style={{ borderColor: "#e2e8f0" }}
                   >
-                    <span style={sectionTitleStyle}>Data highlights</span>
+                    <span className="fw-semibold">Data highlights</span>
                     <GearButton />
                   </div>
 
@@ -1797,16 +1699,14 @@ import React, {
                   </div>
                 </div>
 
-                <div style={{ ...cardStyle, marginBottom: "12px" }}>
+                <div className="bg-white border rounded mb-3 overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
                   <div
                     style={{
                       padding: "16px 20px",
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <p style={{ ...sectionTitleStyle, marginBottom: "14px", display: "block" }}>
-                      Recent activities
-                    </p>
+                    <p className="fw-semibold mb-3">Recent activities</p>
 
                     <ActivitiesToolbar
                       filterLabel="All time so far"
@@ -1934,16 +1834,14 @@ import React, {
                 <AssociatedCard title="Payments" items={associatedPayments} />
                 <AssociatedCard title="Projects" items={associatedProjects} />
 
-                <div style={{ ...cardStyle, marginBottom: "12px" }}>
+                <div className="bg-white border rounded mb-3 overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
                   <div
                     style={{
                       padding: "16px 20px",
                       borderBottom: "1px solid #e2e8f0",
                     }}
                   >
-                    <p style={{ ...sectionTitleStyle, marginBottom: "14px", display: "block" }}>
-                      Upcoming activities
-                    </p>
+                    <p className="fw-semibold mb-3">Upcoming activities</p>
 
                     <ActivitiesToolbar
                       filterLabel="All upcoming"
@@ -1997,9 +1895,9 @@ import React, {
                   </div>
                 </div>
 
-                <div style={{ ...cardStyle, marginBottom: "12px" }}>
+                <div className="bg-white border rounded mb-3 overflow-hidden" style={{ borderColor: "#e2e8f0" }}>
                   <div style={{ padding: "14px 20px" }}>
-                    <span style={sectionTitleStyle}>Pinned activity</span>
+                    <span className="fw-semibold">Pinned activity</span>
                   </div>
 
                   <div

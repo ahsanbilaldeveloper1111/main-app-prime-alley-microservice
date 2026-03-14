@@ -644,6 +644,19 @@ interface TaskDetailPanelProps {
   onHide: () => void;
 }
 
+function DetailBox({
+  label,
+  children,
+  className,
+}: Readonly<{ label: string; children: React.ReactNode; className?: string }>) {
+  return (
+    <div className={className} style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
+      <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide }) => {
   if (!task) return null;
   const status = statusConfig[task.status];
@@ -678,8 +691,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
         {/* Status & Priority */}
         <Row className="g-2 mb-3">
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Status</div>
+            <DetailBox label="Status">
               <span
                 style={{
                   display: "inline-flex",
@@ -696,11 +708,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 <StatusIcon size={13} />
                 {status.label}
               </span>
-            </div>
+            </DetailBox>
           </Col>
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Priority</div>
+            <DetailBox label="Priority">
               <span
                 style={{
                   display: "inline-flex",
@@ -714,15 +725,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: priority.color, display: "inline-block" }} />
                 {priority.label}
               </span>
-            </div>
+            </DetailBox>
           </Col>
         </Row>
 
         {/* Assignee & Due Date */}
         <Row className="g-2 mb-3">
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Assignee</div>
+            <DetailBox label="Assignee">
               {task.assignee ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: "#667eea", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600 }}>
@@ -733,35 +743,32 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
               ) : (
                 <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>Unassigned</span>
               )}
-            </div>
+            </DetailBox>
           </Col>
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Due Date</div>
+            <DetailBox label="Due Date">
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: "#6b7280" }} />
                 {task.dueDate
                   ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                   : "No due date"}
               </div>
-            </div>
+            </DetailBox>
           </Col>
         </Row>
 
         {/* Description */}
         {task.description && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Description</div>
+          <DetailBox label="Description" className="mb-3">
             <p style={{ fontSize: "0.875rem", color: "#475569", margin: 0, lineHeight: 1.6 }}>
               {task.description}
             </p>
-          </div>
+          </DetailBox>
         )}
 
         {/* Labels */}
         {task.labels && task.labels.length > 0 && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Labels</div>
+          <DetailBox label="Labels" className="mb-3">
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {task.labels.map((label) => (
                 <span
@@ -772,18 +779,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 </span>
               ))}
             </div>
-          </div>
+          </DetailBox>
         )}
 
         {/* Subtasks */}
         {task.subtasks && task.subtasks.length > 0 && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Subtasks</span>
-              <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                {task.subtasks.filter((s) => s.status === "done").length}/{task.subtasks.length} completed
-              </span>
-            </div>
+          <DetailBox
+            label={`Subtasks (${task.subtasks.filter((s) => s.status === "done").length}/${task.subtasks.length} completed)`}
+            className="mb-3"
+          >
             {/* Progress */}
             <ProgressBar
               now={Math.round((task.subtasks.filter((s) => s.status === "done").length / task.subtasks.length) * 100)}
@@ -825,7 +829,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 );
               })}
             </div>
-          </div>
+          </DetailBox>
         )}
       </Offcanvas.Body>
     </Offcanvas>
