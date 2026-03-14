@@ -726,11 +726,9 @@ import React, {
             .join(", ");
         }
         if (value instanceof Date) return value.toISOString();
-        const t = typeof value;
-        if (t === "string" || t === "number" || t === "boolean" || t === "bigint") {
-          return String(value);
-        }
-        if (t === "object") {
+        if (typeof value === "string") return value;
+        if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return `${value}`;
+        if (typeof value === "object") {
           try {
             return JSON.stringify(value);
           } catch {
