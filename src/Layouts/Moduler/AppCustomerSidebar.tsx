@@ -29,7 +29,6 @@ import {
   Voicemail,
   Wifi,
   MonitorCheck,
-  User,
   Calendar,
   Clock,
   MessageCircle,
