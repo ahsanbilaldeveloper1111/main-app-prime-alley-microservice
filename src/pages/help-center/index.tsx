@@ -123,7 +123,7 @@ const isFaqModule = (value: unknown): value is FaqModule =>
 const isFaqItem = (value: unknown): value is FaqItem =>
   isRecord(value) && ('id' in value) && (('question' in value) || ('title' in value));
 
-const reportError = (message: string, error: unknown): void => {
+const reportError = (message: string, error: unknown) => {
   // Keep noise out of production logs; still useful in dev.
   if (process.env.NODE_ENV !== 'production') {
     // eslint-disable-next-line no-console
@@ -146,36 +146,36 @@ const HelpCenterHome = () => {
   const [loadingTrendingSearches, setLoadingTrendingSearches] = useState(false);
 
   useEffect(() => {
-    const fetchModules = async () => {
-      setLoadingModules(true);
-      try {
-        const response: unknown = await ListFAQModules({ page: 1, perPage: 100 });
+    setLoadingModules(true);
+
+    Promise.resolve(ListFAQModules({ page: 1, perPage: 100 }) as unknown)
+      .then((response) => {
         const modules = extractDataArray(response).filter(isFaqModule);
         setFaqModules(modules);
-      } catch (error) {
+      })
+      .catch((error) => {
         reportError('Error fetching FAQ modules:', error);
-      } finally {
+      })
+      .finally(() => {
         setLoadingModules(false);
-      }
-    };
-    void fetchModules();
+      });
   }, []);
 
   useEffect(() => {
-    const fetchTrendingSearches = async () => {
-      setLoadingTrendingSearches(true);
-      try {
-        const response: unknown = await getMostViewedFAQs();
+    setLoadingTrendingSearches(true);
+
+    Promise.resolve(getMostViewedFAQs() as unknown)
+      .then((response) => {
         const faqs = extractDataArray(response).filter(isFaqItem);
         setTrendingSearches(faqs);
-      } catch (error) {
+      })
+      .catch((error) => {
         reportError('Error fetching trending searches:', error);
         setTrendingSearches([]);
-      } finally {
+      })
+      .finally(() => {
         setLoadingTrendingSearches(false);
-      }
-    };
-    void fetchTrendingSearches();
+      });
   }, []);
 
   useEffect(() => {
@@ -192,21 +192,22 @@ const HelpCenterHome = () => {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      void (async () => {
-        setLoadingSuggestions(true);
-        try {
-          const response: unknown = await ListFAQItems({ page: 1, perPage: 5, search: query });
+      setLoadingSuggestions(true);
+
+      Promise.resolve(ListFAQItems({ page: 1, perPage: 5, search: query }) as unknown)
+        .then((response) => {
           const items = extractDataArray(response).filter(isFaqItem).slice(0, 5);
           setSearchSuggestions(items);
           setShowSuggestions(items.length > 0);
-        } catch (error) {
+        })
+        .catch((error) => {
           reportError('Error fetching search suggestions:', error);
           setSearchSuggestions([]);
           setShowSuggestions(false);
-        } finally {
+        })
+        .finally(() => {
           setLoadingSuggestions(false);
-        }
-      })();
+        });
     }, 300);
 
     return () => {
@@ -227,9 +228,11 @@ const HelpCenterHome = () => {
   }, []);
 
   const handleSuggestionClick = (article: FaqItem) => {
-    void router.push({
+    router.push({
       pathname: '/help-center/knowledge-base/[id]',
       query: { id: String(article.id), search: searchInput || article.title || article.question || '' }
+    }).catch((error) => {
+      reportError('Failed to navigate to article:', error);
     });
     setSearchInput('');
     setShowSuggestions(false);
@@ -237,7 +240,9 @@ const HelpCenterHome = () => {
 
   const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchInput.trim()) {
-      void router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
+      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } }).catch((error) => {
+        reportError('Failed to navigate to search results:', error);
+      });
       setShowSuggestions(false);
     }
   };
@@ -431,9 +436,11 @@ const HelpCenterHome = () => {
             type="button"
             className="hc-trending-item"
             onClick={() => {
-              void router.push({
+              router.push({
                 pathname: '/help-center/knowledge-base/[id]',
                 query: { id: item.id?.toString(), search: item.title },
+              }).catch((error) => {
+                reportError('Failed to navigate to trending article:', error);
               });
             }}
           >
@@ -669,7 +676,9 @@ const HelpCenterHome = () => {
                 <button
                   onClick={() => {
                     if (searchInput.trim()) {
-                      void router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
+                      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } }).catch((error) => {
+                        reportError('Failed to navigate to search results:', error);
+                      });
                       setShowSuggestions(false);
                     }
                   }}
