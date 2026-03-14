@@ -29,7 +29,6 @@ import {
   Voicemail,
   Wifi,
   MonitorCheck,
-  User,
   Calendar,
   Clock,
   MessageCircle,
@@ -666,14 +665,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         //outbound start
         {
           id: 'voicebot-outbound-trunks',
-          title: 'Trunks',
+          title: 'Outbound - Trunks',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/trunks'
         },
         {
           id: 'voicebot-outbound-voicebots',
-          title: 'Bots',
+          title: 'Outbound - Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
           url: '/voicebot/outbound/voicebots'
@@ -681,21 +680,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         
         {
           id: 'voicebot-outbound-campaigns',
-          title: 'Campaigns',
+          title: 'Outbound - Campaigns',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
           url: '/voicebot/outbound/campaigns'
         },
         {
           id: 'voicebot-outbound-reports',
-          title: 'Reports',
+          title: 'Outbound - Reports',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/reports'
         },
         {
           id: 'voicebot-outbound-analytics',
-          title: 'Analytics',
+          title: 'Outbound - Analytics',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/analytics'
@@ -712,21 +711,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         //inbound start
         {
           id: 'voicebot-inbound-dashboard',
-          title: 'Dashboard',
+          title: 'Inbound - Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/dashboard'
         },
         {
           id: 'voicebot-inbound-companies',
-          title: 'Companies',
+          title: 'Inbound - Companies',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/companies'
         },
         {
           id: 'voicebot-inbound-bots',
-          title: 'Bots',
+          title: 'Inbound - Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/voicebot/inbound/bots'
@@ -734,14 +733,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         
         {
           id: 'voicebot-inbound-calls',
-          title: 'Conversations',
+          title: 'Inbound - Conversations',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/conversations'
         },
         {
           id: 'voicebot-inbound-analytics',
-          title: 'Analytics',
+          title: 'Inbound - Analytics',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/analytics'
@@ -757,27 +756,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       //old
        
         
-        {
-          id: 'virtual-agents-agent-campaigns',
-          title: 'Agent Campaigns',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
-          url: '/agents/agent-campaigns'
-        },
-        {
-          id: 'virtual-agents-create-campaigns',
-          title: 'Create Campaign',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.CREATE_CAMPAIGN_AIML,
-          url: '/agents/create-campaign'
-        },
-        {
-          id: 'ai-agent-outbound-campaigns-pitch-deck',
-          title: 'Pitch Deck',
-          icon: <User size={16} />,
-          permission: PERMISSIONS.VIEW_PITCH_DECK_AIML,
-          url: '/agents/pitch-deck'
-        },
         {
           id: 'virtual-agents-live-monitoring',
           title: 'Live Monitoring',

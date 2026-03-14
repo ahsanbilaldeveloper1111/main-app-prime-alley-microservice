@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { X, Plus, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { Dropdown, Form } from "react-bootstrap";
+import { APP_FONT } from "../../styles/fonts";
+
+const FF = APP_FONT;
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface TicketFormData {
@@ -70,7 +73,7 @@ const fieldLabel = (text: string, required: boolean = false) => (
       fontWeight: "600",
       color: "#141414",
       marginBottom: "8px",
-      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+      fontFamily: FF,
     }}
   >
     {text}
@@ -83,7 +86,7 @@ const inputStyle: React.CSSProperties = {
   display: "inline-block",
   height: "auto",
   width: "100%",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+  fontFamily: FF,
   fontSize: "16px",
   fontWeight: 300,
   letterSpacing: "0px",
@@ -108,7 +111,7 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   display: "flex",
   height: "auto",
   width: "100%",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+  fontFamily: FF,
   fontSize: "16px",
   fontWeight: 300,
   letterSpacing: "0px",
@@ -244,7 +247,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           zIndex: 1001,
           display: "flex",
           flexDirection: "column",
-          fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+          fontFamily: FF,
         }}
       >
         {/* ── Header ── */}
@@ -263,7 +266,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontWeight: "600",
               color: "#141414",
               margin: 0,
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
             }}
           >
             Create Ticket
@@ -433,7 +436,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                 color: "#141414",
                 marginBottom: "16px",
                 marginTop: 0,
-                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                fontFamily: FF,
               }}
             >
               Associate Ticket with
@@ -476,7 +479,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     fontSize: "14px",
                     fontWeight: "600",
                     color: "#141414",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                    fontFamily: FF,
                   }}
                 >
                   Contacts
@@ -494,7 +497,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Associate records
@@ -518,7 +521,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Association label
@@ -536,7 +539,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     <Form.Check
                       type="checkbox"
                       label={
-                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
+                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: FF }}>
                           Add timeline activity from this Contact{" "}
                           <span
                             title="Adds contact activity to the ticket timeline"
@@ -575,7 +578,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
-                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      fontFamily: FF,
                     }}
                   >
                     <Plus size={14} /> Add more
@@ -621,7 +624,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     fontSize: "14px",
                     fontWeight: "600",
                     color: "#141414",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                    fontFamily: FF,
                   }}
                 >
                   Companies
@@ -639,7 +642,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Associate records
@@ -663,7 +666,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Association label{" "}
@@ -703,7 +706,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     <Form.Check
                       type="checkbox"
                       label={
-                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
+                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: FF }}>
                           Add timeline activity from this Company{" "}
                           <span
                             title="Adds company activity to the ticket timeline"
@@ -742,7 +745,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
-                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      fontFamily: FF,
                     }}
                   >
                     <Plus size={14} /> Add more
@@ -777,7 +780,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {
@@ -803,7 +806,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {
@@ -830,7 +833,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {

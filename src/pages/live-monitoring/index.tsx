@@ -1,5 +1,6 @@
 import React, { useState, ReactElement } from "react";
 import Layout from "@layout/index";
+import { APP_FONT } from "../../styles/fonts";
 import {
    RotateCcw,
   Settings,
@@ -165,7 +166,7 @@ const USER_STATUS_GROUPS: UserStatusGroup[] = [
 
 // ─── Shared constants ─────────────────────────────────────────────────────────
 
-const FF = "Lexend Deca, Helvetica, Arial, sans-serif";
+const FF = APP_FONT;
 
 const TRANS = "background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1)";
 

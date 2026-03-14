@@ -16,6 +16,7 @@ import {
 } from "@utils/voicebot/outbound";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import Link from "next/link";
@@ -24,12 +25,6 @@ import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, Clipboar
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { formatDateForTable } from "@utils/Helper";
 import "@assets/scss/common.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 interface CampaignRow {
   id?: number | string;
@@ -92,17 +87,7 @@ const CampaignsPage = () => {
         setCompanies([]);
         return;
       }
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        const id = item.company_id ?? item.identifier ?? item.id ?? "";
-        return { id, company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
     }

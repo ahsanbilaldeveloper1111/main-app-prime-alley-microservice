@@ -10,8 +10,9 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
+import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
 
-const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+const font = BILLING_FONT;
 
 const toInvoiceViewData = (invoice: InvoiceData): InvoiceViewData => ({
   ...(invoice as unknown as InvoiceViewData),
@@ -194,13 +195,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   actionLink: {
-    fontWeight: 600,
-    color: "rgb(0, 97, 98)",
-    cursor: "pointer",
-    textUnderlineOffset: "24%",
-    textDecoration: "underline",
-    fontFamily: font,
-    fontSize: 14,
+    ...BILLING_LINK,
   },
   divider: {
     color: "#ccc",

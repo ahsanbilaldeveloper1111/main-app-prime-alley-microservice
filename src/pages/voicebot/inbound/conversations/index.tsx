@@ -5,6 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { getCalls, getCallsStats, getBots, getCall } from "@utils/voicebot/inbound";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -71,7 +72,7 @@ const CallsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CallRow[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; identifier?: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
   const [botCounts, setBotCounts] = useState<{ published: number; active: number }>({ published: 0, active: 0 });
   const [loading, setLoading] = useState(false);
@@ -99,17 +100,7 @@ const CallsPage = () => {
         setCompanies([]);
         return;
       }
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const id = c.company_id ?? c.identifier ?? c.id ?? "";
-        const identifier = c.identifier ?? c.company_id ?? c.id ?? "";
-        return { id, identifier, name: c.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       toast.error("Failed to load companies");
       setCompanies([]);

@@ -10,6 +10,7 @@ import {
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -17,12 +18,6 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 interface VoicebotRow {
   id?: number | string;
@@ -87,13 +82,7 @@ const VoicebotsPage = () => {
         setCompanies([]);
         return;
       }
-      const list = Array.isArray(res) ? res : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ?? (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ?? [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        const id = item.identifier ?? item.company_id ?? item.id ?? "";
-        return { id, company_id: item.identifier ?? item.company_id ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     }
