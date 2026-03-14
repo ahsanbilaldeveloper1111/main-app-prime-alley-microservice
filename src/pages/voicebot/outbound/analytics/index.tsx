@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useMemo, useRef, useState } from "react";
+import React, { ReactElement, useEffect, useMemo, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Card, Col, Form, Row, Spinner } from "react-bootstrap";
