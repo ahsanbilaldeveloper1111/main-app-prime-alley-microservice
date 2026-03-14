@@ -15,7 +15,7 @@ import {
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { GetCompanies } from "@utils/users";
+import { getCompanies } from "@utils/voicebot/inbound";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -82,11 +82,7 @@ const CampaignsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      if (res === false) {
-        setCompanies([]);
-        return;
-      }
+      const res = await getCompanies();
       setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);

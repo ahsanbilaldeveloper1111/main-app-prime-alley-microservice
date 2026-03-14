@@ -6,7 +6,6 @@ import TopSection from "../Overview/TopSection";
 import { BILLING_PAGE, billingSharedStyles } from "@components/billings/shared/styles";
 import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
 import InfoTooltip from "@components/billings/shared/InfoTooltip";
-import router from "next/router";
 
 const PRO_PLAN_INCLUDES = [
   "Smart CRM ",

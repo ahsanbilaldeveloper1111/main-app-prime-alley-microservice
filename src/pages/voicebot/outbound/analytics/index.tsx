@@ -423,8 +423,29 @@ function useOutboundCampaignPerformance(companyIdentifier: string, campaignId: s
   return { loading, rows, truncated };
 }
 
-function renderDashboardContent(companyIdentifier: string, dashboardLoading: boolean, dashboard: DashboardData | null): React.ReactNode {
-  if (!companyIdentifier) return <div className="text-muted">Company is missing in session.</div>;
+function renderCompanyEmptyState(args: { isAdmin: boolean }): React.ReactNode {
+  const { isAdmin } = args;
+  return (
+    <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "180px" }}>
+      <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
+      <p className="mb-1 fw-medium">
+        {isAdmin ? "Select company to load data" : "Company identifier not available"}
+      </p>
+      <p className="small mb-0 opacity-75">
+        {isAdmin ? "Choose a company from the Company dropdown above." : "Please contact your administrator to set your company in the session."}
+      </p>
+    </div>
+  );
+}
+
+function renderDashboardContent(args: {
+  companyIdentifier: string;
+  isAdmin: boolean;
+  dashboardLoading: boolean;
+  dashboard: DashboardData | null;
+}): React.ReactNode {
+  const { companyIdentifier, isAdmin, dashboardLoading, dashboard } = args;
+  if (!companyIdentifier) return renderCompanyEmptyState({ isAdmin });
   if (dashboardLoading) {
     return (
       <div className="d-flex align-items-center gap-2">
@@ -957,7 +978,12 @@ const OutboundAnalytics = () => {
     return name || (key ? `#${key}` : "—");
   };
 
-  const dashboardContent = renderDashboardContent(effectiveCompanyId, dashboardLoading, dashboard);
+  const dashboardContent = renderDashboardContent({
+    companyIdentifier: effectiveCompanyId,
+    isAdmin,
+    dashboardLoading,
+    dashboard,
+  });
   const volumeContent = renderVolumeContent({ companyIdentifier: effectiveCompanyId, fromDate, toDate, volumeLoading, volumeData });
   const successRateTrendContent = renderSuccessRateTrendContent({
     effectiveCompanyId,

@@ -98,6 +98,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
+function handleRouteChange(promise: Promise<boolean>, label: string) {
+  promise.catch((error) => {
+    console.error(`[AccountBilling] ${label} navigation failed`, error);
+  });
+}
+
 const AccountBilling = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AccountBillingTab>("Overview");
@@ -114,15 +120,21 @@ const AccountBilling = () => {
     if (!router.isReady) return;
 
     if (tab === "Overview") {
-      void router.push({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true });
+      handleRouteChange(
+        router.push({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+        "push overview",
+      );
       return;
     }
 
     const slug = tabSlugFromLabel(tab);
-    void router.push(
-      { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
-      `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
-      { shallow: true },
+    handleRouteChange(
+      router.push(
+        { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
+        `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
+        { shallow: true },
+      ),
+      `push tab ${slug}`,
     );
   };
 
@@ -143,21 +155,30 @@ const AccountBilling = () => {
     // Normalize legacy query-param URLs to friendly path URLs.
     if (router.pathname === ACCOUNT_BILLING_BASE_PATH) {
       if (nextTab === "Overview") {
-        void router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true });
+        handleRouteChange(
+          router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+          "replace overview",
+        );
         return;
       }
 
       const slug = tabSlugFromLabel(nextTab);
-      void router.replace(
-        { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
-        `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
-        { shallow: true },
+      handleRouteChange(
+        router.replace(
+          { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
+          `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
+          { shallow: true },
+        ),
+        `replace tab ${slug}`,
       );
     }
 
     // If someone lands on /account-billing/overview, keep the canonical URL clean.
     if (router.pathname === ACCOUNT_BILLING_TAB_PATHNAME && nextTab === "Overview") {
-      void router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true });
+      handleRouteChange(
+        router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+        "replace canonical overview",
+      );
     }
   }, [activeTab, queryWithoutTab, router.isReady, router.pathname, router.query.tab]);
 
