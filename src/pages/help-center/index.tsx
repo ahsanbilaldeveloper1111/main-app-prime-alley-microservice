@@ -44,11 +44,12 @@ import {
   Mail,
   Star,
   Database,
+  type LucideIcon,
 } from 'lucide-react';
 
 // Lucide icon map — used to render topic icons from the API's icon string
 // Add more mappings here as needed to match your FAQ module icons
-const LUCIDE_ICON_MAP: Record<string, React.ElementType> = {
+const LUCIDE_ICON_MAP: Record<string, LucideIcon> = {
   help_outline: HelpCircle,
   help: HelpCircle,
   settings: Settings,
@@ -80,81 +81,139 @@ const LUCIDE_ICON_MAP: Record<string, React.ElementType> = {
   activity: Activity,
 };
 
+type FaqModule = {
+  id: string | number;
+  name: string;
+  description?: string | null;
+  faqs_count?: number | null;
+  icon?: string | null;
+};
+
+type FaqItem = {
+  id: string | number;
+  title?: string | null;
+  question?: string | null;
+  description?: string | null;
+  view_count?: number | null;
+};
+
+const MODULE_COLORS = [
+  '#4680ff',
+  '#04a9f5',
+  '#1de9b6',
+  '#f4c22b',
+  '#ff6b6b',
+  '#4ecdc4',
+  '#95a5a6',
+  '#e74c3c',
+];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const extractDataArray = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (isRecord(value) && Array.isArray(value.data)) return value.data;
+  return [];
+};
+
+const isFaqModule = (value: unknown): value is FaqModule =>
+  isRecord(value) && ('id' in value) && typeof value.name === 'string';
+
+const isFaqItem = (value: unknown): value is FaqItem =>
+  isRecord(value) && ('id' in value) && (('question' in value) || ('title' in value));
+
+const reportError = (message: string, error: unknown): void => {
+  // Keep noise out of production logs; still useful in dev.
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.error(message, error);
+  }
+};
+
 const HelpCenterHome = () => {
   const router = useRouter();
 
-  const [searchInput, setSearchInput] = useState<string>('');
-  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState<boolean>(false);
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const searchInputRef = useRef<HTMLDivElement>(null);
-  const [faqModules, setFaqModules] = useState<any[]>([]);
-  const [loadingModules, setLoadingModules] = useState<boolean>(false);
-  const [trendingSearches, setTrendingSearches] = useState<any[]>([]);
-  const [loadingTrendingSearches, setLoadingTrendingSearches] = useState<boolean>(false);
-
-  const moduleColors = ['#4680ff', '#04a9f5', '#1de9b6', '#f4c22b', '#ff6b6b', '#4ecdc4', '#95a5a6', '#e74c3c'];
+  const [searchInput, setSearchInput] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<FaqItem[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLDivElement | null>(null);
+  const [faqModules, setFaqModules] = useState<FaqModule[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
+  const [trendingSearches, setTrendingSearches] = useState<FaqItem[]>([]);
+  const [loadingTrendingSearches, setLoadingTrendingSearches] = useState(false);
 
   useEffect(() => {
     const fetchModules = async () => {
       setLoadingModules(true);
       try {
-        const response = await ListFAQModules({ page: 1, perPage: 100 });
-        if (response && response.data) setFaqModules(response.data);
-        else if (Array.isArray(response)) setFaqModules(response);
+        const response: unknown = await ListFAQModules({ page: 1, perPage: 100 });
+        const modules = extractDataArray(response).filter(isFaqModule);
+        setFaqModules(modules);
       } catch (error) {
-        console.error('Error fetching FAQ modules:', error);
+        reportError('Error fetching FAQ modules:', error);
       } finally {
         setLoadingModules(false);
       }
     };
-    fetchModules();
+    void fetchModules();
   }, []);
 
   useEffect(() => {
     const fetchTrendingSearches = async () => {
       setLoadingTrendingSearches(true);
       try {
-        const response = await getMostViewedFAQs();
-        if (response && Array.isArray(response)) setTrendingSearches(response);
-        else if (response && response.data && Array.isArray(response.data)) setTrendingSearches(response.data);
-        else setTrendingSearches([]);
+        const response: unknown = await getMostViewedFAQs();
+        const faqs = extractDataArray(response).filter(isFaqItem);
+        setTrendingSearches(faqs);
       } catch (error) {
-        console.error('Error fetching trending searches:', error);
+        reportError('Error fetching trending searches:', error);
         setTrendingSearches([]);
       } finally {
         setLoadingTrendingSearches(false);
       }
     };
-    fetchTrendingSearches();
+    void fetchTrendingSearches();
   }, []);
 
   useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (searchInput.trim().length < 2) {
+    const query = searchInput.trim();
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (query.length < 2) {
       setSearchSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-    searchTimeoutRef.current = setTimeout(async () => {
-      setLoadingSuggestions(true);
-      try {
-        const response = await ListFAQItems({ page: 1, perPage: 5, search: searchInput.trim() });
-        let items: any[] = [];
-        if (response && response.data) items = Array.isArray(response.data) ? response.data : [];
-        else if (Array.isArray(response)) items = response;
-        setSearchSuggestions(items);
-        setShowSuggestions(items.length > 0);
-      } catch (error) {
-        console.error('Error fetching search suggestions:', error);
-        setSearchSuggestions([]);
-        setShowSuggestions(false);
-      } finally {
-        setLoadingSuggestions(false);
-      }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      void (async () => {
+        setLoadingSuggestions(true);
+        try {
+          const response: unknown = await ListFAQItems({ page: 1, perPage: 5, search: query });
+          const items = extractDataArray(response).filter(isFaqItem).slice(0, 5);
+          setSearchSuggestions(items);
+          setShowSuggestions(items.length > 0);
+        } catch (error) {
+          reportError('Error fetching search suggestions:', error);
+          setSearchSuggestions([]);
+          setShowSuggestions(false);
+        } finally {
+          setLoadingSuggestions(false);
+        }
+      })();
     }, 300);
-    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [searchInput]);
 
   useEffect(() => {
@@ -167,10 +226,10 @@ const HelpCenterHome = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSuggestionClick = (article: any) => {
-    router.push({
+  const handleSuggestionClick = (article: FaqItem) => {
+    void router.push({
       pathname: '/help-center/knowledge-base/[id]',
-      query: { id: article?.id?.toString() || article?.id, search: searchInput || article?.title || article?.question || '' }
+      query: { id: String(article.id), search: searchInput || article.title || article.question || '' }
     });
     setSearchInput('');
     setShowSuggestions(false);
@@ -178,7 +237,7 @@ const HelpCenterHome = () => {
 
   const handleSearchEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchInput.trim()) {
-      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
+      void router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
       setShowSuggestions(false);
     }
   };
@@ -193,17 +252,218 @@ const HelpCenterHome = () => {
   const featuredTopics = faqModules.map((module, index) => ({
     id: module.id,
     title: module.name,
-    description: module.description || '',
-    faqCount: module.faqs_count || 0,
-    color: moduleColors[index % moduleColors.length],
-    icon: module.icon || 'help_outline',
+    description: module.description ?? '',
+    faqCount: module.faqs_count ?? 0,
+    color: MODULE_COLORS[index % MODULE_COLORS.length],
+    icon: module.icon ?? 'help_outline',
   }));
 
   const transformedTrendingSearches = trendingSearches.map((faq) => ({
     id: faq.id,
-    title: faq.question,
-    viewCount: faq.view_count || 0,
+    title: faq.question ?? faq.title ?? '',
+    viewCount: faq.view_count ?? 0,
   }));
+
+  const shouldShowSuggestionsDropdown =
+    showSuggestions && (searchSuggestions.length > 0 || loadingSuggestions);
+
+  let suggestionsDropdown: React.ReactNode = null;
+  if (shouldShowSuggestionsDropdown) {
+    suggestionsDropdown = (
+      <div className="hc-suggestion-dropdown">
+        {loadingSuggestions && (
+          <div
+            style={{
+              padding: '14px',
+              textAlign: 'center',
+              fontSize: 13,
+              color: '#9ca3af',
+            }}
+          >
+            Searching...
+          </div>
+        )}
+
+        {!loadingSuggestions && searchSuggestions.length > 0 && (
+          <>
+            <div className="hc-label">Suggestions ({searchSuggestions.length})</div>
+            {searchSuggestions.map((item, index) => (
+              <button
+                key={item.id || index}
+                type="button"
+                className="hc-suggestion-item"
+                onClick={() => handleSuggestionClick(item)}
+              >
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: '#eef2ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <FileQuestion size={13} color="#4680ff" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: '#141414',
+                      marginBottom: 1,
+                    }}
+                  >
+                    {item.title || item.question || 'Untitled'}
+                  </div>
+                  {item.description && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#6b7280',
+                        lineHeight: 1.4,
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {item.description}
+                    </div>
+                  )}
+                </div>
+                <ChevronRight
+                  size={13}
+                  color="#d1d5db"
+                  style={{ flexShrink: 0 }}
+                />
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  let browseTopicsBody: React.ReactNode;
+  if (loadingModules) {
+    browseTopicsBody = (
+      <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+        Loading topics...
+      </div>
+    );
+  } else if (featuredTopics.length > 0) {
+    browseTopicsBody = (
+      <Row className="g-2">
+        {featuredTopics.map((topic) => {
+          const TopicIcon = LUCIDE_ICON_MAP[topic.icon] || HelpCircle;
+          const articleSuffix = topic.faqCount === 1 ? '' : 's';
+          const subtitle =
+            topic.faqCount > 0
+              ? `${topic.faqCount} article${articleSuffix}`
+              : (topic.description || 'View articles');
+
+          return (
+            <Col xs={12} sm={6} key={topic.id || topic.title}>
+              <Link
+                href={`/help-center/knowledge-base?moduleId=${topic.id}&moduleName=${encodeURIComponent(topic.title)}`}
+                className="hc-topic-card"
+              >
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: topic.color + '18',
+                    borderRadius: 7,
+                  }}
+                >
+                  <TopicIcon size={17} color={topic.color} strokeWidth={1.8} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#141414',
+                      lineHeight: 1.3,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {topic.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>{subtitle}</div>
+                </div>
+                <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
+              </Link>
+            </Col>
+          );
+        })}
+      </Row>
+    );
+  } else {
+    browseTopicsBody = (
+      <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+        No topics available
+      </div>
+    );
+  }
+
+  let trendingBody: React.ReactNode;
+  if (loadingTrendingSearches) {
+    trendingBody = (
+      <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+        Loading...
+      </div>
+    );
+  } else if (transformedTrendingSearches.length > 0) {
+    trendingBody = (
+      <div>
+        {transformedTrendingSearches.map((item, index) => (
+          <button
+            key={item.id || index}
+            type="button"
+            className="hc-trending-item"
+            onClick={() => {
+              void router.push({
+                pathname: '/help-center/knowledge-base/[id]',
+                query: { id: item.id?.toString(), search: item.title },
+              });
+            }}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#4680ff',
+                width: 20,
+                textAlign: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {String(index + 1).padStart(2, '0')}
+            </span>
+            <span style={{ fontSize: 13, color: '#334155', flex: 1, lineHeight: 1.4 }}>
+              {item.title}
+            </span>
+            <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
+          </button>
+        ))}
+      </div>
+    );
+  } else {
+    trendingBody = (
+      <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
+        No trending searches available
+      </div>
+    );
+  }
 
   return (
     <React.Fragment>
@@ -272,6 +532,13 @@ const HelpCenterHome = () => {
           cursor: pointer;
           transition: background 0.15s ease;
           border-bottom: 1px solid #f4f6f9;
+          background: transparent;
+          border-left: 0;
+          border-right: 0;
+          border-top: 0;
+          width: 100%;
+          text-align: left;
+          font: inherit;
         }
         .hc-trending-item:last-child { border-bottom: none; }
         .hc-trending-item:hover { background: #f4f7ff; }
@@ -324,6 +591,13 @@ const HelpCenterHome = () => {
           cursor: pointer;
           border-bottom: 1px solid #f4f6f9;
           transition: background 0.15s;
+          background: transparent;
+          border-left: 0;
+          border-right: 0;
+          border-top: 0;
+          width: 100%;
+          text-align: left;
+          font: inherit;
         }
         .hc-suggestion-item:last-child { border-bottom: none; }
         .hc-suggestion-item:hover { background: #f4f7ff; }
@@ -395,7 +669,7 @@ const HelpCenterHome = () => {
                 <button
                   onClick={() => {
                     if (searchInput.trim()) {
-                      router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
+                      void router.push({ pathname: '/help-center/knowledge-base', query: { search: searchInput.trim() } });
                       setShowSuggestions(false);
                     }
                   }}
@@ -414,35 +688,7 @@ const HelpCenterHome = () => {
               </div>
 
               {/* Suggestions Dropdown */}
-              {showSuggestions && (searchSuggestions.length > 0 || loadingSuggestions) && (
-                <div className="hc-suggestion-dropdown">
-                  {loadingSuggestions ? (
-                    <div style={{ padding: '14px', textAlign: 'center', fontSize: 13, color: '#9ca3af' }}>Searching...</div>
-                  ) : searchSuggestions.length > 0 ? (
-                    <>
-                      <div className="hc-label">Suggestions ({searchSuggestions.length})</div>
-                      {searchSuggestions.map((item, index) => (
-                        <div key={item.id || index} className="hc-suggestion-item" onClick={() => handleSuggestionClick(item)}>
-                          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <FileQuestion size={13} color="#4680ff" />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: '#141414', marginBottom: 1 }}>
-                              {item.title || item.question || 'Untitled'}
-                            </div>
-                            {item.description && (
-                              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
-                                {item.description}
-                              </div>
-                            )}
-                          </div>
-                          <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
-                        </div>
-                      ))}
-                    </>
-                  ) : null}
-                </div>
-              )}
+              {suggestionsDropdown}
             </div>
           </div>
         </div>
@@ -486,52 +732,7 @@ const HelpCenterHome = () => {
                 <span className="hc-section-title">Browse Topics</span>
               </div>
 
-              {loadingModules ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
-                  Loading topics...
-                </div>
-              ) : featuredTopics.length > 0 ? (
-                <Row className="g-2">
-                  {featuredTopics.map((topic) => {
-                    // Resolve lucide icon from the API icon string, fallback to HelpCircle
-                    const TopicIcon = LUCIDE_ICON_MAP[topic.icon] || HelpCircle;
-                    return (
-                      <Col xs={12} sm={6} key={topic.id || topic.title}>
-                        <Link
-                          href={`/help-center/knowledge-base?moduleId=${topic.id}&moduleName=${encodeURIComponent(topic.title)}`}
-                          className="hc-topic-card"
-                        >
-                          {/* Icon on left */}
-                          <div style={{
-                            width: 34, height: 34, flexShrink: 0,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: topic.color + '18',
-                            borderRadius: 7,
-                          }}>
-                            <TopicIcon size={17} color={topic.color} strokeWidth={1.8} />
-                          </div>
-                          {/* Text on right */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#141414', lineHeight: 1.3, marginBottom: 2 }}>
-                              {topic.title}
-                            </div>
-                            <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                              {topic.faqCount > 0
-                                ? `${topic.faqCount} article${topic.faqCount !== 1 ? 's' : ''}`
-                                : topic.description || 'View articles'}
-                            </div>
-                          </div>
-                          <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
-                        </Link>
-                      </Col>
-                    );
-                  })}
-                </Row>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
-                  No topics available
-                </div>
-              )}
+              {browseTopicsBody}
             </div>
           </Col>
 
@@ -543,38 +744,7 @@ const HelpCenterHome = () => {
                 <span className="hc-section-title">Trending Searches</span>
               </div>
 
-              {loadingTrendingSearches ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
-                  Loading...
-                </div>
-              ) : transformedTrendingSearches.length > 0 ? (
-                <div>
-                  {transformedTrendingSearches.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="hc-trending-item"
-                      onClick={() => {
-                        router.push({
-                          pathname: '/help-center/knowledge-base/[id]',
-                          query: { id: item.id?.toString(), search: item.title },
-                        });
-                      }}
-                    >
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#4680ff', width: 20, textAlign: 'center', flexShrink: 0 }}>
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <span style={{ fontSize: 13, color: '#334155', flex: 1, lineHeight: 1.4 }}>
-                        {item.title}
-                      </span>
-                      <ChevronRight size={13} color="#d1d5db" style={{ flexShrink: 0 }} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#9ca3af', fontSize: 13 }}>
-                  No trending searches available
-                </div>
-              )}
+              {trendingBody}
             </div>
           </Col>
 

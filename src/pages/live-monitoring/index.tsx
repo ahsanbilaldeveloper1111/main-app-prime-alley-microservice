@@ -169,15 +169,24 @@ const FF = "Lexend Deca, Helvetica, Arial, sans-serif";
 
 const TRANS = "background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1)";
 
+function pluralize(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
 // ─── Small reusable components ────────────────────────────────────────────────
 const CallInfoSidebar: React.FC<{ call: CallRow; onClose: () => void }> = ({ call, onClose }) => {
   const [aiBannerVisible, setAiBannerVisible] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(call.callId).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    navigator.clipboard.writeText(call.callId)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        setCopied(false);
+      });
   };
 
   const divider = (
@@ -205,11 +214,23 @@ const CallInfoSidebar: React.FC<{ call: CallRow; onClose: () => void }> = ({ cal
         position: "fixed", inset: 0, zIndex: 1000,
         display: "flex", justifyContent: "flex-end",
       }}
-      onClick={onClose}
     >
-      {/* Sidebar panel — stop propagation so clicks inside don't close */}
+      <button
+        type="button"
+        aria-label="Close call info"
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          inset: 0,
+          border: "none",
+          padding: 0,
+          margin: 0,
+          background: "transparent",
+          cursor: "pointer",
+        }}
+      />
+
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: 440,
           height: "100%",
@@ -219,6 +240,8 @@ const CallInfoSidebar: React.FC<{ call: CallRow; onClose: () => void }> = ({ cal
           flexDirection: "column",
           overflowY: "auto",
           animation: "slideIn 200ms ease",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <style>{`
@@ -481,7 +504,10 @@ const FilterDropdown: React.FC<{ label: string }> = ({ label }) => {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <div
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
         style={{
           display: "flex", alignItems: "center", gap: 8, height: 40,
@@ -489,12 +515,13 @@ const FilterDropdown: React.FC<{ label: string }> = ({ label }) => {
           border: "1px solid #D6D6D6", backgroundColor: "#FFFFFF",
           cursor: "pointer", userSelect: "none", fontFamily: FF,
           fontSize: 14, fontWeight: 500, color: "#24262A",
-          minWidth: 130, boxSizing: "border-box" as const,
+          minWidth: 130, boxSizing: "border-box" as const, width: "100%",
+          textAlign: "left",
         }}
       >
         <span style={{ flex: 1 }}>{label}</span>
         <ChevronDown size={15} color="#9CA3AF" strokeWidth={2} />
-      </div>
+      </button>
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", left: 0, minWidth: 150,
@@ -502,11 +529,26 @@ const FilterDropdown: React.FC<{ label: string }> = ({ label }) => {
           boxShadow: "0 4px 16px rgba(0,0,0,0.10)", zIndex: 300, padding: "4px 0",
         }}>
           {["All", "Option A", "Option B"].map((o) => (
-            <div key={o} onClick={() => setOpen(false)}
-              style={{ padding: "9px 14px", cursor: "pointer", fontSize: 14, fontFamily: FF, color: "#24262A" }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.backgroundColor = "#F5F5F5")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent")}
-            >{o}</div>
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOpen(false)}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                background: "transparent",
+                padding: "9px 14px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontFamily: FF,
+                color: "#24262A",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F5F5F5"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              {o}
+            </button>
           ))}
         </div>
       )}
@@ -521,16 +563,24 @@ const TodayDropdown: React.FC = () => {
   const [sel, setSel] = useState("Today");
   return (
     <div style={{ position: "relative" }}>
-      <div onClick={() => setOpen(!open)} style={{
-        display: "flex", alignItems: "center", gap: 8, height: 40,
-        paddingLeft: 16, paddingRight: 14, border: "1px solid #D6D6D6",
-        borderRadius: 8, backgroundColor: "#FFFFFF", cursor: "pointer",
-        fontFamily: FF, fontSize: 14, fontWeight: 500, color: "#24262A",
-        minWidth: 120, boxSizing: "border-box" as const,
-      }}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex", alignItems: "center", gap: 8, height: 40,
+          paddingLeft: 16, paddingRight: 14, border: "1px solid #D6D6D6",
+          borderRadius: 8, backgroundColor: "#FFFFFF", cursor: "pointer",
+          fontFamily: FF, fontSize: 14, fontWeight: 500, color: "#24262A",
+          minWidth: 120, boxSizing: "border-box" as const,
+          width: "100%",
+          textAlign: "left",
+        }}
+      >
         <span style={{ flex: 1 }}>{sel}</span>
         <ChevronDown size={15} color="#9CA3AF" strokeWidth={2} />
-      </div>
+      </button>
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 150,
@@ -538,11 +588,26 @@ const TodayDropdown: React.FC = () => {
           boxShadow: "0 4px 16px rgba(0,0,0,0.10)", zIndex: 300, padding: "4px 0",
         }}>
           {options.map((o) => (
-            <div key={o} onClick={() => { setSel(o); setOpen(false); }}
-              style={{ padding: "9px 16px", cursor: "pointer", fontSize: 14, fontFamily: FF, color: "#24262A", backgroundColor: sel === o ? "#F0F0F0" : "transparent" }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLDivElement).style.backgroundColor = "#F5F5F5")}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLDivElement).style.backgroundColor = sel === o ? "#F0F0F0" : "transparent")}
-            >{o}</div>
+            <button
+              key={o}
+              type="button"
+              onClick={() => { setSel(o); setOpen(false); }}
+              style={{
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                backgroundColor: sel === o ? "#F0F0F0" : "transparent",
+                padding: "9px 16px",
+                cursor: "pointer",
+                fontSize: 14,
+                fontFamily: FF,
+                color: "#24262A",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F5F5F5"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = sel === o ? "#F0F0F0" : "transparent"; }}
+            >
+              {o}
+            </button>
           ))}
         </div>
       )}
@@ -552,7 +617,16 @@ const TodayDropdown: React.FC = () => {
 
 // Toggle switch
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
-  <div onClick={() => onChange(!checked)} style={{
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    style={{
+      border: "none",
+      padding: 0,
+      margin: 0,
+      background: "none",
     width: 44, height: 24, borderRadius: 12,
     backgroundColor: checked ? "#00C896" : "#D1D5DB",
     position: "relative", cursor: "pointer",
@@ -563,7 +637,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = (
       width: 20, height: 20, borderRadius: "50%", backgroundColor: "#fff",
       boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 200ms",
     }} />
-  </div>
+  </button>
 );
 
 // ── SLA Card: 128×148 ─────────────────────────────────────────────────────────
@@ -704,7 +778,6 @@ const MergedKpiGroup: React.FC<{ cards: KpiStatCardProps[] }> = ({ cards }) => (
         style={{
           flex: 1,
           minWidth: 0,
-          borderRight: index < cards.length - 1 ? "none" : "none",
         }}
       >
         <KpiStatCard
@@ -812,14 +885,21 @@ const Sidebar: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           return (
             <div key={group.label}>
               {/* Group row */}
-              <div
-                onClick={() => hasUsers && toggleGroup(group.label)}
+              <button
+                type="button"
+                aria-expanded={hasUsers ? isExpanded : undefined}
+                disabled={!hasUsers}
+                onClick={() => toggleGroup(group.label)}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: "16px", borderRadius: 8,
                   backgroundColor: "rgb(247, 247, 247)",
                   cursor: hasUsers ? "pointer" : "default",
                   userSelect: "none",
+                  width: "100%",
+                  border: "none",
+                  textAlign: "left",
+                  opacity: 1,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -842,7 +922,7 @@ const Sidebar: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     ? <ChevronUp size={15} color="#6B6B6B" />
                     : <ChevronDown size={15} color="#6B6B6B" />
                 )}
-              </div>
+              </button>
 
               {/* Expanded users */}
               {isExpanded && hasUsers && (
@@ -893,7 +973,7 @@ const LiveMonitoring: React.FC & { getLayout?: (page: ReactElement) => ReactElem
   const [showKPIs, setShowKPIs] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("calls");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
+  const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
   const tabs: { key: TabType; label: string; icon: React.ReactNode }[] = [
     { key: "calls",   label: "Calls",   icon: <Phone size={13} /> },
     { key: "users",   label: "Users",   icon: <Users size={13} /> },
@@ -911,6 +991,19 @@ const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
       }}>A</div> */}
     </div>
   );
+
+  let filterLabel: string;
+  let countText: string;
+  if (activeTab === "calls") {
+    filterLabel = "Filter calls";
+    countText = pluralize(CALL_DATA.length, "call");
+  } else if (activeTab === "users") {
+    filterLabel = "Filter users";
+    countText = pluralize(USERS_DATA.length, "user");
+  } else {
+    filterLabel = "Filter numbers";
+    countText = pluralize(NUMBERS_DATA.length, "number");
+  }
 
   return (
     <div style={{ minHeight: "100vh", height: "100%", backgroundColor: "#FFFFFF", fontFamily: FF }}>
@@ -1093,15 +1186,11 @@ const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
                 border: "none", cursor: "pointer", fontFamily: FF, fontSize: 13,
                 fontWeight: 500, color: "#24262A", padding: "4px 8px", borderRadius: 6,
               }}>
-                {activeTab === "calls" ? "Filter calls" : activeTab === "users" ? "Filter users" : "Filter numbers"}
+                {filterLabel}
                 <ChevronDown size={14} />
               </button>
               <span style={{ fontFamily: FF, fontSize: 13, color: "#6B6B6B" }}>
-                {activeTab === "calls"
-                  ? `${CALL_DATA.length} call${CALL_DATA.length !== 1 ? "s" : ""}`
-                  : activeTab === "users"
-                  ? `${USERS_DATA.length} user${USERS_DATA.length !== 1 ? "s" : ""}`
-                  : `${NUMBERS_DATA.length} number${NUMBERS_DATA.length !== 1 ? "s" : ""}`}
+                {countText}
               </span>
             </div>
 
