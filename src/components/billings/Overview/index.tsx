@@ -392,7 +392,7 @@ const OverviewPage = () => {
               {starterIncludes.map((item) => (
                 <div key={item} style={{ fontSize: 14, color: "#141414", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
                   <span>{item}</span>
-                  <InfoTooltip message="Some features may not work." />
+                  <InfoTooltip message="Feature availability is subject to the specific plan purchased." />
                 </div>
               ))}
             </div>

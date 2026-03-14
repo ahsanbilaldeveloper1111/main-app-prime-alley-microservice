@@ -59,7 +59,7 @@ function IncludesList({ items }: Readonly<{ items: readonly string[] }>) {
       {items.map((item) => (
         <div key={item} style={{ ...styles.includedItem, display: "flex", alignItems: "center", gap: 6 }}>
           <span>{item}</span>
-          <InfoTooltip message="Some features may not work." />
+          <InfoTooltip message="Feature availability is subject to the specific plan purchased." />
         </div>
       ))}
     </>
@@ -143,7 +143,7 @@ export default function SubscriptionsPage() {
             {/* Discount label */}
             <div style={{ fontSize: 13, color: "#141414", marginTop: 2, marginBottom: 20 }}>
               {/* New Pro Plan Promotion Annual Discount (55%) */}
-              The current Pro Plan reflects an upward adjustment in the annual subscription cost.
+              The annual subscription cost for the Pro Plan is subject to a 5% increase effective next year.
             </div>
 
             {/* Includes */}
@@ -193,7 +193,7 @@ export default function SubscriptionsPage() {
                 <h3 style={styles.subHeading}>Pro Plan</h3>
                 <div style={{ fontSize: 13, color: "#141414", marginTop: 4 }}>
                   {/* Annual payment discount (25%) */}
-                  The current Pro Plan reflects an upward adjustment in the annual subscription cost.
+                  The annual subscription cost for the Pro Plan is subject to a 5% increase effective next year.
                 </div>
               </div>
               {/* <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "flex-end", minWidth: 120 }}>

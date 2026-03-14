@@ -26,19 +26,19 @@ export const sidebarGroups: SidebarGroup[] = [
   {
     heading: 'Services',
     items: [
-      { id: 'account-defaults', label: 'Account Defaults' },
+      { id: 'account-defaults', label: 'Account Defaults', permission: PERMISSIONS.VIEW_ACCOUNT_DEFAULTS_GENERAL },
       { id: 'users-teams', label: 'Users & Teams', permission: PERMISSIONS.CONTROL_HUB_SERVICES },
       { id: 'smart-crm', label: 'Smart CRM', permission: PERMISSIONS.CRM_SERVICES },
       { id: 'communications', label: 'Communications', permission: PERMISSIONS.COMMUNICATIONS_SERVICES },
       { id: 'planner', label: 'Planner', permission: PERMISSIONS.WORK_PLANNER_SERVICES },
-      { id: 'virtual-agents', label: 'Virtual Agents', permission: PERMISSIONS.VIRTUAL_AGENTS_SERVICES },
+      { id: 'virtual-agents', label: 'Virtual Agents', permission: PERMISSIONS.VIEW_VIRTUAL_AGENTS },
       { id: 'pulse', label: 'Pulse', permission: PERMISSIONS.PULSE_SERVICES },
       { id: 'compliance', label: 'Compliance', badge: 'Beta', permission: PERMISSIONS.DNCR_SERVICES },
       { id: 'workforce', label: 'Workforce', permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES },
       { id: 'billing', label: 'Billing', permission: PERMISSIONS.ACCOUNTS_SERVICES },
       { id: 'tickets', label: 'Tickets', permission: PERMISSIONS.TICKETS_SERVICES },
       { id: 'help-center', label: 'Help Center', permission: PERMISSIONS.MANAGE_HELP_CENTER },
-      { id: 'ai-chat', label: 'AI Chat', permission: PERMISSIONS.AI_ML_SERVICES },
+      { id: 'ai-chat', label: 'AI Chat', permission: PERMISSIONS.VIEW_AI_CHAT },
     ],
   },
 ]
