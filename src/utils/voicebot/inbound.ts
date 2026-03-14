@@ -37,92 +37,56 @@ export interface UpdateCompanyPayload {
 
 /** GET /companies/ - List companies. Set show_inactive=true to include inactive. */
 export const getCompanies = async (params?: ListCompaniesParams) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/companies/`, { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/companies/`, { params });
+  return response.data;
 };
 
 /** POST /companies/ - Create a new company */
 export const postCompanies = async (payload: CreateCompanyPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/companies/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/companies/`, payload);
+  return response.data;
 };
 
 /** GET /companies/{companyId}/ - Get company details */
 export const getCompany = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/`);
+  return response.data;
 };
 
 /** PUT /companies/{companyId}/ - Update company */
 export const putCompany = async (companyId: string, payload: UpdateCompanyPayload) => {
-  try {
-    const response = await axiosInstance.put(`${PREFIX}/companies/${companyId}/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.put(`${PREFIX}/companies/${companyId}/`, payload);
+  return response.data;
 };
 
 /** DELETE /companies/{companyId}/ - Delete company */
 export const deleteCompany = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.delete(`${PREFIX}/companies/${companyId}/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.delete(`${PREFIX}/companies/${companyId}/`);
+  return response.data;
 };
 
 /** POST /companies/{companyId}/activate/ - Activate company */
 export const activateCompany = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/activate/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/activate/`);
+  return response.data;
 };
 
 /** POST /companies/{companyId}/deactivate/ - Deactivate company */
 export const deactivateCompany = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/deactivate/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/deactivate/`);
+  return response.data;
 };
 
 /** GET /companies/{companyId}/stats/ - Get company stats */
 export const getCompanyStats = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/stats/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/stats/`);
+  return response.data;
 };
 
 /** GET /companies/{companyId}/bots/ - Get company bots */
 export const getCompanyBots = async (companyId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/bots/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/bots/`);
+  return response.data;
 };
 
 // ---------------------------------------------------------------------------
@@ -179,92 +143,56 @@ export interface RollbackBotPayload {
 
 /** GET /bots/ - List bots, optionally by company_id and limit */
 export const getBots = async (params?: ListBotsParams) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/bots/`, { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/bots/`, { params });
+  return response.data;
 };
 
 /** POST /bots/ - Create bot */
 export const postBots = async (payload: CreateBotPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/bots/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/bots/`, payload);
+  return response.data;
 };
 
 /** GET /bots/lookup/ - Lookup bot by phone_number or sip_trunk_id */
 export const getBotsLookup = async (params: { phone_number?: string; sip_trunk_id?: string }) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/bots/lookup/`, { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/bots/lookup/`, { params });
+  return response.data;
 };
 
 /** GET /bots/{botId}/ - Get bot details */
 export const getBot = async (botId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/bots/${botId}/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/bots/${botId}/`);
+  return response.data;
 };
 
 /** PUT /bots/{botId}/ - Update bot */
 export const putBot = async (botId: string, payload: UpdateBotPayload) => {
-  try {
-    const response = await axiosInstance.put(`${PREFIX}/bots/${botId}/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.put(`${PREFIX}/bots/${botId}/`, payload);
+  return response.data;
 };
 
 /** DELETE /bots/{botId}/ - Delete bot */
 export const deleteBot = async (botId: string) => {
-  try {
-    const response = await axiosInstance.delete(`${PREFIX}/bots/${botId}/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.delete(`${PREFIX}/bots/${botId}/`);
+  return response.data;
 };
 
 /** POST /bots/{botId}/publish/ - Publish bot */
 export const publishBot = async (botId: string) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/publish/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/publish/`);
+  return response.data;
 };
 
 /** POST /bots/{botId}/unpublish/ - Unpublish bot */
 export const unpublishBot = async (botId: string) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/unpublish/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/unpublish/`);
+  return response.data;
 };
 
 /** GET /bots/{botId}/config/ - Get bot runtime config (published bots only) */
 export const getBotConfig = async (botId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/bots/${botId}/config/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/bots/${botId}/config/`);
+  return response.data;
 };
 
 /** Response item from GET /bots/{botId}/versions/ */
@@ -279,22 +207,14 @@ export interface BotVersionItem {
 
 /** GET /bots/{botId}/versions/ - Get bot version history */
 export const getBotVersions = async (botId: string): Promise<BotVersionItem[]> => {
-  try {
-    const response = await axiosInstance.get<BotVersionItem[]>(`${PREFIX}/bots/${botId}/versions/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get<BotVersionItem[]>(`${PREFIX}/bots/${botId}/versions/`);
+  return response.data;
 };
 
 /** POST /bots/{botId}/rollback/ - Rollback bot to a version */
 export const rollbackBot = async (botId: string, payload: RollbackBotPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/rollback/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/rollback/`, payload);
+  return response.data;
 };
 
 // ---------------------------------------------------------------------------
@@ -377,80 +297,48 @@ export interface GetCallsStatsParams {
 
 /** GET /calls/ - List calls with optional filters */
 export const getCalls = async (params?: ListCallsParams) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/calls/`, { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/calls/`, { params });
+  return response.data;
 };
 
 /** POST /calls/ - Create call log */
 export const postCalls = async (payload: CreateCallPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/calls/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/calls/`, payload);
+  return response.data;
 };
 
 /** GET /calls/stats/ - Get call statistics */
 export const getCallsStats = async (params?: GetCallsStatsParams) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/calls/stats/`, { params });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/calls/stats/`, { params });
+  return response.data;
 };
 
 /** GET /calls/{callId}/ - Get call details */
 export const getCall = async (callId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/`);
+  return response.data;
 };
 
 /** POST /calls/{callId}/add_message/ - Add messages to call */
 export const addCallMessage = async (callId: string, messages: CallMessageItem[]) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_message/`, messages);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_message/`, messages);
+  return response.data;
 };
 
 /** POST /calls/{callId}/update_stats/ - Update call stats and usage */
 export const updateCallStats = async (callId: string, payload: UpdateCallStatsPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/update_stats/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/update_stats/`, payload);
+  return response.data;
 };
 
 /** GET /calls/{callId}/transcript/ - Get call transcript */
 export const getCallTranscript = async (callId: string) => {
-  try {
-    const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/transcript/`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/transcript/`);
+  return response.data;
 };
 
 /** POST /calls/{callId}/add_recording/ - Add recording to call */
 export const addCallRecording = async (callId: string, payload: AddRecordingPayload) => {
-  try {
-    const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_recording/`, payload);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
+  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_recording/`, payload);
+  return response.data;
 };
