@@ -355,7 +355,7 @@ const CampaignsPage = () => {
                 </Form.Select>
               )}
               <Form.Select
-                style={{ width: "120px" }}
+                style={{ width: "150px" }}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >

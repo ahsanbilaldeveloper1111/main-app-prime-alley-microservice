@@ -11,7 +11,7 @@ import {
   type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
 import { toFormString } from "@utils/voicebot/formDisplay";
-import { GetCompanies } from "@utils/users";
+import { getCompanies } from "@utils/voicebot/inbound";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -352,19 +352,21 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                       </Form.Group>
                     </Col>
                     <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label style={labelStyle}>Company <span className="text-danger">*</span></Form.Label>
-                        <Form.Select
-                          value={isAdmin ? form.company_id : userCompanyIdentifier}
-                          onChange={(e) => { if (isAdmin) setForm((f) => ({ ...f, company_id: e.target.value })); }}
-                          required
-                          disabled={loadingCompanies || !isAdmin}
-                          style={inputStyle}
-                        >
-                          <option value="">Select company</option>
-                          {renderCompanyOptions(companies, isAdmin, userCompanyIdentifier, userCompanyName)}
-                        </Form.Select>
-                      </Form.Group>
+                      {isAdmin ? (
+                        <Form.Group className="mb-3">
+                          <Form.Label style={labelStyle}>Company <span className="text-danger">*</span></Form.Label>
+                          <Form.Select
+                            value={form.company_id}
+                            onChange={(e) => setForm((f) => ({ ...f, company_id: e.target.value }))}
+                            required
+                            disabled={loadingCompanies}
+                            style={inputStyle}
+                          >
+                            <option value="">Select company</option>
+                            {renderCompanyOptions(companies, true, userCompanyIdentifier, userCompanyName)}
+                          </Form.Select>
+                        </Form.Group>
+                      ) : null}
                       <Form.Group className="mb-3">
                         <Form.Label style={labelStyle}>Select VoiceBot</Form.Label>
                         <Form.Select value={form.voicebot_id ?? ""} onChange={(e) => setForm((f) => ({ ...f, voicebot_id: e.target.value ? Number(e.target.value) : undefined }))} style={inputStyle}>
@@ -512,7 +514,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(isAdmin);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<CreateCampaignFormState>({ ...defaultForm });
   const csvInputRef = React.useRef<HTMLInputElement>(null);
@@ -546,9 +548,14 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
   };
 
   const fetchCompanies = useCallback(async () => {
+    if (!isAdmin) {
+      setCompanies([]);
+      setLoadingCompanies(false);
+      return;
+    }
     setLoadingCompanies(true);
     try {
-      const res = await GetCompanies();
+      const res = await getCompanies();
       const opts = parseCompaniesResponse(res);
       setCompanies(opts);
       if (opts.length > 0 && !form.company_id && !editCampaignId) setForm((f) => ({ ...f, company_id: opts[0].id }));
@@ -557,7 +564,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     } finally {
       setLoadingCompanies(false);
     }
-  }, [editCampaignId]);
+  }, [editCampaignId, isAdmin, form.company_id]);
 
   const fetchVoicebots = useCallback(async (companyId: string) => {
     if (!companyId) {

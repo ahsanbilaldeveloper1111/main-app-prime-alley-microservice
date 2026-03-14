@@ -864,8 +864,20 @@ const OutboundAnalytics = () => {
   const effectiveCampaignId = selectedCampaignId;
 
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption["value"]>("7");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+
+  const todayYmd = useMemo(() => toYmd(new Date()), []);
+
+  const getDefaultDateRange = (period: TimePeriodOption["value"]) => {
+    const days = Number.parseInt(period, 10);
+    if (!Number.isFinite(days) || days <= 0) return { from: "", to: todayYmd };
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(start.getDate() - days);
+    return { from: toYmd(start), to: toYmd(end) };
+  };
+
+  const [fromDate, setFromDate] = useState<string>(() => getDefaultDateRange("7").from);
+  const [toDate, setToDate] = useState<string>(() => getDefaultDateRange("7").to);
   const { loading: dashboardLoading, dashboard } = useOutboundDashboard(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
   const { loading: volumeLoading, data: volumeData, truncated: volumeTruncated } = useOutboundCallVolume(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
   const { loading: costLoading, costs } = useOutboundCosts(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
@@ -876,9 +888,6 @@ const OutboundAnalytics = () => {
     fromDate,
     toDate
   );
-
-  const todayYmd = useMemo(() => toYmd(new Date()), []);
-  const skipAutoDateOnFirstRender = useRef(true);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -940,17 +949,10 @@ const OutboundAnalytics = () => {
   }, [selectedCompanyId, effectiveCompanyId]);
 
   useEffect(() => {
-    if (skipAutoDateOnFirstRender.current) {
-      skipAutoDateOnFirstRender.current = false;
-      return;
-    }
-    const days = Number.parseInt(timePeriod, 10);
-    if (!Number.isFinite(days) || days <= 0) return;
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(start.getDate() - days);
-    setFromDate(toYmd(start));
-    setToDate(toYmd(end));
+    const next = getDefaultDateRange(timePeriod);
+    if (!next.from || !next.to) return;
+    setFromDate(next.from);
+    setToDate(next.to);
   }, [timePeriod]);
 
   const onFromDateChange = (value: string) => {
