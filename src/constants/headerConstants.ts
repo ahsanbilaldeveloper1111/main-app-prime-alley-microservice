@@ -267,6 +267,24 @@ MENU_COLORS: {
   // Permissions
   PERMISSIONS: {
 
+    //Account defaults permissions start
+   VIEW_ACCOUNT_DEFAULTS_GENERAL: 'account-defaults-general',
+   VIEW_ACCOUNT_GENERAL: 'view-account-general-general',
+   VIEW_ACCOUNT_USER_DEFAULT: 'view-account-user-default-general',
+   VIEW_ACCOUNT_NOTIFICATION_PROFILES: 'view-account-notification-profiles-general',
+   VIEW_ACCOUNT_CURRENCY: 'view-account-currency-general',
+   VIEW_ACCOUNT_DATA_HOSTING: 'view-account-data-hosting-general',
+   VIEW_ACCOUNT_FEATURE_RELEASE: 'view-account-feature-release-general',
+    //Account defaults permissions end
+
+    //AI chat permissions start
+    VIEW_AI_CHAT: 'view-ai-chat-general',
+    VIEW_AI_CHAT_MENTIONS: 'view-ai-chat-mentions-general',
+    VIEW_AI_CHAT_RESPONSES: 'view-ai-chat-responses-general',
+    VIEW_VIRTUAL_AGENTS:'view-virtual-agents-general',
+    
+    //AI chat permissions end
+
     //Services permissions start
     CRM_SERVICES: 'crm-services',
     COMMUNICATIONS_SERVICES: 'communications-services-services',
