@@ -46,9 +46,10 @@ import CurrencyTabContent from '@components/CurrencyTabContent'
 import GeneralTabContent from '@components/GeneralTabContent'
 import { HEADER_CONSTANTS } from '@constants/headerConstants'
 import { useSession } from 'next-auth/react'
+import { APP_FONT } from '../../styles/fonts'
 
 const { PERMISSIONS } = HEADER_CONSTANTS
-const BASE_FONT = 'Lexend Deca, Helvetica, Arial, sans-serif'
+const BASE_FONT = APP_FONT
 
 // ─── Tab Definitions ──────────────────────────────────────────────────────────
 type Tab = {
@@ -90,15 +91,54 @@ function resolveAllowedActiveTabId(routeActiveTab: string | undefined, activeTab
 }
 
 const accountDefaultsTabs: Tab[] = [
-  { id: 'general', label: 'General' },
-  { id: 'user-defaults', label: 'User Defaults' },
-  { id: 'notification-profiles', label: 'Notification Profiles' },
-  { id: 'currency', label: 'Currency' },
-  { id: 'data-hosting', label: 'Data Hosting' },
-  { id: 'feature-releases', label: 'Feature Releases' },
+  { id: 'general', label: 'General', permission: PERMISSIONS.VIEW_ACCOUNT_DEFAULTS_GENERAL },
+  { id: 'user-defaults', label: 'User Defaults', permission: PERMISSIONS.VIEW_ACCOUNT_USER_DEFAULT },
+  { id: 'notification-profiles', label: 'Notification Profiles', permission: PERMISSIONS.VIEW_ACCOUNT_NOTIFICATION_PROFILES },
+  { id: 'currency', label: 'Currency', permission: PERMISSIONS.VIEW_ACCOUNT_CURRENCY },
+  { id: 'data-hosting', label: 'Data Hosting', permission: PERMISSIONS.VIEW_ACCOUNT_DATA_HOSTING },
+  { id: 'feature-releases', label: 'Feature Releases', permission: PERMISSIONS.VIEW_ACCOUNT_FEATURE_RELEASE },
 ]
 
 // ─── Tab Content Components ───────────────────────────────────────────────────
+
+const HelpDot: React.FC = () => (
+  <span
+    title="Help"
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '16px',
+      height: '16px',
+      borderRadius: '50%',
+      border: '1.5px solid #888',
+      fontSize: '10px',
+      color: '#888',
+      cursor: 'default',
+      lineHeight: 1,
+    }}
+  >
+    i
+  </span>
+)
+
+const FieldLabelRow: React.FC<{ label: string; helpIcon?: boolean }> = ({ label, helpIcon }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      marginBottom: '8px',
+      fontFamily: BASE_FONT,
+      fontSize: '14px',
+      fontWeight: 600,
+      color: '#141414',
+    }}
+  >
+    {label}
+    {helpIcon ? <HelpDot /> : null}
+  </div>
+)
 
 const InputField: React.FC<{ label: string; value?: string; helpIcon?: boolean }> = ({
   label,
@@ -106,40 +146,7 @@ const InputField: React.FC<{ label: string; value?: string; helpIcon?: boolean }
   helpIcon,
 }) => (
   <div style={{ marginBottom: '24px' }}>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontFamily: BASE_FONT,
-        fontSize: '14px',
-        fontWeight: 600,
-        color: '#141414',
-      }}
-    >
-      {label}
-      {helpIcon && (
-        <span
-          title="Help"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: '1.5px solid #888',
-            fontSize: '10px',
-            color: '#888',
-            cursor: 'default',
-            lineHeight: 1,
-          }}
-        >
-          i
-        </span>
-      )}
-    </div>
+    <FieldLabelRow label={label} helpIcon={helpIcon} />
     <input
       type="text"
       defaultValue={value}
@@ -169,39 +176,7 @@ const SelectField: React.FC<{ label: string; value?: string; options: string[]; 
   helpIcon,
 }) => (
   <div style={{ marginBottom: '24px' }}>
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        marginBottom: '8px',
-        fontFamily: BASE_FONT,
-        fontSize: '14px',
-        fontWeight: 600,
-        color: '#141414',
-      }}
-    >
-      {label}
-      {helpIcon && (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '16px',
-            height: '16px',
-            borderRadius: '50%',
-            border: '1.5px solid #888',
-            fontSize: '10px',
-            color: '#888',
-            cursor: 'default',
-            lineHeight: 1,
-          }}
-        >
-          i
-        </span>
-      )}
-    </div>
+    <FieldLabelRow label={label} helpIcon={helpIcon} />
     <div style={{ position: 'relative', width: '340px', maxWidth: '100%' }}>
       <select
         defaultValue={value}
@@ -1132,11 +1107,15 @@ const FeatureReleasesTabContent: React.FC = () => {
 
 // ─── Right Panel Pages ────────────────────────────────────────────────────────
 const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {
+  const { data: session } = useSession()
+  const userPermissions = useMemo(() => getUserPermissions(session), [session])
+  const allowedTabs = useMemo(() => filterTabsByPermission(accountDefaultsTabs, userPermissions), [userPermissions])
   const [activeTab, setActiveTab] = useState('general')
 
   useEffect(() => {
-    if (routeActiveTab && routeActiveTab !== activeTab) setActiveTab(routeActiveTab)
-  }, [routeActiveTab, activeTab])
+    const next = resolveAllowedActiveTabId(routeActiveTab, activeTab, allowedTabs)
+    if (next !== activeTab) setActiveTab(next)
+  }, [routeActiveTab, activeTab, allowedTabs])
 
   const tabContentMap: Record<string, React.ReactNode> = {
     general: <GeneralTabContent />,
@@ -1172,9 +1151,9 @@ const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAc
           overflow: 'hidden',
         }}
       >
-        {accountDefaultsTabs.map((tab, index) => {
+        {allowedTabs.map((tab, index) => {
           const isActive = activeTab === tab.id;
-          const isLast = index === accountDefaultsTabs.length - 1;
+          const isLast = index === allowedTabs.length - 1;
           return (
             <button
               key={tab.id}
@@ -1206,7 +1185,13 @@ const AccountDefaultsPage: React.FC<ControlledTabsProps> = ({ activeTab: routeAc
       </div>
 
       {/* Tab Content */}
-      <div>{tabContentMap[activeTab]}</div>
+      <div>
+        {allowedTabs.length === 0 ? (
+          <div style={{ color: '#6b7280' }}>You don&apos;t have permission to view this section.</div>
+        ) : (
+          tabContentMap[activeTab]
+        )}
+      </div>
     </div>
   )
 }
@@ -2217,7 +2202,7 @@ const defaultTopics: NotificationTopic[] = [
     id: "account-defaults", label: "Account Defaults",
     channels: { popup: false, browser: false, bell: true, email: true },
     subtopics: [
-      { id: "account-defaults-general", label: "General settings", description: "Get notified about changes to account defaults and general settings.", channels: { popup: false, browser: false, bell: true, email: true } },
+      { id: "account-defaults-general", label: "General settingsss", description: "Get notified about changes to account defaults and general settings.", channels: { popup: false, browser: false, bell: true, email: true } },
       { id: "account-defaults-currency", label: "Currency updates", description: "Receive notifications about currency and fiscal year changes.", channels: { popup: false, browser: false, bell: false, email: true } },
     ],
   },

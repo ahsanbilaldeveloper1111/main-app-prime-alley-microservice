@@ -4,6 +4,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { getCalls, getCallsStats } from "@utils/voicebot/inbound";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
@@ -31,7 +32,7 @@ interface StatsState {
 const AnalyticsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const [companies, setCompanies] = useState<{ id: string; identifier?: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [companyFilter, setCompanyFilter] = useState("");
   const [timePeriod, setTimePeriod] = useState("7");
   const [loading, setLoading] = useState(false);
@@ -48,17 +49,7 @@ const AnalyticsPage = () => {
         setCompanies([]);
         return;
       }
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const id = c.company_id ?? c.identifier ?? c.id ?? "";
-        const identifier = c.identifier ?? c.company_id ?? c.id ?? "";
-        return { id, identifier, name: c.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
     }

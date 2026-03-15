@@ -17,6 +17,24 @@ import { Calendar, AlertCircle, User, Layers, Tag, History, FileText } from "luc
 
 type TicketStatus = "Open" | "In Progress" | "Resolved";
 type TicketPriority = "Low" | "Medium" | "High";
+type TicketFilters = {
+  ticketOwner: string;
+  createDate: string;
+  lastActivityDate: string;
+  priority: TicketPriority | "All Priorities";
+};
+
+type CrmSummary = {
+  id: number;
+  summary: string;
+};
+
+type TicketRowData = {
+  crm_summary?: CrmSummary;
+  data?: {
+    crm_summary?: CrmSummary;
+  };
+};
 
 interface TicketRow {
   id: number;
@@ -32,9 +50,12 @@ interface TicketRow {
   phone?: string;
   created_at?: string;
   updated_at?: string;
-  crm_summary?: any;
-  data?: any;
+  crm_summary?: CrmSummary;
+  data?: TicketRowData;
 }
+
+const getTicketCrmSummary = (ticket: TicketRow): CrmSummary | undefined =>
+  ticket.crm_summary ?? ticket.data?.crm_summary ?? ticket.data?.data?.crm_summary;
 
 const DUMMY_TICKETS: TicketRow[] = [
   {
@@ -90,12 +111,26 @@ const ALL_COLUMNS = [
   "last_activity_date",
 ];
 
+const DEFAULT_TICKET_FILTERS: TicketFilters = {
+  ticketOwner: "All Owners",
+  createDate: "",
+  lastActivityDate: "",
+  priority: "All Priorities",
+};
+
 const CrmTicketsPage = () => {
   const router = useRouter();
 
   const openTicketDetailPage = useCallback(
     (ticketId: number) => {
-      router.push(`/crm/tickets/tickets-detailpage`);
+      router
+        .push({
+          pathname: "/crm/tickets/tickets-detailpage",
+          query: { id: String(ticketId) },
+        })
+        .catch(() => {
+          // navigation errors can happen during rapid route changes
+        });
     },
     [router],
   );
@@ -118,18 +153,50 @@ const CrmTicketsPage = () => {
   const [showTicketSidebar, setShowTicketSidebar] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<TicketRow | null>(null);
 
-  const [filterForm, setFilterForm] = useState({
-    ticketOwner: "All Owners",
-    createDate: "",
-    lastActivityDate: "",
-    priority: "All Priorities",
+  const persistSelectedColumns = useCallback((columns: string[]) => {
+    try {
+      if (globalThis.window !== undefined) {
+        globalThis.window.localStorage.setItem(
+          "ticketsSelectedColumns",
+          JSON.stringify(columns),
+        );
+      }
+    } catch {
+      // Ignore storage errors (SSR, private mode, quota).
+    }
+  }, []);
+
+  const handleColumnToggle = useCallback(
+    (column: string, checked: boolean) => {
+      setSelectedColumns((prev) => {
+        if (checked) return prev.includes(column) ? prev : [...prev, column];
+        const next = prev.filter((k) => k !== column);
+        return next.length ? next : ALL_COLUMNS;
+      });
+    },
+    [],
+  );
+
+  const [filterForm, setFilterForm] = useState<TicketFilters>({ ...DEFAULT_TICKET_FILTERS });
+  const [appliedFilters, setAppliedFilters] = useState<TicketFilters>({
+    ...DEFAULT_TICKET_FILTERS,
   });
-  const [appliedFilters, setAppliedFilters] = useState({
-    ticketOwner: "All Owners",
-    createDate: "",
-    lastActivityDate: "",
-    priority: "All Priorities",
-  });
+
+  const handleCloseFilterSidebar = useCallback(() => {
+    setShowFilterSidebar(false);
+  }, []);
+
+  const handleApplyFilters = useCallback(() => {
+    setAppliedFilters(filterForm);
+    setShowFilterSidebar(false);
+  }, [filterForm]);
+
+  const handleResetFilters = useCallback(() => {
+    const reset = { ...DEFAULT_TICKET_FILTERS };
+    setFilterForm(reset);
+    setAppliedFilters(reset);
+    setShowFilterSidebar(false);
+  }, []);
 
   const filteredData = useMemo(() => {
     let list = [...tickets];
@@ -663,12 +730,7 @@ const CrmTicketsPage = () => {
               name: selectedTicket.ticket_name,
               gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
             }}
-            crmSummary={
-              selectedTicket?.crm_summary ??
-              selectedTicket?.data?.crm_summary ??
-              (selectedTicket as any)?.data?.data?.crm_summary ??
-              undefined
-            }
+            crmSummary={getTicketCrmSummary(selectedTicket)}
             actionsDropdown={{
               label: "Actions",
               items: [
@@ -708,25 +770,12 @@ const CrmTicketsPage = () => {
 
       <GenericFilterSidebar
         isOpen={showFilterSidebar}
-        onClose={() => setShowFilterSidebar(false)}
+        onClose={handleCloseFilterSidebar}
         title="Filters"
         subtitle="Filter tickets"
         filters={advancedFilterFields}
-        onApply={() => {
-          setAppliedFilters(filterForm);
-          setShowFilterSidebar(false);
-        }}
-        onReset={() => {
-          const reset = {
-            ticketOwner: "All Owners",
-            createDate: "",
-            lastActivityDate: "",
-            priority: "All Priorities",
-          };
-          setFilterForm(reset);
-          setAppliedFilters(reset);
-          setShowFilterSidebar(false);
-        }}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
         width="400px"
         showApplyButton
         showResetButton
@@ -747,12 +796,7 @@ const CrmTicketsPage = () => {
                 label={found?.label || column}
                 checked={selectedColumns.includes(column)}
                 onChange={(e) => {
-                  const checked = e.target.checked;
-                  setSelectedColumns((prev) => {
-                    if (checked) return prev.includes(column) ? prev : [...prev, column];
-                    const next = prev.filter((k) => k !== column);
-                    return next.length ? next : ALL_COLUMNS;
-                  });
+                  handleColumnToggle(column, e.target.checked);
                 }}
               />
             );
@@ -763,9 +807,7 @@ const CrmTicketsPage = () => {
             variant="outline-secondary"
             onClick={() => {
               setSelectedColumns(ALL_COLUMNS);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("ticketsSelectedColumns", JSON.stringify(ALL_COLUMNS));
-              }
+              persistSelectedColumns(ALL_COLUMNS);
             }}
           >
             Reset
@@ -773,9 +815,7 @@ const CrmTicketsPage = () => {
           <Button
             variant="primary"
             onClick={() => {
-              if (typeof window !== "undefined") {
-                localStorage.setItem("ticketsSelectedColumns", JSON.stringify(selectedColumns));
-              }
+              persistSelectedColumns(selectedColumns);
               setShowColumnEditor(false);
             }}
           >

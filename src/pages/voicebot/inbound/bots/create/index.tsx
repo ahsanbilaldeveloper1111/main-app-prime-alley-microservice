@@ -17,9 +17,12 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
-import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone, Check, ChevronDown } from "lucide-react";
+import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone } from "lucide-react";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
+import { TabsNavigation } from "@components/voicebot/TabsNavigation";
+import { type CompanyOption } from "@components/voicebot/CompanyOptions";
+import { ValidationChecklist } from "@components/voicebot/ValidationChecklist";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
@@ -61,11 +64,7 @@ const defaultConfig: BotConfiguration = {
   phone_number: "",
 };
 
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
+// CompanyOption extracted to `CompanyOptions` component module
 
 const TAB_KEYS = {
   basic: "basic",
@@ -101,95 +100,219 @@ interface ValidationItemType {
   message: string;
 }
 
-const ValidationChecklist = ({
-  items,
-  expandedId,
-  onToggle,
+function getPageCopy(isEditMode: boolean) {
+  return {
+    breadcrumbSubTitle: isEditMode
+      ? "Voicebot Inbound - Bots - Edit"
+      : "Voicebot Inbound - Bots - Create",
+    title: isEditMode ? "Edit Inbound Bot" : "Create Inbound Bot",
+    finalActionLabel: isEditMode ? "Update Bot" : "Create Bot",
+  };
+}
+
+const BasicInfoPane = ({
+  form,
+  setForm,
+  isAdmin,
+  companies,
+  loadingCompanies,
+  isEditMode,
+  userCompanyIdentifier,
+  userCompanyName,
+  labelStyle,
+  inputStyle,
 }: {
-  items: ValidationItemType[];
-  expandedId: string | null;
-  onToggle: (id: string | null) => void;
+  form: CreateBotPayload;
+  setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>;
+  isAdmin: boolean;
+  companies: CompanyOption[];
+  loadingCompanies: boolean;
+  isEditMode: boolean;
+  userCompanyIdentifier: string;
+  userCompanyName: string;
+  labelStyle: React.CSSProperties;
+  inputStyle: React.CSSProperties;
 }) => (
-  <div>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-      <h6 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>Validation Checklist</h6>
-      <span style={{ fontSize: "12px", color: "#6b7280" }}>
-        {items.filter((item) => item.checked).length}/{items.length} Complete
-      </span>
+  <Tab.Pane eventKey={TAB_KEYS.basic}>
+    <h6
+      style={{
+        margin: "0 0 20px 0",
+        fontSize: "16px",
+        fontWeight: 600,
+        color: "#1f2937",
+      }}
+    >
+      Basic Information
+    </h6>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <Form.Group className="mb-3">
+        <Form.Label style={labelStyle}>Bot Name *</Form.Label>
+        <Form.Control
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          required
+          placeholder="Bot name"
+          style={inputStyle}
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label style={labelStyle}>Company *</Form.Label>
+        <Form.Select
+          value={form.company}
+          onChange={(e) => isAdmin && setForm((f) => ({ ...f, company: e.target.value }))}
+          required
+          disabled={loadingCompanies || !isAdmin || isEditMode}
+          style={inputStyle}
+        >
+          <option value="">Select company</option>
+          {isAdmin &&
+            companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          {!isAdmin && userCompanyIdentifier && (
+            <option value={userCompanyIdentifier}>
+              {userCompanyName || userCompanyIdentifier}
+            </option>
+          )}
+        </Form.Select>
+      </Form.Group>
     </div>
-    {items.map((item, index) => (
-      <div
-        key={item.id}
+    <Form.Group className="mb-3">
+      <Form.Label style={labelStyle}>Description *</Form.Label>
+      <Form.Control
+        as="textarea"
+        rows={3}
+        value={form.description ?? ""}
+        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+        placeholder="Description"
+        required
+        style={{ ...inputStyle, resize: "vertical" as const }}
+      />
+    </Form.Group>
+  </Tab.Pane>
+);
+
+const BottomActionBar = ({
+  submitting,
+  isFirstTab,
+  isLastTab,
+  onCancel,
+  onPrev,
+  onNext,
+  onFinalSubmit,
+  finalActionLabel,
+  canSubmitFinal,
+}: {
+  submitting: boolean;
+  isFirstTab: boolean;
+  isLastTab: boolean;
+  onCancel: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onFinalSubmit: () => void;
+  finalActionLabel: string;
+  canSubmitFinal: boolean;
+}) => (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: "24px",
+      padding: "24px",
+      backgroundColor: "white",
+      borderRadius: "12px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+    }}
+  >
+    <button
+      type="button"
+      onClick={onCancel}
+      disabled={submitting}
+      style={{
+        padding: "10px 24px",
+        backgroundColor: "transparent",
+        border: "none",
+        color: "#6b7280",
+        fontSize: "14px",
+        fontWeight: 500,
+        cursor: submitting ? "not-allowed" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        opacity: submitting ? 0.6 : 1,
+      }}
+    >
+      ← Cancel
+    </button>
+    <div style={{ display: "flex", gap: "12px" }}>
+      <button
+        type="button"
+        onClick={onPrev}
+        disabled={isFirstTab || submitting}
         style={{
-          borderBottom: index < items.length - 1 ? "1px solid #f3f4f6" : "none",
-          paddingBottom: expandedId === item.id ? "12px" : "0",
+          padding: "10px 24px",
+          backgroundColor: "transparent",
+          border: "1px solid #e5e7eb",
+          color: "#6b7280",
+          fontSize: "14px",
+          fontWeight: 500,
+          borderRadius: "8px",
+          cursor: isFirstTab || submitting ? "not-allowed" : "pointer",
+          opacity: isFirstTab || submitting ? 0.6 : 1,
         }}
       >
+        Previous
+      </button>
+      {isLastTab ? (
         <button
           type="button"
-          onClick={() => onToggle(expandedId === item.id ? null : item.id)}
+          disabled={submitting || !canSubmitFinal}
+          onClick={onFinalSubmit}
           style={{
+            padding: "10px 32px",
+            backgroundColor: submitting || !canSubmitFinal ? "#9ca3af" : "#667eea",
+            border: "none",
+            color: "white",
+            fontSize: "14px",
+            fontWeight: 500,
+            borderRadius: "8px",
+            cursor: submitting || !canSubmitFinal ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 0",
-            cursor: "pointer",
-            transition: "all 0.2s",
-            width: "100%",
-            border: "none",
-            background: "none",
-            textAlign: "left",
-            font: "inherit",
-            color: "inherit",
+            gap: "8px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div
-              style={{
-                width: "20px",
-                height: "20px",
-                borderRadius: "50%",
-                backgroundColor: item.checked ? "#d1fae5" : "#fee2e2",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {item.checked ? (
-                <Check size={14} color="#059669" />
-              ) : (
-                <span style={{ fontSize: "12px", color: "#dc2626", fontWeight: "bold" }}>!</span>
-              )}
-            </div>
-            <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 500 }}>{item.label}</span>
-          </div>
-          <ChevronDown
-            size={16}
-            color="#9ca3af"
-            style={{
-              transform: expandedId === item.id ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.2s",
-            }}
-          />
+          {submitting ? <Spinner animation="border" size="sm" /> : null}
+          {finalActionLabel}
         </button>
-        {expandedId === item.id && (
-          <div
-            style={{
-              fontSize: "13px",
-              color: item.checked ? "#059669" : "#dc2626",
-              backgroundColor: item.checked ? "#f0fdf4" : "#fef2f2",
-              padding: "8px 12px 8px 30px",
-              borderRadius: "6px",
-              marginTop: "4px",
-            }}
-          >
-            {item.message}
-          </div>
-        )}
-      </div>
-    ))}
+      ) : (
+        <button
+          type="button"
+          onClick={onNext}
+          style={{
+            padding: "10px 32px",
+            backgroundColor: "#667eea",
+            border: "none",
+            color: "white",
+            fontSize: "14px",
+            fontWeight: 500,
+            borderRadius: "8px",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          Next →
+        </button>
+      )}
+    </div>
   </div>
 );
+
+// TabsNavigation/ValidationChecklist extracted to shared components
 
 function getFirstValidationError(form: CreateBotPayload): string | null {
   if (!form.company) return "Please select a company";
@@ -422,6 +545,7 @@ const VoicebotInboundBotsCreate = () => {
   const router = useRouter();
   const botId = typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
+  const pageCopy = getPageCopy(isEditMode);
   const { isAdmin, userCompanyIdentifier, userCompanyName } = useSessionCompany();
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [form, setForm] = useState<CreateBotPayload>({
@@ -447,12 +571,15 @@ const VoicebotInboundBotsCreate = () => {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateFormAndToast(form)) return;
+  const submit = () => {
+    if (!validateFormAndToast(form)) return Promise.resolve();
     setSubmitting(true);
-    await submitBotForm(form, isEditMode, botId, router);
-    setSubmitting(false);
+    return submitBotForm(form, isEditMode, botId, router).finally(() => setSubmitting(false));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submit();
   };
 
   const handleCancel = () => {
@@ -484,51 +611,11 @@ const VoicebotInboundBotsCreate = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle={isEditMode ? "Voicebot Inbound - Bots - Edit" : "Voicebot Inbound - Bots - Create"} />
-      <PageHeader title={isEditMode ? "Edit Inbound Bot" : "Create Inbound Bot"} showSearch={false} />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle={pageCopy.breadcrumbSubTitle} />
+      <PageHeader title={pageCopy.title} showSearch={false} />
 
       {/* Tab navigation */}
-      <div style={{ backgroundColor: "white", borderBottom: "1px solid #e5e7eb" }}>
-        <div style={{ maxWidth: "1600px", margin: "0 auto", display: "flex", gap: "8px", overflowX: "auto" }}>
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "12px 20px",
-                border: "none",
-                backgroundColor: "transparent",
-                color: activeTab === tab.id ? "#667eea" : "#9ca3af",
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                fontSize: "14px",
-                cursor: "pointer",
-                borderBottom: activeTab === tab.id ? "3px solid #667eea" : "3px solid transparent",
-                transition: "all 0.2s",
-                whiteSpace: "nowrap",
-              }}
-            >
-              <div
-                style={{
-                  width: "24px",
-                  height: "24px",
-                  borderRadius: "50%",
-                  backgroundColor: activeTab === tab.id ? "#667eea" : "#e5e7eb",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <tab.icon size={14} color={activeTab === tab.id ? "white" : "#9ca3af"} />
-              </div>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TabsNavigation tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <Form
         onSubmit={handleSubmit}
@@ -553,54 +640,18 @@ const VoicebotInboundBotsCreate = () => {
               >
                 <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k ?? TAB_KEYS.basic)}>
                   <Tab.Content>
-                    <Tab.Pane eventKey={TAB_KEYS.basic}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
-                        Basic Information
-                      </h6>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                        <Form.Group className="mb-3">
-                          <Form.Label style={labelStyle}>Bot Name *</Form.Label>
-                          <Form.Control
-                            value={form.name}
-                            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                            required
-                            placeholder="Bot name"
-                            style={inputStyle}
-                          />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                          <Form.Label style={labelStyle}>Company *</Form.Label>
-                          <Form.Select
-                            value={form.company}
-                            onChange={(e) => isAdmin && setForm((f) => ({ ...f, company: e.target.value }))}
-                            required
-                            disabled={loadingCompanies || !isAdmin || isEditMode}
-                            style={inputStyle}
-                          >
-                            <option value="">Select company</option>
-                            {isAdmin &&
-                              companies.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            {!isAdmin && userCompanyIdentifier && (
-                              <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>
-                            )}
-                          </Form.Select>
-                        </Form.Group>
-                      </div>
-                      <Form.Group className="mb-3">
-                        <Form.Label style={labelStyle}>Description *</Form.Label>
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          value={form.description ?? ""}
-                          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                          placeholder="Description"
-                          required
-                          style={{ ...inputStyle, resize: "vertical" as const }}
-                        />
-                      </Form.Group>
-                    </Tab.Pane>
+                    <BasicInfoPane
+                      form={form}
+                      setForm={setForm}
+                      isAdmin={isAdmin}
+                      companies={companies}
+                      loadingCompanies={loadingCompanies}
+                      isEditMode={isEditMode}
+                      userCompanyIdentifier={userCompanyIdentifier}
+                      userCompanyName={userCompanyName}
+                      labelStyle={labelStyle}
+                      inputStyle={inputStyle}
+                    />
                     <Tab.Pane eventKey={TAB_KEYS.configuration}>
                       <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
                         Configuration
@@ -912,104 +963,19 @@ const VoicebotInboundBotsCreate = () => {
           </div>
 
           {/* Bottom action bar */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "24px",
-              padding: "24px",
-              backgroundColor: "white",
-              borderRadius: "12px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          <BottomActionBar
+            submitting={submitting}
+            isFirstTab={isFirstTab}
+            isLastTab={isLastTab}
+            onCancel={handleCancel}
+            onPrev={goPrev}
+            onNext={goNext}
+            onFinalSubmit={() => {
+              submit();
             }}
-          >
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={submitting}
-              style={{
-                padding: "10px 24px",
-                backgroundColor: "transparent",
-                border: "none",
-                color: "#6b7280",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor: submitting ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                opacity: submitting ? 0.6 : 1,
-              }}
-            >
-              ← Cancel
-            </button>
-            <div style={{ display: "flex", gap: "12px" }}>
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={isFirstTab || submitting}
-                style={{
-                  padding: "10px 24px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #e5e7eb",
-                  color: "#6b7280",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  borderRadius: "8px",
-                  cursor: isFirstTab || submitting ? "not-allowed" : "pointer",
-                  opacity: isFirstTab || submitting ? 0.6 : 1,
-                }}
-              >
-                Previous
-              </button>
-              {isLastTab ? (
-                <button
-                  type="button"
-                  disabled={submitting || !form.company || !form.name?.trim()}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleSubmit(e as unknown as React.FormEvent);
-                  }}
-                  style={{
-                    padding: "10px 32px",
-                    backgroundColor: submitting || !form.company || !form.name?.trim() ? "#9ca3af" : "#667eea",
-                    border: "none",
-                    color: "white",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    borderRadius: "8px",
-                    cursor: submitting || !form.company || !form.name?.trim() ? "not-allowed" : "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  {submitting ? <Spinner animation="border" size="sm" /> : null}
-                  {isEditMode ? "Update Bot" : "Create Bot"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={goNext}
-                  style={{
-                    padding: "10px 32px",
-                    backgroundColor: "#667eea",
-                    border: "none",
-                    color: "white",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  Next →
-                </button>
-              )}
-            </div>
-          </div>
+            finalActionLabel={pageCopy.finalActionLabel}
+            canSubmitFinal={Boolean(form.company && form.name?.trim())}
+          />
         </div>
       </Form>
 

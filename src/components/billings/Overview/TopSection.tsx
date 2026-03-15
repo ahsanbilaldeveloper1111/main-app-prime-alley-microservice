@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { ACCOUNT_BILLING_TAB_PAYMENT_METHODS_SLUG } from "@components/billings/shared/accountBillingTabs";
 
 export interface TopSectionStyles {
   label: React.CSSProperties;
@@ -76,7 +77,12 @@ const TopSection = ({
         ) : (
           <div style={styles.value}>No payment method</div>
         )}
-        <Link href="#" style={{ ...styles.link, fontSize: 12 }}>Change</Link>
+        <Link
+          href={`/billing/account-billing/${ACCOUNT_BILLING_TAB_PAYMENT_METHODS_SLUG}`}
+          style={{ ...styles.link, fontSize: 12 }}
+        >
+          Change
+        </Link>
       </div>
     </div>
   </div>

@@ -15,7 +15,8 @@ import {
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { GetCompanies } from "@utils/users";
+import { getCompanies } from "@utils/voicebot/inbound";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import Link from "next/link";
@@ -24,12 +25,6 @@ import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, Clipboar
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { formatDateForTable } from "@utils/Helper";
 import "@assets/scss/common.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 interface CampaignRow {
   id?: number | string;
@@ -87,22 +82,8 @@ const CampaignsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      if (res === false) {
-        setCompanies([]);
-        return;
-      }
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        const id = item.company_id ?? item.identifier ?? item.id ?? "";
-        return { id, company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      const res = await getCompanies();
+      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
     }
@@ -374,7 +355,7 @@ const CampaignsPage = () => {
                 </Form.Select>
               )}
               <Form.Select
-                style={{ width: "120px" }}
+                style={{ width: "150px" }}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >

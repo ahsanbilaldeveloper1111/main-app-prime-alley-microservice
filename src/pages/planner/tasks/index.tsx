@@ -52,6 +52,12 @@ interface ApiTask {
   type?: string;
 }
 
+type HierarchyExtension = {
+  id?: string;
+  extension_number?: string;
+  name?: string;
+};
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const TASK_TYPE_OPTIONS = [
@@ -247,10 +253,11 @@ const CELL_STYLE: React.CSSProperties = {
       const priority = priorityMap[p] ?? "medium";
 
       const findExtensionName = (extNumber: string): string => {
-        if (!extNumber || !hierarchyDataExtensions) return extNumber;
-        const ext = (hierarchyDataExtensions as any[]).find(
-          (e: any) => e.id === extNumber || e.extension_number === extNumber
-        );
+        if (!extNumber || !Array.isArray(hierarchyDataExtensions)) return extNumber;
+        const ext = hierarchyDataExtensions.find((e) => {
+          const item = e as HierarchyExtension;
+          return item.id === extNumber || item.extension_number === extNumber;
+        }) as HierarchyExtension | undefined;
         return ext?.name || extNumber;
       };
 
@@ -266,7 +273,7 @@ const CELL_STYLE: React.CSSProperties = {
 
       const isCompleted = apiTask.is_completed === true;
       const dueMoment = dueDate ? moment(dueDate) : null;
-      const isOverdue = dueMoment && dueMoment.isBefore(moment(), "day") && !isCompleted;
+      const isOverdue = dueMoment?.isBefore(moment(), "day") && !isCompleted;
       let status: Task["status"] = "pending";
       if (isCompleted) status = "completed";
       else if (isOverdue) status = "overdue";
@@ -295,11 +302,14 @@ const CELL_STYLE: React.CSSProperties = {
 
     // Assignee options for CreateTaskSidebar
     const assigneeOptions = useMemo(() => {
-      if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) return [];
-      return (hierarchyDataExtensions as any[]).map((ext: any) => ({
-        value: ext.extension_number || ext.id || "",
-        label: ext.name || ext.extension_number || ext.id || "Unknown",
-      }));
+      if (!Array.isArray(hierarchyDataExtensions)) return [];
+      return hierarchyDataExtensions.map((ext) => {
+        const item = ext as HierarchyExtension;
+        return {
+          value: item.extension_number || item.id || "",
+          label: item.name || item.extension_number || item.id || "Unknown",
+        };
+      });
     }, [hierarchyDataExtensions]);
 
     // ── Tab state ─────────────────────────────────────────────────────────────────
@@ -415,7 +425,7 @@ const CELL_STYLE: React.CSSProperties = {
 
         const res = await listTasks(params);
         if (res?.data) {
-          const mapped = (res.data as ApiTask[]).map(mapApiTaskToTask);
+          const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
           setTasks(mapped);
           setTotal(res.pagination?.total ?? 0);
         } else {

@@ -10,8 +10,10 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
+import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
+import { LinkButton } from "@components/shared/LinkButton";
 
-const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+const font = BILLING_FONT;
 
 const toInvoiceViewData = (invoice: InvoiceData): InvoiceViewData => ({
   ...(invoice as unknown as InvoiceViewData),
@@ -29,28 +31,6 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
   }
   return next;
 };
-
-const LINK_BUTTON_RESET: React.CSSProperties = {
-  background: "none",
-  border: "none",
-  padding: 0,
-};
-
-function LinkButton({
-  onClick,
-  style,
-  children,
-}: Readonly<{
-  onClick?: () => void;
-  style: React.CSSProperties;
-  children: React.ReactNode;
-}>) {
-  return (
-    <button type="button" onClick={onClick ?? (() => null)} style={{ ...style, ...LINK_BUTTON_RESET }}>
-      {children}
-    </button>
-  );
-}
 
 function CardActions({
   onView,
@@ -194,13 +174,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   actionLink: {
-    fontWeight: 600,
-    color: "rgb(0, 97, 98)",
-    cursor: "pointer",
-    textUnderlineOffset: "24%",
-    textDecoration: "underline",
-    fontFamily: font,
-    fontSize: 14,
+    ...BILLING_LINK,
   },
   divider: {
     color: "#ccc",
