@@ -2,8 +2,67 @@ import { useState, useEffect, useCallback } from "react";
 import { Info, Plus } from "lucide-react";
 import { GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+const PLACEHOLDER = "—";
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function formatNameWithOptionalEmail(name: unknown, email: unknown): string | null {
+  const n = toNonEmptyString(name);
+  if (!n) return null;
+  const e = toNonEmptyString(email);
+  return e ? `${n} (${e})` : n;
+}
+
+function getCompanyName(companyDetails: any, session: any): string {
+  return companyDetails?.name ?? session?.user?.company_name ?? PLACEHOLDER;
+}
+
+function getBusinessTrn(companyDetails: any): string {
+  return (
+    companyDetails?.profile?.trn ??
+    companyDetails?.trn ??
+    companyDetails?.business_trn ??
+    companyDetails?.business_trn_number ??
+    PLACEHOLDER
+  );
+}
+
+function getPrimaryContactLabel(companyDetails: any, session: any): string {
+  const fromCompany =
+    formatNameWithOptionalEmail(
+      companyDetails?.primary_contact_name ?? companyDetails?.billing_contact_name,
+      companyDetails?.email
+    );
+  return fromCompany ?? session?.user?.name ?? PLACEHOLDER;
+}
+
+function getBillingContactLabel(companyDetails: any, primaryContactLabel: string): string {
+  const fromBilling =
+    formatNameWithOptionalEmail(
+      companyDetails?.billing_contact_name,
+      companyDetails?.billing_email ?? companyDetails?.email
+    );
+  return fromBilling ?? primaryContactLabel;
+}
+
+function toSelectDefaultValue(label: string): string | undefined {
+  const normalized = toNonEmptyString(label);
+  if (!normalized || normalized === PLACEHOLDER) return undefined;
+  return normalized;
+}
+
+function getAddressDisplay(companyDetails: any): string {
+  const lines = getAddressLines(companyDetails);
+  return lines.length > 0 ? lines.join("\n") : PLACEHOLDER;
+}
 
 function getAddressLines(companyDetails: any): string[] {
   if (!companyDetails) return [];
@@ -281,13 +340,13 @@ function SelectField({
   requiredNote,
   placeholder,
   defaultValue,
-}: {
+}: Readonly<{
   label: string;
   required?: boolean;
   requiredNote?: boolean;
   placeholder?: string;
   defaultValue?: string;
-}) {
+}>) {
   return (
     <div>
       <span style={s.selectLabel}>
@@ -312,6 +371,7 @@ function SelectField({
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function CompanyInfoPage() {
+
   const { data: session } = useSession();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -333,16 +393,65 @@ export default function CompanyInfoPage() {
     fetchCompany();
   }, [fetchCompany]);
 
-  const companyName = companyDetails?.name ?? session?.user?.company_name ?? "—";
-  const addressLines = getAddressLines(companyDetails);
-  const addressDisplay = addressLines.length > 0 ? addressLines.join("\n") : null;
-  const trn = companyDetails?.profile?.trn ?? companyDetails?.trn ?? companyDetails?.business_trn ?? companyDetails?.business_trn_number ?? "—";
-  const primaryContactLabel = companyDetails?.primary_contact_name ?? companyDetails?.billing_contact_name
-    ? `${companyDetails.primary_contact_name ?? companyDetails.billing_contact_name}${companyDetails?.email ? ` (${companyDetails.email})` : ""}`
-    : session?.user?.name ?? "—";
-  const billingContactLabel = companyDetails?.billing_contact_name
-    ? `${companyDetails.billing_contact_name}${companyDetails?.billing_email ? ` (${companyDetails.billing_email})` : companyDetails?.email ? ` (${companyDetails.email})` : ""}`
-    : primaryContactLabel;
+  const companyName = getCompanyName(companyDetails, session);
+  const addressDisplay = getAddressDisplay(companyDetails);
+  const trn = getBusinessTrn(companyDetails);
+  const primaryContactLabel = getPrimaryContactLabel(companyDetails, session);
+  const billingContactLabel = getBillingContactLabel(companyDetails, primaryContactLabel);
+  const primaryDefault = toSelectDefaultValue(primaryContactLabel);
+  const billingDefault = toSelectDefaultValue(billingContactLabel);
+  const billingDefaultForOthers = billingDefault ?? primaryDefault;
+
+  const companyInfoSection = loading ? (
+    <div style={{ ...s.card, padding: 40, textAlign: "center" as const, color: "#666", fontFamily: font }}>
+      Loading…
+    </div>
+  ) : (
+    <div style={s.card}>
+      {/* Company Name */}
+      <div style={s.infoRow}>
+        <div style={s.infoLeft}>
+          <div style={{ width: 100, flexShrink: 0, display: "flex", alignItems: "flex-start", paddingTop: 4 }}>
+            <CompanyLogo />
+          </div>
+          <div>
+            <p style={s.fieldLabel}>Company Name</p>
+            <p style={s.fieldValue}>{companyName}</p>
+          </div>
+        </div>
+        {/* <button style={s.btnLight}>Edit name</button> */}
+      </div>
+
+      {/* Primary Company Address */}
+      <div style={s.infoRow}>
+        <div style={s.infoLeft}>
+          <div style={{ width: 100, flexShrink: 0 }} />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <p style={{ ...s.fieldLabel, margin: 0 }}>Primary Company Address</p>
+              <Info size={14} color="#888" />
+            </div>
+            <p style={{ ...s.fieldValue, lineHeight: "24px", whiteSpace: "pre-line" }}>
+              {addressDisplay}
+            </p>
+          </div>
+        </div>
+        {/* <button style={s.btnLight}>Edit address</button> */}
+      </div>
+
+      {/* Business TRN number */}
+      <div style={{ ...s.infoRow, borderBottom: "none" }}>
+        <div style={s.infoLeft}>
+          <div style={{ width: 100, flexShrink: 0 }} />
+          <div>
+            <p style={s.fieldLabel}>Business TRN number</p>
+            <p style={s.fieldValue}>{trn}</p>
+          </div>
+        </div>
+        {/* <button style={s.btnLight}>Edit Business TRN number</button> */}
+      </div>
+    </div>
+  );
 
   return (
     <div style={s.page}>
@@ -350,61 +459,16 @@ export default function CompanyInfoPage() {
       {/* ── Company Information ── */}
       <h1 style={s.pageHeading}>Company Information</h1>
 
-      {loading ? (
-        <div style={{ ...s.card, padding: 40, textAlign: "center" as const, color: "#666", fontFamily: font }}>
-          Loading…
-        </div>
-      ) : (
-      <div style={s.card}>
-        {/* Company Name */}
-        <div style={s.infoRow}>
-          <div style={s.infoLeft}>
-            <div style={{ width: 100, flexShrink: 0, display: "flex", alignItems: "flex-start", paddingTop: 4 }}>
-              <CompanyLogo />
-            </div>
-            <div>
-              <p style={s.fieldLabel}>Company Name</p>
-              <p style={s.fieldValue}>{companyName}</p>
-            </div>
-          </div>
-          <button style={s.btnLight}>Edit name</button>
-        </div>
-
-        {/* Primary Company Address */}
-        <div style={s.infoRow}>
-          <div style={s.infoLeft}>
-            <div style={{ width: 100, flexShrink: 0 }} />
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                <p style={{ ...s.fieldLabel, margin: 0 }}>Primary Company Address</p>
-                <Info size={14} color="#888" />
-              </div>
-              <p style={{ ...s.fieldValue, lineHeight: "24px", whiteSpace: "pre-line" }}>
-                {addressDisplay ?? "—"}
-              </p>
-            </div>
-          </div>
-          <button style={s.btnLight}>Edit address</button>
-        </div>
-
-        {/* Business TRN number */}
-        <div style={{ ...s.infoRow, borderBottom: "none" }}>
-          <div style={s.infoLeft}>
-            <div style={{ width: 100, flexShrink: 0 }} />
-            <div>
-              <p style={s.fieldLabel}>Business TRN number</p>
-              <p style={s.fieldValue}>{trn}</p>
-            </div>
-          </div>
-          <button style={s.btnLight}>Edit Business TRN number</button>
-        </div>
-      </div>
-      )}
+      {companyInfoSection}
 
       {/* ── Points of Contact ── */}
       <div style={{ ...s.sectionHeadingRow, marginTop: 8 }}>
         <h2 style={s.sectionHeading}>Points of Contact</h2>
-        <a style={s.link}>Looking for user permissions?</a>
+        {session?.user?.permissions?.includes(HEADER_CONSTANTS.PERMISSIONS.VIEW_SETTINGS as PermissionName) && (
+            <Link href="/main-settings/account-defaults?tab=general" style={s.link}>
+              Looking for user permissions?
+            </Link>
+        )}
       </div>
 
       {/* Primary + Billing contacts side by side */}
@@ -419,7 +483,7 @@ export default function CompanyInfoPage() {
             label="Select a user"
             required
             requiredNote
-            defaultValue={primaryContactLabel !== "—" ? primaryContactLabel : undefined}
+            defaultValue={primaryDefault}
             placeholder="Select a contact"
           />
           <button style={s.addAnother}>
@@ -438,7 +502,7 @@ export default function CompanyInfoPage() {
             label="Select a user"
             required
             requiredNote
-            defaultValue={billingContactLabel !== "—" ? billingContactLabel : undefined}
+            defaultValue={billingDefault}
             placeholder="Select a contact"
           />
           <button style={s.addAnother}>
@@ -458,7 +522,7 @@ export default function CompanyInfoPage() {
             <p style={s.otherContactName}>Accounts Payable</p>
             <p style={s.otherContactDesc}>Send copies of invoices and credit memos to these users or email addresses.</p>
           </div>
-          <SelectField label="Select a user or enter an email address" placeholder="Select a contact" />
+          <SelectField label="Select a user or enter an email address" placeholder="Select a contact" defaultValue={billingDefaultForOthers}  />
         </div>
 
         {/* Decision Maker */}
@@ -467,7 +531,7 @@ export default function CompanyInfoPage() {
             <p style={s.otherContactName}>Decision Maker</p>
             <p style={s.otherContactDesc}>Approves HubSpot purchases, upgrades, and renewals. Receives all important account notifications.</p>
           </div>
-          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" />
+          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" defaultValue={billingDefaultForOthers} />
         </div>
 
         {/* Onboarding Contact */}
@@ -476,7 +540,7 @@ export default function CompanyInfoPage() {
             <p style={s.otherContactName}>Onboarding Contact</p>
             <p style={s.otherContactDesc}>Sets up this account through our onboarding process with HubSpot.</p>
           </div>
-          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" />
+          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" defaultValue={billingDefaultForOthers} />
         </div>
 
         {/* Security Contact */}
@@ -485,7 +549,7 @@ export default function CompanyInfoPage() {
             <p style={s.otherContactName}>Security Contact</p>
             <p style={s.otherContactDesc}>Receives security alerts and notifications.</p>
           </div>
-          <SelectField label="Select a user or enter an email address" required requiredNote placeholder="Select a contact" />
+          <SelectField label="Select a user or enter an email address" required requiredNote placeholder="Select a contact" defaultValue={billingDefaultForOthers} />
         </div>
 
         {/* Technical Admin */}
@@ -494,7 +558,7 @@ export default function CompanyInfoPage() {
             <p style={s.otherContactName}>Technical Admin</p>
             <p style={s.otherContactDesc}>Manages all technical settings in this account, such as domain and integration changes.</p>
           </div>
-          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" />
+          <SelectField label="Select a user" required requiredNote placeholder="Select a contact" defaultValue={billingDefaultForOthers} />
         </div>
       </div>
 

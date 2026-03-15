@@ -5,45 +5,26 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import {
   getCampaigns,
-  postCampaigns,
   getCampaign,
-  putCampaign,
   deleteCampaign,
   postCampaignDispatch,
   postCampaignPause,
   postCampaignResume,
   postCampaignStop,
   getCampaignStatus,
-  getVoicebots,
-  getTrunks,
   type ListCampaignsParams,
-  type CreateCampaignPayload,
-  type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
+import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { getCompanies } from "@utils/voicebot/inbound";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useRouter } from "next/router";
-import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity } from "lucide-react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, ClipboardList, Megaphone, Bot, Phone, Timer, Layers, Check } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { formatDateForTable } from "@utils/Helper";
 import "@assets/scss/common.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
-
-interface VoicebotOption {
-  id: number | string;
-  name: string;
-}
-
-interface TrunkOption {
-  id: string;
-  trunk_id?: string;
-  name: string;
-}
 
 interface CampaignRow {
   id?: number | string;
@@ -63,118 +44,60 @@ interface CampaignRow {
   [key: string]: unknown;
 }
 
-const defaultCreateForm: CreateCampaignPayload & { target_list_raw?: string } = {
-  company_id: "",
-  name: "",
-  description: "",
-  voicebot_id: undefined,
-  trunk_id: "",
-  caller_id: "",
-  target_list: [],
-  target_list_raw: "",
-  schedule_start: "",
-  schedule_end: "",
-  retry_attempts: 3,
-  retry_interval_minutes: 60,
-  status: "draft",
-};
+function getDispatchStatusVariant(status: string): "warning" | "success" | "secondary" {
+  if (status === "draft") return "warning";
+  if (status === "active" || status === "running") return "success";
+  return "secondary";
+}
 
-const defaultEditForm: UpdateCampaignPayload = {
-  company_id: "",
-  name: "",
-  description: "",
-  retry_attempts: 3,
-};
+function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | "primary" | "secondary" {
+  if (status === "active") return "success";
+  if (status === "paused") return "warning";
+  if (status === "running") return "primary";
+  return "secondary";
+}
 
 const CampaignsPage = () => {
-  const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const [data, setData] = useState<CampaignRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
-  const [trunks, setTrunks] = useState<TrunkOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [totalRows, setTotalRows] = useState(0);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CampaignRow | null>(null);
-  const [formLoading, setFormLoading] = useState(false);
   const [opLoading, setOpLoading] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState<typeof defaultCreateForm>({ ...defaultCreateForm });
-  const [editForm, setEditForm] = useState<typeof defaultEditForm>({ ...defaultEditForm });
   const [statusData, setStatusData] = useState<Record<string, unknown> | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchSummaryData, setDispatchSummaryData] = useState<Record<string, unknown> | null>(null);
+  const [dispatchSummaryLoading, setDispatchSummaryLoading] = useState(false);
+  const [rowToDispatch, setRowToDispatch] = useState<CampaignRow | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies({ show_inactive: true });
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => ({
-        id: c.company_id ?? (c as { id?: string }).id ?? "",
-        company_id: c.company_id ?? (c as { id?: string }).id,
-        name: (c as { name?: string }).name ?? "",
-      }));
-      setCompanies(opts);
-      if (opts.length && !createForm.company_id) setCreateForm((f) => ({ ...f, company_id: opts[0].id }));
+      const res = await getCompanies();
+      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
     }
   }, []);
 
-  const fetchVoicebots = useCallback(async () => {
-    try {
-      const res = await getVoicebots({ page: 1, page_size: 500 });
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { bot_id?: number; id?: number; name?: string }[] })?.results ??
-          (res as { data?: { bot_id?: number; id?: number; name?: string }[] })?.data ??
-          [];
-      const raw = Array.isArray(list) ? list : [];
-      setVoicebots(
-        raw.map((b) => ({
-          id: b.bot_id ?? (b as { id?: number }).id ?? 0,
-          name: (b as { name?: string }).name ?? "",
-        }))
-      );
-    } catch {
-      setVoicebots([]);
-    }
-  }, []);
-
-  const fetchTrunks = useCallback(async () => {
-    try {
-      const res = await getTrunks();
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: TrunkOption[] })?.results ?? (res as { data?: TrunkOption[] })?.data ?? [];
-      const raw = Array.isArray(list) ? list : [];
-      setTrunks(
-        raw.map((t) => ({
-          id: t.trunk_id ?? t.id ?? "",
-          trunk_id: t.trunk_id ?? t.id,
-          name: (t as { name?: string }).name ?? "",
-        }))
-      );
-    } catch {
-      setTrunks([]);
-    }
-  }, []);
+  const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
+  const effectiveCompanyId = isAdmin ? companyFilter : companyIdentifier || companyFilter;
 
   const fetchCampaigns = useCallback(async () => {
+    if (!isAdmin && !companyIdentifier) return;
     setLoading(true);
     try {
       const params: ListCampaignsParams = { page, page_size: pageSize };
-      if (companyFilter) params.company_id = companyFilter;
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId;
       if (statusFilter) params.status = statusFilter;
       const res = await getCampaigns(params);
       const list = Array.isArray(res)
@@ -189,39 +112,37 @@ const CampaignsPage = () => {
       setData(rows);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Failed to load campaigns");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load campaigns"));
       setData([]);
     } finally {
       setLoading(false);
     }
-  }, [companyFilter, statusFilter, page, pageSize]);
+  }, [effectiveCompanyId, companyIdentifier, isAdmin, statusFilter, page, pageSize]);
 
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
 
   useEffect(() => {
-    fetchVoicebots();
-    fetchTrunks();
-  }, [fetchVoicebots, fetchTrunks]);
+    if (companyIdentifier) {
+      setCompanyFilter(companyIdentifier);
+    }
+  }, [companyIdentifier]);
 
   useEffect(() => {
     fetchCampaigns();
   }, [fetchCampaigns]);
 
   const campaignId = (row: CampaignRow) => String(row.campaign_id ?? row.id ?? "");
-  const selectedCompanyId = selectedRow?.company_id ?? companyFilter;
+  const selectedCompanyId = selectedRow?.company_id ?? effectiveCompanyId;
 
   const handleOp = async (
     op: "dispatch" | "pause" | "resume" | "stop",
     row: CampaignRow
   ) => {
     const id = campaignId(row);
-    const companyId = (row.company_id ?? companyFilter) as string;
-    if (!id) {
-      toast.error("Missing campaign id");
-      return;
-    }
+    const companyId = String(row.company_id ?? effectiveCompanyId ?? "");
+    if (id) {
     setOpLoading(`${op}-${id}`);
     try {
       const payload = companyId ? { company_id: companyId } : undefined;
@@ -233,16 +154,19 @@ const CampaignsPage = () => {
       fetchCampaigns();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || `${op} failed`);
+      toast.error(e?.response?.data?.detail || String(e?.message ?? `${op} failed`));
     } finally {
       setOpLoading(null);
+    }
+    } else {
+      toast.error("Missing campaign id");
     }
   };
 
   const loadStatus = useCallback(
     async (row: CampaignRow) => {
       const id = campaignId(row);
-      const companyId = (row.company_id ?? companyFilter) as string;
+      const companyId = String(row.company_id ?? effectiveCompanyId ?? "");
       setStatusLoading(true);
       setStatusData(null);
       setSelectedRow(row);
@@ -253,7 +177,7 @@ const CampaignsPage = () => {
         setStatusData(typeof res === "object" ? res : { data: res });
       } catch (err: unknown) {
         const e = err as { response?: { data?: { detail?: string } }; message?: string };
-        toast.error(e?.response?.data?.detail || (e?.message as string) || "Failed to load status");
+        toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load status"));
       } finally {
         setStatusLoading(false);
       }
@@ -263,89 +187,111 @@ const CampaignsPage = () => {
 
   const columns: TableColumn<CampaignRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "description", label: "Description", render: (r) => (r.description as string) || "—" },
     {
       key: "status",
       label: "Status",
       sortable: true,
       render: (r) => {
-        const s = (r.status as string) || "—";
-        const variant =
-          s === "active" ? "success" : s === "paused" ? "warning" : s === "running" ? "primary" : "secondary";
-        return <Badge bg={variant}>{s}</Badge>;
+        const s = String(r.status ?? "—");
+        const variant = getCampaignStatusBadgeVariant(s);
+        return <Badge className="status-badge text-capitalize" bg={variant}>{s}</Badge>;
       },
     },
-    { key: "company_id", label: "Company ID", render: (r) => (r.company_id as string) || "—" },
     {
-      key: "schedule",
-      label: "Schedule",
+      key: "voicebot_name",
+      label: "Bot",
+      render: (r) => safeDisplayString(r.voicebot_name),
+    },
+    {
+      key: "company_id",
+      label: "Company",
       render: (r) => {
-        const start = r.schedule_start ? new Date(r.schedule_start as string).toLocaleString() : "—";
-        const end = r.schedule_end ? new Date(r.schedule_end as string).toLocaleString() : "—";
-        return (
-          <span className="small">
-            {start} → {end}
-          </span>
-        );
+        const cid = r.company_id;
+        if (cid) {
+          const company = companies.find((c) => c.id === cid || c.company_id === cid);
+          return company?.name ?? cid;
+        }
+        return "—";
       },
     },
+
+    { key: "created_at", label: "Created At", render: (r) => formatDateForTable(r.created_at as string | undefined) || "—" },
+    
     {
       key: "actions",
       label: "Actions",
       render: (row) => {
         const id = campaignId(row);
         const loadingKey = opLoading;
-        const status = (row.status as string) || "";
+        const status = String(row.status ?? "");
+        const isCompleted = status === "completed";
         return (
           <div className="d-flex flex-wrap gap-1 align-items-center">
-            <Button
-              size="sm"
-              variant="outline-primary"
-              onClick={async () => {
-                setSelectedRow(row);
-                try {
-                  const detail = await getCampaign(id, row.company_id ? { company_id: row.company_id } : undefined);
-                  setEditForm({
-                    company_id: (detail.company_id ?? row.company_id) as string,
-                    name: (detail.name ?? row.name) as string,
-                    description: (detail.description ?? row.description) as string,
-                    retry_attempts: (detail.retry_attempts ?? row.retry_attempts ?? 3) as number,
-                  });
-                  setShowEditModal(true);
-                } catch (e: unknown) {
-                  const err = e as { response?: { data?: { detail?: string } } };
-                  toast.error(err?.response?.data?.detail || "Failed to load campaign details");
-                }
-              }}
-            >
-              <Pencil size={14} />
-            </Button>
-            <Button size="sm" variant="outline-success" onClick={() => handleOp("dispatch", row)} disabled={!!loadingKey}>
-              {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={14} />}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline-warning"
-              onClick={() => handleOp("pause", row)}
-              disabled={!!loadingKey || (status !== "active" && status !== "running")}
-            >
-              {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={14} />}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline-info"
-              onClick={() => handleOp("resume", row)}
-              disabled={!!loadingKey || status !== "paused"}
-            >
-              {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={14} />}
-            </Button>
-            <Button size="sm" variant="outline-danger" onClick={() => handleOp("stop", row)} disabled={!!loadingKey}>
-              {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={14} />}
-            </Button>
+            {isCompleted ? null : (
+              <>
+                <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${encodeURIComponent(String(row.company_id ?? effectiveCompanyId ?? ""))}`}>
+                  <Button size="sm" variant="outline-primary" title="Edit campaign">
+                    <Pencil size={14} />
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
+                  variant="outline-success"
+                  onClick={() => {
+                    setRowToDispatch(row);
+                    setShowDispatchModal(true);
+                    setDispatchSummaryData(null);
+                    setDispatchSummaryLoading(true);
+                    const cid = String(row.company_id ?? effectiveCompanyId ?? "");
+                    if (cid) {
+                      getCampaign(id, { company_id: cid })
+                      .then((res: Record<string, unknown>) => {
+                        const detail = (res?.data ?? res) as Record<string, unknown>;
+                        setDispatchSummaryData(detail);
+                      })
+                      .catch(() => {
+                        toast.error("Failed to load campaign summary");
+                        setShowDispatchModal(false);
+                        setRowToDispatch(null);
+                      })
+                      .finally(() => setDispatchSummaryLoading(false));
+                    } else {
+                      setDispatchSummaryLoading(false);
+                    }
+                  }}
+                  disabled={!!loadingKey}
+                  title="Dispatch campaign"
+                >
+                  {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={14} />}
+                </Button>
+                <Button
+                  size="sm"
+                  title="Pause campaign"
+                  variant="outline-warning"
+                  onClick={() => handleOp("pause", row)}
+                  disabled={!!loadingKey || (status !== "active" && status !== "running")}
+                >
+                  {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={14} />}
+                </Button>
+                <Button
+                  size="sm"
+                  title="Resume campaign"
+                  variant="outline-info"
+                  onClick={() => handleOp("resume", row)}
+                  disabled={!!loadingKey || status !== "paused"}
+                >
+                  {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={14} />}
+                </Button>
+                <Button title="Stop campaign" size="sm" variant="outline-danger" onClick={() => handleOp("stop", row)} disabled={!!loadingKey}>
+                  {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={14} />}
+                </Button>
+              </>
+            )}
             <Button size="sm" variant="outline-secondary" onClick={() => loadStatus(row)} title="Campaign status">
               <Activity size={14} />
             </Button>
             <Button
+              title="Delete campaign"
               size="sm"
               variant="outline-danger"
               onClick={() => {
@@ -360,70 +306,6 @@ const CampaignsPage = () => {
       },
     },
   ];
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createForm.company_id || !createForm.name) {
-      toast.error("Company and name are required");
-      return;
-    }
-    setFormLoading(true);
-    try {
-      const targetList = (createForm.target_list_raw ?? "")
-        .split(/[\n,]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const payload: CreateCampaignPayload = {
-        company_id: createForm.company_id,
-        name: createForm.name,
-        description: createForm.description || undefined,
-        voicebot_id: createForm.voicebot_id,
-        trunk_id: createForm.trunk_id || undefined,
-        caller_id: createForm.caller_id || undefined,
-        target_list: targetList.length ? targetList : undefined,
-        schedule_start: createForm.schedule_start || undefined,
-        schedule_end: createForm.schedule_end || undefined,
-        retry_attempts: createForm.retry_attempts,
-        retry_interval_minutes: createForm.retry_interval_minutes,
-        status: createForm.status || undefined,
-      };
-      await postCampaigns(payload);
-      toast.success("Campaign created");
-      setShowAddModal(false);
-      setCreateForm({ ...defaultCreateForm, company_id: companies[0]?.id ?? "" });
-      fetchCampaigns();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Create failed");
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRow) return;
-    const id = campaignId(selectedRow);
-    setFormLoading(true);
-    try {
-      const payload: UpdateCampaignPayload = {
-        company_id: editForm.company_id || undefined,
-        name: editForm.name,
-        description: editForm.description || undefined,
-        retry_attempts: editForm.retry_attempts,
-      };
-      await putCampaign(id, payload);
-      toast.success("Campaign updated");
-      setShowEditModal(false);
-      setSelectedRow(null);
-      fetchCampaigns();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Update failed");
-    } finally {
-      setFormLoading(false);
-    }
-  };
 
   const handleDeleteConfirm = async () => {
     if (!selectedRow) return;
@@ -442,7 +324,7 @@ const CampaignsPage = () => {
       fetchCampaigns();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Delete failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
     } finally {
       setDeleteLoading(false);
     }
@@ -455,26 +337,25 @@ const CampaignsPage = () => {
         <Col md={12}>
           <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div className="d-flex align-items-center gap-2">
-              <Button variant="link" className="p-0" onClick={() => router.push("/voicebot/outbound")}>
-                ← Back
-              </Button>
+              
               <h2 className="mb-0">Campaigns</h2>
             </div>
             <div className="d-flex align-items-center gap-2 flex-wrap">
+              {isAdmin && (
+                <Form.Select
+                  style={{ width: "180px" }}
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                >
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              )}
               <Form.Select
-                style={{ width: "180px" }}
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-              >
-                <option value="">All companies</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-              <Form.Select
-                style={{ width: "120px" }}
+                style={{ width: "150px" }}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -485,15 +366,11 @@ const CampaignsPage = () => {
                 <option value="running">Running</option>
                 <option value="completed">Completed</option>
               </Form.Select>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setCreateForm({ ...defaultCreateForm, company_id: (companyFilter || companies[0]?.id) ?? "" });
-                  setShowAddModal(true);
-                }}
-              >
-                <Plus size={18} className="me-1" /> Add Campaign
-              </Button>
+              <Link href="/voicebot/outbound/campaigns/create">
+                <Button variant="primary">
+                  <Plus size={18} className="me-1" /> Add Campaign
+                </Button>
+              </Link>
             </div>
           </div>
         </Col>
@@ -520,262 +397,174 @@ const CampaignsPage = () => {
         striped={false}
       />
 
-      {/* Create Campaign Modal */}
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)} centered size="lg">
+      {/* Campaign Summary / Dispatch Modal */}
+      <Modal show={showDispatchModal} onHide={() => { setShowDispatchModal(false); setRowToDispatch(null); setDispatchSummaryData(null); }} centered size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>Create Campaign</Modal.Title>
+          <Modal.Title className="d-flex align-items-center gap-2">
+            <ClipboardList size={20} />
+            Campaign Summary
+          </Modal.Title>
         </Modal.Header>
-        <Form onSubmit={handleCreateSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-2">
-              <Form.Label>Company *</Form.Label>
-              <Form.Select
-                value={createForm.company_id}
-                onChange={(e) => setCreateForm((f) => ({ ...f, company_id: e.target.value }))}
-                required
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Name *</Form.Label>
-              <Form.Control
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                required
-                placeholder="e.g. Q1 2026 Sales Campaign"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={createForm.description ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Lead generation campaign for Q1"
-              />
-            </Form.Group>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Voicebot</Form.Label>
-                  <Form.Select
-                    value={createForm.voicebot_id ?? ""}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({ ...f, voicebot_id: e.target.value ? Number(e.target.value) : undefined }))
-                    }
-                  >
-                    <option value="">—</option>
-                    {voicebots.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Trunk</Form.Label>
-                  <Form.Select
-                    value={createForm.trunk_id ?? ""}
-                    onChange={(e) => setCreateForm((f) => ({ ...f, trunk_id: e.target.value }))}
-                  >
-                    <option value="">—</option>
-                    {trunks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-            <Form.Group className="mb-2">
-              <Form.Label>Caller ID</Form.Label>
-              <Form.Control
-                value={createForm.caller_id ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, caller_id: e.target.value }))}
-                placeholder="+1234567890"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Target list (comma or newline separated)</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={createForm.target_list_raw ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, target_list_raw: e.target.value }))}
-                placeholder="+0987654321, +1122334455"
-              />
-            </Form.Group>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Schedule start (ISO)</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    value={
-                      createForm.schedule_start
-                        ? new Date(createForm.schedule_start).toISOString().slice(0, 16)
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setCreateForm((f) => ({
-                        ...f,
-                        schedule_start: e.target.value ? new Date(e.target.value).toISOString() : "",
-                      }))
-                    }
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Schedule end (ISO)</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    value={
-                      createForm.schedule_end ? new Date(createForm.schedule_end).toISOString().slice(0, 16) : ""
-                    }
-                    onChange={(e) =>
-                      setCreateForm((f) => ({
-                        ...f,
-                        schedule_end: e.target.value ? new Date(e.target.value).toISOString() : "",
-                      }))
-                    }
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Retry attempts</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min={0}
-                    value={createForm.retry_attempts ?? ""}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({
-                        ...f,
-                        retry_attempts: e.target.value ? Number(e.target.value) : undefined,
-                      }))
-                    }
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-2">
-                  <Form.Label>Retry interval (minutes)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min={0}
-                    value={createForm.retry_interval_minutes ?? ""}
-                    onChange={(e) =>
-                      setCreateForm((f) => ({
-                        ...f,
-                        retry_interval_minutes: e.target.value ? Number(e.target.value) : undefined,
-                      }))
-                    }
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Form.Group className="mb-2">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={createForm.status ?? "draft"}
-                onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-              </Form.Select>
-            </Form.Group>
-          </Modal.Body>
+        <Modal.Body>
+          {(() => {
+            if (dispatchSummaryLoading) {
+              return (
+                <div className="text-center py-5">
+                  <Spinner animation="border" />
+                </div>
+              );
+            }
+            if (dispatchSummaryData) {
+              return (
+            <>
+              <Row>
+                <Col md={6}>
+                  <h6 className="d-flex align-items-center gap-2 mb-3" style={{ fontWeight: 600, color: "#1f2937" }}>
+                    <Megaphone size={18} />
+                    Campaign Details
+                  </h6>
+                  <p className="mb-1"><strong>Name:</strong> {String(dispatchSummaryData.name ?? "—")}</p>
+                  <p className="mb-1">
+                    <strong>Status:</strong>{" "}
+                    <Badge bg={getDispatchStatusVariant(String(dispatchSummaryData.status ?? ""))}>
+                      {String(dispatchSummaryData.status ?? "—")}
+                    </Badge>
+                  </p>
+                  <p className="mb-1">
+                    <strong>Total Numbers:</strong>{" "}
+                    <span style={{ color: "#059669" }}>
+                      {Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0)}
+                    </span>
+                  </p>
+                  {String(dispatchSummaryData.description ?? "").trim() ? (
+                    <p className="mb-2 mt-2"><strong>Description:</strong> {String(dispatchSummaryData.description)}</p>
+                  ) : null}
+                </Col>
+                <Col md={6}>
+                  <h6 className="d-flex align-items-center gap-2 mb-3" style={{ fontWeight: 600, color: "#1f2937" }}>
+                    <Bot size={18} />
+                    VoiceBot Configuration
+                  </h6>
+                  {(() => {
+                    const vb = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
+                    if (!vb) return <p className="text-muted small">No VoiceBot linked.</p>;
+                    return (
+                      <>
+                        <p className="mb-1"><strong>VoiceBot:</strong> {safeDisplayString(vb.name, safeDisplayString(dispatchSummaryData.voicebot_name))}</p>
+                        <p className="mb-1"><strong>Voice Model:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.voice_model)}</span></p>
+                        <p className="mb-1"><strong>Language:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.language)}</span></p>
+                        <p className="mb-1"><strong>TTS Provider:</strong> <span style={{ color: "#059669" }}>{safeDisplayString(vb.tts_provider)}</span></p>
+                      </>
+                    );
+                  })()}
+                </Col>
+              </Row>
+              <Row className="mt-3">
+                <Col xs={12} md={4}>
+                  <div className="p-2 rounded bg-light d-flex align-items-center gap-2">
+                    <Phone size={16} />
+                    <div>
+                      <small className="text-muted d-block">Trunk ID</small>
+                      <span className="small">{safeDisplayString((dispatchSummaryData.voicebot as Record<string, unknown> | undefined)?.trunk_id)}</span>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} md={4}>
+                  <div className="p-2 rounded bg-light d-flex align-items-center gap-2">
+                    <Timer size={16} />
+                    <div>
+                      <small className="text-muted d-block">Max Duration</small>
+                      <span className="small">
+                        {(() => {
+                          const vbRec = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
+                          const sec = typeof vbRec?.max_call_duration === "number" ? vbRec.max_call_duration : undefined;
+                          if (sec != null) {
+                          const m = Math.floor(sec / 60);
+                          const suffix = m > 0 ? " (" + m + "m)" : "";
+                          return String(sec) + "s" + suffix;
+                        }
+                        return "—";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </Col>
+                <Col xs={12} md={4}>
+                  <div className="p-2 rounded bg-light d-flex align-items-center gap-2">
+                    <Layers size={16} />
+                    <div>
+                      <small className="text-muted d-block">Concurrency</small>
+                      <span className="small">
+                        {(() => {
+                          const v = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
+                          const limit = v?.concurrency_limit;
+                          if (limit == null) return "—";
+                          return safeDisplayString(limit, "—") + " calls";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <div className="mt-4 pt-3 border-top">
+                <h6 className="d-flex align-items-center gap-2 mb-3" style={{ fontWeight: 600, color: "#1f2937" }}>
+                  <Check size={18} color="#059669" />
+                  Pre-Dispatch Validation
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  {(() => {
+                    const vb = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
+                    const targetCount = Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0);
+                    const scriptOk = String(dispatchSummaryData.campaign_script ?? "").trim().length > 0;
+                    const items = [
+                      { ok: safeDisplayString(vb?.status, "") === "active", label: "VoiceBot is active" },
+                      { ok: !!vb?.trunk_id, label: "Trunk is configured" },
+                      { ok: targetCount > 0, label: `${targetCount} target number${targetCount === 1 ? "" : "s"} loaded` },
+                      { ok: scriptOk, label: "Campaign script is configured" },
+                    ];
+                    return items.map((item) => (
+                      <div
+                        key={item.label}
+                        className="d-flex align-items-center gap-2 px-3 py-2 rounded"
+                        style={{
+                          backgroundColor: item.ok ? "#d1fae5" : "#f3f4f6",
+                          color: item.ok ? "#047857" : "#6b7280",
+                        }}
+                      >
+                        
+                        <span style={{ fontWeight: 500 }}>{item.ok ? "✓ " : ""}{item.label}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </>
+              );
+            }
+            return <p className="text-muted mb-0">No campaign data to display.</p>;
+          })()}
+        </Modal.Body>
+        {dispatchSummaryData && !dispatchSummaryLoading && (
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+            <Button variant="secondary" onClick={() => { setShowDispatchModal(false); setRowToDispatch(null); setDispatchSummaryData(null); }}>
               Cancel
             </Button>
             <Button
-              variant="primary"
-              type="submit"
-              disabled={formLoading || !createForm.company_id || !createForm.name}
+              variant="success"
+              disabled={!!opLoading}
+              onClick={async () => {
+                if (!rowToDispatch) return;
+                await handleOp("dispatch", rowToDispatch);
+                setShowDispatchModal(false);
+                setRowToDispatch(null);
+                setDispatchSummaryData(null);
+              }}
             >
-              {formLoading ? <Spinner animation="border" size="sm" /> : "Create"}
+              {opLoading && rowToDispatch && opLoading === `dispatch-${campaignId(rowToDispatch)}` ? <Spinner animation="border" size="sm" className="me-1" /> : null}
+              Confirm Dispatch
             </Button>
           </Modal.Footer>
-        </Form>
-      </Modal>
-
-      {/* Edit Campaign Modal */}
-      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setSelectedRow(null); }} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Campaign</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleEditSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-2">
-              <Form.Label>Company</Form.Label>
-              <Form.Select
-                value={editForm.company_id ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, company_id: e.target.value }))}
-              >
-                <option value="">—</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Name *</Form.Label>
-              <Form.Control
-                value={editForm.name ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                required
-                placeholder="Campaign name"
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={2}
-                value={editForm.description ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </Form.Group>
-            <Form.Group className="mb-2">
-              <Form.Label>Retry attempts</Form.Label>
-              <Form.Control
-                type="number"
-                min={0}
-                value={editForm.retry_attempts ?? ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({
-                    ...f,
-                    retry_attempts: e.target.value ? Number(e.target.value) : undefined,
-                  }))
-                }
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowEditModal(false); setSelectedRow(null); }}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={formLoading || !editForm.name}>
-              {formLoading ? <Spinner animation="border" size="sm" /> : "Save"}
-            </Button>
-          </Modal.Footer>
-        </Form>
+        )}
       </Modal>
 
       <DeleteConfirmationModal
@@ -793,17 +582,67 @@ const CampaignsPage = () => {
           <Modal.Title>Campaign Status {selectedRow?.name ? `— ${selectedRow.name}` : ""}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {statusLoading ? (
-            <div className="text-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : statusData ? (
-            <pre className="bg-light p-3 rounded small mb-0" style={{ maxHeight: "70vh", overflow: "auto" }}>
-              {JSON.stringify(statusData, null, 2)}
-            </pre>
-          ) : (
-            <p className="text-muted mb-0">No status data.</p>
-          )}
+          {(() => {
+            if (statusLoading) {
+              return (
+                <div className="text-center py-4">
+                  <Spinner animation="border" />
+                </div>
+              );
+            }
+            if (statusData) {
+            return (
+            (() => {
+              const data = (statusData.data ?? statusData) as Record<string, unknown>;
+              const campaignStatus = safeDisplayString(data.campaign_status);
+              const totalNumbers = Number(data.total_numbers ?? 0);
+              const dispatched = Number(data.dispatched ?? 0);
+              const inProgress = Number(data.in_progress ?? 0);
+              const completed = Number(data.completed ?? 0);
+              const failed = Number(data.failed ?? 0);
+              const successRate = Number(data.success_rate ?? 0);
+              const avgCallDuration = Number(data.avg_call_duration ?? 0);
+              const totalCost = Number(data.total_cost ?? 0);
+              const formatDuration = (sec: number) => (sec >= 60 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${sec}s`);
+              let statusVariant: "success" | "primary" | "secondary" = "secondary";
+              if (campaignStatus === "completed") statusVariant = "success";
+              else if (campaignStatus === "running" || campaignStatus === "active") statusVariant = "primary";
+
+              const cards: { label: string; value: string; isStatus?: boolean }[] = [
+                { label: "Campaign Status", value: campaignStatus, isStatus: true },
+                { label: "Total Numbers", value: String(totalNumbers) },
+                { label: "Dispatched", value: String(dispatched) },
+                { label: "In Progress", value: String(inProgress) },
+                { label: "Completed", value: String(completed) },
+                { label: "Failed", value: String(failed) },
+                { label: "Success Rate", value: `${Number(successRate).toFixed(1)}%` },
+                { label: "Avg Call Duration", value: formatDuration(avgCallDuration) },
+                { label: "Total Cost", value: String(totalCost) },
+              ];
+              return (
+                <div className="row g-3">
+                  {cards.map((card) => (
+                    <div key={card.label} className="col-6 col-md-4">
+                      <div className="card h-100 border rounded">
+                        <div className="card-body py-3 px-3">
+                          <div className="small text-muted mb-1">{card.label}</div>
+                          <div className="fw-semibold">
+                            {card.isStatus ? (
+                              <Badge bg={statusVariant} className="text-capitalize">{card.value}</Badge>
+                            ) : (
+                              card.value
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })() );
+            }
+            return <p className="text-muted mb-0">No status data.</p>;
+          })()}
         </Modal.Body>
       </Modal>
     </React.Fragment>

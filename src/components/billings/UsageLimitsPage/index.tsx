@@ -1,21 +1,13 @@
 import { useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, ReferenceLine,
+  LineChart, Line,
 } from "recharts";
 import { RefreshCw, ExternalLink, Search, PlusCircle, ChevronDown, Info, Check } from "lucide-react";
+import Link from "next/link";
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
-
-// ── Helper functions for dynamic styles ──────────────────────────────────────
-const getSidebarItemStyle = (active: boolean): React.CSSProperties => ({
-  display: "block", width: "100%", textAlign: "left", background: "none", border: "none",
-  fontFamily: font, fontSize: 14, fontWeight: active ? 600 : 400,
-  color: active ? "#141414" : "#444",
-  padding: "10px 20px", cursor: "pointer",
-  borderLeft: active ? "3px solid #141414" : "3px solid transparent",
-});
 
 const getTagStyle = (color: string, bg: string): React.CSSProperties => ({
   fontSize: 10, fontWeight: 700, fontFamily: font, padding: "2px 8px",
@@ -69,14 +61,14 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 // ── Bar chart data (usage this month) ─────────────────────────────────────────
-const monthBarData = [{ name: "", used: 10, limit: 490 }];
+const monthBarData = [{ name: "", used: 0, limit: 0 }];
 
-const barTicks = [0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500];
+const barTicks = [0, 0];
 
 // ── Historical line chart data ─────────────────────────────────────────────────
 const historicalData = [
-  { period: "1 Feb 2026 – 28 Feb 2026", nonBilled: 1500, billed: 1450, monthly: 500 },
-  { period: "11 Feb 2026 – 10 Mar 2026", nonBilled: 0, billed: 10, monthly: 500 },
+  { period: "1 Feb 2026 – 28 Feb 2026", nonBilled: 0, billed: 0, monthly: 0 },
+  { period: "11 Feb 2026 – 10 Mar 2026", nonBilled: 0, billed: 0, monthly: 0 },
 ];
 
 // ── Feature table rows ─────────────────────────────────────────────────────────
@@ -102,7 +94,6 @@ const CustomBarTooltip = ({ active, payload }: any) => {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function UsageLimitsPage() {
-  const [activeSection, setActiveSection] = useState("Credits");
   const [showUnbilled, setShowUnbilled] = useState(true);
   const [featureFilter, setFeatureFilter] = useState("All features");
   const [searchQuery, setSearchQuery] = useState("");
@@ -134,7 +125,7 @@ export default function UsageLimitsPage() {
               {/* Left */}
               <div style={{ minWidth: 180 }}>
                 <div style={s.label}>Monthly credits <Info size={12} color="#999" style={{ display: "inline", verticalAlign: "middle" }} /></div>
-                <div style={s.value}>500</div>
+                <div style={s.value}>0</div>
                 <button style={s.btnDark}>
                   <PlusCircle size={13} /> Add credits
                 </button>
@@ -146,11 +137,11 @@ export default function UsageLimitsPage() {
                 <p style={{ fontSize: 13, color: "#141414", margin: "0 0 8px 0", lineHeight: "20px" }}>
                    Credits are a simple, flexible way to pay for what you use. Credits works across all usage-based features.
                 </p>
-                <a style={s.link}><span>Learn more</span><ExternalLink size={11} /></a>
+                <Link href="/settings" style={s.link}><span>Learn more</span><ExternalLink size={11} /></Link>
                 <p style={{ fontSize: 13, color: "#141414", margin: "10px 0 6px 0" }}>
                   Credits are managed by users with billing permissions or super admin access.
                 </p>
-                <a style={s.link}><span>Manage user permissions</span><ExternalLink size={11} /></a>
+                <Link href="/settings" style={s.link}><span>Manage user permissions</span><ExternalLink size={11} /></Link>
               </div>
             </div>
           </div>
@@ -186,12 +177,12 @@ export default function UsageLimitsPage() {
               <ResponsiveContainer width="100%" height={80}>
                 <BarChart
                   layout="vertical"
-                  data={[{ name: "usage", used: 10, rest: 490 }]}
+                  data={[{ name: "usage", used: 0, rest: 0 }]}
                   margin={{ top: 16, right: 1, left: 0, bottom: 0 }}
                   barCategoryGap={0}
                 >
                   <XAxis
-                    type="number" domain={[0, 500]} ticks={barTicks}
+                    type="number" domain={[0, 0]} ticks={barTicks}
                     tick={{ fontSize: 11, fill: "#888", fontFamily: font }}
                     axisLine={false} tickLine={false}
                   />
@@ -199,7 +190,7 @@ export default function UsageLimitsPage() {
                   <Tooltip content={<CustomBarTooltip />} />
                   <Bar dataKey="used" stackId="a" fill="#00897b" barSize={22} radius={[0, 0, 0, 0]}>
                     <foreignObject x={4} y={2} width={30} height={22}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: font, paddingTop: 2 }}>10</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: font, paddingTop: 2 }}>0</div>
                     </foreignObject>
                   </Bar>
                   <Bar dataKey="rest" stackId="a" fill="#e5e5e5" barSize={22} />
@@ -217,7 +208,7 @@ export default function UsageLimitsPage() {
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#666", letterSpacing: 1, fontFamily: font, marginBottom: 6 }}>
                   MONTHLY CREDITS USED
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 300, fontFamily: font, marginBottom: 4 }}>10 of 500</div>
+                <div style={{ fontSize: 28, fontWeight: 300, fontFamily: font, marginBottom: 4 }}>0 of 0</div>
                 <div style={{ fontSize: 13, color: "#666", fontFamily: font }}>credits reset on 11 March</div>
               </div>
             </div>
@@ -264,7 +255,9 @@ export default function UsageLimitsPage() {
                       <tr key={f.name} style={{ backgroundColor: "#fff" }}>
                         <td style={s.tableCell}>
                           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" as const, gap: 4 }}>
-                            <a style={s.link}>{f.name}</a>
+                            <button type="button" style={{ ...s.link, background: "none", border: "none", padding: 0 }} onClick={() => {}}>
+                              {f.name}
+                            </button>
                             {f.tags.map(t => (
                               <span key={t.label} style={getTagStyle(t.color, t.bg)}>{t.label}</span>
                             ))}
@@ -275,12 +268,12 @@ export default function UsageLimitsPage() {
                           {f.status === "not" ? (
                             <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#888" }}>
                               <span style={{ width: 8, height: 8, borderRadius: "50%", border: "2px solid #aaa", display: "inline-block" }} />
-                              Not consuming credits
+                              <span>Not consuming credits</span>
                             </span>
                           ) : (
                             <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#141414" }}>
                               <span style={getDotStyle("#00897b")} />
-                              Consuming credits
+                              <span>Consuming credits</span>
                             </span>
                           )}
                         </td>
@@ -299,13 +292,18 @@ export default function UsageLimitsPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 13, color: "#444", fontFamily: font }}>Show usage that isn't billed</span>
                 {/* Toggle */}
-                <div
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showUnbilled}
                   onClick={() => setShowUnbilled(!showUnbilled)}
                   style={{
                     width: 40, height: 22, borderRadius: 11, cursor: "pointer",
                     backgroundColor: showUnbilled ? "#141414" : "#ccc",
                     position: "relative" as const, transition: "background 200ms",
                     display: "flex", alignItems: "center",
+                    border: "none",
+                    padding: 0,
                   }}
                 >
                   <div style={{
@@ -315,7 +313,7 @@ export default function UsageLimitsPage() {
                   }}>
                     {showUnbilled && <Check size={10} color="#141414" strokeWidth={3} />}
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -356,7 +354,7 @@ export default function UsageLimitsPage() {
                   axisLine={false} tickLine={false}
                   tickFormatter={v => v >= 1000 ? `${v / 1000}K` : v}
                   label={{ value: "Credits used", angle: -90, position: "insideLeft", offset: -4, fontSize: 12, fill: "#888", fontFamily: font }}
-                  domain={[0, 2000]} ticks={[0, 500, 1000, 1500, 2000]}
+                  domain={[0, 0]} ticks={[0, 0]}
                 />
                 <Tooltip
                   contentStyle={{ fontFamily: font, fontSize: 12, borderRadius: 6 }}
@@ -415,9 +413,9 @@ export default function UsageLimitsPage() {
                   <tr>
                     <td style={s.tableCell}>Intent</td>
                     <td style={s.tableCell}>Company Added and/or Tracked</td>
-                    <td style={s.tableCell}>10 credits</td>
-                    <td style={s.tableCell}>1</td>
-                    <td style={s.tableCell}>10</td>
+                    <td style={s.tableCell}>0 credits</td>
+                    <td style={s.tableCell}>0</td>
+                    <td style={s.tableCell}>0</td>
                   </tr>
                 </tbody>
               </table>

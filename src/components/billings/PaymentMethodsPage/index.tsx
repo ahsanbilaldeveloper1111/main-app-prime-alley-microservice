@@ -348,14 +348,25 @@ function CheckIcon() {
   );
 }
 
-function getBillingAddressLines(companyDetails: any): string[] {
+type BillingAddressLine = {
+  key: string;
+  text: string;
+  tone: "primary" | "secondary";
+};
+
+function getBillingAddressLines(companyDetails: any): BillingAddressLine[] {
   if (!companyDetails) return [];
   const address = companyDetails?.profile?.address;
   const country = companyDetails?.country ?? companyDetails?.profile?.country ?? companyDetails?.billing_address?.country ?? "";
   if (typeof address === "string" && address.trim()) {
     const lines = address.split("\n").filter(Boolean);
-    if (country.trim()) lines.push(country.trim());
-    return lines;
+    const out: BillingAddressLine[] = lines.map((text, idx) => ({
+      key: `address_${idx + 1}`,
+      text,
+      tone: idx === 0 ? "primary" : "secondary",
+    }));
+    if (country.trim()) out.push({ key: "country", text: country.trim(), tone: "secondary" });
+    return out;
   }
   const p = companyDetails?.profile ?? companyDetails?.billing_address ?? {};
   const line1 = p?.address_line1 ?? p?.address ?? "";
@@ -363,8 +374,14 @@ function getBillingAddressLines(companyDetails: any): string[] {
   const city = p?.city ?? p?.region ?? "";
   const postal = p?.postal_code ?? "";
   const countryFallback = p?.country ?? country;
-  const parts = [line1, line2, [city, postal].filter(Boolean).join(" "), countryFallback].filter(Boolean);
-  return parts;
+  const cityPostal = [city, postal].filter(Boolean).join(" ");
+
+  const out: BillingAddressLine[] = [];
+  if (line1) out.push({ key: "line1", text: line1, tone: "primary" });
+  if (line2) out.push({ key: "line2", text: line2, tone: "secondary" });
+  if (cityPostal) out.push({ key: "city_postal", text: cityPostal, tone: "secondary" });
+  if (countryFallback) out.push({ key: "country", text: countryFallback, tone: "secondary" });
+  return out;
 }
 
 /** Returns Stripe createToken address fields when using company address */
@@ -398,11 +415,11 @@ function AddCardFormSidebar({
   onSuccess,
   onCancel,
   companyDetails,
-}: {
+}: Readonly<{
   onSuccess: () => void;
   onCancel: () => void;
   companyDetails?: any;
-}) {
+}>) {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -495,8 +512,9 @@ function AddCardFormSidebar({
         </span>
       </p>
 
-      <label style={{ ...s.fieldLabel, marginTop: 20 }}>Name on card *</label>
+      <label htmlFor="cardholderName" style={{ ...s.fieldLabel, marginTop: 20 }}>Name on card *</label>
       <input
+        id="cardholderName"
         style={s.input}
         type="text"
         placeholder="John Doe"
@@ -515,15 +533,15 @@ function AddCardFormSidebar({
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "end", marginTop: 16 }}>
         <div>
-          <label style={s.fieldLabel}>Expiration date *</label>
+          <label htmlFor="cardExpiry" style={s.fieldLabel}>Expiration date *</label>
           <div style={stripeInputWrapper}>
-            <CardExpiryElement options={cardElementOptions} />
+            <CardExpiryElement id="cardExpiry" options={cardElementOptions} />
           </div>
         </div>
         <div>
-          <label style={s.fieldLabel}>Security code *</label>
+          <label htmlFor="cardCvc" style={s.fieldLabel}>Security code *</label>
           <div style={stripeInputWrapper}>
-            <CardCvcElement options={cardElementOptions} />
+            <CardCvcElement id="cardCvc" options={cardElementOptions} />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8 }}>
@@ -541,41 +559,79 @@ function AddCardFormSidebar({
         Your card information is securely processed by Stripe.
       </p>
 
-      <div style={s.checkRow} onClick={() => setIsDefault(!isDefault)}>
-        <div style={{ ...s.checkbox, backgroundColor: isDefault ? "#141414" : "#fff" }}>
+      <label style={{ ...s.checkRow, cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={isDefault}
+          onChange={(e) => setIsDefault(e.target.checked)}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            width: 1,
+            height: 1,
+            margin: 0,
+            pointerEvents: "none",
+          }}
+        />
+        <span
+          aria-hidden="true"
+          style={{ ...s.checkbox, backgroundColor: isDefault ? "#141414" : "#fff" }}
+        >
           {isDefault && <CheckIcon />}
-        </div>
+        </span>
         <span style={s.checkLabel}>Set as default payment method</span>
-      </div>
+      </label>
 
       {companyDetails && (
         <>
           <hr style={s.sectionDivider} />
           <div style={s.sectionHeading}>Billing address</div>
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}
-            onClick={() => setUseCompanyAddress(!useCompanyAddress)}
-          >
-            <div style={{
-              width: 18, height: 18, border: "2px solid #141414", borderRadius: 3,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              backgroundColor: useCompanyAddress ? "#141414" : "#fff", flexShrink: 0,
-            }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={useCompanyAddress}
+              onChange={(e) => setUseCompanyAddress(e.target.checked)}
+              style={{
+                position: "absolute",
+                opacity: 0,
+                width: 1,
+                height: 1,
+                margin: 0,
+                pointerEvents: "none",
+              }}
+            />
+            <span
+              aria-hidden="true"
+              style={{
+                width: 18,
+                height: 18,
+                border: "2px solid #141414",
+                borderRadius: 3,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: useCompanyAddress ? "#141414" : "#fff",
+                flexShrink: 0,
+              }}
+            >
               {useCompanyAddress && (
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                   <polyline points="1.5,5.5 4,8.5 9.5,2.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
-            </div>
-            <span style={{ fontSize: 14, fontFamily: font, color: "#141414", cursor: "pointer" }}>
+            </span>
+            <span style={{ fontSize: 14, fontFamily: font, color: "#141414" }}>
               Use my company address
             </span>
-          </div>
+          </label>
           {useCompanyAddress && billingAddressLines.length > 0 && (
             <div style={{ marginTop: 4, lineHeight: "24px" }}>
-              {billingAddressLines.map((line, i) => (
-                <div key={i} style={{ fontSize: 14, fontFamily: font, color: i === 0 ? "#141414" : "rgb(0, 97, 98)" }}>
-                  {line}
+              {billingAddressLines.map((line) => (
+                <div
+                  key={line.key}
+                  style={{ fontSize: 14, fontFamily: font, color: line.tone === "primary" ? "#141414" : "rgb(0, 97, 98)" }}
+                >
+                  {line.text}
                 </div>
               ))}
             </div>
@@ -599,7 +655,7 @@ function AddCardFormSidebar({
 }
 
 // ── Add Payment Sidebar ────────────────────────────────────────────────────────
-function AddPaymentSidebar({ onClose }: { onClose: () => void }) {
+function AddPaymentSidebar({ onClose }: Readonly<{ onClose: () => void }>) {
   const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [companyDetails, setCompanyDetails] = useState<any>(null);
 
@@ -615,6 +671,7 @@ function AddPaymentSidebar({ onClose }: { onClose: () => void }) {
         const res = await GetCompanyDetails();
         if (!cancelled) setCompanyDetails(res);
       } catch (err) {
+        console.error("AddPaymentSidebar fetchCompany error:", err);
         if (!cancelled) setCompanyDetails(null);
       }
     };
@@ -628,7 +685,12 @@ function AddPaymentSidebar({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div style={s.overlay} onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close add payment sidebar"
+        onClick={onClose}
+        style={{ ...s.overlay, border: "none", padding: 0 }}
+      />
 
       <div style={s.sidebar}>
         <div style={s.sidebarHeader}>
@@ -667,13 +729,18 @@ function AddPaymentSidebar({ onClose }: { onClose: () => void }) {
 function DeleteConfirmModal({
   onConfirm,
   onCancel,
-}: {
+}: Readonly<{
   onConfirm: () => void;
   onCancel: () => void;
-}) {
+}>) {
   return (
     <>
-      <div style={s.overlay} onClick={onCancel} />
+      <button
+        type="button"
+        aria-label="Close delete confirmation"
+        onClick={onCancel}
+        style={{ ...s.overlay, border: "none", padding: 0 }}
+      />
       <div style={{
         position: "fixed" as const,
         left: "50%",
@@ -741,6 +808,7 @@ export default function PaymentMethodsPage() {
       toast.success("Default payment method updated");
       fetchPaymentMethods();
     } catch (err) {
+      console.error("setDefaultPaymentMethod error:", err);
       toast.error("Failed to set default payment method");
     }
   };
@@ -758,6 +826,7 @@ export default function PaymentMethodsPage() {
       setDeleteConfirmId(null);
       fetchPaymentMethods();
     } catch (err) {
+      console.error("deletePaymentMethod error:", err);
       toast.error("Failed to delete payment method");
     }
   };
@@ -777,6 +846,138 @@ export default function PaymentMethodsPage() {
     return "—";
   };
   const isDefault = (m: any) => m?.is_default === true || m?.isDefault === true;
+
+  let tableRows: React.ReactNode;
+  if (loading) {
+    tableRows = (
+      <tr>
+        <td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#666" }}>
+          Loading…
+        </td>
+      </tr>
+    );
+  } else if (paymentMethods.length === 0) {
+    tableRows = (
+      <tr>
+        <td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#666" }}>
+          No payment methods yet. Add one to get started.
+        </td>
+      </tr>
+    );
+  } else {
+    tableRows = paymentMethods.map((method) => (
+      <tr key={method?.id}>
+        <td style={s.td}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span style={s.visaChip}>{brand(method)}</span>
+            <div>
+              <div style={{ fontSize: 14, fontFamily: font, color: "#141414" }}>
+                {brand(method)} <em style={{ fontStyle: "italic", fontWeight: 400 }}>ending in</em>{" "}
+                <strong>{last4(method)}</strong>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: font, color: "#141414" }}>
+                {holder(method)}
+              </div>
+            </div>
+          </div>
+        </td>
+        <td style={s.td}>
+          <span style={{ fontSize: 14, fontFamily: font, color: "#141414", display: "block" }}>
+            {method?.billing_details?.address?.line1 ?? "—"}
+          </span>
+          <span style={s.addressLink}>
+            {method?.billing_details?.address?.line2 ?? method?.billing_details?.address?.city ?? ""}
+          </span>
+          <span style={s.addressLink}>
+            {method?.billing_details?.address?.postal_code ?? ""}{" "}
+            {method?.billing_details?.address?.country ?? ""}
+          </span>
+        </td>
+        <td style={s.td}>
+          <span style={{ fontSize: 14, fontFamily: font, color: "#141414" }}>{expStr(method)}</span>
+        </td>
+        <td style={s.td}>
+          <span style={s.productLink}>Pro Plan</span>
+        </td>
+        <td style={s.td}> <div style={{ display: "flex", alignItems: "center", gap: 4 }}> {isDefault(method) ? <Check size={20} color="#006162" /> : <></>} <span style={{ fontSize: 12, fontFamily: font, color: "#141414" }}>{isDefault(method) ? "Default" : ""}</span></div></td>
+       
+        <td style={{ ...s.td, position: "relative" as const }}>
+          <button
+            style={s.actionsBtn}
+            onClick={() => setActionsOpenId(actionsOpenId === method?.id ? null : method?.id)}
+          >
+            Actions ▾
+          </button>
+          {actionsOpenId === method?.id && (
+            <>
+              <button
+                type="button"
+                aria-label="Close actions menu"
+                onClick={() => setActionsOpenId(null)}
+                style={{
+                  position: "fixed" as const,
+                  inset: 0,
+                  zIndex: 9998,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                }}
+              />
+              <div style={{
+                position: "absolute" as const,
+                top: "calc(100% - 8px)",
+                right: 0,
+                zIndex: 9999,
+                backgroundColor: "#fff",
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                boxShadow: "rgba(20,20,20,0.12) 0px 4px 16px",
+                minWidth: 180,
+                padding: "6px 0",
+              }}>
+                {!isDefault(method) && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetDefault(method.id)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      background: "none",
+                      border: "none",
+                      padding: "10px 16px",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      fontFamily: font,
+                      color: "#141414",
+                    }}
+                  >
+                    Set as default
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteClick(method.id)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: "10px 16px",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontFamily: font,
+                    color: "#c0392b",
+                  }}
+                >
+                  Delete payment method
+                </button>
+              </div>
+            </>
+          )}
+        </td>
+      </tr>
+    ));
+  }
 
   return (
     <div style={s.page}>
@@ -800,113 +1001,7 @@ export default function PaymentMethodsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#666" }}>
-                  Loading…
-                </td>
-              </tr>
-            ) : paymentMethods.length === 0 ? (
-              <tr>
-                <td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#666" }}>
-                  No payment methods yet. Add one to get started.
-                </td>
-              </tr>
-            ) : (
-              paymentMethods.map((method) => (
-                <tr key={method?.id}>
-                  <td style={s.td}>
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                      <span style={s.visaChip}>{brand(method)}</span>
-                      <div>
-                        <div style={{ fontSize: 14, fontFamily: font, color: "#141414" }}>
-                          {brand(method)} <em style={{ fontStyle: "italic", fontWeight: 400 }}>ending in</em>{" "}
-                          <strong>{last4(method)}</strong>
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, fontFamily: font, color: "#141414" }}>
-                          {holder(method)}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={s.td}>
-                    <span style={{ fontSize: 14, fontFamily: font, color: "#141414", display: "block" }}>
-                      {method?.billing_details?.address?.line1 ?? "—"}
-                    </span>
-                    <span style={s.addressLink}>
-                      {method?.billing_details?.address?.line2 ?? method?.billing_details?.address?.city ?? ""}
-                    </span>
-                    <span style={s.addressLink}>
-                      {method?.billing_details?.address?.postal_code ?? ""}{" "}
-                      {method?.billing_details?.address?.country ?? ""}
-                    </span>
-                  </td>
-                  <td style={s.td}>
-                    <span style={{ fontSize: 14, fontFamily: font, color: "#141414" }}>{expStr(method)}</span>
-                  </td>
-                  <td style={s.td}>
-                    <span style={s.productLink}>Pro Plan</span>
-                  </td>
-                  <td style={s.td}> <div style={{ display: "flex", alignItems: "center", gap: 4 }}> {isDefault(method) ? <Check size={20} color="#006162" /> : <></>} <span style={{ fontSize: 12, fontFamily: font, color: "#141414" }}>{isDefault(method) ? "Default" : ""}</span></div></td>
-                 
-                  <td style={{ ...s.td, position: "relative" as const }}>
-                    <button
-                      style={s.actionsBtn}
-                      onClick={() => setActionsOpenId(actionsOpenId === method?.id ? null : method?.id)}
-                    >
-                      Actions ▾
-                    </button>
-                    {actionsOpenId === method?.id && (
-                      <>
-                        <div
-                          style={{ position: "fixed" as const, inset: 0, zIndex: 9998 }}
-                          onClick={() => setActionsOpenId(null)}
-                        />
-                        <div style={{
-                          position: "absolute" as const,
-                          top: "calc(100% - 8px)",
-                          right: 0,
-                          zIndex: 9999,
-                          backgroundColor: "#fff",
-                          border: "1px solid #ccc",
-                          borderRadius: 6,
-                          boxShadow: "rgba(20,20,20,0.12) 0px 4px 16px",
-                          minWidth: 180,
-                          padding: "6px 0",
-                        }}>
-                          {!isDefault(method) && (
-                            <div
-                              onClick={() => handleSetDefault(method.id)}
-                              style={{
-                                padding: "10px 16px",
-                                cursor: "pointer",
-                                fontSize: 14,
-                                fontFamily: font,
-                                color: "#141414",
-                              }}
-                            >
-                              Set as default
-                            </div>
-                          )}
-                          <div
-                            onClick={() => handleDeleteClick(method.id)}
-                            style={{
-                              padding: "10px 16px",
-                              cursor: "pointer",
-                              fontSize: 14,
-                              fontFamily: font,
-                              color: "#c0392b",
-                            }}
-                          >
-                            Delete payment method
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
+            {tableRows}
           </tbody>
         </table>
       </div>

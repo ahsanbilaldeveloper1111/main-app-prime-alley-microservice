@@ -11,19 +11,18 @@
  * 5. A new `<TaskDetailPanel>` Offcanvas sidebar shows task details on Preview/click
  * 
  * HOW TO INTEGRATE WITH REAL DATA:
- * - Search for "TODO: REPLACE WITH REAL API" comments
+ * - Search for "NOTE: REPLACE WITH REAL API" comments
  * - The `expandedProjects` state tracks which project rows are open
  * - The `projectTasks` state is a map of { [projectId]: Task[] }
  * - When a project row is expanded, call your real tasks API and store in `projectTasks`
  */
 
-import React, { ReactElement, useState, useEffect, useRef } from "react";
+import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
-import { useRouter } from "next/router";
 import {
   listProjects,
   createProject,
@@ -36,7 +35,7 @@ import {
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import GenericTable, {
@@ -46,29 +45,29 @@ import GenericTable, {
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
-import { Spinner, Modal, Offcanvas, Badge, ProgressBar } from "react-bootstrap";
-import Select, { SingleValue, StylesConfig } from "react-select";
 import {
-  Container,
-  Row,
-  Col,
-  Card,
+  Badge,
   Button,
+  Col,
+  Container,
   Form,
   Nav,
+  Modal,
+  Offcanvas,
+  ProgressBar,
+  Row,
+  Spinner,
 } from "react-bootstrap";
 import {
   FolderOpen,
   Folder,
   Plus,
-  Search,
   X,
   MoreVertical,
   Calendar,
   AlertCircle,
   CalendarDays,
   Users,
-  SlidersHorizontal,
   Palette,
   Smartphone,
   Megaphone,
@@ -78,15 +77,11 @@ import {
   Settings,
   Trash2,
   ExternalLink,
-  Archive,
   CheckCircle2,
-  Edit3,
   ChevronRight,
   ChevronDown as ChevronDownIcon,
   Circle,
   Clock,
-  Tag,
-  User,
   Eye,
 } from "lucide-react";
 
@@ -116,6 +111,8 @@ interface ApiProject {
   statuses?: Array<any>;
 }
 
+type ProjectStatusFilter = "active" | "completed" | "archived" | "all";
+
 interface Project {
   id: string;
   name: string;
@@ -131,9 +128,26 @@ interface Project {
   apiData?: ApiProject;
 }
 
+const getProjectStatusFromApiStatus = (apiStatus: string | undefined): Project["status"] => {
+  if (apiStatus === "active") return "Active";
+  if (apiStatus === "completed") return "Completed";
+  return "Archived";
+};
+
+const getProjectStatusVariant = (status: Project["status"]): "success" | "secondary" | "warning" => {
+  if (status === "Active") return "success";
+  if (status === "Archived") return "warning";
+  return "secondary";
+};
+
+const coerceProjectStatusFilter = (value: unknown): ProjectStatusFilter => {
+  if (value === "all" || value === "active" || value === "completed" || value === "archived") return value;
+  return "active";
+};
+
 // ============================================================
 // === DUMMY DATA ===
-// TODO: REPLACE WITH REAL API - Remove this section when integrating real tasks
+// NOTE: REPLACE WITH REAL API - Remove this section when integrating real tasks
 // Replace calls to `getDummyTasksForProject(projectId)` with your actual API
 // e.g., const tasks = await getTasks(projectId, { with: ['subtasks', 'assignees'] })
 // ============================================================
@@ -247,7 +261,7 @@ const DUMMY_TASKS: Record<string, Task[]> = {
 };
 
 /**
- * TODO: REPLACE WITH REAL API
+ * NOTE: REPLACE WITH REAL API
  * Currently returns dummy tasks. Replace with:
  *   const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] })
  *   return response.data
@@ -342,7 +356,9 @@ const TaskRow: React.FC<TaskRowProps> = ({
             <StatusIcon size={14} style={{ color: status.color, flexShrink: 0 }} />
 
             {/* Task title */}
-            <span
+            <button
+              type="button"
+              onClick={() => onPreview(task)}
               style={{
                 fontSize: "0.875rem",
                 color: "#334155",
@@ -350,11 +366,14 @@ const TaskRow: React.FC<TaskRowProps> = ({
                 cursor: "pointer",
                 textDecoration: task.status === "done" ? "line-through" : "none",
                 opacity: task.status === "done" ? 0.6 : 1,
+                background: "none",
+                border: "none",
+                padding: 0,
+                textAlign: "left",
               }}
-              onClick={() => onPreview(task)}
             >
               {task.title}
-            </span>
+            </button>
 
             {/* Subtask count badge */}
             {hasSubtasks && (
@@ -478,7 +497,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
         hasSubtasks &&
         task.subtasks!.map((sub) => (
           <SubtaskRow key={sub.id} subtask={sub} depth={depth + 1} onPreview={() => {
-            // TODO: REPLACE WITH REAL API - open subtask preview
+            // NOTE: REPLACE WITH REAL API - open subtask preview
             // For now, cast subtask to Task shape for the preview panel
             onPreview({
               id: sub.id,
@@ -527,18 +546,23 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) =>
           {/* Indent spacer */}
           <span style={{ width: 14, display: "inline-block", flexShrink: 0 }} />
           <StatusIcon size={13} style={{ color: status.color, flexShrink: 0 }} />
-          <span
+          <button
+            type="button"
+            onClick={onPreview}
             style={{
               fontSize: "0.825rem",
               color: "#475569",
               textDecoration: subtask.status === "done" ? "line-through" : "none",
               opacity: subtask.status === "done" ? 0.55 : 1,
               cursor: "pointer",
+              background: "none",
+              border: "none",
+              padding: 0,
+              textAlign: "left",
             }}
-            onClick={onPreview}
           >
             {subtask.title}
-          </span>
+          </button>
 
           {/* Preview button on hover */}
           {hovered && (
@@ -620,6 +644,19 @@ interface TaskDetailPanelProps {
   onHide: () => void;
 }
 
+function DetailBox({
+  label,
+  children,
+  className,
+}: Readonly<{ label: string; children: React.ReactNode; className?: string }>) {
+  return (
+    <div className={className} style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
+      <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide }) => {
   if (!task) return null;
   const status = statusConfig[task.status];
@@ -654,8 +691,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
         {/* Status & Priority */}
         <Row className="g-2 mb-3">
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Status</div>
+            <DetailBox label="Status">
               <span
                 style={{
                   display: "inline-flex",
@@ -672,11 +708,10 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 <StatusIcon size={13} />
                 {status.label}
               </span>
-            </div>
+            </DetailBox>
           </Col>
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Priority</div>
+            <DetailBox label="Priority">
               <span
                 style={{
                   display: "inline-flex",
@@ -690,15 +725,14 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: priority.color, display: "inline-block" }} />
                 {priority.label}
               </span>
-            </div>
+            </DetailBox>
           </Col>
         </Row>
 
         {/* Assignee & Due Date */}
         <Row className="g-2 mb-3">
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Assignee</div>
+            <DetailBox label="Assignee">
               {task.assignee ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: "#667eea", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600 }}>
@@ -709,35 +743,32 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
               ) : (
                 <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>Unassigned</span>
               )}
-            </div>
+            </DetailBox>
           </Col>
           <Col xs={6}>
-            <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5 }}>
-              <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Due Date</div>
+            <DetailBox label="Due Date">
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: "#6b7280" }} />
                 {task.dueDate
                   ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                   : "No due date"}
               </div>
-            </div>
+            </DetailBox>
           </Col>
         </Row>
 
         {/* Description */}
         {task.description && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Description</div>
+          <DetailBox label="Description" className="mb-3">
             <p style={{ fontSize: "0.875rem", color: "#475569", margin: 0, lineHeight: 1.6 }}>
               {task.description}
             </p>
-          </div>
+          </DetailBox>
         )}
 
         {/* Labels */}
         {task.labels && task.labels.length > 0 && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>Labels</div>
+          <DetailBox label="Labels" className="mb-3">
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {task.labels.map((label) => (
                 <span
@@ -748,18 +779,15 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 </span>
               ))}
             </div>
-          </div>
+          </DetailBox>
         )}
 
         {/* Subtasks */}
         {task.subtasks && task.subtasks.length > 0 && (
-          <div style={{ padding: 16, border: "1px solid #eaf0f6", borderRadius: 5, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Subtasks</span>
-              <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                {task.subtasks.filter((s) => s.status === "done").length}/{task.subtasks.length} completed
-              </span>
-            </div>
+          <DetailBox
+            label={`Subtasks (${task.subtasks.filter((s) => s.status === "done").length}/${task.subtasks.length} completed)`}
+            className="mb-3"
+          >
             {/* Progress */}
             <ProgressBar
               now={Math.round((task.subtasks.filter((s) => s.status === "done").length / task.subtasks.length) * 100)}
@@ -801,7 +829,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
                 );
               })}
             </div>
-          </div>
+          </DetailBox>
         )}
       </Offcanvas.Body>
     </Offcanvas>
@@ -833,6 +861,19 @@ interface ExpandableProjectTableProps {
   actions: TableAction<Project>[];
 }
 
+type PlannerSidebarTaskAssignee = { extension_number: string };
+type PlannerSidebarTaskPriority = "low" | "normal" | "high" | "urgent";
+type PlannerSidebarTask = {
+  id: string;
+  title: string;
+  description: string;
+  priority: PlannerSidebarTaskPriority;
+  due_date: string;
+  type: "regular";
+  project_id?: number;
+  assignees: PlannerSidebarTaskAssignee[];
+};
+
 /**
  * ExpandableProjectTable
  *
@@ -844,7 +885,7 @@ interface ExpandableProjectTableProps {
  * a custom table body and pass it as `customBody` to GenericTable's card wrapper.
  * The toolbar and pagination are still handled by GenericTable.
  *
- * TODO: REPLACE WITH REAL API
+ * NOTE: REPLACE WITH REAL API
  * In `handleToggleProject`, replace `getDummyTasksForProject(project.id)`
  * with your real API: `const tasks = await getTasks(project.id, { with: ['subtasks'] })`
  */
@@ -873,8 +914,27 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   // Loading state per project
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
   // Selected task for CreateTaskSidebar
-  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [editingTask, setEditingTask] = useState<PlannerSidebarTask | null>(null);
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
+
+  const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
+    const selected: Project[] = [];
+    for (const project of projects) {
+      if (selectedIds.has(project.id)) selected.push(project);
+    }
+    return selected;
+  };
+
+  const handleProjectSelectionChange = (projectId: string, checked: boolean) => {
+    const nextSelectedIds = new Set(selectedProjects);
+    if (checked) nextSelectedIds.add(projectId);
+    else nextSelectedIds.delete(projectId);
+    onSelectionChange(buildSelectedProjectsFromIds(nextSelectedIds));
+  };
+
+  const handleToggleAllProjects = (checked: boolean) => {
+    onSelectionChange(checked ? projects : []);
+  };
 
   const handleToggleProject = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -894,7 +954,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       if (!projectTasks[projectId]) {
         setLoadingTasks((prev) => new Set(prev).add(projectId));
 
-        // TODO: REPLACE WITH REAL API
+        // NOTE: REPLACE WITH REAL API
         // const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] });
         // const tasks = response.data;
         const tasks = getDummyTasksForProject(projectId);
@@ -920,7 +980,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   };
 
   const handlePreviewTask = (task: Task) => {
-    const sidebarTask = {
+    const sidebarTask: PlannerSidebarTask = {
       id: task.id,
       title: task.title,
       description: task.description || "",
@@ -983,12 +1043,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <input
               type="checkbox"
               checked={isSelected}
-              onChange={(e) => {
-                const newSelected = new Set(selectedProjects);
-                if (e.target.checked) newSelected.add(project.id);
-                else newSelected.delete(project.id);
-                onSelectionChange(projects.filter((p) => newSelected.has(p.id)));
-              }}
+              onChange={(e) => handleProjectSelectionChange(project.id, e.target.checked)}
               style={{ cursor: "pointer" }}
             />
           </td>
@@ -1061,7 +1116,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                <div className="dropdown" onClick={(e) => e.stopPropagation()}>
+                <div className="dropdown">
                   <button
                     className="btn btn-link btn-sm p-1 dropdown-toggle"
                     type="button"
@@ -1149,7 +1204,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   gap: 4,
                   padding: "4px 0",
                 }}
-                // TODO: wire to create task flow for this project
+                // NOTE: wire to create task flow for this project
                 onClick={(e) => e.stopPropagation()}
               >
                 <Plus size={14} />
@@ -1176,7 +1231,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           setShowCreateTaskSidebar(false);
           setEditingTask(null);
         }}
-        extensions={extensions as any}
+        extensions={extensions}
         labels={[]}
         task={editingTask}
         isEdit={!!editingTask}
@@ -1243,10 +1298,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   <th className="generic-table-th" style={{ width: 40 }}>
                     <input
                       type="checkbox"
-                      onChange={(e) => {
-                        if (e.target.checked) onSelectionChange(projects);
-                        else onSelectionChange([]);
-                      }}
+                      onChange={(e) => handleToggleAllProjects(e.target.checked)}
                       checked={projects.length > 0 && selectedProjects.size === projects.length}
                     />
                   </th>
@@ -1268,6 +1320,428 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 };
 
 // ============================================================
+// PROJECT DETAIL SIDEBAR (extracted to reduce complexity)
+// ============================================================
+
+type ProjectDetailOffcanvasProps = {
+  show: boolean;
+  onHide: () => void;
+  selectedProject: Project | null;
+  selectedProjectDetails: ApiProject | null;
+  loadingProjectDetails: boolean;
+  loadingOverdueTasks: boolean;
+  overdueTasks: any[];
+  detailTab: string;
+  setDetailTab: (tab: string) => void;
+  loadingActivities: boolean;
+  projectActivities: any[];
+  getUserNameFromExtension: (extensionNumber: string) => string;
+  getAvatarColor: (extensionNumber: string, index: number) => string;
+  getInitials: (extensionNumber: string) => string;
+  getActionColor: (action: string) => string;
+  formatTimeAgo: (dateString: string) => string;
+  formatDateTime: (dateString: string) => string;
+};
+
+const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
+  show,
+  onHide,
+  selectedProject,
+  selectedProjectDetails,
+  loadingProjectDetails,
+  loadingOverdueTasks,
+  overdueTasks,
+  detailTab,
+  setDetailTab,
+  loadingActivities,
+  projectActivities,
+  getUserNameFromExtension,
+  getAvatarColor,
+  getInitials,
+  getActionColor,
+  formatTimeAgo,
+  formatDateTime,
+}) => {
+  const resolvedStatus =
+    selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject?.status;
+
+  const recentActivityContent = (() => {
+    if (loadingActivities) return <Spinner animation="border" size="sm" />;
+    if (projectActivities.length === 0) {
+      return (
+        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+          No recent activity
+        </div>
+      );
+    }
+
+    return (
+      <div className="d-flex flex-column gap-3">
+        {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
+          const ext = activity.extension_number || "system";
+          return (
+            <div key={activity.id || `${ext}-${activity.created_at || idx}`} className="d-flex gap-2">
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  backgroundColor: getAvatarColor(ext, idx),
+                  color: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.7rem",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                {getInitials(ext)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "0.875rem", color: "#334155" }}>
+                  <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>{" "}
+                  {activity.description || `${activity.action} task`}
+                  {activity.task && (
+                    <span style={{ fontWeight: 600, color: "#3b82f6" }}>
+                      {" "}
+                      {activity.task?.title || activity.task?.task_id}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                  {formatTimeAgo(activity.created_at)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  })();
+
+  const historyContent = (() => {
+    if (loadingActivities) return <Spinner animation="border" size="sm" />;
+    if (projectActivities.length === 0) {
+      return (
+        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+          No history available
+        </div>
+      );
+    }
+
+    return (
+      <div className="d-flex flex-column gap-2">
+        {projectActivities.map((activity: any, idx: number) => {
+          const ext = activity.extension_number || "system";
+          const actionColor = getActionColor(activity.action);
+          return (
+            <div
+              key={activity.id || `${ext}-${activity.created_at || idx}`}
+              style={{
+                padding: "0.75rem",
+                backgroundColor: "#f8fafc",
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+                borderLeft: `3px solid ${actionColor}`,
+              }}
+            >
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <AlertCircle size={16} style={{ color: actionColor }} />
+                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#334155" }}>
+                  {activity.description || `${activity.action} task`}
+                </span>
+              </div>
+              <div style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
+                <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>
+                {activity.task && (
+                  <>
+                    {" "}
+                    -{" "}
+                    <span style={{ fontWeight: 600, color: "#3b82f6" }}>
+                      {activity.task?.title || activity.task?.task_id}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{formatDateTime(activity.created_at)}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  })();
+
+  const bodyContent = (() => {
+    if (loadingProjectDetails) {
+      return (
+        <div className="text-center py-5">
+          <Spinner animation="border" />
+          <p className="mt-3 text-muted">Loading project details...</p>
+        </div>
+      );
+    }
+
+    if (!selectedProject) return null;
+
+    return (
+      <>
+        <Row className="g-2 mb-3">
+          <Col xs={6}>
+            <div className="detail-section">
+              <div className="detail-label">Open Tasks</div>
+              <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#3b82f6" }}>{selectedProject.open}</div>
+            </div>
+          </Col>
+          <Col xs={6}>
+            <div className="detail-section">
+              <div className="detail-label">Overdue Tasks</div>
+              {loadingOverdueTasks ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                <div
+                  style={{
+                    fontSize: "1.75rem",
+                    fontWeight: 700,
+                    color: overdueTasks.length > 0 ? "#ef4444" : "#10b981",
+                  }}
+                >
+                  {overdueTasks.length}
+                </div>
+              )}
+            </div>
+          </Col>
+        </Row>
+
+        <div className="detail-section">
+          <div className="detail-label">Project Progress</div>
+          <ProgressBar
+            now={Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}
+            style={{ height: 10, marginBottom: "0.5rem" }}
+            variant="primary"
+          />
+          <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>
+            {Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}% Complete
+          </div>
+        </div>
+
+        <Row className="g-2 mb-3">
+          <Col xs={6}>
+            <div
+              className="detail-section"
+              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
+            >
+              <div className="detail-label">Owner / PM</div>
+              <div
+                style={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  color: "#334155",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginTop: "auto",
+                }}
+              >
+                <span>
+                  {selectedProjectDetails?.owner_extension_number
+                    ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number)
+                    : selectedProject.owner}
+                </span>
+              </div>
+            </div>
+          </Col>
+          <Col xs={6}>
+            <div
+              className="detail-section"
+              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
+            >
+              <div className="detail-label">Status</div>
+              <div style={{ marginTop: "auto" }}>
+                <Badge
+                  bg={getProjectStatusVariant(resolvedStatus ?? selectedProject.status)}
+                  style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.5rem 0.75rem" }}
+                >
+                  {(resolvedStatus ?? selectedProject.status).toUpperCase()}
+                </Badge>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        <Row className="g-2 mb-3">
+          <Col xs={6}>
+            <div className="detail-section">
+              <div className="detail-label">
+                Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})
+              </div>
+              <div className="d-flex flex-wrap gap-2">
+                {(selectedProjectDetails?.members || selectedProject.members).map((member: any) => {
+                  const ext = member.extension_number || member.name || "";
+                  const key = String(
+                    member?.id ?? member?.extension_number ?? member?.name ?? `${ext}-${member?.role ?? ""}`,
+                  );
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        backgroundColor: "white",
+                        width: "100%",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.8125rem",
+                          fontWeight: 500,
+                          color: "#334155",
+                          flex: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {member.user?.name || getUserNameFromExtension(ext)} {member.role ? `(${member.role})` : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Col>
+
+          <Col xs={6}>
+            <div className="detail-section">
+              <div className="detail-label">Last Updated</div>
+              <div className="d-flex align-items-center" style={{ fontSize: "0.875rem", fontWeight: 500 }}>
+                <Calendar size={16} className="me-2 text-muted" />
+                <span>
+                  {selectedProjectDetails?.updated_at
+                    ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : selectedProject.lastUpdate}
+                </span>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {selectedProjectDetails?.description && (
+          <div className="detail-section">
+            <div className="detail-label">Description</div>
+            <div style={{ fontSize: "0.875rem", color: "#475569" }}>{selectedProjectDetails.description}</div>
+          </div>
+        )}
+
+        <Nav variant="tabs" className="detail-tabs" activeKey={detailTab} onSelect={(k) => k && setDetailTab(k)}>
+          <Nav.Item>
+            <Nav.Link eventKey="Activity">Activity</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="History">History</Nav.Link>
+          </Nav.Item>
+        </Nav>
+
+        <div style={{ marginTop: "1.5rem" }}>
+          {detailTab === "Activity" && (
+            <div>
+              <div className="detail-label" style={{ marginBottom: "1rem" }}>
+                Recent Activity
+              </div>
+              {recentActivityContent}
+            </div>
+          )}
+          {detailTab === "History" && (
+            <div>
+              <div className="detail-label" style={{ marginBottom: "1rem" }}>
+                Project History
+              </div>
+              {historyContent}
+            </div>
+          )}
+        </div>
+      </>
+    );
+  })();
+
+  return (
+    <Offcanvas show={show} onHide={onHide} placement="end" className="project-detail-panel">
+      <Offcanvas.Header style={{ position: "relative" }}>
+        <Offcanvas.Title>
+          <div className="d-flex align-items-center gap-3">
+            {selectedProject && (
+              <>
+                <div className="project-icon" style={{ backgroundColor: selectedProject.iconColor + "20" }}>
+                  <selectedProject.icon size={24} style={{ color: selectedProject.iconColor }} />
+                </div>
+                <div>
+                  <div className="fw-bold" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
+                    {selectedProject.name}
+                  </div>
+                  <Badge bg={getProjectStatusVariant(selectedProject.status)} style={{ fontSize: "0.7rem" }}>
+                    {selectedProject.status.toUpperCase()}
+                  </Badge>
+                </div>
+              </>
+            )}
+          </div>
+        </Offcanvas.Title>
+
+        <div className="d-flex align-items-center gap-2">
+          {selectedProject && (
+            <Button
+              variant="link"
+              className="p-0"
+              onClick={() => {
+                globalThis.window?.open(`/planner/projects/${selectedProject.id}`, "_blank");
+              }}
+              style={{
+                color: "#6b7280",
+                textDecoration: "none",
+                width: 32,
+                height: 32,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 4,
+              }}
+            >
+              <ExternalLink size={18} />
+            </Button>
+          )}
+          <Button
+            variant="link"
+            className="p-0"
+            onClick={onHide}
+            style={{
+              color: "#6b7280",
+              textDecoration: "none",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 4,
+            }}
+          >
+            <X size={18} />
+          </Button>
+        </div>
+      </Offcanvas.Header>
+
+      <Offcanvas.Body>
+        {bodyContent}
+      </Offcanvas.Body>
+    </Offcanvas>
+  );
+};
+
+// ============================================================
 // MAIN PAGE COMPONENT
 // (mostly unchanged from original — search for "CHANGED" comments)
 // ============================================================
@@ -1275,13 +1749,12 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 type SelectOption = { value: string; label: string };
 type AppliedProjectFilters = {
   search: string;
-  status: string;
+  status: ProjectStatusFilter;
   owner: string;
   team: string;
 };
 
 const WorkPlannerProjects = () => {
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
@@ -1297,11 +1770,11 @@ const WorkPlannerProjects = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"active" | "completed" | "archived" | "all">("active");
+  const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("active");
   const [filterOwner, setFilterOwner] = useState("All Owners");
   const [filterTeam, setFilterTeam] = useState("All Teams");
   const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({ search: "", status: "active", owner: "All Owners", team: "All Teams" });
-  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
+  const [customTabs] = useState<TabConfig[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<ApiProject | null>(null);
@@ -1312,6 +1785,12 @@ const WorkPlannerProjects = () => {
   const [loadingOverdueTasks, setLoadingOverdueTasks] = useState(false);
   const [showProjectDetail, setShowProjectDetail] = useState(false);
   const [detailTab, setDetailTab] = useState("Activity");
+
+  const resetProjectModalState = useCallback(() => {
+    setShowProjectModal(false);
+    setEditingProject(null);
+    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+  }, []);
 
   useEffect(() => {
     if (!hierarchyLoading) {
@@ -1331,15 +1810,16 @@ const WorkPlannerProjects = () => {
         status: statusParam,
         user_extensions: ownerParam,
       });
-      if (response && response.success === true && response.data && Array.isArray(response.data)) {
+      if (response?.success === true && Array.isArray(response.data)) {
         setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
         if (response.pagination) setPagination((prev) => ({ ...prev, ...response.pagination }));
-        if (response.summary) {
+        const summary = response.summary;
+        if (summary) {
           setStats({
-            activeProjects: response.summary.active || 0,
-            totalProjects: response.summary.total || 0,
-            tasksDueThisWeek: response.summary.task_due_this_week || 0,
-            overdueAcrossProjects: response.summary.overdue_tasks || 0,
+            activeProjects: summary.active ?? 0,
+            totalProjects: summary.total ?? 0,
+            tasksDueThisWeek: summary.task_due_this_week ?? 0,
+            overdueAcrossProjects: summary.overdue_tasks ?? 0,
           });
         }
       } else {
@@ -1390,7 +1870,7 @@ const WorkPlannerProjects = () => {
       open: openTasks,
       overdue: overdueTasks,
       lastUpdate,
-      status: apiProject.status === "active" ? "Active" : apiProject.status === "completed" ? "Completed" : "Archived",
+      status: getProjectStatusFromApiStatus(apiProject.status),
       owner: members[0]?.name || "N/A",
       team: "Team",
       apiData: apiProject,
@@ -1441,9 +1921,7 @@ const WorkPlannerProjects = () => {
         : await createProject(projectData);
       if (result) {
         await fetchProjects(appliedFilters);
-        setShowProjectModal(false);
-        setEditingProject(null);
-        setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+        resetProjectModalState();
       }
     } catch (error) {
       console.error("Error saving project:", error);
@@ -1480,7 +1958,7 @@ const WorkPlannerProjects = () => {
   };
 
   const formatTimeAgo = (dateString: string) => {
-    const diff = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+    const diff = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
     if (diff < 60) return "just now";
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
@@ -1538,7 +2016,12 @@ const WorkPlannerProjects = () => {
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
-    const statusMap: Record<string, "active" | "completed" | "archived" | "all"> = { all: "all", active: "active", completed: "completed", archived: "archived" };
+    const statusMap: Record<string, ProjectStatusFilter> = {
+      all: "all",
+      active: "active",
+      completed: "completed",
+      archived: "archived",
+    };
     if (statusMap[tabId]) setFilterStatus(statusMap[tabId]);
     setPagination((prev) => ({ ...prev, page: 1 }));
   };
@@ -1565,13 +2048,16 @@ const WorkPlannerProjects = () => {
 
   const ownerSelectOptions: SelectOption[] = [{ value: "All Owners", label: "All Owners" }, ...userOptions];
 
-  const statuses: Array<{ value: "active" | "completed" | "archived" | "all"; label: string }> = [
-    { value: "all", label: "All Status" }, { value: "active", label: "Active" }, { value: "completed", label: "Completed" }, { value: "archived", label: "Archived" },
+  const statuses: Array<{ value: ProjectStatusFilter; label: string }> = [
+    { value: "all", label: "All Status" },
+    { value: "active", label: "Active" },
+    { value: "completed", label: "Completed" },
+    { value: "archived", label: "Archived" },
   ];
 
   const filterFields: FilterField[] = [
     { id: "search", label: "Search", type: "text", value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ""), placeholder: "Search projects..." },
-    { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus((v ?? "active") as any), options: statuses },
+    { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus(coerceProjectStatusFilter(v)), options: statuses },
     { id: "owner", label: "Owner / PM", type: "dropdown", value: filterOwner, onChange: (v) => setFilterOwner(v ?? "All Owners"), options: ownerSelectOptions },
   ];
 
@@ -1592,15 +2078,18 @@ const WorkPlannerProjects = () => {
     {
       id: "status",
       label: filterStatus === "all" ? "Status" : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1),
-      active: filterStatus !== "all",
-      activeLabel: filterStatus !== "all" ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) : undefined,
+      active: filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived",
+      activeLabel:
+        filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived"
+          ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)
+          : undefined,
       onClear: () => setFilterStatus("all"),
     },
     {
       id: "owner",
       label: filterOwner === "All Owners" ? "Owner / PM" : filterOwner,
       active: filterOwner !== "All Owners",
-      activeLabel: filterOwner !== "All Owners" ? getUserNameFromExtension(filterOwner) : undefined,
+      activeLabel: filterOwner === "All Owners" ? undefined : getUserNameFromExtension(filterOwner),
       onClear: () => setFilterOwner("All Owners"),
     },
   ];
@@ -1644,6 +2133,15 @@ const WorkPlannerProjects = () => {
       </button>
     ),
   };
+
+  const handleCloseFilterSidebar = () => setShowFilterSidebar(false);
+  const handleApplyFiltersAndClose = () => {
+    handleApplyFilters();
+    setShowFilterSidebar(false);
+  };
+
+  const submitButtonText = editingProject ? "Update Project" : "Create Project";
+  const submittingButtonText = editingProject ? "Updating..." : "Creating...";
 
   // Columns definition (used only for toolbar column customization; actual rendering done by ExpandableProjectTable)
   const projectTableColumns: TableColumn<Project>[] = [
@@ -1699,11 +2197,11 @@ const WorkPlannerProjects = () => {
           <Container fluid>
             <GenericFilterSidebar
               isOpen={showFilterSidebar}
-              onClose={() => setShowFilterSidebar(false)}
+              onClose={handleCloseFilterSidebar}
               title="Filters"
               subtitle="Filter and refine projects"
               filters={filterFields}
-              onApply={() => { handleApplyFilters(); setShowFilterSidebar(false); }}
+              onApply={handleApplyFiltersAndClose}
               onReset={clearFilters}
               width="400px"
               showApplyButton
@@ -1730,173 +2228,28 @@ const WorkPlannerProjects = () => {
           </Container>
         </div>
 
-        {/* Project Detail Sidebar (unchanged from original) */}
-        <Offcanvas show={showProjectDetail} onHide={() => setShowProjectDetail(false)} placement="end" className="project-detail-panel">
-          <Offcanvas.Header style={{ position: "relative" }}>
-            <Offcanvas.Title>
-              <div className="d-flex align-items-center gap-3">
-                {selectedProject && (
-                  <>
-                    <div className="project-icon" style={{ backgroundColor: selectedProject.iconColor + "20" }}>
-                      <selectedProject.icon size={24} style={{ color: selectedProject.iconColor }} />
-                    </div>
-                    <div>
-                      <div className="fw-bold" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>{selectedProject.name}</div>
-                      <Badge bg={selectedProject.status === "Active" ? "success" : selectedProject.status === "Archived" ? "warning" : "secondary"} style={{ fontSize: "0.7rem" }}>
-                        {selectedProject.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Offcanvas.Title>
-            <div className="d-flex align-items-center gap-2">
-              {selectedProject && (
-                <Button variant="link" className="p-0" onClick={() => window.open(`/planner/projects/${selectedProject.id}`, "_blank")} style={{ color: "#6b7280", textDecoration: "none", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4 }}>
-                  <ExternalLink size={18} />
-                </Button>
-              )}
-              <Button variant="link" className="p-0" onClick={() => setShowProjectDetail(false)} style={{ color: "#6b7280", textDecoration: "none", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4 }}>
-                <X size={18} />
-              </Button>
-            </div>
-          </Offcanvas.Header>
-          <Offcanvas.Body>
-            {loadingProjectDetails ? (
-              <div className="text-center py-5">
-                <Spinner animation="border" />
-                <p className="mt-3 text-muted">Loading project details...</p>
-              </div>
-            ) : selectedProject && (
-              <>
-                <Row className="g-2 mb-3">
-                  <Col xs={6}><div className="detail-section"><div className="detail-label">Open Tasks</div><div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#3b82f6" }}>{selectedProject.open}</div></div></Col>
-                  <Col xs={6}><div className="detail-section"><div className="detail-label">Overdue Tasks</div>{loadingOverdueTasks ? <Spinner animation="border" size="sm" /> : <div style={{ fontSize: "1.75rem", fontWeight: 700, color: overdueTasks.length > 0 ? "#ef4444" : "#10b981" }}>{overdueTasks.length}</div>}</div></Col>
-                </Row>
-                <div className="detail-section">
-                  <div className="detail-label">Project Progress</div>
-                  <ProgressBar now={Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)} style={{ height: 10, marginBottom: "0.5rem" }} variant="primary" />
-                  <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>{Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}% Complete</div>
-                </div>
-                <Row className="g-2 mb-3">
-                  <Col xs={6}>
-                    <div className="detail-section">
-                      <div className="detail-label">Owner / PM</div>
-                      <div style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <span>{selectedProjectDetails?.owner_extension_number ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number) : selectedProject.owner}</span>
-                      </div>
-                    </div>
-                  </Col>
-                  <Col xs={6}>
-                    <div className="detail-section">
-                      <div className="detail-label">Status</div>
-                      <Badge bg={selectedProjectDetails?.status === "active" ? "success" : selectedProjectDetails?.status === "completed" ? "secondary" : "warning"} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.5rem 0.75rem" }}>
-                        {(selectedProjectDetails?.status || selectedProject.status).toUpperCase()}
-                      </Badge>
-                    </div>
-                  </Col>
-                </Row>
-                <div className="detail-section">
-                  <div className="detail-label">Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})</div>
-                  <div className="d-flex flex-wrap gap-2">
-                    {(selectedProjectDetails?.members || selectedProject.members).map((member: any, idx: number) => {
-                      const ext = member.extension_number || member.name || "";
-                      const colors = ["#667eea", "#f56565", "#48bb78", "#ed64a6", "#4299e1", "#9f7aea", "#fc8181"];
-                      return (
-                        <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: "white", padding: "0.5rem 0.75rem", borderRadius: 8, border: "1px solid #e2e8f0", flex: "1 1 calc(50% - 0.25rem)", minWidth: 120 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: member.color || colors[idx % colors.length], color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600, flexShrink: 0 }}>
-                            {getInitials(ext)}
-                          </div>
-                          <span style={{ fontSize: "0.8125rem", fontWeight: 500, color: "#334155", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {member.user?.name || getUserNameFromExtension(ext)} {member.role ? `(${member.role})` : ""}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="detail-section">
-                  <div className="detail-label">Last Updated</div>
-                  <div className="d-flex align-items-center" style={{ fontSize: "0.9rem", fontWeight: 500 }}>
-                    <Calendar size={16} className="me-2 text-muted" />
-                    <span>{selectedProjectDetails?.updated_at ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : selectedProject.lastUpdate}</span>
-                  </div>
-                </div>
-                {selectedProjectDetails?.description && (
-                  <div className="detail-section">
-                    <div className="detail-label">Description</div>
-                    <div style={{ fontSize: "0.875rem", color: "#475569" }}>{selectedProjectDetails.description}</div>
-                  </div>
-                )}
-                <Nav variant="tabs" className="detail-tabs" activeKey={detailTab} onSelect={(k) => k && setDetailTab(k)}>
-                  <Nav.Item><Nav.Link eventKey="Activity">Activity</Nav.Link></Nav.Item>
-                  <Nav.Item><Nav.Link eventKey="History">History</Nav.Link></Nav.Item>
-                </Nav>
-                <div style={{ marginTop: "1.5rem" }}>
-                  {detailTab === "Activity" && (
-                    <div>
-                      <div className="detail-label" style={{ marginBottom: "1rem" }}>Recent Activity</div>
-                      {loadingActivities ? <Spinner animation="border" size="sm" /> : projectActivities.length === 0 ? (
-                        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>No recent activity</div>
-                      ) : (
-                        <div className="d-flex flex-column gap-3">
-                          {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
-                            const ext = activity.extension_number || "system";
-                            return (
-                              <div key={activity.id || idx} className="d-flex gap-2">
-                                <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: getAvatarColor(ext, idx), color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 600, flexShrink: 0 }}>
-                                  {getInitials(ext)}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: "0.875rem", color: "#334155" }}>
-                                    <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span> {activity.description || `${activity.action} task`}
-                                    {activity.task && <span style={{ fontWeight: 600, color: "#3b82f6" }}> {activity.task?.title || activity.task?.task_id}</span>}
-                                  </div>
-                                  <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>{formatTimeAgo(activity.created_at)}</div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {detailTab === "History" && (
-                    <div>
-                      <div className="detail-label" style={{ marginBottom: "1rem" }}>Project History</div>
-                      {loadingActivities ? <Spinner animation="border" size="sm" /> : projectActivities.length === 0 ? (
-                        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>No history available</div>
-                      ) : (
-                        <div className="d-flex flex-column gap-2">
-                          {projectActivities.map((activity: any, idx: number) => {
-                            const ext = activity.extension_number || "system";
-                            const actionColor = getActionColor(activity.action);
-                            return (
-                              <div key={activity.id || idx} style={{ padding: "0.75rem", backgroundColor: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", borderLeft: `3px solid ${actionColor}` }}>
-                                <div className="d-flex align-items-center gap-2 mb-2">
-                                  <AlertCircle size={16} style={{ color: actionColor }} />
-                                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#334155" }}>{activity.description || `${activity.action} task`}</span>
-                                </div>
-                                <div style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                                  <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>
-                                  {activity.task && <> - <span style={{ fontWeight: 600, color: "#3b82f6" }}>{activity.task?.title || activity.task?.task_id}</span></>}
-                                </div>
-                                <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{formatDateTime(activity.created_at)}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </Offcanvas.Body>
-        </Offcanvas>
+        <ProjectDetailOffcanvas
+          show={showProjectDetail}
+          onHide={() => setShowProjectDetail(false)}
+          selectedProject={selectedProject}
+          selectedProjectDetails={selectedProjectDetails}
+          loadingProjectDetails={loadingProjectDetails}
+          loadingOverdueTasks={loadingOverdueTasks}
+          overdueTasks={overdueTasks}
+          detailTab={detailTab}
+          setDetailTab={setDetailTab}
+          loadingActivities={loadingActivities}
+          projectActivities={projectActivities}
+          getUserNameFromExtension={getUserNameFromExtension}
+          getAvatarColor={getAvatarColor}
+          getInitials={getInitials}
+          getActionColor={getActionColor}
+          formatTimeAgo={formatTimeAgo}
+          formatDateTime={formatDateTime}
+        />
 
         {/* Project Form Modal */}
-        <Modal show={showProjectModal} onHide={() => { setShowProjectModal(false); setEditingProject(null); setProjectFormData({ name: "", description: "", color: "#3b82f6" }); }} centered size="lg">
+        <Modal show={showProjectModal} onHide={resetProjectModalState} centered size="lg">
           <Modal.Header closeButton>
             <Modal.Title>{editingProject ? "Edit Project" : "Create New Project"}</Modal.Title>
           </Modal.Header>
@@ -1918,9 +2271,16 @@ const WorkPlannerProjects = () => {
                 </div>
               </Form.Group>
               <div className="d-flex justify-content-end gap-2">
-                <Button variant="secondary" onClick={() => { setShowProjectModal(false); setEditingProject(null); setProjectFormData({ name: "", description: "", color: "#3b82f6" }); }} disabled={submitting}>Cancel</Button>
+                <Button variant="secondary" onClick={resetProjectModalState} disabled={submitting}>Cancel</Button>
                 <Button variant="primary" type="submit" disabled={submitting || !projectFormData.name.trim()}>
-                  {submitting ? <><Spinner as="span" animation="border" size="sm" className="me-2" />{editingProject ? "Updating..." : "Creating..."}</> : editingProject ? "Update Project" : "Create Project"}
+                  {submitting ? (
+                    <>
+                      <Spinner as="span" animation="border" size="sm" className="me-2" />
+                      {submittingButtonText}
+                    </>
+                  ) : (
+                    submitButtonText
+                  )}
                 </Button>
               </div>
             </Form>

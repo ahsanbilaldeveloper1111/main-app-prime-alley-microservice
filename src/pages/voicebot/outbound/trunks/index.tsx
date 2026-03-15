@@ -12,7 +12,6 @@ import {
 import { Row, Col, Button, Modal, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { Plus, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 
@@ -52,7 +51,7 @@ const TrunksPage = () => {
       setData(rows);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Failed to load trunks");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load trunks"));
       setData([]);
     } finally {
       setLoading(false);
@@ -79,24 +78,24 @@ const TrunksPage = () => {
         return ids.length ? ids.join(", ") : "—";
       },
     },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (row) => (
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-danger"
-            onClick={() => {
-              setSelectedRow(row);
-              setShowDeleteModal(true);
-            }}
-          >
-            <Trash2 size={14} />
-          </Button>
-        </div>
-      ),
-    },
+    // {
+    //   key: "actions",
+    //   label: "Actions",
+    //   render: (row) => (
+    //     <div className="d-flex gap-1">
+    //       <Button
+    //         size="sm"
+    //         variant="outline-danger"
+    //         onClick={() => {
+    //           setSelectedRow(row);
+    //           setShowDeleteModal(true);
+    //         }}
+    //       >
+    //         <Trash2 size={14} />
+    //       </Button>
+    //     </div>
+    //   ),
+    // },
   ];
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -123,7 +122,7 @@ const TrunksPage = () => {
       fetchTrunks();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Create failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Create failed"));
     } finally {
       setFormLoading(false);
     }
@@ -145,7 +144,7 @@ const TrunksPage = () => {
       fetchTrunks();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || (e?.message as string) || "Delete failed");
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
     } finally {
       setDeleteLoading(false);
     }
@@ -164,9 +163,7 @@ const TrunksPage = () => {
               <h2 className="mb-0">Trunks</h2>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <Button variant="primary" onClick={() => setShowAddModal(true)}>
-                <Plus size={18} className="me-1" /> Add Trunk
-              </Button>
+             
             </div>
           </div>
         </Col>

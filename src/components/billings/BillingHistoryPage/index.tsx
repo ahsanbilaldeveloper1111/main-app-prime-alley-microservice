@@ -1,21 +1,53 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
-import { GetPayments } from "@utils/accounting";
+import {
+  downloadInvoicePdf,
+  getInvoice,
+  getInvoices,
+} from "@utils/accounts";
+import type { InvoiceData } from "@utils/accounts";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import moment from "moment";
+import { useSession } from "next-auth/react";
+import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
+import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
+import { LinkButton } from "@components/shared/LinkButton";
 
-function formatBillingDate(value: string | undefined): string {
-  if (!value) return "—";
-  try {
-    const d = new Date(value);
-    const day = d.getDate();
-    const month = d.toLocaleDateString("en-GB", { month: "short" });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return String(value);
+const font = BILLING_FONT;
+
+const toInvoiceViewData = (invoice: InvoiceData): InvoiceViewData => ({
+  ...(invoice as unknown as InvoiceViewData),
+  company: {
+    ...(invoice.company as unknown as NonNullable<InvoiceViewData["company"]>),
+    crm_company_id: invoice.company?.crm_company_id ?? undefined,
+  },
+});
+
+const toggleStringSelection = (list: readonly string[], value: string): string[] => {
+  if (!list.includes(value)) return [...list, value];
+  const next: string[] = [];
+  for (const item of list) {
+    if (item !== value) next.push(item);
   }
-}
+  return next;
+};
 
-const font = "Lexend Deca, Helvetica, Arial, sans-serif";
+function CardActions({
+  onView,
+  onDownload,
+}: Readonly<{ onView?: () => void; onDownload?: () => void }>) {
+  return (
+    <div style={s.cardActions}>
+      <LinkButton onClick={onView} style={s.actionLink}>
+        View
+      </LinkButton>
+      <span style={s.divider}>|</span>
+      <LinkButton onClick={onDownload} style={s.actionLink}>
+        Download
+      </LinkButton>
+    </div>
+  );
+}
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
@@ -32,7 +64,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 12,
     padding: "16px 24px",
     backgroundColor: "#f5f5f5",
-    // flexWrap: "wrap" as const,
+    flexWrap: "wrap" as const,
   },
   searchWrapper: {
     position: "relative" as const,
@@ -41,7 +73,7 @@ const s: Record<string, React.CSSProperties> = {
   searchInput: {
     backgroundColor: "rgb(255, 255, 255)",
     border: "1px solid rgb(138, 138, 138)",
-    borderRadius: 20,
+    borderRadius: 4,
     color: "rgb(20, 20, 20)",
     display: "block",
     fontFamily: font,
@@ -79,8 +111,8 @@ const s: Record<string, React.CSSProperties> = {
     borderStyle: "solid",
     borderColor: "#ccc",
     verticalAlign: "middle",
-    // paddingBlock: 10,
-    // paddingInline: 12,
+    paddingBlock: 10,
+    paddingInline: 12,
     fontFamily: font,
     fontSize: 14,
     fontWeight: 600,
@@ -142,13 +174,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   actionLink: {
-    fontWeight: 600,
-    color: "rgb(0, 97, 98)",
-    cursor: "pointer",
-    textUnderlineOffset: "24%",
-    textDecoration: "underline",
-    fontFamily: font,
-    fontSize: 14,
+    ...BILLING_LINK,
   },
   divider: {
     color: "#ccc",
@@ -222,17 +248,24 @@ const s: Record<string, React.CSSProperties> = {
 };
 
 // ── Dropdown filter component ──────────────────────────────────────────────────
-function FilterDropdown({ label, options }: { label: string; options: string[] }) {
+function FilterDropdown({
+  label,
+  options,
+}: Readonly<{ label: string; options: readonly string[] }>) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+
+  const handleToggleOption = (opt: string) => {
+    setSelected((prev) => toggleStringSelection(prev, opt));
+  };
 
   return (
     <div style={{ position: "relative" as const }}>
       <button
         style={{
           ...s.filterBtn,
-        //   backgroundColor: selected.length > 0 ? "transparent" : "transparent",
-          borderColor: selected.length > 0 ? "transparent" : "transparent",
+          backgroundColor: selected.length > 0 ? "#f0fafa" : "#fff",
+          borderColor: selected.length > 0 ? "rgb(0,97,98)" : "#ccc",
           color: selected.length > 0 ? "rgb(0,97,98)" : "#141414",
         }}
         onClick={() => setOpen(!open)}
@@ -251,9 +284,19 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
       </button>
       {open && (
         <>
-          <div
-            style={{ position: "fixed" as const, inset: 0, zIndex: 9 }}
+          <button
+            type="button"
+            aria-label="Close filter dropdown"
             onClick={() => setOpen(false)}
+            style={{
+              position: "fixed" as const,
+              inset: 0,
+              zIndex: 9,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "default",
+            }}
           />
           <div style={{
             position: "absolute" as const, top: "calc(100% + 4px)", left: 0, zIndex: 10,
@@ -262,15 +305,21 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
             minWidth: 180, padding: "6px 0",
           }}>
             {options.map(opt => (
-              <div
+              <button
                 key={opt}
+                type="button"
                 onClick={() => {
-                  setSelected(prev =>
-                    prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt]
-                  );
+                  handleToggleOption(opt);
                 }}
                 style={{
-                  padding: "8px 16px", cursor: "pointer", fontSize: 14, fontFamily: font,
+                  width: "100%",
+                  textAlign: "left",
+                  background: "none",
+                  border: "none",
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontFamily: font,
                   display: "flex", alignItems: "center", gap: 10,
                   backgroundColor: selected.includes(opt) ? "#f0fafa" : "transparent",
                   color: selected.includes(opt) ? "rgb(0,97,98)" : "#141414",
@@ -287,7 +336,7 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
                   )}
                 </span>
                 {opt}
-              </div>
+              </button>
             ))}
           </div>
         </>
@@ -296,13 +345,73 @@ function FilterDropdown({ label, options }: { label: string; options: string[] }
   );
 }
 
+// ── Card: Invoice issued ───────────────────────────────────────────────────────
+function InvoiceCard({
+  invoiceNumber,
+  product,
+  amount,
+  balance,
+  onView,
+  onDownload,
+}: Readonly<{
+  invoiceNumber: string;
+  product: string;
+  amount: string;
+  balance: string;
+  onView: () => void;
+  onDownload: () => void;
+}>) {
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div style={s.cardTitleRow}>
+          <FileText size={22} color="#141414" />
+          <h3 style={s.cardTitle}>Invoice issued #{invoiceNumber}</h3>
+        </div>
+        <CardActions onView={onView} onDownload={onDownload} />
+      </div>
+      <div style={s.cardBody}>
+        <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <div style={s.colLabel}>Products</div>
+            <div style={s.colValue}>
+              {product}{" "}
+              <LinkButton onClick={() => null} style={s.link}>
+                includes
+              </LinkButton>
+            </div>
+          </div>
+          <div>
+            <div style={s.colLabel}>Invoice amount</div>
+            <div style={s.colValue}>{amount}</div>
+          </div>
+        </div>
+        <hr style={s.hr} />
+        <div style={s.balanceRow}>
+          <span style={s.balanceLabel}>Invoice balance</span>
+          <span style={s.balanceAmount}>{balance}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Card: Payment processed ────────────────────────────────────────────────────
-function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount, brand = "VISA" }: {
-  id: string; product: string; invoiceRef: string;
-  cardLast4: string; cardHolder: string; amount: string;
-  brand?: string;
-}) {
+function PaymentCard({
+  id,
+  product,
+  invoiceRef,
+  cardLast4,
+  cardHolder,
+  amount,
+}: Readonly<{
+  id: string;
+  product: string;
+  invoiceRef: string;
+  cardLast4: string;
+  cardHolder: string;
+  amount: string;
+}>) {
   return (
     <div style={s.card}>
       <div style={s.cardHeader}>
@@ -310,33 +419,34 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount, b
           <Landmark size={22} color="#141414" />
           <h3 style={s.cardTitle}>Payment processed #{id}</h3>
         </div>
-        {/* <div style={s.cardActions}>
-          <a style={s.actionLink}>View</a>
-          <span style={s.divider}>|</span>
-          <a style={s.actionLink}>Download</a>
-        </div> */}
+        <CardActions />
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
           <div>
             <div style={s.colLabel}>Products</div>
             <div style={s.colValue}>
-              {product} <a style={s.link}>includes</a>
+              {product}{" "}
+              <LinkButton onClick={() => null} style={s.link}>
+                includes
+              </LinkButton>
             </div>
           </div>
           <div>
             <div style={s.colLabel}>Paid for invoice</div>
             <div style={s.colValue}>
-              <a style={s.link}>#{invoiceRef}</a>
+              <LinkButton onClick={() => null} style={s.link}>
+                #{invoiceRef}
+              </LinkButton>
             </div>
           </div>
           <div>
             <div style={s.colLabel}>Payment method</div>
             <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
-              <span style={s.visaChip}>{brand}</span>
+              <span style={s.visaChip}>VISA</span>
               <div>
                 <div style={{ fontSize: 14, color: "#141414", fontFamily: font }}>
-                  {brand} <em>ending in</em> {cardLast4}
+                  Visa <em>ending in</em> {cardLast4}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, fontFamily: font, color: "#141414" }}>{cardHolder}</div>
               </div>
@@ -353,43 +463,93 @@ function PaymentCard({ id, product, invoiceRef, cardLast4, cardHolder, amount, b
   );
 }
 
+// ── Card: Order issued ─────────────────────────────────────────────────────────
+function OrderCard({
+  id,
+  product,
+  amount,
+}: Readonly<{ id: string; product: string; amount: string }>) {
+  return (
+    <div style={s.card}>
+      <div style={s.cardHeader}>
+        <div style={s.cardTitleRow}>
+          <FileMinus size={22} color="#141414" />
+          <h3 style={s.cardTitle}>Order issued #{id}</h3>
+        </div>
+        <CardActions />
+      </div>
+      <div style={s.cardBody}>
+        <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
+          <div>
+            <div style={s.colLabel}>Products</div>
+            <div style={s.colValue}>
+              {product}{" "}
+              <LinkButton onClick={() => null} style={s.link}>
+                includes
+              </LinkButton>
+            </div>
+          </div>
+        </div>
+        <hr style={s.hr} />
+        <div style={s.balanceRow}>
+          <span style={s.balanceLabel}>Amount</span>
+          <span style={s.balanceAmount}>{amount}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Main page ──────────────────────────────────────────────────────────────────
-const STATUS_OPTIONS = [
-  { value: "", label: "All Status" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-  { value: "failed", label: "Failed" },
-];
-
 export default function BillingHistoryPage() {
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [paymentsList, setPaymentsList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchPayments = useCallback(async () => {
-    setLoading(true);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
+
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(false);
+  }, []);
+
+  const handleViewInvoice = useCallback(async (invoiceId: number) => {
+    setShowViewInvoiceModal(true);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(true);
     try {
-      const response = await GetPayments({
-        page: 1,
-        per_page: 50,
-        ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
-      }) as any;
-      const list = response?.dataList ?? response?.data ?? [];
-      setPaymentsList(Array.isArray(list) ? list : []);
+      const invoiceDetails = await getInvoice(invoiceId);
+      setSelectedInvoiceForView(toInvoiceViewData(invoiceDetails));
     } catch (err) {
-      console.error("GetPayments error:", err);
-      setPaymentsList([]);
+      console.error("BillingHistoryPage view invoice error:", err);
+      closeViewInvoiceModal();
     } finally {
-      setLoading(false);
+      setIsInvoiceLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, [closeViewInvoiceModal]);
 
+  const handleDownloadInvoice = useCallback(async (invoiceId: number) => {
+    try {
+      await downloadInvoicePdf(invoiceId);
+    } catch (err) {
+      console.error("BillingHistoryPage download invoice error:", err);
+    }
+  }, []);
   useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+    const fetchInvoices = async () => {
+      try {
+        const res = await getInvoices({ page: 1, per_page: 50, limit: 50 }) as any;
+        setInvoices(res?.data || []);
+        console.log("getInvoices response:", res);
+      } catch (err) {
+        console.error("BillingHistoryPage getInvoices error:", err);
+      }
+    };
+    fetchInvoices();
+  }, []);
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
@@ -401,94 +561,70 @@ export default function BillingHistoryPage() {
     { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
   ];
 
-  const currency = (row: any) => row?.currency_code ?? row?.currency ?? "AED";
-  const amountStr = (row: any) => `${currency(row)} ${Number(row?.amount ?? 0).toFixed(2)}`;
-  const cardLast4 = (row: any) =>
-    row?.payment_method?.last4 ?? row?.card_last4 ?? row?.last4 ?? (typeof row?.payment_method === "string" ? "****" : "****");
-  const cardHolder = (row: any) =>
-    row?.payment_method?.holder_name ?? row?.billing_details?.name ?? row?.card_holder ?? "—";
-  const cardBrand = (row: any) =>
-    (row?.payment_method?.brand ?? row?.payment_method ?? "CARD").toString().toUpperCase();
-
-  const paymentsByDate = paymentsList.reduce<Record<string, any[]>>((acc, row) => {
-    const dateKey = row?.payment_date ?? row?.created_at ?? row?.date ?? "";
-    const d = dateKey ? formatBillingDate(dateKey) : "—";
-    if (!acc[d]) acc[d] = [];
-    acc[d].push(row);
-    return acc;
-  }, {});
-  const sortedDates = Object.keys(paymentsByDate).sort((a, b) => {
-    if (a === "—" || b === "—") return a === "—" ? 1 : -1;
-    const timeA = paymentsByDate[a][0]?.payment_date ?? paymentsByDate[a][0]?.created_at ?? 0;
-    const timeB = paymentsByDate[b][0]?.payment_date ?? paymentsByDate[b][0]?.created_at ?? 0;
-    return new Date(timeB).getTime() - new Date(timeA).getTime();
-  });
-
   return (
     <div style={s.page}>
-      {/* Top bar: search + status filter (same as payment-history) + filters */}
+      {/* Top bar: search + filters */}
       <div style={s.topBar}>
+        {/* Search */}
         <div style={s.searchWrapper}>
           <Search size={16} color="#888" style={s.searchIcon} />
           <input
             style={s.searchInput}
             type="text"
-            placeholder="Search by invoice number or payment ID..."
+            placeholder="Search Billing History"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          style={{
-            ...s.filterBtn,
-            minWidth: 160,
-            paddingLeft: 12,
-            paddingRight: 28,
-            cursor: "pointer",
-            appearance: "auto",
-          }}
-        >
-          {STATUS_OPTIONS.map(opt => (
-            <option key={opt.value || "all"} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+
+        {/* Filter dropdowns */}
         {filters.map(f => (
           <FilterDropdown key={f.label} label={f.label} options={f.options} />
         ))}
       </div>
 
+      {/* Content */}
       <div style={s.content}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center" as const, color: "#666", fontFamily: font }}>
-            Loading…
+
+        {invoices.map((invoice: any) => (
+          <div key={invoice.id}>
+            <div style={s.dateLabel}>{moment(invoice.created_at).format(GlobalDateTimeFormat)}</div>
+            <InvoiceCard
+              invoiceNumber={String(invoice.invoice_number ?? "")}
+              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
+              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+              balance={`${invoice.currency_code || "AED"} ${invoice.amount_due ?? 0}`}
+              onView={() => handleViewInvoice(Number(invoice.id))}
+              onDownload={() => handleDownloadInvoice(Number(invoice.id))}
+            />
+            
+            {Array.isArray(invoice.payments) && invoice.payments.map((payment: any) => (
+              <PaymentCard
+                key={payment.id}
+                id={String(payment.id)}
+                product={payment.notes}
+                invoiceRef={String(invoice.invoice_number ?? "")}
+                cardLast4={payment?.card_last4 ?? ""}
+                cardHolder={payment?.card_holder ?? ""}
+                amount={`${payment?.currency_code || "AED"} ${payment?.amount ?? 0}`}
+              />
+            ))}
+
+            <OrderCard
+              id="22970930"
+              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
+              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+            />
+
           </div>
-        ) : paymentsList.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center" as const, color: "#666", fontFamily: font }}>
-            No billing history found.
-          </div>
-        ) : (
-          sortedDates.map((dateLabel) => (
-            <div key={dateLabel}>
-              <div style={s.dateLabel}>{dateLabel}</div>
-              {paymentsByDate[dateLabel].map((row: any) => (
-                <PaymentCard
-                  key={row?.id ?? row?.payment_id ?? Math.random()}
-                  id={String(row?.id ?? row?.payment_id ?? "—")}
-                  product={row?.product_name ?? row?.invoice?.product ?? row?.description ?? "—"}
-                  invoiceRef={row?.invoice?.invoice_number ?? row?.invoice_number ?? row?.invoice_id ?? "—"}
-                  cardLast4={cardLast4(row)}
-                  cardHolder={cardHolder(row)}
-                  amount={amountStr(row)}
-                  brand={cardBrand(row)}
-                />
-              ))}
-            </div>
-          ))
-        )}
+        ))}
+        <InvoiceViewModal
+          show={showViewInvoiceModal}
+          onHide={closeViewInvoiceModal}
+          invoice={selectedInvoiceForView}
+          loading={isInvoiceLoading}
+          companyName={session?.user?.company_name || ""}
+        />
       </div>
     </div>
   );

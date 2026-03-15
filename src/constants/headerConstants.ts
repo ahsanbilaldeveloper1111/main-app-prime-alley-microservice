@@ -267,6 +267,24 @@ MENU_COLORS: {
   // Permissions
   PERMISSIONS: {
 
+    //Account defaults permissions start
+   VIEW_ACCOUNT_DEFAULTS_GENERAL: 'account-defaults-general',
+   VIEW_ACCOUNT_GENERAL: 'view-account-general-general',
+   VIEW_ACCOUNT_USER_DEFAULT: 'view-account-user-default-general',
+   VIEW_ACCOUNT_NOTIFICATION_PROFILES: 'view-account-notification-profiles-general',
+   VIEW_ACCOUNT_CURRENCY: 'view-account-currency-general',
+   VIEW_ACCOUNT_DATA_HOSTING: 'view-account-data-hosting-general',
+   VIEW_ACCOUNT_FEATURE_RELEASE: 'view-account-feature-release-general',
+    //Account defaults permissions end
+
+    //AI chat permissions start
+    VIEW_AI_CHAT: 'view-ai-chat-general',
+    VIEW_AI_CHAT_MENTIONS: 'view-ai-chat-mentions-general',
+    VIEW_AI_CHAT_RESPONSES: 'view-ai-chat-responses-general',
+    VIEW_VIRTUAL_AGENTS:'view-virtual-agents-general',
+    
+    //AI chat permissions end
+
     //Services permissions start
     CRM_SERVICES: 'crm-services',
     COMMUNICATIONS_SERVICES: 'communications-services-services',
@@ -313,13 +331,23 @@ MENU_COLORS: {
 
     //Virtual Agents permissions start
     VIEW_OUTBOUND_CALLS_AIML: 'view-outbound-calls-aiml-aiml',
-    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    
     VIEW_AGENT_CAMPAIGNS_AIML: 'view-agent-campaigns-aiml-aiml',
     CREATE_CAMPAIGN_AIML: 'view-create-campaign-aiml-aiml',
     VIEW_PITCH_DECK_AIML: 'view-pitch-deck-aiml-aiml',
     VIEW_LIVE_MONITORING_AIML: 'view-live-monitoring-aiml-aiml',
     VIEW_ANALYTICS_AIML: 'view-analytics-aiml-aiml',
     VIEW_USAGE_REPORTS_AIML: 'view-usage-reports-aiml-aiml',
+
+    VIEW_INBOUND_CALLS_AIML: 'view-inbound-calls-aiml-aiml',
+    VIEW_INBOUND_COMPANIES_AIML: 'view-inbound-companies-aiml',
+    VIEW_INBOUND_BOTS_AIML: 'view-inbound-bots-aiml',
+    VIEW_INBOUND_ANALYTICS_AIML: 'view-inbound-analytics-aiml',
+    VIEW_INBOUND_USAGE_REPORTS_AIML: 'view-inbound-dashboard-aiml',
+
+    MANAGE_INBOUND_COMPANIES_AIML: 'manage-inbound-companies-aiml',
+    MANAGE_INBOUND_BOTS_AIML: 'manage-inbound-bots-aiml',
+
     //Virtual Agents permissions end
 
     //pulse permissions start

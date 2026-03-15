@@ -16,6 +16,8 @@ export const routePermissions: RoutePermission[] = [
     
     //profile services start
     {path: '/profile',permissions: ['']},
+    {path: '/live-monitoring',permissions: ['']},
+    {path: '/user-settings',permissions: ['']},
     
     {path: '/coming-soon',permissions: ['']},
     {path: '/plan-upgrade',permissions: ['']},
@@ -110,6 +112,8 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
                 ]
             },
+            { path: '/tickets',permissions: [PERMISSIONS.TICKETS_SERVICES]},
+            { path: '/tickets/tickets-detailpage',permissions: [PERMISSIONS.TICKETS_SERVICES]},
 
             { 
                 path: '/leads',permissions: [PERMISSIONS.VIEW_CRM_LEADS],
@@ -279,7 +283,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/pitch-deck',permissions: [PERMISSIONS.VIEW_PITCH_DECK_AIML]},
             { path: '/live-monitoring',permissions: [PERMISSIONS.VIEW_LIVE_MONITORING_AIML]},
             { path: '/analytics',permissions: [PERMISSIONS.VIEW_ANALYTICS_AIML]},
-            { path: '/usage-reports',permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]},
+            { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+            
         ]
     },
     //virtual agents services end
@@ -687,37 +692,8 @@ export const routePermissions: RoutePermission[] = [
                 path: '/management',permissions: [PERMISSIONS.TMS_SERVICES],
                 children: [
                     { path: '/users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { 
-                        path: '/rank-permissions',permissions: [PERMISSIONS.TMS_SERVICES],
-                        children: [
-                            { path: '/',permissions: [PERMISSIONS.TMS_SERVICES]}
-                        ]
-                    },
                 ]
             },
-            {
-                path: '/cisco-pbx',permissions: [PERMISSIONS.TMS_SERVICES],
-                children: [
-                    { path: '/app-users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/users-directory',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/custom-users',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/facilities-info',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/line',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/phone',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/sip-trunks',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/translation-patterns',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/device-pool',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/locations',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/route-partitions',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/css',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/regions',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/route-pattern',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/remote-destination',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/remote-destination/profile',permissions: [PERMISSIONS.TMS_SERVICES]},
-                    { path: '/recording-profile',permissions: [PERMISSIONS.TMS_SERVICES]},
-                ]
-            }
 
         ]
     },
@@ -749,9 +725,12 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
         children: [
             { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/calls', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/bots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
         ]
     },
 
@@ -762,7 +741,14 @@ export const routePermissions: RoutePermission[] = [
             { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/voicebots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/campaigns/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/reports', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+
+
+
         ]
     },
     //voicebot services end
@@ -842,7 +828,7 @@ export interface SearchableRoute {
 
 function pathToLabel(path: string): string {
     const segments = path.split('/').filter(Boolean);
-    return segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')).join(' / ') || 'Home';
+    return segments.map(s => s.charAt(0).toUpperCase() + s.slice(1).replaceAll('-', ' ')).join(' / ') || 'Home';
 }
 
 /** True if path contains a dynamic segment ([id], :id, {id}, etc.) */
@@ -877,9 +863,9 @@ export const SEARCH_EXCLUDED_ROUTES: string[] = [
 ];
 
 function isExcludedFromSearch(path: string): boolean {
-    const normalized = path.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    const normalized = path.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
     return SEARCH_EXCLUDED_ROUTES.some((ex) => {
-        const exNorm = ex.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+        const exNorm = ex.replaceAll(/\/+/g, '/').replace(/\/$/, '') || '/';
         return normalized === exNorm || normalized.startsWith(exNorm + '/');
     });
 }
@@ -889,7 +875,7 @@ export function getSearchableRoutes(): SearchableRoute[] {
     const result: SearchableRoute[] = [];
     function traverse(routes: RoutePermission[], currentPath: string = '') {
         for (const route of routes) {
-            const fullPath = `${currentPath}${route.path}`.replace(/\/+/g, '/') || '/';
+            const fullPath = `${currentPath}${route.path}`.replaceAll(/\/+/g, '/') || '/';
             if (isDynamicPath(fullPath)) continue;
             const normalized = fullPath.endsWith('/') && fullPath.length > 1 ? fullPath.slice(0, -1) : fullPath;
             if (isExcludedFromSearch(normalized)) continue;

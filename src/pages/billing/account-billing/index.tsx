@@ -1,4 +1,5 @@
-import { useState, ReactElement } from "react";
+import { useEffect, useMemo, useState, ReactElement } from "react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import OverviewPage from "@components/billings/Overview";
 import SubscriptionsPage from "@components/billings/SubscriptionPage";
@@ -8,6 +9,43 @@ import TransactionsPage from "@components/billings/TransactionPage";
 import DocumentsPage from "@components/billings/DocumentPage";
 import PaymentMethodsPage from "@components/billings/PaymentMethodsPage";
 import CompanyInfoPage from "@components/billings/CompanyInfoPage";
+import { ACCOUNT_BILLING_TABS, tabLabelFromQuery, tabSlugFromLabel, type AccountBillingTab } from "@components/billings/shared/accountBillingTabs";
+
+type TabPageComponent = React.ComponentType<Record<string, never>>;
+
+const ACCOUNT_BILLING_BASE_PATH = "/billing/account-billing";
+const ACCOUNT_BILLING_TAB_PATHNAME = "/billing/account-billing/[tab]";
+
+const TAB_PAGES: Record<AccountBillingTab, TabPageComponent> = {
+  Overview: OverviewPage,
+  Subscriptions: SubscriptionsPage,
+  "Usage & Limits": UsageLimitsPage,
+  "Billing History": BillingHistoryPage,
+  "Company Info": CompanyInfoPage,
+  Transactions: TransactionsPage,
+  Documents: DocumentsPage,
+  "Payment Methods": PaymentMethodsPage,
+};
+
+type TabButtonProps = {
+  tab: AccountBillingTab;
+  activeTab: AccountBillingTab;
+  onSelect: (tab: AccountBillingTab) => void;
+};
+
+const TabButton = ({ tab, activeTab, onSelect }: TabButtonProps) => {
+  const isActive = activeTab === tab;
+
+  return (
+    <button
+      type="button"
+      style={{ ...styles.tab, ...(isActive ? styles.activeTab : undefined) }}
+      onClick={() => onSelect(tab)}
+    >
+      {tab}
+    </button>
+  );
+};
 const styles: Record<string, React.CSSProperties> = {
   body: {
     fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
@@ -60,19 +98,89 @@ const styles: Record<string, React.CSSProperties> = {
   },
 };
 
-const tabs = [
-  "Overview",
-  "Subscriptions",
-  "Usage & Limits",
-  "Billing History",
-  "Company Info",
-  "Transactions",
-  "Documents",
-  "Payment Methods",
-];
+function handleRouteChange(promise: Promise<boolean>, label: string) {
+  promise.catch((error) => {
+    console.error(`[AccountBilling] ${label} navigation failed`, error);
+  });
+}
 
 const AccountBilling = () => {
-  const [activeTab, setActiveTab] = useState("Overview");
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<AccountBillingTab>("Overview");
+  const ActiveTabPage = TAB_PAGES[activeTab];
+
+  const queryWithoutTab = useMemo(() => {
+    const { tab: _tab, ...rest } = router.query;
+    return rest;
+  }, [router.query]);
+
+  const selectTab = (tab: AccountBillingTab) => {
+    setActiveTab(tab);
+
+    if (!router.isReady) return;
+
+    if (tab === "Overview") {
+      handleRouteChange(
+        router.push({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+        "push overview",
+      );
+      return;
+    }
+
+    const slug = tabSlugFromLabel(tab);
+    handleRouteChange(
+      router.push(
+        { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
+        `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
+        { shallow: true },
+      ),
+      `push tab ${slug}`,
+    );
+  };
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const tabParam = router.query.tab;
+    const requestedTab = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+    if (!requestedTab) {
+      if (activeTab !== "Overview") setActiveTab("Overview");
+      return;
+    }
+
+    const nextTab = tabLabelFromQuery(requestedTab);
+    if (!nextTab) return;
+    if (nextTab !== activeTab) setActiveTab(nextTab);
+
+    // Normalize legacy query-param URLs to friendly path URLs.
+    if (router.pathname === ACCOUNT_BILLING_BASE_PATH) {
+      if (nextTab === "Overview") {
+        handleRouteChange(
+          router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+          "replace overview",
+        );
+        return;
+      }
+
+      const slug = tabSlugFromLabel(nextTab);
+      handleRouteChange(
+        router.replace(
+          { pathname: ACCOUNT_BILLING_TAB_PATHNAME, query: { ...queryWithoutTab, tab: slug } },
+          `${ACCOUNT_BILLING_BASE_PATH}/${slug}`,
+          { shallow: true },
+        ),
+        `replace tab ${slug}`,
+      );
+    }
+
+    // If someone lands on /account-billing/overview, keep the canonical URL clean.
+    if (router.pathname === ACCOUNT_BILLING_TAB_PATHNAME && nextTab === "Overview") {
+      handleRouteChange(
+        router.replace({ pathname: ACCOUNT_BILLING_BASE_PATH, query: queryWithoutTab }, undefined, { shallow: true }),
+        "replace canonical overview",
+      );
+    }
+  }, [activeTab, queryWithoutTab, router.isReady, router.pathname, router.query.tab]);
 
   return (
     <div style={styles.body}>
@@ -81,19 +189,8 @@ const AccountBilling = () => {
         <div style={{ ...styles.container, paddingBottom: 0 }}>
           <h1 style={styles.pageHeading}>Account &amp; Billing</h1>
           <div style={styles.tabBar}>
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                style={{
-                  ...styles.tab,
-                  borderBottom: activeTab === tab ? "2px solid #141414" : "2px solid transparent",
-                  fontWeight: activeTab === tab ? 700 : 500,
-                }}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
+            {ACCOUNT_BILLING_TABS.map(({ label }) => (
+              <TabButton key={label} tab={label} activeTab={activeTab} onSelect={selectTab} />
             ))}
           </div>
         </div>
@@ -101,29 +198,11 @@ const AccountBilling = () => {
 
       {/* Main Content */}
       <div style={{ ...styles.container, paddingTop: 24 }}>
-
-      {activeTab === "Subscriptions" ? (
-          <SubscriptionsPage />
-        ) : activeTab === "Usage & Limits" ? (
-          <UsageLimitsPage />
-        ) : activeTab === "Billing History" ? (
-          <BillingHistoryPage />
-        ) : activeTab === "Transactions" ? (
-          <TransactionsPage />
-        ) : activeTab === "Documents" ? (
-          <DocumentsPage />
-        ) : activeTab === "Payment Methods" ? (
-          <PaymentMethodsPage />
-        ) : activeTab === "Company Info" ? (
-          <CompanyInfoPage />
-        ) : (
-          <OverviewPage />
-        )}
-
+        <ActiveTabPage />
       </div>
     </div>
   );
-}
+};
 AccountBilling.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };

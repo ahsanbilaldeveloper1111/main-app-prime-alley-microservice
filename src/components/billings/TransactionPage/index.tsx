@@ -1,54 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { GetCustomerStatements } from "@utils/accounting";
+import { GetPayments } from "@utils/accounting";
+import { GlobalDateFormat, GlobalDateTimeFormat } from "@utils/Helper";
+import { downloadInvoicePdf, getInvoice } from "@utils/accounts";
+import moment from "moment";
+import { useSession } from "next-auth/react";
+import InvoiceViewModal from "@components/billings/InvoiceViewModal";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
-
-function formatDate(value: string | undefined): string {
-  if (!value) return "—";
-  try {
-    const d = new Date(value);
-    const day = d.getDate();
-    const month = d.toLocaleDateString("en-GB", { month: "short" });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return String(value);
-  }
-}
-
-/** Map API transaction shape (type, date, reference, description, debit, credit, balance, currency) to table row */
-function mapStatementToRow(row: any, index: number) {
-  const dateIssued = formatDate(row.date ?? row.datetime ?? row.date_issued ?? row.created_at);
-  const detailsTitle = row.description ?? row.reference ?? row.details_title ?? row.invoice_number ?? `#${index + 1}`;
-  const detailsSub = row.type ? String(row.type).charAt(0).toUpperCase() + String(row.type).slice(1) : null;
-  const poNumber = row.po_number ?? row.po ?? "-";
-  const products = row.type ? String(row.type) : "";
-  const currency = row.currency ?? "USD";
-  const amounts: { label: string; value: string }[] = [];
-  if (row.debit != null && Number(row.debit) !== 0) {
-    amounts.push({ label: "Debit", value: `${currency} ${Number(row.debit).toFixed(2)}` });
-  }
-  if (row.credit != null && Number(row.credit) !== 0) {
-    amounts.push({ label: "Credit", value: `${currency} ${Number(row.credit).toFixed(2)}` });
-  }
-  if (row.balance != null) {
-    amounts.push({ label: "Balance", value: `${currency} ${Number(row.balance).toFixed(2)}` });
-  }
-  if (amounts.length === 0 && (row.amount != null || row.total != null)) {
-    amounts.push({ label: "Amount", value: `${currency} ${Number(row.amount ?? row.total ?? 0).toFixed(2)}` });
-  }
-  const status = row.status ?? "Processed";
-  return {
-    id: row.sort_order ?? index,
-    dateIssued,
-    detailsTitle: String(detailsTitle),
-    detailsSub: detailsSub != null ? String(detailsSub) : null,
-    poNumber: poNumber != null ? String(poNumber) : "-",
-    products,
-    amounts,
-    status: String(status),
-  };
-}
 
 const s: Record<string, React.CSSProperties> = {
   page: {
@@ -172,45 +130,128 @@ const s: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     backgroundColor: "#fff",
   },
+  statusBadgeSuccess: {
+    border: "1px solid #16a34a",
+    color: "#166534",
+    backgroundColor: "#dcfce7",
+  },
+  statusBadgeDanger: {
+    border: "1px solid #ef4444",
+    color: "#991b1b",
+    backgroundColor: "#fee2e2",
+  },
 };
+
+function toStatusText(status: unknown): string {
+  if (status == null) return ""
+
+  if (typeof status === "string" || typeof status === "number" || typeof status === "boolean") {
+    return String(status)
+  }
+
+  if (typeof status === "object") {
+    const record = status as Record<string, unknown>
+    const candidate =
+      record.status ??
+      record.value ??
+      record.name ??
+      record.label
+
+    if (typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean") {
+      return String(candidate)
+    }
+  }
+
+  return ""
+}
+
+function normalizeStatus(status: unknown): string {
+  return toStatusText(status).trim().toLowerCase()
+}
+
+function getPaymentStatusBadge(status: unknown): { label: string; style?: React.CSSProperties } {
+  const normalized = normalizeStatus(status);
+  if (normalized === "completed") return { label: "Processed", style: s.statusBadgeSuccess };
+  if (normalized === "failed") return { label: "Failed", style: s.statusBadgeDanger };
+  const label = toStatusText(status).trim();
+  return { label: label || "-", style: undefined };
+}
+
+function getPaymentMethodLabel(paymentMethod: unknown): string {
+  if (paymentMethod == null) return "-"
+  if (typeof paymentMethod !== "string") return "-"
+
+  const normalized = paymentMethod.trim().toLowerCase()
+  if (normalized === "stripe") return "Card"
+
+  return paymentMethod.trim() || "-"
+}
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
+  const { data: session } = useSession();
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<Array<{
-    id: number;
-    dateIssued: string;
-    detailsTitle: string;
-    detailsSub: string | null;
-    poNumber: string;
-    products: string;
-    amounts: Array<{ label: string; value: string }>;
-    status: string;
-  }>>([]);
-  const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<any>(null);
+  const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
 
-  const fetchStatements = useCallback(async () => {
-    setLoading(true);
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
+  }, []);
+
+  const handleViewInvoice = useCallback(async (payment: any) => {
+    const invoiceId = payment?.invoice?.id ?? payment?.invoice_id ?? payment?.invoice?.invoice_id;
+    if (!invoiceId) {
+      console.warn("No invoice id found for payment:", payment);
+      return;
+    }
+
+    setShowViewInvoiceModal(true);
+    setSelectedInvoiceForView(null);
+    setIsInvoiceLoading(true);
     try {
-      const response = await GetCustomerStatements() as any;
-      const rawList = response?.transactions ?? response?.data?.transactions ?? (Array.isArray(response) ? response : []);
-      const mapped = (rawList || []).map((item: any, idx: number) => mapStatementToRow(item, idx));
-      setTransactions(mapped);
+      const invoiceDetails = await getInvoice(Number(invoiceId));
+      setSelectedInvoiceForView(invoiceDetails);
     } catch (err) {
-      console.error("GetCustomerStatements error:", err);
-      setTransactions([]);
+      console.error("View invoice error:", err);
     } finally {
-      setLoading(false);
+      setIsInvoiceLoading(false);
+    }
+  }, []);
+
+  const handleDownloadPDF = useCallback(async (payment: any) => {
+    const invoiceId = payment?.invoice?.id ?? payment?.invoice_id ?? payment?.invoice?.invoice_id;
+    if (!invoiceId) {
+      console.warn("No invoice id found for payment:", payment);
+      return;
+    }
+    try {
+      await downloadInvoicePdf(Number(invoiceId));
+    } catch (err) {
+      console.error("PDF download error:", err);
     }
   }, []);
 
   useEffect(() => {
-    fetchStatements();
-  }, [fetchStatements]);
+    const fetchPayments = async () => {
+      try {
+        const response = await GetPayments({ page: 1, per_page: 500 });
+        setPayments(response?.dataList || []);
+        console.log("GetPayments response:", response);
+      } catch (err) {
+        console.error("TransactionsPage GetPayments error:", err);
+      }
+    };
+    fetchPayments();
+  }, []);
 
   return (
     <div style={s.page}>
       <h1 style={s.pageHeading}>Transactions</h1>
+
+  
 
       <div style={s.tableWrapper}>
         <table style={s.table}>
@@ -218,88 +259,111 @@ export default function TransactionsPage() {
             <tr>
               <th style={{ ...s.th, width: 130 }}>Date Issued</th>
               <th style={{ ...s.th, width: 220 }}>Details</th>
-              <th style={{ ...s.th, width: 120 }}>PO Number</th>
-              <th style={{ ...s.th }}>Products</th>
+              <th style={{ ...s.th, width: 120 }}>Transaction Number</th>
+              <th style={{ ...s.th }}>Subscriptions</th>
+              <th style={{ ...s.th }}>Payment Method</th>
               <th style={{ ...s.th, width: 160 }}>Amount</th>
               <th style={{ ...s.th, width: 120 }}>Status</th>
-              <th style={{ ...s.th, width: 80 }}>Actions</th>
-            </tr>
+             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} style={{ ...s.td, textAlign: "center", color: "#666", padding: 32 }}>
-                  Loading…
-                </td>
-              </tr>
-            ) : transactions.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ ...s.td, textAlign: "center", color: "#666", padding: 32 }}>
-                  No transactions found.
-                </td>
-              </tr>
-            ) : (
-            transactions.map((tx) => (
+            {payments.map((payment) => (
               <tr
-                key={tx.id}
-                onMouseEnter={() => setHoveredRow(tx.id)}
+                key={payment?.id}
+                onMouseEnter={() => setHoveredRow(payment?.id)}
                 onMouseLeave={() => setHoveredRow(null)}
                 style={{
-                  backgroundColor: hoveredRow === tx.id ? "#fafafa" : "#fff",
+                  backgroundColor: hoveredRow === payment.id ? "#fafafa" : "#fff",
                   transition: "background-color 100ms ease-out",
                 }}
               >
                 {/* Date Issued */}
                 <td style={{ ...s.td, ...s.dateCell }}>
-                  {tx.dateIssued}
+                  {payment?.invoice?.invoice_date ? moment(payment?.invoice?.invoice_date).format(GlobalDateFormat) : ""}
                 </td>
 
                 {/* Details */}
                 <td style={s.td}>
-                  <div style={s.detailsTitle}>{tx.detailsTitle}</div>
-                  {tx.detailsSub && (
-                    <div style={s.detailsSub}>{tx.detailsSub}</div>
-                  )}
+                  <div style={s.detailsTitle}>Invoice #{payment?.invoice?.invoice_number}</div>
+                 
+                    <div style={s.detailsSub}>{payment?.updated_at ? moment(payment?.updated_at).format(GlobalDateTimeFormat) : ""}</div>
+                  
                   <div style={s.actionLinks}>
-                    <a style={s.link}>View</a>
+                    <button
+                      type="button"
+                      style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+                      onClick={() => handleViewInvoice(payment)}
+                    >
+                      View
+                    </button>
                     <span style={s.divider}>|</span>
-                    <a style={s.link}>Download</a>
+                    <button
+                      type="button"
+                      style={{ ...s.link, background: "none", border: "none", padding: 0 }}
+                      onClick={() => handleDownloadPDF(payment)}
+                    >
+                      Download
+                    </button>
                   </div>
                 </td>
 
                 {/* PO Number */}
-                <td style={{ ...s.td, color: tx.poNumber === "-" ? "#141414" : "#ccc" }}>
-                  {tx.poNumber || ""}
+                <td style={{ ...s.td }}>
+                  #{payment?.id?.toString() || "-"}
                 </td>
 
+               
                 {/* Products */}
                 <td style={s.td}>
-                  {tx.products || ""}
+                  <div style={{ whiteSpace: "pre-line" }}>
+                    {payment?.invoice?.items?.map((item: any) => item?.product?.name).join("\n") || ""}
+                  </div>
+                </td>
+
+                {/* Payment Method */}
+                <td style={s.td}>
+                  {getPaymentMethodLabel(payment?.payment_method)}
                 </td>
 
                 {/* Amount */}
                 <td style={s.td}>
-                  {tx.amounts.map((amt, i) => (
-                    <div key={i} style={{ marginBottom: i < tx.amounts.length - 1 ? 12 : 0 }}>
-                      <div style={s.amountLabel}>{amt.label}</div>
-                      <div style={s.amountValue}>{amt.value}</div>
+                  
+                    <div  style={{ marginBottom: 12 }}>
+                      <div style={s.amountLabel}>Invoice amount</div>
+                      <div style={s.amountValue}>{payment?.invoice?.currency_code || "AED"} {payment?.invoice?.total_amount??0}</div>
                     </div>
-                  ))}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={s.amountLabel}>Invoice Balance</div>
+                      <div style={s.amountValue}>{payment?.invoice?.currency_code || "AED"} {payment?.invoice?.amount_due??0}</div>
+                    </div>
                 </td>
 
                 {/* Status */}
                 <td style={s.td}>
-                  <span style={s.statusBadge}>{tx.status}</span>
+                  {(() => {
+                    const badge = getPaymentStatusBadge(payment?.status);
+                    return (
+                      <span style={badge.style ? { ...s.statusBadge, ...badge.style } : s.statusBadge}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </td>
 
-                {/* Actions (empty col per design) */}
-                <td style={s.td} />
               </tr>
-            ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
+
+      <InvoiceViewModal
+        show={showViewInvoiceModal}
+        onHide={closeViewInvoiceModal}
+        invoice={selectedInvoiceForView}
+        loading={isInvoiceLoading}
+        companyName={session?.user?.company_name || ""}
+      />
+
     </div>
   );
 }
