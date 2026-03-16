@@ -100,8 +100,9 @@ const Users = () => {
 
     const {
         loadingLdapUsers,
-        responseDataLdapUsers,
+        ldapSyncJob,
         showSyncLdapUsersModal,
+        refreshLdapJobStatus,
         handleCloseSyncLdapUsersModal,
         syncLdapUsers
     } = useLdapSync();
@@ -179,7 +180,8 @@ const Users = () => {
                     show={showSyncLdapUsersModal}
                     onHide={handleCloseSyncLdapUsersModal}
                     loading={loadingLdapUsers}
-                    responseData={responseDataLdapUsers}
+                    job={ldapSyncJob}
+                    onRefreshJob={refreshLdapJobStatus}
                 />
 
                 <ResetPasswordModal
