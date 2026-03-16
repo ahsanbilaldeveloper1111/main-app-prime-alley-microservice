@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { X, Plus, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { Dropdown, Form } from "react-bootstrap";
+import { APP_FONT } from "../../styles/fonts";
+
+const FF = APP_FONT;
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface TicketFormData {
@@ -23,6 +26,7 @@ interface TicketFormData {
 
 interface SimpleDropdownProps {
   value: string;
+  id?: string;
   options: string[];
   onChange: (value: string) => void;
   placeholder?: string;
@@ -69,7 +73,7 @@ const fieldLabel = (text: string, required: boolean = false) => (
       fontWeight: "600",
       color: "#141414",
       marginBottom: "8px",
-      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+      fontFamily: FF,
     }}
   >
     {text}
@@ -82,7 +86,7 @@ const inputStyle: React.CSSProperties = {
   display: "inline-block",
   height: "auto",
   width: "100%",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+  fontFamily: FF,
   fontSize: "16px",
   fontWeight: 300,
   letterSpacing: "0px",
@@ -107,7 +111,7 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   display: "flex",
   height: "auto",
   width: "100%",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+  fontFamily: FF,
   fontSize: "16px",
   fontWeight: 300,
   letterSpacing: "0px",
@@ -126,9 +130,36 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   boxSizing: "border-box",
 });
 
+const OVERLAY_BUTTON_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1000,
+  background: "transparent",
+  border: "none",
+  padding: 0,
+};
+
+const SIDEBAR_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+  zIndex: 1001,
+  display: "flex",
+  flexDirection: "column",
+  fontFamily: FF,
+};
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
+  id,
   options,
   onChange,
   placeholder,
@@ -136,6 +167,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
 }) => (
   <Dropdown>
     <Dropdown.Toggle
+      id={id}
       data-test-id={testId}
       variant="outline-secondary"
       style={dropdownToggleStyle(!!value)}
@@ -173,8 +205,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
 
-  const set = (key: keyof TicketFormData) => (val: any) =>
-    setTicketForm((prev) => ({ ...prev, [key]: val }));
+  const set =
+    <K extends keyof TicketFormData>(key: K) =>
+    (val: TicketFormData[K]) =>
+      setTicketForm((prev) => ({ ...prev, [key]: val }));
 
   const setE =
     (key: keyof TicketFormData) =>
@@ -209,34 +243,16 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
   return (
     <>
       {/* Overlay */}
-      <div
+      <button
+        type="button"
+        aria-label="Close create ticket sidebar"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-        }}
+        style={OVERLAY_BUTTON_STYLE}
       />
 
       {/* Sidebar */}
       <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-          zIndex: 1001,
-          display: "flex",
-          flexDirection: "column",
-          fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-        }}
+        style={SIDEBAR_STYLE}
       >
         {/* ── Header ── */}
         <div
@@ -254,12 +270,13 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontWeight: "600",
               color: "#141414",
               margin: 0,
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
             }}
           >
             Create Ticket
           </h2>
           <button
+            type="button"
             onClick={onClose}
             style={{
               background: "transparent",
@@ -280,8 +297,8 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 
           {/* Edit this form link */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
-            <a
-              href="#"
+            <button
+              type="button"
               style={{
                 fontSize: "13px",
                 fontWeight: "500",
@@ -290,12 +307,16 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 gap: "4px",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
               onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
             >
               Edit this form <ExternalLink size={13} />
-            </a>
+            </button>
           </div>
 
           {/* Ticket Name */}
@@ -317,6 +338,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           <div style={fieldWrap}>
             {fieldLabel("Pipeline", true)}
             <SimpleDropdown
+              id="create-ticket-pipeline"
               value={ticketForm.pipeline}
               options={PIPELINE_OPTIONS}
               onChange={set("pipeline")}
@@ -329,6 +351,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           <div style={fieldWrap}>
             {fieldLabel("Ticket status", true)}
             <SimpleDropdown
+              id="create-ticket-status"
               value={ticketForm.ticketStatus}
               options={TICKET_STATUS_OPTIONS}
               onChange={set("ticketStatus")}
@@ -356,6 +379,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           <div style={fieldWrap}>
             {fieldLabel("Source")}
             <SimpleDropdown
+              id="create-ticket-source"
               value={ticketForm.source}
               options={SOURCE_OPTIONS}
               onChange={set("source")}
@@ -368,6 +392,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           <div style={fieldWrap}>
             {fieldLabel("Ticket owner")}
             <SimpleDropdown
+              id="create-ticket-owner"
               value={ticketForm.ticketOwner}
               options={TICKET_OWNER_OPTIONS}
               onChange={set("ticketOwner")}
@@ -380,6 +405,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
           <div style={fieldWrap}>
             {fieldLabel("Priority")}
             <SimpleDropdown
+              id="create-ticket-priority"
               value={ticketForm.priority}
               options={PRIORITY_OPTIONS}
               onChange={set("priority")}
@@ -414,7 +440,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                 color: "#141414",
                 marginBottom: "16px",
                 marginTop: 0,
-                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                fontFamily: FF,
               }}
             >
               Associate Ticket with
@@ -430,8 +456,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                 borderLeft: "4px solid #ccc",
               }}
             >
-              <div
-                onClick={() => setIsContactsExpanded(!isContactsExpanded)}
+              <button
+                type="button"
+                aria-expanded={isContactsExpanded}
+                onClick={() => setIsContactsExpanded((v) => !v)}
                 style={{
                   padding: "12px 16px",
                   backgroundColor: "transparent",
@@ -439,6 +467,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  font: "inherit",
                 }}
               >
                 {isContactsExpanded ? (
@@ -451,29 +483,31 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     fontSize: "14px",
                     fontWeight: "600",
                     color: "#141414",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                    fontFamily: FF,
                   }}
                 >
                   Contacts
                 </span>
-              </div>
+              </button>
 
               {isContactsExpanded && (
                 <div style={{ padding: "16px" }}>
                   <div style={fieldWrap}>
                     <label
+                      htmlFor="create-ticket-contact-associate"
                       style={{
                         display: "block",
                         fontSize: "13px",
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Associate records
                     </label>
                     <SimpleDropdown
+                      id="create-ticket-contact-associate"
                       value={ticketForm.contactAssociateRecord}
                       options={["Contact A", "Contact B", "Contact C"]}
                       onChange={set("contactAssociateRecord")}
@@ -484,18 +518,20 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 
                   <div style={fieldWrap}>
                     <label
+                      htmlFor="create-ticket-contact-association-label"
                       style={{
                         display: "block",
                         fontSize: "13px",
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Association label
                     </label>
                     <SimpleDropdown
+                      id="create-ticket-contact-association-label"
                       value={ticketForm.contactAssociationLabel}
                       options={ASSOCIATION_LABEL_OPTIONS}
                       onChange={set("contactAssociationLabel")}
@@ -507,7 +543,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     <Form.Check
                       type="checkbox"
                       label={
-                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
+                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: FF }}>
                           Add timeline activity from this Contact{" "}
                           <span
                             title="Adds contact activity to the ticket timeline"
@@ -546,7 +582,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
-                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      fontFamily: FF,
                     }}
                   >
                     <Plus size={14} /> Add more
@@ -565,8 +601,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                 borderLeft: "4px solid #ccc",
               }}
             >
-              <div
-                onClick={() => setIsCompaniesExpanded(!isCompaniesExpanded)}
+              <button
+                type="button"
+                aria-expanded={isCompaniesExpanded}
+                onClick={() => setIsCompaniesExpanded((v) => !v)}
                 style={{
                   padding: "12px 16px",
                   backgroundColor: "transparent",
@@ -574,6 +612,10 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  font: "inherit",
                 }}
               >
                 {isCompaniesExpanded ? (
@@ -586,29 +628,31 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     fontSize: "14px",
                     fontWeight: "600",
                     color: "#141414",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                    fontFamily: FF,
                   }}
                 >
                   Companies
                 </span>
-              </div>
+              </button>
 
               {isCompaniesExpanded && (
                 <div style={{ padding: "16px" }}>
                   <div style={fieldWrap}>
                     <label
+                      htmlFor="create-ticket-company-associate"
                       style={{
                         display: "block",
                         fontSize: "13px",
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Associate records
                     </label>
                     <SimpleDropdown
+                      id="create-ticket-company-associate"
                       value={ticketForm.companyAssociateRecord}
                       options={["Company A", "Company B", "Company C"]}
                       onChange={set("companyAssociateRecord")}
@@ -619,13 +663,14 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 
                   <div style={fieldWrap}>
                     <label
+                      htmlFor="create-ticket-company-association-label"
                       style={{
                         display: "block",
                         fontSize: "13px",
                         fontWeight: "600",
                         color: "#141414",
                         marginBottom: "6px",
-                        fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                        fontFamily: FF,
                       }}
                     >
                       Association label{" "}
@@ -649,6 +694,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       </span>
                     </label>
                     <input
+                      id="create-ticket-company-association-label"
                       type="text"
                       value={ticketForm.companyAssociationLabel}
                       readOnly
@@ -664,7 +710,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                     <Form.Check
                       type="checkbox"
                       label={
-                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
+                        <span style={{ fontSize: "13px", color: "#6c757d", fontFamily: FF }}>
                           Add timeline activity from this Company{" "}
                           <span
                             title="Adds company activity to the ticket timeline"
@@ -703,7 +749,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
                       display: "flex",
                       alignItems: "center",
                       gap: "4px",
-                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                      fontFamily: FF,
                     }}
                   >
                     <Plus size={14} /> Add more
@@ -738,7 +784,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {
@@ -764,7 +810,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {
@@ -791,7 +837,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               fontSize: "14px",
               fontWeight: "500",
               cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+              fontFamily: FF,
               transition: "150ms ease-out",
             }}
             onMouseEnter={(e) => {

@@ -9,7 +9,8 @@ import {
   deleteVoicebot,
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
-import { GetCompanies } from "@utils/users";
+import { getCompanies } from "@utils/voicebot/inbound";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -17,12 +18,6 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 interface VoicebotRow {
   id?: number | string;
@@ -46,6 +41,13 @@ interface VoicebotRow {
   [key: string]: unknown;
 }
 
+function listFromResponse<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const r = res as { results?: unknown; data?: unknown } | null | undefined;
+  const list = r?.results ?? r?.data;
+  return Array.isArray(list) ? (list as T[]) : [];
+}
+
 const VoicebotsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
@@ -55,7 +57,7 @@ const VoicebotsPage = () => {
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
+  const [search] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalRows, setTotalRows] = useState(0);
@@ -68,8 +70,8 @@ const VoicebotsPage = () => {
   const fetchTrunks = useCallback(async () => {
     try {
       const res = await getTrunks();
-      const list = Array.isArray(res) ? res : (res as { results?: { trunk_id?: string; id?: string; name?: string }[] })?.results ?? (res as { data?: { trunk_id?: string; id?: string; name?: string }[] })?.data ?? [];
-      const rows = (Array.isArray(list) ? list : []).map((r, i) => ({
+      const list = listFromResponse<{ trunk_id?: string; id?: string; name?: string }>(res);
+      const rows = list.map((r, i) => ({
         id: r.trunk_id ?? r.id ?? `trunk-${i}`,
         trunk_id: r.trunk_id ?? r.id,
         name: (r as { name?: string }).name ?? r.trunk_id ?? r.id ?? "",
@@ -82,18 +84,8 @@ const VoicebotsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      if (res === false) {
-        setCompanies([]);
-        return;
-      }
-      const list = Array.isArray(res) ? res : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ?? (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ?? [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        const id = item.identifier ?? item.company_id ?? item.id ?? "";
-        return { id, company_id: item.identifier ?? item.company_id ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      const res = await getCompanies();
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     }
@@ -108,8 +100,7 @@ const VoicebotsPage = () => {
       if (statusFilter) params.status = statusFilter;
       if (search?.trim()) params.search = search.trim();
       const res = await getVoicebots(params);
-      const list = Array.isArray(res) ? res : (res as { results?: VoicebotRow[] })?.results ?? (res as { data?: VoicebotRow[] })?.data ?? [];
-      const rawList = Array.isArray(list) ? list : [];
+      const rawList = listFromResponse<VoicebotRow>(res);
       setTotalRows((res as { count?: number })?.count ?? rawList.length);
       const rows = rawList.map((r, i) => ({
         ...r,

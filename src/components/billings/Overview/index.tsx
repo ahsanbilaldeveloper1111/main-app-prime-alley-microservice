@@ -5,9 +5,7 @@ import {
   ExternalLink,
   FileText,
   Info,
-  RefreshCcw,
   Settings,
-  UserPlus,
 } from "lucide-react";
 
 import { useSession } from "next-auth/react";
@@ -18,8 +16,41 @@ import {
   GetDashboardCounters,
   GetPayments,
 } from "@utils/accounting";
+import { getAllUsers } from "@utils/users";
 
 import TopSection from "./TopSection";
+import { BILLING_FONT, billingSharedStyles } from "@components/billings/shared/styles";
+import { hasDefaultPaymentMethod, normalizePaymentMethods, pickDisplayPaymentMethod } from "@components/billings/shared/paymentMethods";
+import InfoTooltip from "@components/billings/shared/InfoTooltip";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractSummaryUsersCount(value: unknown): number | null {
+  if (!isRecord(value)) return null;
+
+  const summary = value.summary;
+  if (!isRecord(summary)) return null;
+
+  const users = summary.users;
+  if (typeof users === "number") return users;
+  if (typeof users === "string") {
+    const parsed = Number(users);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (isRecord(users)) {
+    const candidate = users.total ?? users.count ?? users.users;
+    if (typeof candidate === "number") return candidate;
+    if (typeof candidate === "string") {
+      const parsed = Number(candidate);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  return null;
+}
 
 /** Given an ISO invoice date (e.g. 2026-03-12), returns the same day next month formatted as "12 April 2026". */
 function formatNextChargeDate(invoiceDateIso: string | null | undefined): string {
@@ -34,22 +65,7 @@ function formatNextChargeDate(invoiceDateIso: string | null | undefined): string
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  card: {
-    position: "relative" as const,
-    display: "flex",
-    flexDirection: "column" as const,
-    width: "100%",
-    padding: 0,
-    backgroundColor: "rgb(255, 255, 255)",
-    boxShadow: "rgba(20, 20, 20, 0.08) 0px 1px 8px 0px",
-    border: "1px solid rgb(204, 204, 204)",
-    marginBlockEnd: 16,
-    borderRadius: 8,
-    boxSizing: "border-box" as const,
-  },
-  cardPadding: {
-    padding: "40px",
-  },
+  ...billingSharedStyles,
   companyHeading: {
     boxSizing: "border-box" as const,
     fontSize: 24,
@@ -59,102 +75,28 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     padding: 0,
     backgroundColor: "unset",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+    fontFamily: BILLING_FONT,
     letterSpacing: 0,
     lineHeight: "29px",
     marginBottom: 20,
   },
-  label: {
-    color: "rgb(102, 102, 102)",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    fontSize: 12,
-    fontWeight: 300,
-    letterSpacing: 0,
-    lineHeight: "18px",
-  },
-  value: {
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    fontSize: 14,
-    fontWeight: 600,
-    letterSpacing: 0,
-    lineHeight: "18px",
-  },
   sectionHeading: {
+    ...billingSharedStyles.sectionHeading,
     boxSizing: "border-box" as const,
-    fontSize: 24,
     fontStyle: "unset",
-    fontWeight: 300,
     textTransform: "unset" as const,
     margin: "0 0 16px 0",
     padding: 0,
     backgroundColor: "unset",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    letterSpacing: 0,
-    lineHeight: "29px",
-  },
-  link: {
-    fontWeight: 600,
-    color: "rgb(0, 97, 98)",
-    cursor: "pointer",
-    textUnderlineOffset: "24%",
-    textDecoration: "underline",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    fontSize: 14,
   },
   btnDark: {
-    display: "inline-flex",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-    backgroundColor: "rgb(20, 20, 20)",
-    borderColor: "rgba(20, 20, 20, 0)",
-    color: "rgb(255, 255, 255)",
-    textDecoration: "none",
-    borderRadius: 4,
-    borderWidth: 1,
-    borderStyle: "solid",
-    verticalAlign: "middle",
-    paddingBlock: 8,
-    paddingInline: 16,
+    ...billingSharedStyles.btnDark,
     maxWidth: "100%",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    fontSize: 12,
-    fontWeight: 400,
-    letterSpacing: 0,
-    lineHeight: "14px",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center" as const,
     textUnderlineOffset: "24%",
-    transition: "150ms ease-out",
-    cursor: "pointer",
   },
   btnLight: {
-    display: "inline-flex",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap" as const,
-    backgroundColor: "rgb(255, 255, 255)",
-    borderColor: "rgb(204, 204, 204)",
-    color: "rgb(20, 20, 20)",
-    textDecoration: "none",
-    borderRadius: 4,
-    borderWidth: 1,
-    borderStyle: "solid",
-    verticalAlign: "middle",
-    paddingBlock: 8,
-    paddingInline: 16,
+    ...billingSharedStyles.btnLight,
     maxWidth: "100%",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    fontSize: 12,
-    fontWeight: 400,
-    letterSpacing: 0,
-    lineHeight: "14px",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center" as const,
-    transition: "150ms ease-out",
-    cursor: "pointer",
   },
   subHeading: {
     boxSizing: "border-box" as const,
@@ -165,28 +107,27 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     padding: 0,
     backgroundColor: "unset",
-    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+    fontFamily: BILLING_FONT,
     letterSpacing: 0,
     lineHeight: "24px",
   },
 };
 
 const commonActions = [
-  { Icon: FileText, label: "View or download invoices" },
-  { Icon: Settings, label: "Manage subscription details" },
-  { Icon: BarChart3, label: "View usage & limits" },
-  { Icon: UserPlus, label: "Add a billing contact" },
-  { Icon: CreditCard, label: "Add a payment method" },
-  { Icon: RefreshCcw, label: "Cancel auto-renewal" },
+  { Icon: FileText, label: "View or download invoices", url: "/billing/account-billing/billing-history" },
+  { Icon: Settings, label: "View subscriptions", url: "/billing/account-billing/subscriptions" },
+  { Icon: CreditCard, label: "View Transactions", url: "/billing/account-billing/transactions" },
+  { Icon: BarChart3, label: "View usage & limits", url: "/billing/account-billing/usage-limits" },
+  { Icon: CreditCard, label: "Add a payment method", url: "/billing/account-billing/payment-methods" },
+
 ];
 
 const starterIncludes = [
   "Smart CRM ",
-  "Call Logs & Recordings",
+  "Communications",
   "Planner",
   "Pulse",
   "Workforce",
-  "1 Core Seat",
 ];
 
 const billingHelpLinks = [
@@ -199,24 +140,28 @@ const OverviewPage = () => {
   const { data: session } = useSession();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [paymentMethods, setPaymentMethods] = useState<any>(null);
+  const [usersCount, setUsersCount] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [companyRes, paymentMethodsRes, countersRes, paymentsRes] = await Promise.all([
+        const [companyRes, paymentMethodsRes, countersRes, paymentsRes, usersRes] = await Promise.all([
           GetCompanyDetails({ crm_company_id: '' }),
           GetPaymentMethods(),
           GetDashboardCounters(),
           GetPayments({ page: 1, per_page: 3, limit: 3 }),
+          getAllUsers({ page: 1, perPage: 1 }),
         ]);
 
         console.log("GetCompanyDetails response:", companyRes);
         console.log("GetPaymentMethods response:", paymentMethodsRes);
         console.log("GetDashboardCounters response:", countersRes);
         console.log("GetPayments response:", paymentsRes);
+        console.log("getAllUsers response:", usersRes);
 
         setCompanyDetails(companyRes);
         setPaymentMethods(paymentMethodsRes);
+        setUsersCount(extractSummaryUsersCount(usersRes));
         
       } catch (err) {
         console.error("Overview API error:", err);
@@ -225,11 +170,10 @@ const OverviewPage = () => {
     fetchData();
   }, []);
 
-  const paymentMethodsList = Array.isArray(paymentMethods)
-    ? paymentMethods
-    : paymentMethods?.data ?? paymentMethods?.payment_methods ?? [];
-  const displayPaymentMethod = paymentMethodsList.find((pm: any) => pm?.is_default) ?? paymentMethodsList[0];
-  const hasDefaultAccount = paymentMethodsList.some((pm: any) => pm?.is_default);
+  const paymentMethodsList = normalizePaymentMethods(paymentMethods);
+  const displayPaymentMethod = pickDisplayPaymentMethod(paymentMethodsList);
+  const hasDefaultAccount = hasDefaultPaymentMethod(paymentMethodsList);
+  const seatsText = usersCount === null ? "—/—" : `${usersCount.toLocaleString()}/${usersCount.toLocaleString()}`;
 
   return (
     <>
@@ -270,7 +214,7 @@ const OverviewPage = () => {
           <div style={styles.cardPadding}>
             <h2 style={styles.sectionHeading}>Your Next Payment</h2>
             <p style={{ margin: "0 0 16px 0", fontSize: 18, color: "#141414" }}>
-            An estimated total of <strong>AED {companyDetails?.latest_invoice?.total_amount ?? "0"}</strong> will be charged on <strong>{formatNextChargeDate(companyDetails?.latest_invoice?.invoice_date)}</strong>.
+            An estimated total of <strong>AED {companyDetails?.latest_invoice?.total_amount ?? "0"}</strong> will be charged on the 1st of every month.
             </p>
             <p style={{ margin: "0 0 16px 0", fontSize: 12, color: "#666", lineHeight: "18px" }}>
               *Includes estimated sales tax or VAT, based on your main company address. Excludes any recent credits to your account. Your recurring fees may increase based on your usage.
@@ -331,7 +275,7 @@ const OverviewPage = () => {
               {commonActions.map((action) => (
                 <div key={action.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <action.Icon size={16} strokeWidth={2} color="#141414" />
-                  <Link href="/billing/account-billing" style={styles.link}>{action.label}</Link>
+                  <Link href={action.url} style={styles.link}>{action.label}</Link>
                 </div>
               ))}
             </div>
@@ -417,8 +361,8 @@ const OverviewPage = () => {
               <span>CORE SEATS (PRO)</span>
               <Info size={14} strokeWidth={2} />
             </div>
-            <div style={{ fontSize: 28, fontWeight: 300, lineHeight: 1 }}>1/2,501</div>
-            <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>2,500 seats left</div>
+            <div style={{ fontSize: 28, fontWeight: 300, lineHeight: 1 }}>{seatsText}</div>
+            <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>0 seats left</div>
           </div>
         </div>
       </div>
@@ -448,7 +392,7 @@ const OverviewPage = () => {
               {starterIncludes.map((item) => (
                 <div key={item} style={{ fontSize: 14, color: "#141414", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
                   <span>{item}</span>
-                  <Info size={14} strokeWidth={2} color="#666" />
+                  <InfoTooltip message="Feature availability is subject to the specific plan purchased." />
                 </div>
               ))}
             </div>
@@ -462,7 +406,7 @@ const OverviewPage = () => {
                   <span style={{
                     background: "#ff5c35", color: "#fff", fontSize: 11, fontWeight: 600,
                     padding: "3px 8px", borderRadius: 12, whiteSpace: "nowrap" as const,
-                  }}>41 days left</span>
+                  }}>Beta</span>
                 </div>
                 <p style={{ fontSize: 13, color: "#666", margin: "6px 0 6px 0" }}>
                   You won't be charged at the end of your trial - you'll just return to your current plan

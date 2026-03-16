@@ -3,6 +3,7 @@ import { Info, Plus } from "lucide-react";
 import { GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 const PLACEHOLDER = "—";
@@ -370,6 +371,7 @@ function SelectField({
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function CompanyInfoPage() {
+
   const { data: session } = useSession();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -417,7 +419,7 @@ export default function CompanyInfoPage() {
             <p style={s.fieldValue}>{companyName}</p>
           </div>
         </div>
-        <button style={s.btnLight}>Edit name</button>
+        {/* <button style={s.btnLight}>Edit name</button> */}
       </div>
 
       {/* Primary Company Address */}
@@ -434,7 +436,7 @@ export default function CompanyInfoPage() {
             </p>
           </div>
         </div>
-        <button style={s.btnLight}>Edit address</button>
+        {/* <button style={s.btnLight}>Edit address</button> */}
       </div>
 
       {/* Business TRN number */}
@@ -446,7 +448,7 @@ export default function CompanyInfoPage() {
             <p style={s.fieldValue}>{trn}</p>
           </div>
         </div>
-        <button style={s.btnLight}>Edit Business TRN number</button>
+        {/* <button style={s.btnLight}>Edit Business TRN number</button> */}
       </div>
     </div>
   );
@@ -462,7 +464,11 @@ export default function CompanyInfoPage() {
       {/* ── Points of Contact ── */}
       <div style={{ ...s.sectionHeadingRow, marginTop: 8 }}>
         <h2 style={s.sectionHeading}>Points of Contact</h2>
-        <Link href="/settings" style={s.link}>Looking for user permissions?</Link>
+        {session?.user?.permissions?.includes(HEADER_CONSTANTS.PERMISSIONS.VIEW_SETTINGS as PermissionName) && (
+            <Link href="/main-settings/account-defaults?tab=general" style={s.link}>
+              Looking for user permissions?
+            </Link>
+        )}
       </div>
 
       {/* Primary + Billing contacts side by side */}
