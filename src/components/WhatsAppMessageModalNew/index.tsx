@@ -77,6 +77,20 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
     selectedTemplate.content_sid &&
     (params.length === 0 || allParamsFilled);
 
+  const templateContent = (selectedTemplate as { content?: string } | null)?.content;
+  const previewContent =
+    templateContent && params.length > 0
+      ? params.reduce((acc, _label, index) => {
+          const key = String(index + 1);
+          const value = (paramValues[key] ?? '').trim();
+          if (!value) {
+            return acc;
+          }
+          const pattern = new RegExp(String.raw`{{\s*${key}\s*}}`, 'g');
+          return acc.replace(pattern, value);
+        }, templateContent)
+      : templateContent;
+
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const contentSid = e.target.value;
     const template = contentSid
@@ -240,6 +254,18 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Template content ── */}
+      {previewContent && (
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '8px', fontWeight: '500' }}>
+            Template content
+          </div>
+          <div style={{ fontSize: '14px', color: '#141414', whiteSpace: 'pre-wrap' }}>
+            {previewContent}
           </div>
         </div>
       )}
