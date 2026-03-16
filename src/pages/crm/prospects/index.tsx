@@ -24,7 +24,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Table,
   Popover,
   OverlayTrigger,
 } from "react-bootstrap";
@@ -41,17 +40,14 @@ import {
   FiDatabase,
   FiSearch,
   FiFilter,
-  FiTrash2,
   FiEye,
   FiEdit,
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
@@ -65,11 +61,9 @@ import {
   X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
-  Plus,
   ArrowUp,
   ArrowDown,
   Download,
-  CheckSquare,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
@@ -78,7 +72,6 @@ import {
   Eye,
   Trash2,
   MoreVertical,
-  MoreHorizontal,
   Phone as PhoneIcon,
   Phone,
   Mail,
@@ -86,30 +79,20 @@ import {
   History,
   FileText,
   Target,
-  Layers,
   MessageCircle,
-  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   getCrmDataById,
@@ -138,6 +121,10 @@ import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+
+let customFieldIdCounter = 0;
+
+const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 import {
   ModuleSlug,
   formatDuration,
@@ -148,7 +135,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -156,10 +142,9 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import CrmActivitiesPanel, {
+import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
-import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // KPI Card Component (from crm-new.tsx design)
@@ -172,6 +157,55 @@ interface KPICardData {
   color: string;
   onClick?: () => void;
 }
+
+interface DeleteModalAdditionalInfoProps {
+  mode: "single" | "bulk" | null;
+  itemToDelete: CrmDataItem | null;
+  selectedCount: number;
+  extensions: any[];
+}
+
+const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
+  mode,
+  itemToDelete,
+  selectedCount,
+  extensions,
+}) => {
+  if (mode === "single" && itemToDelete) {
+    const assignedTo =
+      itemToDelete.user_extension
+        ? extensions.find(
+            (extension: any) =>
+              extension.id.toString() ===
+              itemToDelete.user_extension?.toString(),
+          )?.display_name || itemToDelete.user_extension
+        : "Unassigned";
+
+    return (
+      <div className="alert alert-warning mb-3">
+        <strong>Entry ID:</strong> #{itemToDelete.id}
+        <br />
+        <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+        <br />
+        <strong>Assigned To:</strong> {assignedTo}
+        <br />
+        <strong>Created:</strong>{" "}
+        {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
+      </div>
+    );
+  }
+
+  if (mode === "bulk") {
+    return (
+      <div className="alert alert-warning mb-3">
+        <strong>Warning:</strong> This action cannot be undone. All{" "}
+        {selectedCount} selected entries will be permanently deleted.
+      </div>
+    );
+  }
+
+  return null;
+};
 
 const PhoneContainer = ({
   phone,
@@ -459,7 +493,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     placeholder={searchPlaceholder}
                     value={searchValue || ""}
                     onChange={(e) => onSearchChange?.(e.target.value)}
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter" && onSearch) {
                         onSearch();
                       }
@@ -511,8 +545,9 @@ const getInitials = (name: string): string => {
 
   if (hasSecondWord && secondWordHasLetter) {
     // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
+    const regex = /[a-z]/i;
+    const firstLetter1 = regex.exec(words[0])?.[0];
+    const firstLetter2 = regex.exec(words[1])?.[0];
 
     if (firstLetter1 && firstLetter2) {
       return (firstLetter1 + firstLetter2).toUpperCase();
@@ -676,7 +711,7 @@ const CrmProspectsManagement = () => {
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [] as Array<{
       id: string;
       field_name: string;
@@ -725,19 +760,20 @@ const CrmProspectsManagement = () => {
 
   // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
   useEffect(() => {
-    if (!router.isReady || router.query.createContact !== "1") return;
-    setShowCreateContactSidebar(true);
-    const rawEditId = router.query.editContactId;
-    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr != null ? Number(editIdStr) : NaN;
-    if (Number.isFinite(editIdNum) && editIdNum > 0) {
-      setEditingContactId(editIdNum);
-    }
+    if (router.isReady && router.query.createContact === "1") {
+      setShowCreateContactSidebar(true);
+      const rawEditId = router.query.editContactId;
+      const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
+      const editIdNum = Number(editIdStr);
+      if (Number.isFinite(editIdNum) && editIdNum > 0) {
+        setEditingContactId(editIdNum);
+      }
 
-    const { createContact: _, editContactId: __, ...rest } = router.query;
-    router.replace({ pathname: router.pathname, query: rest }, undefined, {
-      shallow: true,
-    });
+      const { createContact: _, editContactId: __, ...rest } = router.query;
+      router.replace({ pathname: router.pathname, query: rest }, undefined, {
+        shallow: true,
+      });
+    }
   }, [router.isReady, router.query.createContact, router.query.editContactId]);
 
   // Close Add Contacts dropdown when clicking outside
@@ -797,7 +833,7 @@ const CrmProspectsManagement = () => {
         let phoneNumber = item.phone ?? "";
         if (typeof item.phone === "string" && item.phone.trim()) {
           try {
-            const normalized = item.phone.replace(/\s/g, "");
+            const normalized = item.phone.replaceAll(" ", "");
             const parsed = parsePhoneNumberInput(normalized);
             if (parsed) {
               phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -822,7 +858,7 @@ const CrmProspectsManagement = () => {
         const customFieldsArray = Object.entries(d)
           .filter(([k]) => !reservedDataKeys.has(k))
           .map(([field_name, field_value]) => ({
-            id: `${Date.now()}-${Math.random()}-${field_name}`,
+            id: createCustomFieldId(),
             field_name,
             field_value: Array.isArray(field_value)
               ? (field_value as string[]).join(", ")
@@ -846,7 +882,11 @@ const CrmProspectsManagement = () => {
           ),
           tags: tagsArray as Array<{ value: string; label: string; id: number }>,
           note: item.note ?? d.note ?? "",
-          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
+          source_file:
+            (item as any).source_file ??
+            d.source ??
+            (item as any).source ??
+            "",
           custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
@@ -1173,86 +1213,6 @@ const CrmProspectsManagement = () => {
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
   });
 
-  const sidebarQuickActions = useMemo(() => {
-    const hasPhone = !!String(sidebarRecordPhone || "").trim();
-    const hasEmail = !!String(sidebarRecordEmail || "").trim();
-    return [
-      {
-        id: "qa-call",
-        label: "Call",
-        icon: Phone,
-        onClick: () => {
-          const phone = String(sidebarRecordPhone || "").trim();
-          if (!phone) {
-            toast.error("No phone number available for this entry");
-            return;
-          }
-          if (!isInitialized) {
-            toast.error("CTI not initialized. Please wait...");
-            return;
-          }
-          dialNumber(phone)
-            .then((result) => {
-              if (result.success) {
-                toast.success(`Calling ${sidebarRecordName || phone}...`);
-              } else {
-                toast.error(result.error || "Failed to make call");
-              }
-            })
-            .catch((error) => {
-              console.error("Call error:", error);
-              toast.error("Failed to make call");
-            });
-        },
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-whatsapp",
-        label: "WhatsApp",
-        icon: MessageCircle,
-        onClick: () => sidebarActivityModals.openWhatsApp(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-sms",
-        label: "SMS",
-        icon: MessageSquare,
-        onClick: () => sidebarActivityModals.openSms(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-meeting",
-        label: "Meeting",
-        icon: Calendar,
-        onClick: () => sidebarActivityModals.openMeeting(),
-      },
-      {
-        id: "qa-email",
-        label: "Email",
-        icon: Mail,
-        onClick: () => sidebarActivityModals.openEmail(),
-        disabled: !hasEmail,
-      },
-      {
-        id: "more",
-        label: "More",
-        icon: MoreHorizontal,
-        onClick: () => {
-          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
-        },
-        disabled: false,
-      },
-    ];
-  }, [
-    sidebarRecordPhone,
-    sidebarRecordEmail,
-    sidebarActivityModals,
-    dialNumber,
-    isInitialized,
-    sidebarRecordName,
-    sidebarRecordId,
-  ]);
-
   const buildCrmDataParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
       const params: any = {
@@ -1391,6 +1351,136 @@ const CrmProspectsManagement = () => {
     [buildExportParams],
   );
 
+  const buildExportHeaders = (allData: CrmDataItem[]) => {
+    const topLevelKeys = new Set<string>();
+    const nestedDataKeys = new Set<string>();
+
+    for (const row of allData as any[]) {
+      if (!row || typeof row !== "object") continue;
+      for (const k of Object.keys(row)) {
+        if (k === "data" && row.data && typeof row.data === "object") {
+          for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
+        } else if (k !== "campaign" && k !== "company") {
+          topLevelKeys.add(k);
+        }
+      }
+    }
+
+    const preferredTopLevelOrder = [
+      "id",
+      "name",
+      "phone",
+      "user_extension",
+      "campaign_id",
+      "source_file",
+      "directory",
+      "is_viewed",
+      "scheduled_call_at",
+      "uploaded_by",
+      "created_by",
+      "note",
+      "company_name",
+      "company_domain",
+      "company_id",
+      "created_at",
+      "updated_at",
+      "tags",
+      "crm_summary",
+    ];
+
+    const orderedTopLevel = [
+      ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
+      ...Array.from(topLevelKeys)
+        .filter((k) => !preferredTopLevelOrder.includes(k))
+        .sort((a, b) => a.localeCompare(b)),
+    ];
+
+    const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const nestedDataKeysSet = new Set(orderedNestedData);
+
+    const headers = [
+      ...orderedTopLevel,
+      ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
+    ];
+
+    return { headers, nestedDataKeysSet };
+  };
+
+  type ExportValueHandler = (row: any) => string;
+
+  const exportValueHandlers: Record<string, ExportValueHandler> = {
+    campaign_id: (row) => {
+      const label = row?.campaign?.name;
+      if (label != null) return label;
+      return row?.campaign_id == null ? null : String(row.campaign_id);
+    },
+    company_name: (row) => {
+      const name = row?.company?.name;
+      if (name != null) return name;
+      return row?.company_name == null ? null : String(row.company_name);
+    },
+    crm_summary: (row) => {
+      const summary =
+        row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
+      if (summary == null) return "";
+      return typeof summary === "string" ? summary : String(summary);
+    },
+  };
+
+  const getExportCellValue = (
+    row: any,
+    header: string,
+    nestedDataKeysSet: Set<string>,
+  ) => {
+    const specialHandler = exportValueHandlers[header];
+    if (specialHandler) {
+      return specialHandler(row);
+    }
+
+    const raw = nestedDataKeysSet.has(header)
+      ? row?.data?.[header] ?? row?.[header]
+      : row?.[header];
+
+    return formatExportRawValue(raw);
+  };
+
+  const formatExportRawValue = (raw: unknown): string => {
+    if (raw == null) return "";
+    if (typeof raw === "string") return raw;
+    if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+    try {
+      return JSON.stringify(raw);
+    } catch {
+    // Fallback for non-serializable objects; avoid default [object Object] stringification.
+    return "";
+    }
+  };
+
+  const escapeCsv = (val: string) => {
+    const s = String(val);
+    if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const buildCsvContent = (
+    headers: string[],
+    allData: CrmDataItem[],
+    nestedDataKeysSet: Set<string>,
+  ) => {
+    return [
+      headers.map((h) => escapeCsv(h)).join(","),
+      ...allData.map((row) =>
+        headers
+          .map((h) =>
+            escapeCsv(getExportCellValue(row, h, nestedDataKeysSet)),
+          )
+          .join(","),
+      ),
+    ].join("\n");
+  };
+
   const handleProspectsExport = useCallback(async () => {
     const name =
       exportFileName.trim() || `prospects_${moment().format("YYYY-MM-DD")}`;
@@ -1402,68 +1492,10 @@ const CrmProspectsManagement = () => {
         toast.info("No prospects match the selected filters.");
         return;
       }
-      const topLevelKeys = new Set<string>();
-      const nestedDataKeys = new Set<string>();
-      for (const row of allData as any[]) {
-        if (!row || typeof row !== "object") continue;
-        for (const k of Object.keys(row)) {
-          if (k === "data" && row.data && typeof row.data === "object") {
-            for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
-          } else if (k !== "campaign" && k !== "company") {
-            topLevelKeys.add(k);
-          }
-        }
-      }
-      const preferredTopLevelOrder = [
-        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
-        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
-        "note", "company_name", "company_domain", "company_id", "created_at",
-        "updated_at", "tags", "crm_summary",
-      ];
-      const orderedTopLevel = [
-        ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
-      ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
-      const nestedDataKeysSet = new Set(orderedNestedData);
-      const headers = [
-        ...orderedTopLevel,
-        ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
-      ];
-      const getCellValue = (row: any, header: string) => {
-        if (header === "campaign_id") {
-          const label = row?.campaign?.name;
-          if (label != null) return label;
-          return row?.campaign_id != null ? String(row.campaign_id) : "";
-        }
-        if (header === "company_name") {
-          const name = row?.company?.name;
-          if (name != null) return name;
-          return row?.company_name != null ? String(row.company_name) : "";
-        }
-        if (header === "crm_summary") {
-          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
-        }
-        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
-        if (raw == null) return "";
-        if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
-        try {
-          return JSON.stringify(raw);
-        } catch {
-          return String(raw);
-        }
-      };
-      const escapeCsv = (val: string) => {
-        const s = String(val);
-        if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-        return s;
-      };
-      const csvContent = [
-        headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
-      ].join("\n");
+
+      const { headers, nestedDataKeysSet } = buildExportHeaders(allData);
+      const csvContent = buildCsvContent(headers, allData, nestedDataKeysSet);
+
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1635,21 +1667,23 @@ const CrmProspectsManagement = () => {
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
   const advancedFilterPills = useMemo<FilterPill[]>(() => {
-    const campaignIds = Array.isArray(currentFilters.campaign_id)
-      ? currentFilters.campaign_id
-      : currentFilters.campaign_id
-        ? [currentFilters.campaign_id]
-        : [];
+    const campaignIds: string[] = [];
+    if (Array.isArray(currentFilters.campaign_id)) {
+      campaignIds.push(...currentFilters.campaign_id);
+    } else if (currentFilters.campaign_id) {
+      campaignIds.push(currentFilters.campaign_id);
+    }
 
     const selectedCampaignOptions = availableCampaigns.filter((c) =>
       campaignIds.includes(c.value),
     );
 
-    const tagValues = Array.isArray(currentFilters.tags)
-      ? currentFilters.tags
-      : currentFilters.tags
-        ? [currentFilters.tags]
-        : [];
+    let tagValues: string[] = [];
+    if (Array.isArray(currentFilters.tags)) {
+      tagValues = currentFilters.tags;
+    } else if (currentFilters.tags) {
+      tagValues = [currentFilters.tags];
+    }
     const selectedTagOptions = availableTags.filter((t) =>
       tagValues.includes(t.value),
     );
@@ -1661,20 +1695,25 @@ const CrmProspectsManagement = () => {
     const nextCallLabel = (() => {
       if (!nextFrom && !nextTo) return undefined;
       if (nextFrom && nextTo && nextFrom === nextTo) {
-        return moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D, YYYY")
+        if (moment(nextFrom).isValid()) {
+          return moment(nextFrom).format("MMM D, YYYY");
+        }
+        return String(nextFrom);
+      }
+
+      let fromLabel = "…";
+      if (nextFrom) {
+        fromLabel = moment(nextFrom).isValid()
+          ? moment(nextFrom).format("MMM D")
           : String(nextFrom);
       }
-      const fromLabel = nextFrom
-        ? moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D")
-          : String(nextFrom)
-        : "…";
-      const toLabel = nextTo
-        ? moment(nextTo).isValid()
+
+      let toLabel = "…";
+      if (nextTo) {
+        toLabel = moment(nextTo).isValid()
           ? moment(nextTo).format("MMM D")
-          : String(nextTo)
-        : "…";
+          : String(nextTo);
+      }
       return `${fromLabel} – ${toLabel}`;
     })();
 
@@ -1729,7 +1768,12 @@ const CrmProspectsManagement = () => {
         label: "Source",
         showDropdown: true,
         active: !!sourceValue,
-        activeLabel: sourceValue ? String(sourceValue) : undefined,
+        activeLabel: (() => {
+          if (!sourceValue) {
+            return undefined;
+          }
+          return String(sourceValue);
+        })(),
         onClear: () => {
           setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
           applyTableFiltersPatch({ source_file: undefined });
@@ -1738,13 +1782,14 @@ const CrmProspectsManagement = () => {
           <div style={{ minWidth: 280 }}>
             <CreatableSelect
               options={uniqueSources}
-              value={
-                sourceValue
-                  ? { value: sourceValue, label: String(sourceValue) }
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
+              value={(() => {
+                if (!sourceValue) {
+                  return null;
+                }
+                return { value: sourceValue, label: String(sourceValue) };
+              })()}
+              onChange={(selected: { value: string } | null) => {
+                const v = selected ? selected.value : null;
                 setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
                 applyTableFiltersPatch({ source_file: v });
               }}
@@ -1772,10 +1817,12 @@ const CrmProspectsManagement = () => {
         label: "Tags",
         showDropdown: true,
         active: tagValues.length > 0,
-        activeLabel:
-          tagValues.length > 1
-            ? `${tagValues.length} selected`
-            : selectedTagOptions[0]?.label,
+        activeLabel: (() => {
+          if (tagValues.length > 1) {
+            return `${tagValues.length} selected`;
+          }
+          return selectedTagOptions[0]?.label;
+        })(),
         onClear: () => {
           setProspectsFilters((prev) => ({ ...prev, tags: null }));
           applyTableFiltersPatch({ tags: undefined });
@@ -2332,7 +2379,7 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  const openProspectSidebar = useCallback((item: CrmDataItem | any) => {
+  const openProspectSidebar = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
     setSelectedProspect(item);
     setShowProspectSidebar(true);
@@ -2932,41 +2979,6 @@ const CrmProspectsManagement = () => {
     setSelectedProspect(null);
   }, []);
 
-  // Handle owner change from prospect sidebar (Update owner dropdown)
-  const handleProspectOwnerSelect = useCallback(
-    async (ownerValue: string) => {
-      const prospect = selectedProspect;
-      if (!prospect?.id) return;
-      const name = prospect.name ?? "";
-      const phone = prospect.phone ?? "";
-      const campaignId =
-        prospect.campaign_id ?? prospect.campaign?.id ?? null;
-      const existingData = (prospect.data as Record<string, unknown>) ?? {};
-      try {
-        await updateCrmData(prospect.id, {
-          name,
-          phone,
-          campaign_id: campaignId,
-          data: { ...existingData, contact_owner: ownerValue || undefined },
-        });
-        fetchCrmData();
-        setSelectedProspect((prev: CrmDataItem | null) =>
-          prev
-            ? {
-                ...prev,
-                data: {
-                  ...(prev.data as Record<string, unknown>),
-                  contact_owner: ownerValue || null,
-                },
-              }
-            : null,
-        );
-      } catch {
-        // Error already shown by updateCrmData
-      }
-    },
-    [selectedProspect, fetchCrmData],
-  );
 
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -3093,6 +3105,7 @@ const CrmProspectsManagement = () => {
           getVariant: () => "secondary",
         },
         emptyValue: "N/A",
+        accessor: (row) => row.source_file || row.data?.source_file || "N/A",
       },
       {
         key: "user_extension",
@@ -3854,7 +3867,7 @@ const CrmProspectsManagement = () => {
                 scheduled_call_at: "",
                 tags: [],
                 note: "",
-                source: "",
+                source_file: "",
                 custom_fields: [],
               });
               setShowCreateContactSidebar(true);
@@ -3949,6 +3962,7 @@ const CrmProspectsManagement = () => {
         legal_basis: contactForm.legal_basis?.length
           ? contactForm.legal_basis
           : undefined,
+        source_file: contactForm.source_file?.trim() || undefined,
       };
       customFieldsForPayload.forEach((f) => {
         dataPayload[f.field_name] = f.field_value;
@@ -3962,7 +3976,6 @@ const CrmProspectsManagement = () => {
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source?.trim() || undefined,
           tag_ids: contactForm.tags?.length
           ? contactForm.tags.map((t) => t.id)
           : [],
@@ -3984,7 +3997,7 @@ const CrmProspectsManagement = () => {
           scheduled_call_at: "",
           tags: [],
           note: "",
-          source: "",
+          source_file: "",
           custom_fields: [],
         });
         if (!addAnother) {
@@ -4047,7 +4060,7 @@ const CrmProspectsManagement = () => {
         phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source?.trim() || undefined,
+        source: contactForm.source_file?.trim() || undefined,
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: contactForm.tags?.length
@@ -6306,42 +6319,25 @@ const CrmProspectsManagement = () => {
             onConfirm={
               deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
             }
-            itemName={
-              deleteModalMode === "single" && itemToDelete
-                ? `prospect entry #${itemToDelete.id}`
-                : deleteModalMode === "bulk"
-                  ? `${selectedItems.length} selected prospects`
-                  : undefined
-            }
+            itemName={(() => {
+              if (deleteModalMode === "single" && itemToDelete) {
+                return `prospect entry #${itemToDelete.id}`;
+              }
+              if (deleteModalMode === "bulk") {
+                return `${selectedItems.length} selected prospects`;
+              }
+              return undefined;
+            })()}
             itemType={
               deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
             }
             additionalInfo={
-              deleteModalMode === "single" && itemToDelete ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Entry ID:</strong> #{itemToDelete.id}
-                  <br />
-                  <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-                  <br />
-                  <strong>Assigned To:</strong>{" "}
-                  {itemToDelete.user_extension
-                    ? extensions.find(
-                        (extension: any) =>
-                          extension.id.toString() ===
-                          itemToDelete.user_extension?.toString(),
-                      )?.display_name || itemToDelete.user_extension
-                    : "Unassigned"}
-                  <br />
-                  <strong>Created:</strong>{" "}
-                  {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
-                </div>
-              ) : deleteModalMode === "bulk" ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Warning:</strong> This action cannot be undone. All{" "}
-                  {selectedItems.length} selected entries will be permanently
-                  deleted.
-                </div>
-              ) : undefined
+              <DeleteModalAdditionalInfo
+                mode={deleteModalMode}
+                itemToDelete={itemToDelete}
+                selectedCount={selectedItems.length}
+                extensions={extensions}
+              />
             }
           />
 
@@ -7403,7 +7399,7 @@ const CrmProspectsManagement = () => {
                   selectedProspect?.id ??
                     selectedProspect?.data?.id ??
                     (selectedProspect as any)?.data?.data?.id ??
-                    NaN,
+                    Number.NaN,
                 );
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
                 handleCloseProspectSidebar();
@@ -7838,8 +7834,8 @@ const CrmProspectsManagement = () => {
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
+          if (typeof globalThis !== "undefined" && globalThis.window) {
+            globalThis.window.localStorage.setItem(
               "crmDataSelectedColumns",
               JSON.stringify(keys),
             );

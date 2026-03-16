@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
 import {
   ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
-  Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
-  ShoppingCart, ShoppingBag, Building2
+  Calendar, ClipboardList, ExternalLink, Copy, FileText, Paperclip,
+  ShoppingCart, ShoppingBag
 } from 'lucide-react';
 import Layout from "@layout/index";
 import { useRouter } from 'next/router';
@@ -15,7 +14,6 @@ import { getOrder, getDeal, getLead } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
 import { toast } from "react-toastify";
-import moment from "moment";
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import CrmActivitiesPanel, { CrmActivitiesRecord, type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
@@ -84,13 +82,13 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "revenue", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "revenue", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -188,7 +186,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
       status: 'active',
       nextBillingDate: '03/13/2026',
       nextPaymentAmount: orderData?.final_amount || orderData?.total_amount 
-        ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
+        ? `${orderData?.currency || 'AED'} ${Number.parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
         : '$500.00',
       contactEmail: orderData?.customer_email || 'ahmad@gmail.com',
       link: '#',
@@ -298,7 +296,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { 
       label: 'Order Value', 
       value: orderData?.final_amount || orderData?.total_amount 
-        ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
+        ? `${orderData?.currency || 'AED'} ${Number.parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
         : 'N/A', 
       copyable: true 
     },
@@ -715,7 +713,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   lineHeight: '1.4',
                 }}>
                   {orderData?.final_amount || orderData?.total_amount 
-                    ? `${orderData?.currency || 'AED'} ${parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
+                    ? `${orderData?.currency || 'AED'} ${Number.parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
                     : 'N/A'} • {orderData?.stage?.name || 'No Stage'}
                 </p>
                 <div style={{
@@ -753,7 +751,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
             ].map((action, index) => {
               const Icon = action.icon;
               return (
-                <div key={index} style={{
+                <div key={action.label} style={{
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -938,9 +936,10 @@ const OrderRecordPage: NextPageWithLayout = () => {
           </div>
 
           {!collapsedSections.has('key-info') && (
-            <div style={{ padding: '20px' }}>
-              {keyInfoFields.map((field, index) => (
-                <div key={index} style={{ marginBottom: '16px' }}>
+            <div style={{ padding: '20px' , maxHeight: "480px",
+              overflowY: "auto",}}>
+              {keyInfoFields.map((field) => (
+                <div key={field.label} style={{ marginBottom: '16px' }}>
                   <div style={{
                     fontSize: '13px',
                     fontWeight: '400',
@@ -1405,31 +1404,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                     }}>
                       Deals (1)
                     </h3>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#141414',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      padding: '6px',
-                      borderRadius: '3px',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f8fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                  </button>
+                  </div>                
                 </div>
 
                 {!collapsedSections.has('deals') && (
@@ -1469,7 +1444,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                         margin: '4px 0',
                       }}>
                         Deal Value: {relatedDeal?.net_value || relatedDeal?.grand_total 
-                          ? `${relatedDeal?.currency || 'AED'} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
+                          ? `${relatedDeal?.currency || 'AED'} ${Number.parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
                           : 'N/A'}
                       </p>
                     </div>
@@ -1571,31 +1546,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                     }}>
                       Contacts (1)
                     </h3>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#141414',
-                      fontSize: '12px',
-                      fontWeight: '500',
-                      padding: '6px',
-                      borderRadius: '3px',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f8fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                  </button>
+                  </div>          
                 </div>
 
                 {!collapsedSections.has('contacts') && (
@@ -1693,31 +1644,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   }}>
                     Attachments
                   </h3>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#141414',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    padding: '6px',
-                    borderRadius: '3px',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f8fa';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-                </button>
+                </div>               
               </div>
 
               {!collapsedSections.has('attachments') && (

@@ -15,6 +15,8 @@ interface FormModalProps {
   submitButtonVariant?: 'primary' | 'danger' | 'warning' | 'success';
   cancelButtonVariant?: 'secondary' | 'export' | 'outline-secondary' | 'primary';
   ShowSubmitButton?: boolean;
+  hideCancelButton?: boolean;
+  hideFooterInstructions?: boolean;
   isSubmitting?: boolean;
   titleIcon?: React.ReactNode;
   isSubmitDisabled?: boolean;
@@ -38,6 +40,8 @@ const FormModal: React.FC<FormModalProps> = ({
   submitButtonVariant = 'primary',
   cancelButtonVariant = 'export',
   ShowSubmitButton = true,
+  hideCancelButton = false,
+  hideFooterInstructions = false,
   isSubmitting = false,
   titleIcon,
   isSubmitDisabled = false,
@@ -66,6 +70,11 @@ const FormModal: React.FC<FormModalProps> = ({
   };
 
   if (!show) return null;
+
+  const showCancelButton = !hideCancelButton
+  const showSubmitButton = ShowSubmitButton
+  const showFooterInstructions = !hideFooterInstructions
+  const showFooter = showFooterInstructions || showCancelButton || showSubmitButton
 
 
   return (
@@ -104,22 +113,37 @@ const FormModal: React.FC<FormModalProps> = ({
 
         {formHtml}
       </Modal.Body>
-      <Modal.Footer className="border-0 pt-0 bg-light">
-        <div className="d-flex justify-content-between align-items-center w-100">
-          <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-            <AlertCircle size={14} />
-            <span style={{ fontSize: '0.813rem' }}>
-              Fields marked with <span className="text-danger fw-bold">*</span> are required
-            </span>
-          </Form.Text>
-       
-        <div className="d-flex gap-2">
-        <Button variant="light" onClick={onCancel}><X size={16} className="me-1" /> {cancelButtonText}</Button>
-        <Button variant={submitButtonVariant} onClick={onSubmit} disabled={isSubmitDisabled}><Check size={16} className="me-1" />{submitButtonText}</Button>
-        </div>
-        </div>
-        
-      </Modal.Footer>
+      {showFooter ? (
+        <Modal.Footer className="border-0 pt-0 bg-light">
+          <div className="d-flex justify-content-between align-items-center w-100">
+            {showFooterInstructions ? (
+              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                <AlertCircle size={14} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Fields marked with <span className="text-danger fw-bold">*</span> are required
+                </span>
+              </Form.Text>
+            ) : (
+              <span />
+            )}
+
+            <div className="d-flex gap-2">
+              {showCancelButton ? (
+                <Button variant="light" onClick={handleCancel}>
+                  <X size={16} className="me-1" /> {cancelButtonText}
+                </Button>
+              ) : null}
+
+              {showSubmitButton ? (
+                <Button variant={submitButtonVariant} onClick={handleSubmit} disabled={isSubmitDisabled}>
+                  <Check size={16} className="me-1" />
+                  {submitButtonText}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Modal.Footer>
+      ) : null}
     </Modal>
   );
 };
