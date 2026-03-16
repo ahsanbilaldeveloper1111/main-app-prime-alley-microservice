@@ -3,15 +3,20 @@ import { useRouter } from 'next/router';
 import {
   ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
-  AlertCircle, ShoppingCart, Handshake, Download as DownloadIcon
+  FileText, Paperclip,
+  AlertCircle, ShoppingCart, Handshake, Download as DownloadIcon,
+  Upload, Trash2
 } from 'lucide-react';
+import { Modal, Button, Form, Card } from 'react-bootstrap';
 import Layout from "@layout/index";
 import {
   getDeal,
   deleteDeal,
   PDFDownloadDeal,
   downloadDealAttachment,
+  getDealAttachments,
+  uploadDealAttachment,
+  deleteDealAttachment,
   type DealData,
 } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
@@ -26,7 +31,7 @@ import { CreateDealSidebar } from "@components/renderCreateDealForm";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 import { toast } from "react-toastify";
 
 // ============================================================================
@@ -103,19 +108,26 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
 
-  // Exporting state (single deal export)
-  const [exporting, setExporting] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null);
 
+  // Manage Attachments modal
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "revenue", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "revenue", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -162,7 +174,10 @@ const DealRecordPage: NextPageWithLayout = () => {
       }
     };
 
-    void fetchExtensions();
+    fetchExtensions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to fetch extensions:", error);
+    });
   }, []);
 
   // Close dropdowns when clicking outside
@@ -281,7 +296,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   const keyInfoFields: KeyInfoField[] = [
     { label: "Deal Value", value: formatDealAmount(deal), copyable: true },
     { label: "Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
-    { label: "Probability", value: deal != null ? `${deal.probability ?? 0}%` : "--" },
+    { label: "Probability", value: deal == null ? null : `${deal.probability ?? 0}%` },
     { label: "Expected Close Date", value: formatDate(deal?.expected_close_date) },
     {
       label: "Company Name",
@@ -353,7 +368,6 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   const handleDealExport = useCallback(async () => {
     if (!dealRecordId) return;
-    setExporting(true);
     try {
       await PDFDownloadDeal(dealRecordId);
       toast.success("Exported deal successfully!");
@@ -361,8 +375,6 @@ const DealRecordPage: NextPageWithLayout = () => {
       // eslint-disable-next-line no-console
       console.error("Failed to export deal:", error);
       toast.error("Failed to export deal");
-    } finally {
-      setExporting(false);
     }
   }, [dealRecordId]);
 
@@ -382,6 +394,113 @@ const DealRecordPage: NextPageWithLayout = () => {
     },
     [dealRecordId],
   );
+
+  // Fetch attachments when Manage Attachments modal opens
+  useEffect(() => {
+    if (showAttachmentModal && dealRecordId) {
+      const fetchAttachments = async () => {
+        setLoadingAttachments(true);
+        try {
+          const data = await getDealAttachments(dealRecordId);
+          setAttachments(data || []);
+        } catch {
+          setAttachments([]);
+        } finally {
+          setLoadingAttachments(false);
+        }
+      };
+      fetchAttachments();
+    } else {
+      setAttachments([]);
+    }
+  }, [showAttachmentModal, dealRecordId]);
+
+  const refetchDealForAttachments = useCallback(async () => {
+    if (!dealRecordId) return;
+    try {
+      const data = await getDeal(dealRecordId);
+      setDeal(data);
+    } catch {
+      // ignore
+    }
+  }, [dealRecordId]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+  };
+
+  const getAttachmentBackgroundColor = (mimeType?: string | null): string => {
+    if (!mimeType) return "#6c757d";
+    if (mimeType.includes("pdf")) return "#dc3545";
+    if (
+      mimeType.includes("csv") ||
+      mimeType.includes("excel") ||
+      mimeType.includes("spreadsheet")
+    ) {
+      return "#198754";
+    }
+    if (mimeType.includes("image")) return "#0d6efd";
+    return "#6c757d";
+  };
+
+  const getAttachmentDisplayName = (attachment: any): string => {
+    if (attachment.name) return attachment.name;
+    if (attachment.original_name) return attachment.original_name;
+    if (attachment.file_path) {
+      const segments = String(attachment.file_path).split("/");
+      const lastSegment = segments.at(-1);
+      if (lastSegment) return lastSegment;
+    }
+    return `Attachment ${attachment.id}`;
+  };
+
+  const handleDealFileUpload = async (file: File) => {
+    if (!dealRecordId) return;
+    setUploadingFile(true);
+    try {
+      await uploadDealAttachment(dealRecordId, file, file.name);
+      const data = await getDealAttachments(dealRecordId);
+      setAttachments(data || []);
+      await refetchDealForAttachments();
+      if (fileInputRef) {
+        fileInputRef.value = "";
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to upload file:", error);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteDealAttachment = useCallback(
+    async (attachmentId: number) => {
+      if (!dealRecordId) return;
+      try {
+        await deleteDealAttachment(dealRecordId, attachmentId);
+        const data = await getDealAttachments(dealRecordId);
+        setAttachments(data || []);
+        await refetchDealForAttachments();
+        toast.success("Attachment deleted successfully!");
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to delete attachment:", error);
+        toast.error("Failed to delete attachment");
+      }
+    },
+    [dealRecordId, refetchDealForAttachments],
+  );
+
+  const confirmDeleteAttachment = useCallback(async () => {
+    if (!attachmentToDelete) return;
+    await handleDeleteDealAttachment(attachmentToDelete.id);
+    setShowDeleteAttachmentModal(false);
+    setAttachmentToDelete(null);
+  }, [attachmentToDelete, handleDeleteDealAttachment]);
 
   const activityModals = useCrmActivityModals({
     recordType: 'deal',
@@ -712,7 +831,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       } else if (action === 'Delete') {
                         handleOpenDeleteDeal();
                       } else if (action === 'Export') {
-                        void handleDealExport();
+                        handleDealExport();
                       }
                     }}
                     style={{
@@ -1605,6 +1724,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    setShowAttachmentModal(true);
                   }}
                   style={{
                     background: 'transparent',
@@ -1648,7 +1768,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                           <Paperclip size={18} style={{ color: "#718096" }} />
                           <button
                             type="button"
-                            onClick={() => void handleDownloadAttachment(att.id)}
+                            onClick={() => handleDownloadAttachment(att.id)}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -1846,6 +1966,220 @@ const DealRecordPage: NextPageWithLayout = () => {
         itemName={dealToDelete?.name}
         itemType="deal"
       />
+
+      {/* Delete Attachment Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteAttachmentModal}
+        onHide={() => {
+          setShowDeleteAttachmentModal(false);
+          setAttachmentToDelete(null);
+        }}
+        onConfirm={confirmDeleteAttachment}
+        itemName={attachmentToDelete?.name}
+        itemType="attachment"
+      />
+
+      {/* Manage Attachments Modal */}
+      {deal && (
+        <Modal
+          show={showAttachmentModal}
+          onHide={() => setShowAttachmentModal(false)}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton className="border-0 pb-0">
+            <Modal.Title className="d-flex align-items-center gap-2">
+              <div
+                className="rounded-circle d-flex align-items-center justify-content-center"
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                }}
+              >
+                <Paperclip size={20} color="white" />
+              </div>
+              <div>
+                <div style={{ fontSize: "20px", fontWeight: 600 }}>
+                  Manage Attachments
+                </div>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#6c757d",
+                    fontWeight: "normal",
+                  }}
+                >
+                  {deal.name || `Deal #${deal.id}`}
+                </div>
+              </div>
+            </Modal.Title>
+          </Modal.Header>
+
+          <Modal.Body className="p-4">
+            <div
+              className="mb-4 p-4 border rounded"
+              style={{ background: "#f8f9fa" }}
+            >
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
+                  <small className="text-muted">
+                    Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
+                  </small>
+                </div>
+              </div>
+              <div className="d-flex gap-2">
+                <Form.Control
+                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
+                  type="file"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const files = e.target.files;
+                    if (files?.length) {
+                      handleDealFileUpload(files[0]);
+                    }
+                  }}
+                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
+                  style={{ flex: 1 }}
+                  disabled={uploadingFile}
+                />
+                <Button
+                  variant="primary"
+                  className="d-flex align-items-center gap-2"
+                  disabled={uploadingFile}
+                >
+                  {uploadingFile ? (
+                    <>
+                      <output
+                        className="spinner-border spinner-border-sm"
+                      />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Upload
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
+                <FileText size={18} />
+                Attachments ({attachments.length})
+              </h6>
+
+              {loadingAttachments && (
+                <div className="text-center py-5">
+                  <output className="spinner-border text-primary">
+                    <span className="visually-hidden">Loading...</span>
+                  </output>
+                </div>
+              )}
+
+              {!loadingAttachments && attachments.length === 0 && (
+                <div className="text-center py-4 text-muted">
+                  <Paperclip size={48} className="mb-3 opacity-25" />
+                  <div>No attachments yet</div>
+                  <small>Upload files using the form above</small>
+                </div>
+              )}
+
+              {!loadingAttachments && attachments.length > 0 && (
+                <div className="d-flex flex-column gap-2 mb-4">
+                  {attachments.map((attachment: any) => {
+                    const backgroundColor = getAttachmentBackgroundColor(
+                      attachment.mime_type
+                    );
+                    const displayName = getAttachmentDisplayName(attachment);
+
+                    return (
+                      <Card key={attachment.id} className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
+                              <div
+                                className="rounded d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: "45px",
+                                  height: "45px",
+                                  background: backgroundColor,
+                                  color: "white",
+                                }}
+                              >
+                                <FileText size={22} />
+                              </div>
+                              <div className="flex-grow-1">
+                                <div
+                                  className="fw-semibold"
+                                  style={{ fontSize: "14px" }}
+                                >
+                                  {displayName}
+                                </div>
+                                <div
+                                  style={{ fontSize: "12px", color: "#6c757d" }}
+                                >
+                                  {attachment.file_size == null
+                                    ? null
+                                    : formatFileSize(attachment.file_size)}
+                                  {attachment.created_at
+                                    ? ` • ${formatDateForTable(
+                                        attachment.created_at
+                                      )}`
+                                    : ""}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="d-flex gap-1">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-primary"
+                                title="Download"
+                                onClick={() =>
+                                  handleDownloadAttachment(attachment.id)
+                                }
+                              >
+                                <DownloadIcon size={18} />
+                              </Button>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-danger"
+                                title="Delete"
+                                onClick={() => {
+                                  setAttachmentToDelete({
+                                    id: attachment.id,
+                                    name: getAttachmentDisplayName(attachment),
+                                  });
+                                  setShowDeleteAttachmentModal(true);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Modal.Body>
+
+          <Modal.Footer className="border-0">
+            <Button
+              variant="secondary"
+              onClick={() => setShowAttachmentModal(false)}
+            >
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
 
       {/* Success Modal for delete and other deal actions */}
       <SuccessfulModal

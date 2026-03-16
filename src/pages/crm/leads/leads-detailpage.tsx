@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, ReactElement } from "react";
 import { useRouter } from "next/router";
 import {
-  X,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -9,27 +8,12 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
-  Ticket,
-  Paperclip,
-  Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
   AlertCircle,
-  ShoppingCart,
 } from "lucide-react";
 import Layout from "@layout/index";
 import { getLead, deleteLead, type LeadData } from "@utils/crm";
@@ -139,13 +123,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -198,7 +182,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
       }
     };
 
-    void fetchExtensions();
+    fetchExtensions().catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Failed to fetch extensions:", error);
+    });
   }, []);
 
   // Close dropdowns when clicking outside
@@ -308,7 +295,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const val = row[h];
             if (val == null) return "";
             if (typeof val === "object") return "";
-            const s = String(val).replace(/"/g, '""');
+            const s = String(val).replaceAll('"', '""');
             return s.includes(",") || s.includes('"') ? `"${s}"` : s;
           })
           .join(","),
@@ -316,15 +303,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
       const blob = new Blob([csvRows.join("\n")], {
         type: "text/csv;charset=utf-8;",
       });
-      const url = window.URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = name + ext;
       a.click();
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
       toast.success("Exported lead successfully!");
     } catch (err) {
       toast.error("Failed to export lead");
+      console.error("Failed to export lead:", err);
     } finally {
       setExporting(false);
     }
@@ -333,7 +321,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const handleOpenExport = useCallback(() => {
     if (!lead) return;
     // Directly export the currently opened lead
-    void handleLeadsExport();
+    handleLeadsExport();
   }, [lead, handleLeadsExport]);
 
   const toggleSection = (sectionId: string) => {
@@ -711,7 +699,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           <button
-            onClick={() => window.history.back()}
+            onClick={() => globalThis.history.back()}
             style={{
               background: "transparent",
               border: "none",
@@ -776,6 +764,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
+                    disabled={action === "Export" && exporting}
             onClick={() => {
               setShowActionsDropdown(false);
               if (action === "Edit") {
@@ -974,7 +963,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const Icon = action.icon;
             return (
               <div
-                key={index}
+                key={action.label}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -1244,9 +1233,10 @@ const ContactRecordPage: NextPageWithLayout = () => {
         </div>
 
         {!collapsedSections.has("key-info") && (
-          <div style={{ padding: "20px" }}>
-            {keyInfoFields.map((field, index) => (
-              <div key={index} style={{ marginBottom: "16px" }}>
+          <div style={{ padding: "20px" , maxHeight: "480px",
+            overflowY: "auto",}}>
+            {keyInfoFields.map((field) => (
+              <div key={field.label} style={{ marginBottom: "16px" }}>
                 <div
                   style={{
                     fontSize: "13px",

@@ -25,7 +25,6 @@ import {
   Sparkles,
   Maximize2,
   Bold,
-  Linkedin,
   Italic,
   Underline,
   List,
@@ -33,7 +32,6 @@ import {
   Image,
   Plus,
   Clock,
-  Repeat,
   MessageCircle,
   Search,
   FileText,
@@ -66,6 +64,7 @@ import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import type { CrmRecordType } from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
@@ -134,6 +133,610 @@ export interface QuickAction {
   disabled?: boolean;
 }
 
+interface RecentActivitiesSectionProps {
+  recentActivitiesState: any;
+  recordType: string | null | undefined;
+  recordId: number | string | null | undefined;
+  section: SidebarSection;
+  EmptyIcon?: LucideIcon;
+  humanizeDataKey: (key: string) => string;
+  resolveUserLabel?: (user: any) => string;
+  router: any;
+  getAuditTrailFromRecord?: (data: any, type?: any) => any[];
+  createResolveFieldVal?: (...args: any[]) => any;
+  buildAuditLinesForEntry?: (
+    entry: any,
+    resolveFieldVal: (fieldKey: string) => any,
+    humanizeDataKey: (key: string) => string,
+  ) => string;
+}
+
+const RecentActivitiesSection = ({
+  recentActivitiesState,
+  recordType,
+  recordId,
+  section,
+  EmptyIcon,
+  humanizeDataKey,
+  resolveUserLabel,
+  router,
+  getAuditTrailFromRecord,
+  createResolveFieldVal,
+  buildAuditLinesForEntry,
+}: RecentActivitiesSectionProps) => {
+  if (recentActivitiesState.loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (!recentActivitiesState.data) {
+    return null;
+  }
+
+  const handleEmptyActionClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    section.emptyState?.action?.onClick();
+  };
+
+  const handleViewMoreClick = () => {
+    if (recordId == null) {
+      return;
+    }
+
+    router.push(recentActivitiesState.detailPath(Number(recordId)));
+  };
+
+  const safeGetAuditTrailFromRecord =
+    getAuditTrailFromRecord ?? (() => [] as any[]);
+  const safeCreateResolveFieldVal =
+    createResolveFieldVal ?? (() => () => undefined);
+
+  const auditTrail = safeGetAuditTrailFromRecord(
+    recentActivitiesState.data,
+    recordType ?? undefined,
+  );
+  const resolveFieldVal = safeCreateResolveFieldVal(
+    recordType ?? undefined,
+    recentActivitiesState.data,
+    resolveUserLabel,
+  );
+
+  if (auditTrail.length === 0) {
+    return (
+      <div style={{ padding: "24px 16px", textAlign: "center" }}>
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {section.emptyState?.message ?? "No recent activities."}
+        </p>
+        {section.emptyState?.action && (
+          <button
+            onClick={handleEmptyActionClick}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {section.emptyState.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const isActivityRecordType = recordType === "activity";
+  const displayTrail = isActivityRecordType
+    ? auditTrail
+    : auditTrail.slice(0, 5);
+  const hasMore = !isActivityRecordType && auditTrail.length > 5;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          maxHeight: "280px",
+          overflowY: "auto",
+          overflowX: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0",
+          minWidth: 0,
+          ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
+        }}
+      >
+        {displayTrail.map((entry: any, index: number) => {
+          const timestamp = entry.created_at
+            ? new Date(entry.created_at).toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "—";
+          const description = buildAuditLinesForEntry
+            ? buildAuditLinesForEntry(entry, resolveFieldVal, humanizeDataKey)
+            : "";
+          return (
+            <div
+              key={entry.id ?? index}
+              style={{
+                padding: "10px 0",
+                marginBottom: index < displayTrail.length - 1 ? "10px" : 0,
+                minWidth: 0,
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#141414",
+                  margin: "0 0 8px 0",
+                  lineHeight: "1.6",
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "break-word",
+                  wordBreak: "break-word",
+                }}
+                dangerouslySetInnerHTML={{ __html: description }}
+              />
+              <span style={{ fontSize: "12px", color: "#718096" }}>
+                {timestamp}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {recordId != null && hasMore && (
+        <button
+          onClick={handleViewMoreClick}
+          style={{
+            marginTop: "8px",
+            padding: "8px 16px",
+            backgroundColor: "#0091ae",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: "pointer",
+            width: "100%",
+          }}
+        >
+          View more
+        </button>
+      )}
+    </div>
+  );
+};
+
+function renderCallsSection(
+  section: any,
+  sidebarCallRecordingsLoading: boolean,
+  sidebarCallRecordings: any[],
+  recordType: string | null | undefined,
+  recordId: string | number | null | undefined,
+  router: any,
+  EmptyIcon: React.ComponentType<any> | null | undefined,
+) {
+  if (sidebarCallRecordingsLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (sidebarCallRecordings.length > 0) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        <div
+          style={{
+            maxHeight: "280px",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px",
+            ...( {
+              scrollbarWidth: "thin",
+              scrollbarColor: "#c8c8c8 transparent",
+            } as any),
+          }}
+        >
+          {sidebarCallRecordings
+            .slice(0, 5)
+            .map((rec: any, index: number) => {
+              const dateStr =
+                rec.DateTime ??
+                rec.start_time ??
+                rec.created_at ??
+                "";
+              let timestamp = "—";
+              if (dateStr) {
+                if (dateStr.length > 10) {
+                  timestamp = new Date(
+                    dateStr,
+                  ).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                } else {
+                  timestamp = dateStr;
+                }
+              }
+              const dir =
+                rec.Direction ??
+                rec.direction ??
+                rec.CallDirection ??
+                "";
+              const direction =
+                dir.includes("INBOUND") ||
+                dir === "Inbound" ||
+                dir === "CALL_INCOMING"
+                  ? "Incoming"
+                  : "Outgoing";
+              const rawDuration =
+                rec.Duration ??
+                rec.duration ??
+                rec.CallDuration ??
+                0;
+              const durationSec =
+                Number.parseInt(String(rawDuration), 10) / 10000000 ||
+                0;
+              const roundedSec =
+                Math.round(durationSec * 10) / 10;
+              let durationStr = "";
+              if (durationSec >= 60) {
+                durationStr = `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}`;
+              } else if (roundedSec > 0) {
+                durationStr = `${roundedSec}s`;
+              }
+              return (
+                <div
+                  key={rec.Id ?? rec.id ?? index}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 12px",
+                    background: "#f9fafb",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: "#1f2937",
+                      }}
+                    >
+                      {timestamp}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#6b7280",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {durationStr ? `${durationStr} · ` : ""}
+                      {direction}
+                    </div>
+                  </div>
+                  <Phone
+                    size={16}
+                    style={{ color: "#718096", flexShrink: 0 }}
+                  />
+                </div>
+              );
+            })}
+        </div>
+        {recordType === "prospect" &&
+          recordId != null &&
+          sidebarCallRecordings.length > 5 && (
+            <button
+              onClick={() =>
+                router.push(
+                  `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                )
+              }
+              style={{
+                marginTop: "8px",
+                padding: "8px 16px",
+                backgroundColor: "#0091ae",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              View more
+            </button>
+          )}
+      </div>
+    );
+  }
+
+  if (section.emptyState) {
+    const es: NonNullable<SidebarSection["emptyState"]> = section.emptyState;
+    return (
+      <div
+        style={{ padding: "24px 16px", textAlign: "center" }}
+      >
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {es.message}
+        </p>
+        {es.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              es.action?.onClick();
+            }}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {es.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function renderGenericSectionContent(
+  section: SidebarSection,
+  EmptyIcon: React.ComponentType<any> | null | undefined,
+  renderField: (field: SidebarField, index: number) => React.ReactNode,
+) {
+  if (section.emptyState) {
+    const es = section.emptyState;
+    return (
+      <div style={{ padding: "24px 16px", textAlign: "center" }}>
+        {EmptyIcon && (
+          <EmptyIcon
+            size={40}
+            style={{ color: "#cbd5e0", marginBottom: "12px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {es.message}
+        </p>
+        {es.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              es.action?.onClick();
+            }}
+            style={{
+              marginTop: "12px",
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+          >
+            {es.action.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (section.isLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+          color: "#141414",
+        }}
+      >
+        <RefreshCw
+          size={16}
+          className="spin"
+          style={{ marginRight: "8px" }}
+        />
+        Loading...
+      </div>
+    );
+  }
+
+  if (section.customContent) {
+    return section.customContent;
+  }
+
+  if (section.fields && section.fields.length > 0) {
+    if (section.id === "about-prospect") {
+      return (
+        <div
+          style={{
+            maxHeight: "280px",
+            overflowY: "auto",
+            overflowX: "hidden",
+            ...( {
+              scrollbarWidth: "thin",
+              scrollbarColor: "#c8c8c8 transparent",
+            } as any),
+          }}
+        >
+          {section.fields.map((field: SidebarField, index: number) =>
+            renderField(field, index),
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {section.fields.map((field: SidebarField, index: number) =>
+          renderField(field, index),
+        )}
+      </div>
+    );
+  }
+
+  if (section.emptyState) {
+    const es: NonNullable<SidebarSection["emptyState"]> = section.emptyState;
+    return (
+      <div
+        style={{
+          padding: "32px 20px",
+          textAlign: "center",
+        }}
+      >
+        {EmptyIcon && (
+          <EmptyIcon
+            size={48}
+            style={{ color: "#cbd5e0", marginBottom: "16px" }}
+          />
+        )}
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#718096",
+            margin: es.action ? "0 0 20px 0" : 0,
+            lineHeight: "1.6",
+          }}
+        >
+          {es.message}
+        </p>
+        {es.action && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              es.action?.onClick();
+            }}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#0091ae",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#007a8c";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#0091ae";
+            }}
+          >
+            {es.action?.label}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 /** CRM summary from API (lead, prospect, deal, order, etc.) */
 export interface CrmSummary {
   id: number;
@@ -150,6 +753,8 @@ interface RecordSummaryDisplay {
   onCopy?: () => void;
   onAskQuestion?: () => void;
 }
+
+type CrmEntityType = "prospect" | "lead" | "deal" | "order";
 
 export interface GenericSidebarProps {
   isOpen: boolean;
@@ -207,10 +812,10 @@ export interface GenericSidebarProps {
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
 
-  recordType?: "prospect" | "lead" | "deal" | "order" | "company" | "activity";
+  recordType?: CrmEntityType | "company" | "activity";
   recordId?: number;
   /** When recordType is "activity", the underlying entity type for fetching history chain (e.g. "lead", "deal"). */
-  activityEntityType?: "prospect" | "lead" | "deal" | "order";
+  activityEntityType?: CrmEntityType;
 
   /** Resolve user extension/id to display name (e.g. for Owner / contact_owner). When provided, prospect sidebar uses it for the Owner field. */
   resolveUserLabel?: (extensionOrId: string) => string;
@@ -321,6 +926,8 @@ export const CallModal: React.FC<CallModalProps> = ({
     onCall(phoneNumber);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -498,7 +1105,6 @@ const NotesModal: React.FC<NotesModalProps> = ({
 }) => {
   const [noteText, setNoteText] = useState("");
   const [createTask, setCreateTask] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -671,7 +1277,8 @@ const NotesModal: React.FC<NotesModalProps> = ({
 
     const start = textarea.selectionStart;
     const lines = noteText.substring(0, start).split("\n");
-    const isAtLineStart = lines[lines.length - 1].trim() === "";
+    const lastLine = lines.at(-1) ?? "";
+    const isAtLineStart = lastLine.trim() === "";
 
     if (isAtLineStart) {
       insertText("- ");
@@ -1154,7 +1761,7 @@ const NotesModal: React.FC<NotesModalProps> = ({
             >
               {attachments.map((file, index) => (
                 <div
-                  key={index}
+                  key={`${file.name}-${file.lastModified}-${index}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1475,7 +2082,7 @@ const MoreActionsModal: React.FC<MoreActionsModalProps> = ({
       <>
         {parts.map((part, index) =>
           part.toLowerCase() === highlight.toLowerCase() ? (
-            <span key={index} style={{ color: "#0073b1" }}>
+            <span key={`${part}-${index}`} style={{ color: "#0073b1" }}>
               {part}
             </span>
           ) : (
@@ -1884,7 +2491,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
     value: string;
     label: string;
   } | null>(null);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const [customDate, setCustomDate] = useState(() =>
     new Date().toISOString().slice(0, 10),
   );
@@ -1896,7 +2502,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   );
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
   const moreFormattingRef = useRef<HTMLDivElement>(null);
   const taskPropertiesRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1980,71 +2586,160 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (notesRef.current) setNotes(notesRef.current.innerHTML || "");
   };
 
-  const handleBold = () => {
-    notesRef.current?.focus();
-    document.execCommand("bold", false);
+  type InlineFormat = "bold" | "italic" | "underline";
+
+  const applyInlineFormat = (type: InlineFormat) => {
+    const el = notesRef.current;
+    if (!el) return;
+
+    el.focus();
+
+    const selection = globalThis.getSelection?.();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+
+    // Ensure the selection is within the notes editor
+    if (!el.contains(range.commonAncestorContainer)) return;
+    if (range.collapsed) return;
+
+    try {
+      let tagName: string;
+      if (type === "bold") {
+        tagName = "strong";
+      } else if (type === "italic") {
+        tagName = "em";
+      } else {
+        tagName = "u";
+      }
+
+      const wrapper = document.createElement(tagName);
+      wrapper.appendChild(range.extractContents());
+      range.insertNode(wrapper);
+
+      selection.removeAllRanges();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(wrapper);
+      selection.addRange(newRange);
+
+      syncNotesFromEditor();
+    } catch (error) {
+      console.error("Failed to apply inline format:", error);
+    }
+  };
+
+  const handleBold = () => applyInlineFormat("bold");
+
+  const handleItalic = () => applyInlineFormat("italic");
+
+  const handleUnderline = () => applyInlineFormat("underline");
+
+  const insertLinkAtSelection = (url: string) => {
+    const el = notesRef.current;
+    if (!el) return;
+
+    const selection = globalThis.getSelection?.();
+    if (!selection) return;
+
+    let range = savedRangeRef.current;
+
+    if (!range) {
+      if (selection.rangeCount === 0) return;
+      const candidate = selection.getRangeAt(0);
+      if (
+        !el.contains(candidate.commonAncestorContainer) ||
+        candidate.collapsed
+      ) {
+        return;
+      }
+      range = candidate;
+    }
+
+    if (!el.contains(range.commonAncestorContainer) || range.collapsed) return;
+
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+
+    anchor.appendChild(range.extractContents());
+    range.insertNode(anchor);
+
+    selection.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(anchor);
+    selection.addRange(newRange);
+
+    savedRangeRef.current = null;
     syncNotesFromEditor();
   };
 
-  const handleItalic = () => {
-    notesRef.current?.focus();
-    document.execCommand("italic", false);
-    syncNotesFromEditor();
-  };
+  const insertImageAtSelection = (url: string) => {
+    const el = notesRef.current;
+    if (!el) return;
 
-  const handleUnderline = () => {
-    notesRef.current?.focus();
-    document.execCommand("underline", false);
+    const selection = globalThis.getSelection?.();
+    if (!selection) return;
+
+    let range: Range;
+
+    if (selection.rangeCount > 0) {
+      const candidate = selection.getRangeAt(0);
+      if (el.contains(candidate.commonAncestorContainer)) {
+        range = candidate;
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+      }
+    } else {
+      range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+    }
+
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+
+    range.insertNode(img);
+
+    selection.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.setStartAfter(img);
+    newRange.collapse(true);
+    selection.addRange(newRange);
+
     syncNotesFromEditor();
   };
 
   const handleLink = () => {
     const el = notesRef.current;
     if (!el) return;
+
+    const selection = globalThis.getSelection?.();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      if (
+        el.contains(range.commonAncestorContainer) &&
+        !range.collapsed
+      ) {
+        savedRangeRef.current = range.cloneRange();
+      } else {
+        savedRangeRef.current = null;
+      }
+    } else {
+      savedRangeRef.current = null;
+    }
+
     el.focus();
     setUrlModalType("link");
   };
 
-  const handleList = () => {
-    notesRef.current?.focus();
-    document.execCommand("insertUnorderedList", false);
-    syncNotesFromEditor();
-  };
-
-  const handleCode = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    const sel = window.getSelection();
-    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    const selectedText = range?.toString() || "code";
-    document.execCommand("insertHTML", false, `<code>${selectedText}</code>`);
-    syncNotesFromEditor();
-  };
-
-  const handleImage = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    setUrlModalType("image");
-  };
-
-  const handleAttachment = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments((prev) => [...prev, ...files]);
-    e.target.value = "";
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
   // Keyboard shortcuts handler (Ctrl/Cmd+B, I, U, K)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!notesRef.current) return;
+
     if (e.ctrlKey || e.metaKey) {
       switch (e.key.toLowerCase()) {
         case "b":
@@ -2105,7 +2800,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
     setQueue("None");
     setSelectedUserExtension(null);
     setNotes("");
-    setAttachments([]);
     setIsMaximized(false);
     onClose();
   };
@@ -2204,8 +2898,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         submitLabel="Insert link"
         onSubmit={(url) => {
           notesRef.current?.focus();
-          document.execCommand("createLink", false, url);
-          syncNotesFromEditor();
+          insertLinkAtSelection(url);
           setUrlModalType(null);
         }}
       />
@@ -2218,8 +2911,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         submitLabel="Insert image"
         onSubmit={(url) => {
           notesRef.current?.focus();
-          document.execCommand("insertImage", false, url);
-          syncNotesFromEditor();
+          insertImageAtSelection(url);
           setUrlModalType(null);
         }}
       />
@@ -2331,7 +3023,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           >
             {/* Activity Date */}
             <div style={{ position: "relative" }}>
-              <label
+              <span
                 style={{
                   fontSize: "13px",
                   color: "#141414",
@@ -2341,7 +3033,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 Activity date
-              </label>
+              </span>
               <div
                 style={{ display: "flex", gap: "8px", alignItems: "center" }}
               >
@@ -3332,8 +4024,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (!isOpen) return null;
-
   // Calendar utilities
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -3434,7 +4124,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
   const parseDateInputToLocalDate = (value: string) => {
     // value format: YYYY-MM-DD
-    const [y, m, d] = value.split("-").map((p) => Number(p));
+    const [y, m, d] = value.split("-").map(Number);
     if (!y || !m || !d) return null;
     return new Date(y, m - 1, d);
   };
@@ -3462,7 +4152,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     if (!el) return;
     if ("showPicker" in el && typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
       (el as HTMLInputElement & { showPicker: () => void }).showPicker();
-      return;
     }
     else el.click();
   };
@@ -3564,7 +4253,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
       const parts = formatter.formatToParts(new Date());
       const offsetPart = parts.find((p) => p.type === "timeZoneName");
       const offset = offsetPart?.value ?? "";
-      const city = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+      const city = tz.split("/").pop()?.replaceAll("_", " ") ?? tz;
       return offset ? `${offset} ${city}` : tz;
     } catch {
       return tz;
@@ -4625,13 +5314,19 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 startOfWeek.setDate(
                   dayDate.getDate() - dayDate.getDay() + (hideWeekends ? 1 : 0),
                 );
-                const currentDayDate = new Date(startOfWeek);
-                currentDayDate.setDate(startOfWeek.getDate() + index);
+              const currentDayDate = new Date(startOfWeek);
+              currentDayDate.setDate(startOfWeek.getDate() + index);
+            
+              const isCurrentDay = isToday(currentDayDate);
+              const isSelectedDay = isSelected(currentDayDate);
+              let dateCircleBackgroundColor = "transparent";
+              if (isCurrentDay) {
+                dateCircleBackgroundColor = "#ff3842";
+              } else if (isSelectedDay) {
+                dateCircleBackgroundColor = "#141414";
+              }
 
-                const isCurrentDay = isToday(currentDayDate);
-                const isSelectedDay = isSelected(currentDayDate);
-
-                return (
+              return (
                   <div
                     key={day}
                     style={{
@@ -4662,11 +5357,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                         fontWeight: isCurrentDay ? "600" : "400",
                         color:
                           isCurrentDay || isSelectedDay ? "#ffffff" : "#141414",
-                        backgroundColor: isCurrentDay
-                          ? "#ff3842"
-                          : isSelectedDay
-                            ? "#141414"
-                            : "transparent",
+                        backgroundColor: dateCircleBackgroundColor,
                         borderRadius: "50%",
                         width: "32px",
                         height: "32px",
@@ -4816,6 +5507,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onSmsLog,
 }) => {
   const router = useRouter();
+  const emailContextPayload =
+    contextPayload && typeof contextPayload === "object"
+      ? {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          lead: contextPayload.lead,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          deal: contextPayload.deal,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          order: contextPayload.order,
+        }
+      : undefined;
   const { data: session } = useSession();
   const {
     dialNumber: ctiDialNumber,
@@ -4844,31 +5546,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Fetched prospect when sidebar is opened for a prospect (by recordId)
   const [prospectData, setProspectData] = useState<CrmDataItem | null>(null);
   const [prospectLoading, setProspectLoading] = useState(false);
-  const [prospectError, setProspectError] = useState<string | null>(null);
 
   // When sidebar is opened for a prospect, fetch prospect by ID
   useEffect(() => {
     if (!isOpen || recordType !== "prospect" || recordId == null) {
       setProspectData(null);
-      setProspectError(null);
       return;
     }
     const id = Number(recordId);
     if (Number.isNaN(id)) {
-      setProspectError("Invalid prospect ID");
       setProspectData(null);
       return;
     }
     setProspectLoading(true);
-    setProspectError(null);
     getAllCrmDataById(id)
       .then((data) => {
         setProspectData(data);
-        setProspectError(null);
       })
       .catch(() => {
         setProspectData(null);
-        setProspectError("Failed to load prospect");
       })
       .finally(() => {
         setProspectLoading(false);
@@ -4878,30 +5574,24 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Fetched lead when sidebar is opened for a lead (by recordId) – for Recent activities
   const [leadData, setLeadData] = useState<LeadData | null>(null);
   const [leadLoading, setLeadLoading] = useState(false);
-  const [leadError, setLeadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || recordType !== "lead" || recordId == null) {
       setLeadData(null);
-      setLeadError(null);
       return;
     }
     const id = Number(recordId);
     if (Number.isNaN(id)) {
-      setLeadError("Invalid lead ID");
       setLeadData(null);
       return;
     }
     setLeadLoading(true);
-    setLeadError(null);
     getLead(id)
       .then((data) => {
         setLeadData(data);
-        setLeadError(null);
       })
       .catch(() => {
         setLeadData(null);
-        setLeadError("Failed to load lead");
       })
       .finally(() => {
         setLeadLoading(false);
@@ -4984,7 +5674,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const recordSummary: RecordSummaryDisplay = {
     content: (crmSummary?.summary ?? "").trim(),
     timestamp: "",
-    onCopy: () => copyToClipboard(crmSummary?.summary ?? ""),
+    onCopy: () => {
+      void copyToClipboard(crmSummary?.summary ?? "");
+    },
     onAskQuestion: () => {
       globalThis.window?.dispatchEvent(
         new CustomEvent("breeze-assistant:open"),
@@ -5081,23 +5773,53 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
   const activityRecordTypeForModals =
     recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
-      ? (recordType as "prospect" | "lead" | "deal" | "order")
+      ? (recordType as CrmEntityType)
       : undefined;
   const activityRecordIdForModals =
-    activityRecordTypeForModals && recordId != null && !Number.isNaN(Number(recordId))
+    activityRecordTypeForModals &&
+    recordId != null &&
+    !Number.isNaN(Number(recordId))
       ? Number(recordId)
       : undefined;
 
-  const activityModals =
+  const activityModalsParams =
     activityRecordTypeForModals && activityRecordIdForModals != null
-      ? useCrmActivityModals({
+      ? {
           recordType: activityRecordTypeForModals,
           recordId: activityRecordIdForModals,
           recordName: title,
           recordEmail: emailList[0] ?? "",
           recordPhone: phoneList[0] ?? "",
-        })
-      : null;
+          // When a note is created via the shared activity modals,
+          // refresh the sidebar notes list for this record so the
+          // "Notes" section in GenericSidebar updates immediately.
+          onNoteCreated: () => {
+            setSidebarNotesLoading(true);
+            getCrmNotes(
+              activityRecordTypeForModals,
+              activityRecordIdForModals,
+            )
+              .then((res) => {
+                setSidebarNotesList(res?.data ?? []);
+              })
+              .catch(() => {
+                setSidebarNotesList([]);
+              })
+              .finally(() => {
+                setSidebarNotesLoading(false);
+              });
+          },
+        }
+      : {
+          recordType: "prospect" as CrmRecordType,
+          recordId: 0,
+          recordName: "",
+          recordEmail: "",
+          recordPhone: "",
+          onNoteCreated: () => {},
+        };
+
+  const activityModals = useCrmActivityModals(activityModalsParams);
 
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(),
@@ -5141,7 +5863,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     if (!isOpen) return;
 
     const collapsed = new Set<string>();
-    if (sections && sections.length > 0) {
+    if (sections?.length) {
       sections.forEach((section) => {
         if (section.collapsible && section.defaultExpanded === false) {
           collapsed.add(section.id);
@@ -5164,7 +5886,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     //skip for activity
     if (recordType === "activity") return;
-    const rType = recordType as "prospect" | "lead" | "deal" | "order";
+    const rType = recordType as CrmEntityType;
     setSidebarNotesLoading(true);
     getCrmNotes(rType, Number(recordId))
       .then((res) => {
@@ -5213,20 +5935,24 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const targetNode = event.target as Node;
+
       if (
         dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        !dropdownRef.current.contains(targetNode)
       ) {
         setShowActionsDropdown(false);
         setOpenActionsSubMenuIndex(null);
         setActionsSubMenuSearch("");
       }
 
-      Object.entries(sectionDropdownRefs.current).forEach(([key, ref]) => {
-        if (ref && !ref.contains(event.target as Node)) {
+      const entries = Object.entries(sectionDropdownRefs.current);
+      for (const [key, ref] of entries) {
+        if (ref && !ref.contains(targetNode)) {
           setShowSectionActions((prev) => (prev === key ? null : prev));
+          break;
         }
-      });
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -5255,18 +5981,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
 
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+      if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(value);
       } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = value;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
+        toast.error("Clipboard API is not available in this browser.");
+        return;
       }
       toast.success("Copied to clipboard");
     } catch (err) {
@@ -5295,17 +6014,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     if (crmRecordType && recordId != null) {
       try {
         await createCrmNote({
-          record_type: crmRecordType as "prospect" | "lead" | "deal" | "order",
+          record_type: crmRecordType as CrmEntityType,
           record_id: Number(recordId),
           text,
-          ...(attachments && attachments.length > 0 && { attachments }),
+          ...(attachments?.length ? { attachments } : {}),
         });
         setShowNotesModal(false);
         toast.success("Note created successfully");
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
         getCrmNotes(
-          crmRecordType as "prospect" | "lead" | "deal" | "order",
+          crmRecordType as CrmEntityType,
           Number(recordId),
         )
           .then((res) => setSidebarNotesList(res?.data ?? []))
@@ -5433,12 +6152,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         taskData.activityDate,
         taskData.activityTime,
       );
-      const urgency =
-        taskData.priority === "High"
-          ? "high"
-          : taskData.priority === "Medium"
-            ? "med"
-            : "low";
+      let urgency: "high" | "med" | "low";
+      if (taskData.priority === "High") {
+        urgency = "high";
+      } else if (taskData.priority === "Medium") {
+        urgency = "med";
+      } else {
+        urgency = "low";
+      }
       try {
         await createTask({
           name: taskData.title.trim() || "Task",
@@ -5454,7 +6175,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           notes: taskData.notes?.trim()
             ? [{ note: taskData.notes.trim() }]
             : undefined,
-          record_type: recordType as "prospect" | "lead" | "deal" | "order",
+          record_type: recordType as CrmEntityType,
           record_id: Number(recordId),
         });
         setShowTaskModal(false);
@@ -5533,7 +6254,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
     const start_date_time = `${meeting_date}T${meeting_time}:00`;
     const end_date_time = `${meeting_date}T${end_time}:00`;
-    const recordType = record.type as "prospect" | "lead" | "deal" | "order";
+    const recordType = record.type as CrmEntityType;
     try {
       await createMeeting({
         name: meetingData.title.trim(),
@@ -5581,11 +6302,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     content_variables: Record<string, string>;
   }) => {
     const rawNumber =
-      (phoneList && phoneList[0]) ||
+      phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
-    const number = rawNumber.replace(/\s/g, "");
-    if (!number) {
+      const number = rawNumber.replaceAll(" ", "");
+      if (!number) {
       toast.error("No phone number available for this record.");
       return;
     }
@@ -5594,7 +6315,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         number,
         content_sid: whatsappData.content_sid,
         content_variables:
-          Object.keys(whatsappData.content_variables || {}).length > 0
+          Object.keys(whatsappData.content_variables ?? {}).length > 0
             ? whatsappData.content_variables
             : undefined,
       });
@@ -5626,10 +6347,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     attachments: File[];
   }) => {
     const rawTo =
-      (phoneList && phoneList[0]) ||
+      phoneList?.[0] ||
       (typeof phone === "string" ? phone.trim() : "") ||
       "";
-    const to = rawTo.replace(/\s/g, "");
+    const to = rawTo.replaceAll(" ", "");
     const body = smsData.message?.trim() || "";
     if (!to || !body) {
       if (!to) toast.error("No phone number available for this record.");
@@ -5667,50 +6388,53 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowMoreModal(false);
   };
 
-  const goToRecordDetailActivity = useCallback(
-    (activityType?: string) => {
-      if (!recordType || recordId == null) return;
+  const buildActivitiesBaseUrl = (
+    type: string,
+    id: number | string,
+    entityTypeOverride?: string,
+  ): string | null => {
+    const effectiveType = type === "activity" ? entityTypeOverride ?? "lead" : type;
+    const effectiveId =
+      type === "activity" ? Number(id) : id;
 
-      let baseUrl: string | null = null;
+    if (type === "activity" && Number.isNaN(effectiveId)) {
+      return null;
+    }
 
-      if (recordType === "prospect") {
-        baseUrl = `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "lead") {
-        baseUrl = `/crm/leads/leads-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "deal") {
-        baseUrl = `/crm/deals/deals-detailpage?id=${recordId}&section=activities`;
-      } else if (recordType === "order") {
-        baseUrl = `/crm/orders/${recordId}/order-detailpage?section=activities`;
-      } else if (recordType === "activity") {
-        // For activity timelines, fall back to the underlying entity type when available
-        const id = Number(recordId);
-        if (Number.isNaN(id)) return;
-        const entityType = activityEntityType ?? "lead";
-        if (entityType === "prospect") {
-          baseUrl = `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
-        } else if (entityType === "lead") {
-          baseUrl = `/crm/leads/leads-detailpage?id=${id}&section=activities`;
-        } else if (entityType === "deal") {
-          baseUrl = `/crm/deals/deals-detailpage?id=${id}&section=activities`;
-        } else {
-          baseUrl = `/crm/orders/${id}/order-detailpage?section=activities`;
-        }
-      }
+    switch (effectiveType) {
+      case "prospect":
+        return `/crm/prospects/prospects-detailpage?id=${effectiveId}&section=activities`;
+      case "lead":
+        return `/crm/leads/leads-detailpage?id=${effectiveId}&section=activities`;
+      case "deal":
+        return `/crm/deals/deals-detailpage?id=${effectiveId}&section=activities`;
+      case "order":
+      default:
+        return `/crm/orders/${effectiveId}/order-detailpage?section=activities`;
+    }
+  };
 
-      if (!baseUrl) return;
+  const goToRecordDetailActivity = (activityType?: string) => {
+    if (!recordType || recordId == null) return;
 
-      let url = baseUrl;
-      if (activityType != null && activityType.trim()) {
-        const separator = baseUrl.includes("?") ? "&" : "?";
-        url = `${baseUrl}${separator}activityType=${encodeURIComponent(
-          activityType,
-        )}`;
-      }
+    const baseUrl = buildActivitiesBaseUrl(
+      recordType,
+      recordId,
+      activityEntityType,
+    );
 
-      router.push(url);
-    },
-    [recordType, recordId, activityEntityType, router],
-  );
+    if (!baseUrl) return;
+
+    let url = baseUrl;
+    if (typeof activityType === "string" && activityType.trim()) {
+      const separator = baseUrl.includes("?") ? "&" : "?";
+      url = `${baseUrl}${separator}activityType=${encodeURIComponent(
+        activityType,
+      )}`;
+    }
+
+    router.push(url);
+  };
 
   const handleMoreActionSelect = (actionId: string) => {
     switch (actionId) {
@@ -5869,7 +6593,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Humanize data key for display (e.g. "contact_owner" -> "Contact Owner")
   const humanizeDataKey = (key: string) =>
-    key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    key.replaceAll("_", " ").replaceAll(/\b\w/g, (c) => c.toUpperCase());
 
   // --- Recent Activities (audit trail) shared helpers ---
   type AuditTrailEntry = {
@@ -5880,144 +6604,174 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     changes?: Record<string, { old?: unknown; new?: unknown }>;
   };
 
-  const getAuditTrailFromRecord = useCallback(
-    (
-      rawData: Record<string, unknown> | null | undefined,
-      rType: string | undefined,
-    ): AuditTrailEntry[] => {
-      if (!rawData) return [];
-      const fromTop =
-        rawData.audit_trail ?? rawData.audit_trails ?? undefined;
-      const fromData =
-        (rawData.data as Record<string, unknown> | undefined)?.audit_trail ??
-        (rawData.data as Record<string, unknown> | undefined)?.audit_trails;
-      const raw = fromTop ?? fromData;
-      return Array.isArray(raw) ? (raw as AuditTrailEntry[]) : [];
-    },
-    [],
-  );
+  const getAuditTrailFromRecord = (
+    rawData: Record<string, unknown> | null | undefined,
+    rType: string | undefined,
+  ): AuditTrailEntry[] => {
+    if (!rawData) return [];
+    const fromTop = rawData.audit_trail ?? rawData.audit_trails ?? undefined;
+    const fromData =
+      (rawData.data as Record<string, unknown> | undefined)?.audit_trail ??
+      (rawData.data as Record<string, unknown> | undefined)?.audit_trails;
+    const raw = fromTop ?? fromData;
+    return Array.isArray(raw) ? (raw as AuditTrailEntry[]) : [];
+  };
 
-  const createResolveFieldVal = useCallback(
-    (
-      rType: string | undefined,
-      rawData: Record<string, unknown> | undefined,
-      resolveUser: ((id: string) => string) | undefined,
-    ): ((field: string, val: unknown) => string) => {
-      const fmt = (v: unknown): string =>
-        v == null
-          ? "—"
-          : typeof v === "string"
-            ? v
-            : typeof v === "object"
-              ? JSON.stringify(v)
-              : String(v);
-      const record = (rawData?.data as Record<string, unknown>) ?? rawData ?? {};
-      const campaign = record.campaign as
-        | { id?: number; name?: string }
-        | undefined;
-      return (field: string, val: unknown): string => {
-        if (
-          (field === "assigned_to" ||
-            field === "contact_owner" ||
-            field === "user_extension") &&
-          resolveUser
-        )
-          return resolveUser(String(val ?? ""));
-        if (
-          field === "campaign_id" &&
-          campaign?.name &&
-          val != null &&
-          Number(val) === Number(campaign?.id)
-        )
-          return campaign.name;
-        if (field === "scheduled_call_at" && val) {
-          try {
-            return new Date(String(val)).toLocaleString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          } catch {
+  const createResolveFieldVal = (
+    rType: string | undefined,
+    rawData: Record<string, unknown> | undefined,
+    resolveUser: ((id: string) => string) | undefined,
+  ): ((field: string, val: unknown) => string) => {
+    const fmt = (v: unknown): string => {
+      if (v == null) return "—";
+      if (typeof v === "string") return v;
+      if (
+        typeof v === "number" ||
+        typeof v === "boolean" ||
+        typeof v === "bigint"
+      ) {
+        return String(v);
+      }
+      if (typeof v === "object") return JSON.stringify(v);
+      if (typeof v === "symbol") return v.toString();
+      if (typeof v === "function") return v.name || "[function]";
+      return "—";
+    };
+    const record = (rawData?.data as Record<string, unknown>) ?? rawData ?? {};
+    const campaign = record.campaign as
+      | { id?: number; name?: string }
+      | undefined;
+    return (field: string, val: unknown): string => {
+      if (
+        (field === "assigned_to" ||
+          field === "contact_owner" ||
+          field === "user_extension") &&
+        resolveUser
+      ) {
+        const id =
+          typeof val === "string" || typeof val === "number" ? String(val) : "";
+        return resolveUser(id);
+      }
+      if (
+        field === "campaign_id" &&
+        campaign?.name &&
+        val != null &&
+        Number(val) === Number(campaign?.id)
+      )
+        return campaign.name;
+      if (field === "scheduled_call_at" && val) {
+        try {
+          if (typeof val !== "string" && typeof val !== "number") {
             return fmt(val);
           }
-        }
-        return fmt(val);
-      };
-    },
-    [],
-  );
-
-  const buildAuditLinesForEntry = useCallback(
-    (
-      entry: AuditTrailEntry,
-      resolveFieldVal: (field: string, val: unknown) => string,
-      humanizeKey: (key: string) => string,
-    ): string => {
-      const event = entry.event === "created" ? "created" : "updated";
-      if (event === "created")
-        return entry.description?.trim() || "Record created";
-      const changes =
-        entry.changes &&
-        typeof entry.changes === "object" &&
-        !Array.isArray(entry.changes)
-          ? entry.changes
-          : null;
-      if (!changes) return entry.description?.trim() || "Record updated";
-      const lines: string[] = [];
-      Object.entries(changes).forEach(([field, val]) => {
-        if (
-          !val ||
-          typeof val !== "object" ||
-          (!("old" in val) && !("new" in val))
-        )
-          return;
-        const rawOld = (val as { old?: unknown }).old;
-        const rawNew = (val as { new?: unknown }).new;
-        if (field === "data") {
-          const oldObj =
-            rawOld &&
-            typeof rawOld === "object" &&
-            !Array.isArray(rawOld)
-              ? (rawOld as Record<string, unknown>)
-              : {};
-          let newObj: Record<string, unknown> = {};
-          if (typeof rawNew === "string") {
-            try {
-              newObj = JSON.parse(rawNew) as Record<string, unknown>;
-            } catch {
-              newObj = {};
-            }
-          } else if (
-            rawNew &&
-            typeof rawNew === "object" &&
-            !Array.isArray(rawNew)
-          )
-            newObj = rawNew as Record<string, unknown>;
-          const allKeys = new Set([
-            ...Object.keys(oldObj),
-            ...Object.keys(newObj),
-          ]);
-          allKeys.forEach((key) => {
-            const o = resolveFieldVal(key, oldObj[key]);
-            const n = resolveFieldVal(key, newObj[key]);
-            if (o !== n) lines.push(`${humanizeKey(key)}: ${o} → ${n}`);
+          return new Date(String(val)).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
           });
-        } else {
-          const o = resolveFieldVal(field, rawOld);
-          const n = resolveFieldVal(field, rawNew);
-          if (o !== n) lines.push(`${humanizeKey(field)}: ${o} → ${n}`);
+        } catch {
+          return fmt(val);
         }
-      });
-      return lines.length > 0
-        ? lines.join("\n")
-        : entry.description?.trim() || "Record updated";
-    },
-    [],
-  );
+      }
+      return fmt(val);
+    };
+  };
 
-  const recentActivitiesState = useMemo(() => {
+  const isValidChangeValue = (
+    val: unknown,
+  ): val is { old?: unknown; new?: unknown } =>
+    !!val &&
+    typeof val === "object" &&
+    !Array.isArray(val) &&
+    (("old" in (val as Record<string, unknown>)) ||
+      ("new" in (val as Record<string, unknown>)));
+
+  const buildDataChangeLines = (
+    rawOld: unknown,
+    rawNew: unknown,
+    resolveFieldVal: (field: string, val: unknown) => string,
+    humanizeKey: (key: string) => string,
+  ): string[] => {
+    const oldObj =
+      rawOld &&
+      typeof rawOld === "object" &&
+      !Array.isArray(rawOld)
+        ? (rawOld as Record<string, unknown>)
+        : {};
+
+    let newObj: Record<string, unknown> = {};
+    if (typeof rawNew === "string") {
+      try {
+        newObj = JSON.parse(rawNew) as Record<string, unknown>;
+      } catch {
+        newObj = {};
+      }
+    } else if (
+      rawNew &&
+      typeof rawNew === "object" &&
+      !Array.isArray(rawNew)
+    ) {
+      newObj = rawNew as Record<string, unknown>;
+    }
+
+    const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+    const lines: string[] = [];
+
+    allKeys.forEach((key) => {
+      const o = resolveFieldVal(key, oldObj[key]);
+      const n = resolveFieldVal(key, newObj[key]);
+      if (o !== n) {
+        lines.push(`${humanizeKey(key)}: ${o} → ${n}`);
+      }
+    });
+
+    return lines;
+  };
+
+  const buildAuditLinesForEntry = (
+    entry: AuditTrailEntry,
+    resolveFieldVal: (field: string, val: unknown) => string,
+    humanizeKey: (key: string) => string,
+  ): string => {
+    const event = entry.event === "created" ? "created" : "updated";
+    if (event === "created")
+      return entry.description?.trim() || "Record created";
+
+    const changes =
+      entry.changes &&
+      typeof entry.changes === "object" &&
+      !Array.isArray(entry.changes)
+        ? entry.changes
+        : null;
+
+    if (!changes) return entry.description?.trim() || "Record updated";
+
+    const lines: string[] = [];
+    Object.entries(changes).forEach(([field, val]) => {
+      if (!isValidChangeValue(val)) return;
+      const rawOld = val.old;
+      const rawNew = val.new;
+
+      if (field === "data") {
+        lines.push(
+          ...buildDataChangeLines(rawOld, rawNew, resolveFieldVal, humanizeKey),
+        );
+        return;
+      }
+
+      const o = resolveFieldVal(field, rawOld);
+      const n = resolveFieldVal(field, rawNew);
+      if (o !== n) lines.push(`${humanizeKey(field)}: ${o} → ${n}`);
+    });
+
+    return lines.length > 0
+      ? lines.join("\n")
+      : entry.description?.trim() || "Record updated";
+  };
+
+  const recentActivitiesState = (() => {
     if (!recordType) return null;
     switch (recordType) {
       case "prospect":
@@ -6052,221 +6806,226 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         return {
           loading: activityHistoryChainLoading,
           data:
-            activityHistoryChain != null
-              ? ({ audit_trail: activityHistoryChain } as Record<
+            activityHistoryChain == null
+              ? null
+              : ({ audit_trail: activityHistoryChain } as Record<
                   string,
                   unknown
-                >)
-              : null,
+                >),
           detailPath: (id: number) => {
             const entityType = activityEntityType ?? "lead";
-            if (entityType === "prospect")
-              return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
-            if (entityType === "lead")
-              return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
-            if (entityType === "deal")
-              return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
-            return `/crm/orders/${id}/order-detailpage?section=activities`;
+            switch (entityType) {
+              case "prospect":
+                return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
+              case "lead":
+                return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
+              case "deal":
+                return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
+              default:
+                return `/crm/orders/${id}/order-detailpage?section=activities`;
+            }
           },
         };
       default:
         return null;
     }
-  }, [
-    recordType,
-    prospectLoading,
-    prospectData,
-    leadLoading,
-    leadData,
-    dealLoading,
-    dealData,
-    orderLoading,
-    orderData,
-    activityHistoryChainLoading,
-    activityHistoryChain,
-    activityEntityType,
-  ]);
+  })();
 
-  // Format a value from prospect data.data for display
-  const formatDataFieldValue = (
-    value: unknown,
-  ): string | string[] | undefined => {
-    if (value == null || value === "") return undefined;
-    if (Array.isArray(value)) {
-      const strings = value.map((v) =>
-        typeof v === "object" && v != null && "name" in v
-          ? (v as { name: string }).name
-          : String(v),
-      );
-      return strings.length ? strings : undefined;
+  const enhanceNotesSection = (section: any): any => {
+    const updatedSection = {
+      ...section,
+      count: sidebarNotesList.length,
+    };
+
+    if (section.emptyState?.action) {
+      return {
+        ...updatedSection,
+        emptyState: {
+          ...section.emptyState,
+          action: {
+            ...section.emptyState.action,
+            onClick: () => {
+              handleNoteClick();
+              section.emptyState?.action?.onClick?.();
+            },
+          },
+        },
+      };
     }
-    if (typeof value === "object") return undefined;
-    return String(value);
+
+    return updatedSection;
+  };
+
+  const buildProspectAboutFields = (
+    data: any,
+    nestedData: any,
+  ): SidebarField[] => {
+    const formatDateTime = (value?: string) =>
+      value
+        ? new Date(value).toLocaleDateString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+          }) +
+          " " +
+          new Date(value).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : undefined;
+
+    const fields: SidebarField[] = [];
+
+    if (data.name) {
+      fields.push({
+        label: "Name",
+        value: data.name,
+      });
+    }
+
+    if (nestedData.email) {
+      fields.push({
+        label: "Email",
+        value: nestedData.email,
+        type: "email",
+        copyable: true,
+      });
+    }
+
+    if (data.phone) {
+      fields.push({
+        label: "Phone",
+        value: data.phone,
+        type: "phone",
+        copyable: true,
+      });
+    }
+
+    if (data.scheduled_call_at) {
+      const formatted = formatDateTime(data.scheduled_call_at);
+      if (formatted) {
+        fields.push({
+          label: "Scheduled Call At",
+          value: formatted,
+          type: "datetime",
+        });
+      }
+    }
+
+    if (data.campaign?.name) {
+      fields.push({
+        label: "Campaign Name",
+        value: data.campaign.name,
+      });
+    }
+
+    if (data.company?.name) {
+      fields.push({
+        label: "Company Name",
+        value: data.company.name,
+      });
+    }
+
+    if (data.company_domain) {
+      fields.push({
+        label: "Company Domain",
+        value: data.company_domain,
+      });
+    }
+
+    if (Array.isArray(data.tags) && data.tags.length > 0) {
+      fields.push({
+        label: "Tags",
+        value: data.tags.map((t: any) => t.name),
+        type: "tags",
+      });
+    }
+
+    const excludedKeys = new Set([
+      "email",
+      "assigned_to",
+      "uploaded_by",
+      "contact_owner",
+    ]);
+
+    Object.entries(nestedData).forEach(([key, value]) => {
+      if (excludedKeys.has(key)) return;
+      if (value === null || value === undefined || value === "") return;
+
+      const label = key
+        .replaceAll("_", " ")
+        .replaceAll(/\b\w/g, (c) => c.toUpperCase());
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) return;
+
+        fields.push({
+          label,
+          value,
+          type: "tags",
+        });
+      } else {
+        let displayValue: string;
+        if (
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean" ||
+          typeof value === "bigint"
+        ) {
+          displayValue = String(value);
+        } else if (value && typeof value === "object") {
+          displayValue = JSON.stringify(value);
+        } else {
+          displayValue = "";
+        }
+
+        fields.push({
+          label,
+          value: displayValue,
+        });
+      }
+    });
+
+    return fields;
+  };
+
+  const enhanceAboutProspectSection = (section: any): any => {
+    if (recordType !== "prospect" || !prospectData) {
+      return { ...section };
+    }
+
+    const prospect = prospectData as any;
+    const data = prospect.data ?? {};
+    const nestedData = data.data ?? {};
+
+    const fields = buildProspectAboutFields(data, nestedData);
+
+    return {
+      ...section,
+      fields,
+      isLoading: prospectLoading,
+    };
   };
 
   // Process sections to override note-related actions and enrich "About this prospect" when we have API data
   const processedSections = sections.map((section) => {
-    // If this is a notes section, override:
-    // - the empty state action to open the note modal
-    // - the count to reflect the number of notes fetched for the sidebar
     if (section.id === "notes") {
-      const updatedSection = {
-        ...section,
-        count: sidebarNotesList.length,
-      };
-
-      if (section.emptyState?.action) {
-        return {
-          ...updatedSection,
-          emptyState: {
-            ...section.emptyState,
-            action: {
-              ...section.emptyState.action,
-              onClick: () => {
-                handleNoteClick();
-                section.emptyState?.action?.onClick?.(); // Call original if provided
-              },
-            },
-          },
-        };
-      }
-
-      return updatedSection;
+      return enhanceNotesSection(section);
     }
 
-    // "About this prospect": when we have prospectData from API, build fields from it and add data.data; otherwise drop Status
     if (section.id === "about-prospect") {
-      if (recordType === "prospect" && prospectData) {
-        const prospect = prospectData as any;
-        const data = prospect.data ?? {};
-        console.log("data", data);
-        const nestedData = data.data ?? {};
-        console.log("nestedData", nestedData);
-      
-        const formatDateTime = (value?: string) =>
-          value
-            ? new Date(value).toLocaleDateString("en-US", {
-                month: "short",
-                day: "2-digit",
-                year: "numeric",
-              }) +
-              " " +
-              new Date(value).toLocaleTimeString("en-US", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })
-            : undefined;
-      
-        const fields: SidebarField[] = [];
-            
-        if (data.name) {
-          fields.push({
-            label: "Name",
-            value: data.name,
-          });
-        }
-      
-        if (nestedData.email) {
-          fields.push({
-            label: "Email",
-            value: nestedData.email,
-            type: "email",
-            copyable: true,
-          });
-        }
-      
-        if (data.phone) {
-          fields.push({
-            label: "Phone",
-            value: data.phone,
-            type: "phone",
-            copyable: true,
-          });
-        }
-      
-        if (data.scheduled_call_at) {
-          const formatted = formatDateTime(data.scheduled_call_at);
-          if (formatted) {
-            fields.push({
-              label: "Scheduled Call At",
-              value: formatted,
-              type: "datetime",
-            });
-          }
-        }
-      
-        if (data.campaign?.name) {
-          fields.push({
-            label: "Campaign Name",
-            value: data.campaign.name,
-          });
-        }
-      
-        if (data.company?.name) {
-          fields.push({
-            label: "Company Name",
-            value: data.company.name,
-          });
-        }
-      
-        if (data.company_domain) {
-          fields.push({
-            label: "Company Domain",
-            value: data.company_domain,
-          });
-        }
-
-        if (Array.isArray(data.tags) && data.tags.length > 0) {
-          fields.push({
-            label: "Tags",
-            value: data.tags.map((t: any) => t.name),
-            type: "tags",
-          });
-        }
-      
-        const excludedKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "contact_owner",
-        ]);
-      
-        Object.entries(nestedData).forEach(([key, value]) => {
-          if (excludedKeys.has(key)) return;
-          if (value === null || value === undefined || value === "") return;
-      
-          const label = key
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-      
-          if (Array.isArray(value)) {
-            if (value.length === 0) return;
-      
-            fields.push({
-              label,
-              value,
-              type: "tags",
-            });
-          } else {
-            fields.push({
-              label,
-              value: String(value),
-            });
-          }
-        });
-      
-        return {
-          ...section,
-          fields,
-          isLoading: prospectLoading,
-        };
-      }
-      return { ...section };
+      return enhanceAboutProspectSection(section);
     }
 
     return section;
   });
+
+  const isHtmlString = (value: unknown) => {
+    if (typeof value !== "string") return false;
+    // Basic check for HTML tags in the string
+    return /<\/?[a-z][\s\S]*>/i.test(value);
+  };
 
   const renderField = (field: SidebarField, index: number) => {
     if (field.show === false) return null;
@@ -6337,6 +7096,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       );
     }
 
+    const isHtmlContent = isHtmlString(field.value);
+
     return (
       <div key={index} style={{ marginBottom: "16px" }}>
         <div
@@ -6357,6 +7118,20 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             gap: "8px",
           }}
         >
+        {isHtmlContent ? (
+          <div
+            style={{
+              fontSize: "14px",
+              color: "#141414",
+              fontWeight: "400",
+              flex: 1,
+              wordBreak: "break-word",
+            }}
+            dangerouslySetInnerHTML={{
+              __html: (field.value as string) || "--",
+            }}
+          />
+        ) : (
           <div
             style={{
               fontSize: "14px",
@@ -6368,6 +7143,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           >
             {field.value || "--"}
           </div>
+        )}
           <div
             style={{
               display: "flex",
@@ -6461,6 +7237,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     const EmptyIcon = section.emptyState?.icon;
     const isCollapsed = collapsedSections.has(section.id);
     const showActions = showSectionActions === section.id;
+    let primaryContent: React.ReactNode | null = null;
 
     return (
       <div
@@ -6475,7 +7252,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         }}
       >
         {/* Section Header */}
-        <div
+        <button
+          type="button"
           style={{
             display: "flex",
             alignItems: "center",
@@ -6484,8 +7262,20 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             cursor: section.collapsible ? "pointer" : "default",
             backgroundColor: "#ffffff",
             borderBottom: isCollapsed ? "none" : "1px solid #eaf0f6",
+            width: "100%",
+            border: "none",
+            outline: "none",
           }}
+          role={section.collapsible ? "button" : undefined}
+          tabIndex={section.collapsible ? 0 : undefined}
           onClick={() => section.collapsible && toggleSection(section.id)}
+          onKeyDown={(e) => {
+            if (!section.collapsible) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleSection(section.id);
+            }
+          }}
         >
           <div
             style={{
@@ -6568,18 +7358,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           </div>
 
           {/* Section Actions Dropdown */}
-          {section.actions && section.actions.length > 0 && (
+          {(section.actions?.length ?? 0) > 0 && (
             <div
               style={{ position: "relative" }}
               ref={(el) => {
                 sectionDropdownRefs.current[section.id] = el;
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
+            }}
+          >
               <button
-                onClick={() =>
-                  setShowSectionActions(showActions ? null : section.id)
-                }
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSectionActions(showActions ? null : section.id);
+              }}
                 style={{
                   background: "transparent",
                   border: "none",
@@ -6619,7 +7409,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     overflow: "hidden",
                   }}
                 >
-                  {section.actions.map((action, index) => (
+                  {(section.actions ?? []).map((action, index) => (
                     <button
                       key={index}
                       onClick={() => {
@@ -6651,264 +7441,99 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               )}
             </div>
           )}
-        </div>
+        </button>
 
         {/* Section Content */}
         {!isCollapsed && (
           <div style={{ padding: "20px", paddingRight: "10px" }}>
             {section.id === "notes" ? (
-              sidebarNotesLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "24px",
-                    color: "#141414",
-                  }}
-                >
-                  <RefreshCw
-                    size={16}
-                    className="spin"
-                    style={{ marginRight: "8px" }}
-                  />
-                  Loading...
-                </div>
-              ) : sidebarNotesList.length > 0 ? (
-                <div>
-                  {sidebarNotesList.map((note) => {
-                    const updatedAt = new Date(
-                      note.updated_at,
-                    ).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-                    return (
-                      <div
-                        key={note.id}
-                        style={{
-                          backgroundColor: "#fff",
-                          border: "1px solid #eaf0f6",
-                          borderRadius: "5px",
-                          padding: "12px 16px",
-                          marginBottom: "10px",
-                        }}
-                      >
-                        {note.text &&
-                        note.text.includes("<") &&
-                        note.text.includes(">") ? (
-                          <div
-                            style={{
-                              fontSize: "14px",
-                              color: "#141414",
-                              margin: "0 0 8px 0",
-                              lineHeight: "1.6",
-                            }}
-                            dangerouslySetInnerHTML={{ __html: note.text }}
-                          />
-                        ) : (
-                          <p
-                            style={{
-                              fontSize: "14px",
-                              color: "#141414",
-                              margin: "0 0 8px 0",
-                              lineHeight: "1.6",
-                              whiteSpace: "pre-wrap",
-                            }}
-                          >
-                            {note.text}
-                          </p>
-                        )}
-                        <span style={{ fontSize: "12px", color: "#718096" }}>
-                          {updatedAt}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : section.emptyState ? (
-                <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                  {EmptyIcon && (
-                    <EmptyIcon
-                      size={40}
-                      style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                    />
-                  )}
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      color: "#718096",
-                      margin: 0,
-                      lineHeight: "1.6",
-                    }}
-                  >
-                    {section.emptyState.message}
-                  </p>
-                  {section.emptyState.action && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        section.emptyState?.action?.onClick();
-                      }}
+              (() => {
+                if (sidebarNotesLoading) {
+                  return (
+                    <div
                       style={{
-                        marginTop: "12px",
-                        padding: "8px 16px",
-                        backgroundColor: "#0091ae",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        fontWeight: "500",
-                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "24px",
+                        color: "#141414",
                       }}
                     >
-                      {section.emptyState.action.label}
-                    </button>
-                  )}
-                </div>
-              ) : null
-            ) : section.id === "recent-activities" && recentActivitiesState ? (
-              recentActivitiesState.loading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "24px",
-                    color: "#141414",
-                  }}
-                >
-                  <RefreshCw
-                    size={16}
-                    className="spin"
-                    style={{ marginRight: "8px" }}
-                  />
-                  Loading...
-                </div>
-              ) : recentActivitiesState.data ? (
-                (() => {
-                  const auditTrail = getAuditTrailFromRecord(
-                    recentActivitiesState.data,
-                    recordType ?? undefined,
+                      <RefreshCw
+                        size={16}
+                        className="spin"
+                        style={{ marginRight: "8px" }}
+                      />
+                      Loading...
+                    </div>
                   );
-                  const resolveFieldVal = createResolveFieldVal(
-                    recordType ?? undefined,
-                    recentActivitiesState.data,
-                    resolveUserLabel,
-                  );
-                  if (auditTrail.length > 0) {
-                    const isActivityRecordType = recordType === "activity";
-                    const displayTrail = isActivityRecordType
-                      ? auditTrail
-                      : auditTrail.slice(0, 5);
-                    const hasMore =
-                      !isActivityRecordType && auditTrail.length > 5;
-                    return (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0",
-                          minWidth: 0,
-                        }}
-                      >
-                        <div
-                          style={{
-                            maxHeight: "280px",
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0",
-                            minWidth: 0,
-                            ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
-                          }}
-                        >
-                          {displayTrail.map((entry, index) => {
-                            const timestamp = entry.created_at
-                              ? new Date(entry.created_at).toLocaleString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )
-                              : "—";
-                            const description = buildAuditLinesForEntry(
-                              entry,
-                              resolveFieldVal,
-                              humanizeDataKey,
-                            );
-                            return (
-                              <div
-                                key={entry.id ?? index}
-                                style={{
-                                  padding: "10px 0",
-                                  marginBottom:
-                                    index < displayTrail.length - 1
-                                      ? "10px"
-                                      : 0,
-                                  minWidth: 0,
-                                }}
-                              >
-                                <p
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#141414",
-                                    margin: "0 0 8px 0",
-                                    lineHeight: "1.6",
-                                    whiteSpace: "pre-wrap",
-                                    overflowWrap: "break-word",
-                                    wordBreak: "break-word",
-                                  }}
-                                >
-                                  {description}
-                                </p>
-                                <span
-                                  style={{ fontSize: "12px", color: "#718096" }}
-                                >
-                                  {timestamp}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      {recordId != null && hasMore && (
-                          <button
-                            onClick={() =>
-                              router.push(
-                                recentActivitiesState.detailPath(
-                                  Number(recordId),
-                                ),
-                              )
-                            }
+                }
+
+                if (sidebarNotesList.length > 0) {
+                  return (
+                    <div>
+                      {sidebarNotesList.map((note) => {
+                        const updatedAt = new Date(
+                          note.updated_at,
+                        ).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                        return (
+                          <div
+                            key={note.id}
                             style={{
-                              marginTop: "8px",
-                              padding: "8px 16px",
-                              backgroundColor: "#0091ae",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                              fontWeight: "500",
-                              cursor: "pointer",
-                              width: "100%",
+                              backgroundColor: "#fff",
+                              border: "1px solid #eaf0f6",
+                              borderRadius: "5px",
+                              padding: "12px 16px",
+                              marginBottom: "10px",
                             }}
                           >
-                            View more
-                          </button>
-                        )}
-                      </div>
-                    );
-                  }
+                            {note.text?.includes("<") &&
+                            note.text?.includes(">") ? (
+                              <div
+                                style={{
+                                  fontSize: "14px",
+                                  color: "#141414",
+                                  margin: "0 0 8px 0",
+                                  lineHeight: "1.6",
+                                }}
+                                dangerouslySetInnerHTML={{ __html: note.text }}
+                              />
+                            ) : (
+                              <p
+                                style={{
+                                  fontSize: "14px",
+                                  color: "#141414",
+                                  margin: "0 0 8px 0",
+                                  lineHeight: "1.6",
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                {note.text}
+                              </p>
+                            )}
+                            <span
+                              style={{ fontSize: "12px", color: "#718096" }}
+                            >
+                              {updatedAt}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                if (section.emptyState) {
                   return (
-                    <div style={{ padding: "24px 16px", textAlign: "center" }}>
+                    <div
+                      style={{ padding: "24px 16px", textAlign: "center" }}
+                    >
                       {EmptyIcon && (
                         <EmptyIcon
                           size={40}
@@ -6923,10 +7548,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                           lineHeight: "1.6",
                         }}
                       >
-                        {section.emptyState?.message ??
-                          "No recent activities."}
+                        {section.emptyState.message}
                       </p>
-                      {section.emptyState?.action && (
+                      {section.emptyState.action && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -6944,370 +7568,52 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                             cursor: "pointer",
                           }}
                         >
-                          {section.emptyState?.action.label}
+                          {section.emptyState.action.label}
                         </button>
                       )}
                     </div>
                   );
-                })()
-              ) : (
-                <div
-                  style={{
-                    padding: "24px 16px",
-                    textAlign: "center",
-                  }}
-                >
-                  {EmptyIcon && (
-                    <EmptyIcon
-                      size={40}
-                      style={{
-                        color: "#cbd5e0",
-                        marginBottom: "12px",
-                      }}
-                    />
-                  )}
-                  <p
-                    style={{
-                      fontSize: "14px",
-                      color: "#718096",
-                      margin: 0,
-                      lineHeight: "1.6",
-                    }}
-                  >
-                    {section.emptyState?.message ??
-                      "No recent activities."}
-                  </p>
-                </div>
-              )
-            ) : section.emptyState ? (
-              <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                {EmptyIcon && (
-                  <EmptyIcon
-                    size={40}
-                    style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                  />
-                )}
-                <p
-                  style={{
-                    fontSize: "14px",
-                    color: "#718096",
-                    margin: 0,
-                    lineHeight: "1.6",
-                  }}
-                >
-                  {section.emptyState.message}
-                </p>
-                {section.emptyState.action && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      section.emptyState?.action?.onClick();
-                    }}
-                    style={{
-                      marginTop: "12px",
-                      padding: "8px 16px",
-                      backgroundColor: "#0091ae",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "4px",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {section.emptyState.action.label}
-                  </button>
-                )}
-              </div>
-            )
-            : section.id === "calls" || section.id === "call-recordings" ? (
-              sidebarCallRecordingsLoading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "24px",
-                    color: "#141414",
-                  }}
-                >
-                  <RefreshCw
-                    size={16}
-                    className="spin"
-                    style={{ marginRight: "8px" }}
-                  />
-                  Loading...
-                </div>
-              ) : sidebarCallRecordings.length > 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      maxHeight: "280px",
-                      overflowY: "auto",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                      ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
-                    }}
-                  >
-                    {sidebarCallRecordings
-                      .slice(0, 5)
-                      .map((rec: any, index: number) => {
-                        const dateStr =
-                          rec.DateTime ??
-                          rec.start_time ??
-                          rec.created_at ??
-                          "";
-                        const timestamp = dateStr
-                          ? dateStr.length > 10
-                            ? new Date(dateStr).toLocaleString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                            : dateStr
-                          : "—";
-                        const dir =
-                          rec.Direction ??
-                          rec.direction ??
-                          rec.CallDirection ??
-                          "";
-                        const direction =
-                          dir.includes("INBOUND") ||
-                          dir === "Inbound" ||
-                          dir === "CALL_INCOMING"
-                            ? "Incoming"
-                            : "Outgoing";
-                        const rawDuration =
-                          rec.Duration ?? rec.duration ?? rec.CallDuration ?? 0;
-                        const durationSec =
-                          parseInt(String(rawDuration), 10) / 10000000 || 0;
-                        const roundedSec = Math.round(durationSec * 10) / 10;
-                        const durationStr =
-                          durationSec >= 60
-                            ? `${Math.floor(durationSec / 60)}:${String(Math.floor(durationSec % 60)).padStart(2, "0")}`
-                            : roundedSec > 0
-                              ? `${roundedSec}s`
-                              : "";
-                        return (
-                          <div
-                            key={rec.Id ?? rec.id ?? index}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "10px 12px",
-                              background: "#f9fafb",
-                              borderRadius: "8px",
-                              border: "1px solid #e5e7eb",
-                            }}
-                          >
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  fontWeight: 500,
-                                  color: "#1f2937",
-                                }}
-                              >
-                                {timestamp}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  color: "#6b7280",
-                                  marginTop: "2px",
-                                }}
-                              >
-                                {durationStr ? `${durationStr} · ` : ""}
-                                {direction}
-                              </div>
-                            </div>
-                            <Phone
-                              size={16}
-                              style={{ color: "#718096", flexShrink: 0 }}
-                            />
-                          </div>
-                        );
-                      })}
-                  </div>
-                  {recordType === "prospect" &&
-                    recordId != null &&
-                    sidebarCallRecordings.length > 5 && (
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
-                          )
-                        }
-                        style={{
-                          marginTop: "8px",
-                          padding: "8px 16px",
-                          backgroundColor: "#0091ae",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          fontWeight: "500",
-                          cursor: "pointer",
-                          width: "100%",
-                        }}
-                      >
-                        View more
-                      </button>
-                    )}
-                </div>
-              ) : section.emptyState ? (
-                (() => {
-                  const es = (section as SidebarSection).emptyState;
-                  return (
-                    <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                      {EmptyIcon && (
-                        <EmptyIcon
-                          size={40}
-                          style={{ color: "#cbd5e0", marginBottom: "12px" }}
-                        />
-                      )}
-                      <p
-                        style={{
-                          fontSize: "14px",
-                          color: "#718096",
-                          margin: 0,
-                          lineHeight: "1.6",
-                        }}
-                      >
-                        {es?.message}
-                      </p>
-                      {es?.action && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            es.action?.onClick();
-                          }}
-                          style={{
-                            marginTop: "12px",
-                            padding: "8px 16px",
-                            backgroundColor: "#0091ae",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            fontWeight: "500",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {es.action.label}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()
-              ) : null
-            ) : section.isLoading ? (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "24px",
-                  color: "#141414",
-                }}
-              >
-                <RefreshCw
-                  size={16}
-                  className="spin"
-                  style={{ marginRight: "8px" }}
-                />
-                Loading...
-              </div>
-            ) : section.customContent ? (
-              section.customContent
-            ) : section.fields && section.fields.length > 0 ? (
-              section.id === "about-prospect" ? (
-                <div
-                  style={{
-                    maxHeight: "280px",
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                    ...( { scrollbarWidth: "thin", scrollbarColor: "#c8c8c8 transparent" } as any),
-                  }}
-                >
-                  {section.fields.map((field, index) =>
-                    renderField(field, index),
-                  )}
-                </div>
-              ) : (
-                <div>
-                  {section.fields.map((field, index) =>
-                    renderField(field, index),
-                  )}
-                </div>
-              )
-            ) : section.emptyState ? (
-              (() => {
-                const es = (section as SidebarSection).emptyState;
-                return (
-                  <div
-                    style={{
-                      padding: "32px 20px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {EmptyIcon && (
-                      <EmptyIcon
-                        size={48}
-                        style={{ color: "#cbd5e0", marginBottom: "16px" }}
-                      />
-                    )}
-                    <p
-                      style={{
-                        fontSize: "14px",
-                        color: "#718096",
-                        margin: es?.action ? "0 0 20px 0" : 0,
-                        lineHeight: "1.6",
-                      }}
-                    >
-                      {es?.message}
-                    </p>
-                    {es?.action && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          es.action?.onClick();
-                        }}
-                        style={{
-                          padding: "8px 16px",
-                          backgroundColor: "#0091ae",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          fontWeight: "500",
-                          cursor: "pointer",
-                          transition: "background-color 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#007a8c";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "#0091ae";
-                        }}
-                      >
-                        {es.action.label}
-                      </button>
-                    )}
-                  </div>
-                );
+                }
+
+                return null;
               })()
-            ) : null}
+            ) : (() => {
+                if (section.id === "recent-activities" && recentActivitiesState) {
+                  return (
+                    <RecentActivitiesSection
+                      recentActivitiesState={recentActivitiesState}
+                      recordType={recordType}
+                      recordId={recordId}
+                      section={section}
+                      EmptyIcon={EmptyIcon}
+                      humanizeDataKey={humanizeDataKey}
+                      resolveUserLabel={resolveUserLabel}
+                      router={router}
+                      getAuditTrailFromRecord={getAuditTrailFromRecord}
+                      createResolveFieldVal={createResolveFieldVal}
+                      buildAuditLinesForEntry={buildAuditLinesForEntry}
+                    />
+                  );
+                }
+
+                if (section.id === "calls" || section.id === "call-recordings") {
+                  return renderCallsSection(
+                    section,
+                    sidebarCallRecordingsLoading,
+                    sidebarCallRecordings,
+                    recordType,
+                    recordId,
+                    router,
+                    EmptyIcon,
+                  );
+                }
+
+                return renderGenericSectionContent(
+                  section,
+                  EmptyIcon,
+                  renderField,
+                );
+              })()}
           </div>
         )}
       </div>
@@ -7452,15 +7758,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             recipientName={title}
             senderEmail={senderEmail}
             senderName={senderName}
-            contextPayload={
-              contextPayload
-                ? {
-                    lead: contextPayload.lead,
-                    deal: contextPayload.deal,
-                    order: contextPayload.order,
-                  }
-                : undefined
-            }
+            contextPayload={emailContextPayload}
             onSend={(emailData) => handleEmailSend(emailData, record)}
           />
 
@@ -7500,25 +7798,30 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       />
 
       {/* Meeting Modal - Rendered as floating window (shared component, same as prospects) */}
-      {!activityModals && (
-        <MeetingModal
-          isOpen={showMeetingModal}
-          onClose={handleMeetingClose}
-          hostEmail={session?.user?.email ?? ""}
-          hostName={session?.user?.name ?? ""}
-          attendeeEmail={
-            Array.isArray(emailList)
-              ? emailList[0]
-              : typeof emailList === "string"
-                ? emailList
-                : ""
-          }
-          attendeeName={title}
-          recordType={record?.type as any}
-          recordId={record?.id}
-          onSchedule={(meetingData) => handleMeetingSchedule(meetingData, record)}
-        />
-      )}
+      {(() => {
+        let attendeeEmail = "";
+        if (Array.isArray(emailList)) {
+          attendeeEmail = emailList[0];
+        } else if (typeof emailList === "string") {
+          attendeeEmail = emailList;
+        }
+
+        return activityModals ? null : (
+          <MeetingModal
+            isOpen={showMeetingModal}
+            onClose={handleMeetingClose}
+            hostEmail={session?.user?.email ?? ""}
+            hostName={session?.user?.name ?? ""}
+            attendeeEmail={attendeeEmail}
+            attendeeName={title}
+            recordType={record?.type}
+            recordId={record?.id}
+            onSchedule={(meetingData) =>
+              handleMeetingSchedule(meetingData, record)
+            }
+          />
+        );
+      })()}
 
       {/* More Actions Modal */}
       <MoreActionsModal
@@ -7712,19 +8015,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       }}
                     >
                       {actionsDropdown.items.map((item, index) => {
-                        const hasSubItems = "subItems" in item && item.subItems?.length;
+                        const hasSubItems =
+                          "subItems" in item && !!item.subItems?.length;
                         const isSubMenuOpen = openActionsSubMenuIndex === index;
-                        const searchLower = actionsSubMenuSearch.trim().toLowerCase();
-                        const filteredSubItems =
-                          hasSubItems && isSubMenuOpen && searchLower
-                            ? item.subItems.filter((sub) =>
-                                sub.label.toLowerCase().includes(searchLower),
-                              )
-                            : hasSubItems
-                              ? item.subItems
-                              : [];
+                        const searchLower =
+                          actionsSubMenuSearch.trim().toLowerCase();
+                        type ActionsSubItem = { label: string; value: string };
+                        let filteredSubItems: ActionsSubItem[] = [];
+                        if (hasSubItems) {
+                          const subItems = (
+                            item as { subItems: ActionsSubItem[] }
+                          ).subItems;
+                          if (isSubMenuOpen && searchLower) {
+                            filteredSubItems = subItems.filter((sub) =>
+                              sub.label.toLowerCase().includes(searchLower),
+                            );
+                          } else {
+                            filteredSubItems = subItems;
+                          }
+                        }
                         return (
-                          <div key={index} style={{ position: "relative" }}>
+                          <div key={item.label} style={{ position: "relative" }}>
                             <button
                               onClick={() => {
                                 if (hasSubItems) {
@@ -7822,9 +8133,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                                       No matching owner
                                     </div>
                                   ) : (
-                                    filteredSubItems.map((sub, subIndex) => (
+                                    filteredSubItems.map((sub) => (
                                       <button
-                                        key={subIndex}
+                                        key={`${sub.value}-${sub.label}`}
                                         onClick={() => {
                                           item.onSubItemSelect(sub.value);
                                           setShowActionsDropdown(false);
@@ -8137,7 +8448,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 border: "1px solid #cccccc",
               }}
             >
-              <div
+              <button
+                type="button"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -8145,8 +8457,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                   padding: "14px 20px",
                   cursor: "pointer",
                   backgroundColor: "#ffffff",
+                  width: "100%",
+                  border: "none",
+                  outline: "none",
                 }}
+                tabIndex={0}
                 onClick={() => toggleSection("breeze-summary")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleSection("breeze-summary");
+                  }
+                }}
               >
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "10px" }}
@@ -8187,7 +8509,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     AI
                   </div>
                 </div>
-              </div>
+              </button>
 
               {!collapsedSections.has("breeze-summary") && (
                 <div

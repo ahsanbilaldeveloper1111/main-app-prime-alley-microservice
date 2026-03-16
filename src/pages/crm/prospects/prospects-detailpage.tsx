@@ -16,33 +16,14 @@ import {
   Phone,
   MoreHorizontal,
   Calendar,
-  MessageSquare,
   ClipboardList,
   ExternalLink,
   Copy,
   RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Sparkles,
-  User,
-  Building2,
-  Briefcase,
   FileText,
   Ticket,
-  Paperclip,
-  Link2,
-  Tag,
-  DollarSign,
-  Search,
-  Filter,
-  AlertCircle,
-  ShoppingCart,
-  Pencil,
-  Trash2,
-  MessageCircle,
-  Download as DownloadIcon,
+  AlertCircle
 } from "lucide-react";
-import parsePhoneNumber from "libphonenumber-js";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import Layout from "@layout/index";
 import {
@@ -53,7 +34,7 @@ import {
   deleteCrmData,
   type CrmDataItem,
 } from "@utils/crm";
-import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
+import { ModuleSlug } from "@utils/Helper";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -64,7 +45,6 @@ import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import RichNoteEditor from "@components/RichNoteEditor";
 import ProspectEditSidebar, {
   type ProspectFormState as ProspectSidebarFormState,
 } from "@components/ProspectEditSidebar";
@@ -72,12 +52,13 @@ import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
-import { Dropdown, Form } from "react-bootstrap";
-import CreatableSelect from "react-select/creatable";
-import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+
+let customFieldIdCounter = 0;
+
+const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -157,9 +138,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
       id: number;
     }>
   >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
   const [extensions, setExtensions] = useState<any[]>([]);
   const [prospectForm, setProspectForm] = useState<ProspectSidebarFormState>({
     firstName: "",
@@ -176,7 +154,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     scheduled_call_at: "",
     tags: [],
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [],
   });
   // Edit Prospect Sidebar States
@@ -336,7 +314,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             const val = row[h];
             if (val == null) return "";
             if (typeof val === "object") return "";
-            const s = String(val).replace(/"/g, '""');
+            const s = String(val).replaceAll('"', '""');
             return s.includes(",") || s.includes('"') ? `"${s}"` : s;
           })
           .join(","),
@@ -344,15 +322,16 @@ const ContactRecordPage: NextPageWithLayout = () => {
       const blob = new Blob([csvRows.join("\n")], {
         type: "text/csv;charset=utf-8;",
       });
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = name + ext;
       a.click();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
       toast.success("Exported prospect successfully!");
     } catch (err) {
       toast.error("Failed to export prospect");
+      console.error("Failed to export prospect:", err);
     } finally {
       setExporting(false);
     }
@@ -430,13 +409,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
   }, []);
 
   // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = ["about", "activities", "intelligence"];
+  const validTabIds = new Set(["about", "activities", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
     const section = router.query.section;
     const tabId =
       typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.includes(tabId)) {
+    if (tabId && validTabIds.has(tabId)) {
       setActiveTab(tabId);
     }
   }, [router.isReady, router.query.section]);
@@ -458,7 +437,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
       return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
     };
 
-    const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
+    const rawTags = item.tags ?? item?.data?.tags ?? d.tags ?? [];
     const tagsArray = Array.isArray(rawTags)
       ? rawTags.map((t: any) =>
           typeof t === "string"
@@ -476,7 +455,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
     console.log("phone", item);
     if (typeof item.phone === "string" && item.phone.trim()) {
       try {
-        const normalized = item.phone.replace(/\s/g, "");
+        const normalized = item.phone.replaceAll(" ", "");
         const parsed = parsePhoneNumberInput(normalized);
         if (parsed) {
           phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -503,42 +482,56 @@ const ContactRecordPage: NextPageWithLayout = () => {
       d && typeof d === "object"
         ? Object.entries(d)
             .filter(([k]) => !reservedDataKeys.has(k))
-            .map(([field_name, field_value]) => ({
-              id: `${Date.now()}-${Math.random()}-${field_name}`,
-              field_name,
-              field_value: Array.isArray(field_value)
-                ? (field_value as string[]).join(", ")
-                : String(field_value ?? "").trim(),
-            }))
+            .map(([field_name, field_value]) => {
+              let normalizedValue = "";
+              if (Array.isArray(field_value)) {
+                normalizedValue = (field_value as string[]).join(", ");
+              } else if (field_value != null) {
+                if (typeof field_value === "string") {
+                  normalizedValue = field_value.trim();
+                } else if (
+                  typeof field_value === "number" ||
+                  typeof field_value === "boolean"
+                ) {
+                  normalizedValue = String(field_value);
+                }
+              }
+
+              return {
+                id: createCustomFieldId(),
+                field_name,
+                field_value: normalizedValue,
+              };
+            })
             .filter((f) => f.field_name || f.field_value)
         : [];
 
     setProspectForm({
       firstName,
       lastName,
-      email: d.email ?? (item as any).email ?? "",
+      email: d.email ?? item.email ?? "",
       phone_country_code: phoneCountryCode,
       phoneNumber,
       campaign_id: item.campaign_id ?? d.campaign_id ?? null,
       contact_owner:
-        (item as any).user_extension ??
+        item.user_extension ??
         d.contact_owner ??
-        (item as any).contact_owner ??
+        item.contact_owner ??
         null,
       lifecycle_stage: d.lifecycle_stage ?? "",
-      disposition: d.disposition ?? (item as any).disposition ?? "",
+      disposition: d.disposition ?? item.disposition ?? "",
       legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
       company_domain:
-        (item as any).company_domain ?? d.company_domain ?? "",
+        item.company_domain ?? d.company_domain ?? "",
       scheduled_call_at: toDatetimeLocal(
         item.scheduled_call_at ?? d.scheduled_call_at,
       ),
       tags: tagsArray as Array<{ value: string; label: string; id: number }>,
       note: item.note ?? d.note ?? "",
-      source:
-        (item as any).source_file ??
+      source_file:
+        item.source_file ??
         d.source ??
-        (item as any).source ??
+        item.source ??
         "",
       custom_fields: customFieldsArray,
     });
@@ -555,13 +548,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
           id: campaign.id,
         }));
         setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
       } catch (error) {
         console.error("Failed to load campaigns:", error);
         // Fallback to empty array
@@ -598,7 +584,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           staticTags.map((tag) => ({
             value: tag.value,
             label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
+            id: Number.parseInt(tag.value.replace("tag-", "")) || 0,
           })),
         );
       }
@@ -974,7 +960,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         phone: phoneForPayload,
         campaign_id: data.campaign_id ?? null,
         company_domain: data.company_domain?.trim() || undefined,
-        source: data.source?.trim() || undefined,
+        source: data.source_file?.trim() || undefined,
         scheduled_call_at: data.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: data.tags?.length
@@ -1133,13 +1119,14 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
+                    disabled={action === "Export" && exporting}
                     onClick={() => {
                       if (action === "Edit") {
                         setShowEditContactSidebar(true);
                       } else if (action === "Delete") {
                         handleOpenDeleteProspect();
                       } else if (action === "Export") {
-                        void handleProspectExport();
+                        handleProspectExport();
                       }
                       setShowActionsDropdown(false);
                     }}
@@ -1161,7 +1148,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    {action}
+                    {action === "Export" && exporting ? "Exporting..." : action}
                   </button>
                 ))}
               </div>
@@ -1542,7 +1529,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
         </div>
 
         {!collapsedSections.has("key-info") && (
-          <div style={{ padding: "20px" }}>
+          <div style={{ padding: "20px", maxHeight: "480px",
+            overflowY: "auto", }}>
             {keyInfoFields.map((field, index) => (
               <div key={index} style={{ marginBottom: "16px" }}>
                 <div
@@ -1720,13 +1708,13 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     if (!prev) return refreshed;
                     const refreshedSummary = (refreshed as any)?.data?.crm_summary;
                     if (!refreshedSummary) return prev;
-                    return {
+                return {
                       ...prev,
                       data: {
                         crm_summary: refreshedSummary,
-                        ...(prev as any).data,
+                        ...prev.data,
                       },
-                    } as any;
+                    };
                   });
                   toast.success("Summary refreshed");
                 } catch {
@@ -2078,15 +2066,25 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   {!collapsedSections.has("deals") && (
                     <div style={{ padding: "20px" }}>
                       {dealsCount === 0 ? (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: 0,
-                          }}
-                        >
-                          No deals associated.
-                        </p>
+                         <div
+                         style={{ padding: "32px 20px", textAlign: "center" }}
+                       >
+                         <Ticket
+                           size={48}
+                           style={{ color: "#cbd5e0", marginBottom: "16px" }}
+                         />
+                         <p
+                           style={{
+                             fontSize: "14px",
+                             color: "#718096",
+                             margin: 0,
+                             lineHeight: "1.6",
+                           }}
+                         >
+                           Track the customer requests associated with this
+                           record.
+                         </p>
+                       </div>
                       ) : (
                         <>
                           {allDeals.map((deal: any) => (

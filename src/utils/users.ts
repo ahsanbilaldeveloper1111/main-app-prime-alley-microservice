@@ -598,7 +598,6 @@ export const SyncLdapUsers = async () => {
   try {
     const response = await axiosInstance.get(`users/syncLdapUsers`);
     if(response){
-      console.log('Response:', response);
       const responseData = response.data;
       if(responseData.code === 200){
         return responseData.data;
@@ -610,6 +609,46 @@ export const SyncLdapUsers = async () => {
       toast.error('Failed to sync LDAP users');
       return false;
     }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+export const GetLdapSyncJobs = async () => {
+  try {
+    const response = await axiosInstance.get(`users/ldap-sync-jobs`);
+    if(response){
+      const responseData = response.data;
+      if(responseData.code === 200){
+        return responseData.data;
+      }else{
+        toast.error(responseData.message);
+        return false;
+      }
+    }else{
+      toast.error('Failed to sync LDAP users');
+      return false;
+    }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+export const GetLdapSyncJobById = async (id: string) => {
+  try {
+    const response = await axiosInstance.get(`users/ldap-sync-jobs/${id}`)
+    if (response) {
+      const responseData = response.data
+      if (responseData.code === 200) {
+        return responseData.data
+      }
+      toast.error(responseData.message)
+      return false
+    }
+    toast.error('Failed to sync LDAP users')
+    return false
   } catch (error) {
     reportApiErrorFromCatch(error, 'users');
     console.error('API Error:', error);
