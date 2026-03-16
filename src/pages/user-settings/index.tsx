@@ -1,5 +1,4 @@
 import React, {
-  ReactElement,
   useState,
   useCallback,
   useRef,
@@ -8,12 +7,39 @@ import React, {
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 import { X, ChevronRight, ChevronDown, ExternalLink, Search, Info } from "lucide-react";
-// import Layout from "@layout/index";
 
 // ─── Shared style tokens ─────────────────────────────────────────────────────
 
 const FONT = "Lexend Deca, Helvetica, Arial, sans-serif";
 const PRIMARY_TEXT = "#141414";
+
+const BUTTON_RESET: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  margin: 0,
+  font: "inherit",
+  color: "inherit",
+};
+
+function useMouseDownOutside<T extends HTMLElement>(args: {
+  ref: React.RefObject<T | null>;
+  enabled: boolean;
+  onOutside: () => void;
+}) {
+  const { ref, enabled, onOutside } = args;
+
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: MouseEvent) => {
+      const el = ref.current;
+      if (!el) return;
+      if (!el.contains(e.target as Node)) onOutside();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [enabled, onOutside, ref]);
+}
 
 const BASE_BUTTON: React.CSSProperties = {
   cursor: "pointer",
@@ -388,22 +414,32 @@ interface TemplateGroup {
 
 const TEMPLATE_MODULES = APP_PERMISSION_MODULES.slice(0, 4);
 
-const buildTemplatePermissions = (variant: "viewer" | "operator"): PermCategory[] => {
-  return TEMPLATE_MODULES.map((module, moduleIndex) => ({
+function getTemplatePermStatus(args: {
+  variant: "viewer" | "operator";
+  moduleIndex: number;
+  categoryIndex: number;
+}): PermStatus {
+  const { variant, moduleIndex, categoryIndex } = args;
+
+  if (variant === "viewer") {
+    if (categoryIndex < 2) return "green-circle";
+    if (categoryIndex < 4) return "green-dot";
+    return "grey-dot";
+  }
+
+  if (categoryIndex < 3) return "green-circle";
+  if (categoryIndex < 6) return "green-dot";
+  return moduleIndex % 2 === 0 ? "grey-dot" : "grey-circle";
+}
+
+const buildTemplatePermissions = (variant: "viewer" | "operator"): PermCategory[] =>
+  TEMPLATE_MODULES.map((module, moduleIndex) => ({
     title: module.label,
-    items: module.categories.map((category, categoryIndex) => {
-      let status: PermStatus;
-
-      if (variant === "viewer") {
-        status = categoryIndex < 2 ? "green-circle" : categoryIndex < 4 ? "green-dot" : "grey-dot";
-      } else {
-        status = categoryIndex < 3 ? "green-circle" : categoryIndex < 6 ? "green-dot" : moduleIndex % 2 === 0 ? "grey-dot" : "grey-circle";
-      }
-
-      return { name: category.label, status };
-    }),
+    items: module.categories.map((category, categoryIndex) => ({
+      name: category.label,
+      status: getTemplatePermStatus({ variant, moduleIndex, categoryIndex }),
+    })),
   }));
-};
 
 const VIEW_ONLY_PERMISSIONS: PermCategory[] = buildTemplatePermissions("viewer");
 
@@ -495,11 +531,14 @@ const PermissionsGrid: React.FC<{ categories: PermCategory[] }> = ({ categories 
               const isHovered = hoveredItem === itemKey;
 
               return (
-                <div
-                  key={item.name}
+                <button
+                  type="button"
+                  key={itemKey}
                   onMouseEnter={() => setHoveredItem(itemKey)}
                   onMouseLeave={() => setHoveredItem(null)}
-                  style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative", width: "fit-content" }}
+                  onFocus={() => setHoveredItem(itemKey)}
+                  onBlur={() => setHoveredItem(null)}
+                  style={{ ...BUTTON_RESET, display: "flex", alignItems: "center", gap: "8px", position: "relative", width: "fit-content", cursor: "default" }}
                 >
                   <PermDot status={item.status} />
                   <span style={{ fontFamily: FONT, fontSize: "15px", fontWeight: 300, color: PRIMARY_TEXT, lineHeight: "18px" }}>
@@ -528,7 +567,7 @@ const PermissionsGrid: React.FC<{ categories: PermCategory[] }> = ({ categories 
                       {tooltipLabel}
                     </span>
                   )}
-                </div>
+                </button>
               );
             })}
         </div>
@@ -549,6 +588,7 @@ const TemplateDropdown: React.FC<{
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   const selectedItem = ALL_TEMPLATE_ITEMS.find((i) => i.id === value);
   const selectedLabel = selectedItem?.label ?? "";
@@ -558,16 +598,17 @@ const TemplateDropdown: React.FC<{
     items: g.items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase())),
   })).filter((g) => g.items.length > 0);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
+    setSearch("");
+    setHoveredItemId(null);
+  }, []);
+
+  useMouseDownOutside({
+    ref,
+    enabled: open,
+    onOutside: closeDropdown,
+  });
 
   useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 10);
@@ -576,8 +617,11 @@ const TemplateDropdown: React.FC<{
   return (
     <div ref={ref} style={{ position: "relative", width: "420px" }}>
       {/* Trigger */}
-      <div
+      <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         style={{
           height: "42px",
           border: `1px solid ${open ? "#141414" : "rgb(138,138,138)"}`,
@@ -590,6 +634,7 @@ const TemplateDropdown: React.FC<{
           backgroundColor: "#fff",
           boxSizing: "border-box",
           gap: "8px",
+          width: "100%",
         }}
       >
         <span style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 300, color: selectedLabel ? "#141414" : "#6b7280", flex: 1 }}>
@@ -600,7 +645,7 @@ const TemplateDropdown: React.FC<{
           color="#555"
           style={{ flexShrink: 0, transition: "transform 150ms ease-out", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
-      </div>
+      </button>
 
       {/* Dropdown panel */}
       {open && (
@@ -671,42 +716,48 @@ const TemplateDropdown: React.FC<{
                   >
                     {group.groupLabel}
                   </div>
-                  {group.items.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        if (!item.disabled) {
-                          onChange(item.id);
-                          setOpen(false);
-                          setSearch("");
-                        }
-                      }}
-                      style={{
-                        padding: "9px 14px 9px 22px",
-                        cursor: item.disabled ? "default" : "pointer",
-                        backgroundColor: item.id === value ? "#f0f5ff" : "#f9f9f9",
-                        transition: "background-color 100ms ease-out",
-                        opacity: item.disabled ? 0.6 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!item.disabled && item.id !== value)
-                          (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f0f0f0";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!item.disabled && item.id !== value)
-                          (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9f9f9";
-                      }}
-                    >
-                      <div style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: item.disabled ? "#9ca3af" : PRIMARY_TEXT }}>
-                        {item.label}
-                      </div>
-                      {item.sublabel && (
-                        <div style={{ fontFamily: FONT, fontSize: "12px", fontWeight: 300, color: "#e8390e", marginTop: "2px" }}>
-                          {item.sublabel}
+                  {group.items.map((item) => {
+                    const isSelected = item.id === value;
+                    const isHovered = hoveredItemId === item.id && !item.disabled && !isSelected;
+                    let backgroundColor = "#f9f9f9";
+                    if (isSelected) backgroundColor = "#f0f5ff";
+                    else if (isHovered) backgroundColor = "#f0f0f0";
+
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => {
+                          if (!item.disabled) {
+                            onChange(item.id);
+                            closeDropdown();
+                          }
+                        }}
+                        onMouseEnter={() => setHoveredItemId(item.id)}
+                        onMouseLeave={() => setHoveredItemId(null)}
+                        disabled={item.disabled}
+                        style={{
+                          ...BUTTON_RESET,
+                          padding: "9px 14px 9px 22px",
+                          cursor: item.disabled ? "default" : "pointer",
+                          width: "100%",
+                          textAlign: "left",
+                          backgroundColor,
+                          transition: "background-color 100ms ease-out",
+                          opacity: item.disabled ? 0.6 : 1,
+                        }}
+                      >
+                        <div style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: item.disabled ? "#9ca3af" : PRIMARY_TEXT }}>
+                          {item.label}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {item.sublabel && (
+                          <div style={{ fontFamily: FONT, fontSize: "12px", fontWeight: 300, color: "#e8390e", marginTop: "2px" }}>
+                            {item.sublabel}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               ))
             )}
@@ -798,11 +849,14 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; small?: boolean
   const w = small ? 34 : 38;
   const h = small ? 18 : 20;
   const knob = small ? 12 : 14;
-  const off = small ? 3 : 3;
+  const off = 3;
   return (
-    <div
+    <button
+      type="button"
+      aria-pressed={checked}
       onClick={(e) => { e.stopPropagation(); onChange(); }}
       style={{
+        ...BUTTON_RESET,
         width: w,
         height: h,
         borderRadius: h / 2,
@@ -824,7 +878,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; small?: boolean
         transition: "left 200ms ease-out",
         boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
       }} />
-    </div>
+    </button>
   );
 };
 
@@ -883,14 +937,10 @@ const PermDropdown: React.FC<{
 }> = ({ value, options, onChange }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [hoveredOpt, setHoveredOpt] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useMouseDownOutside({ ref, enabled: open, onOutside: close });
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
@@ -927,27 +977,38 @@ const PermDropdown: React.FC<{
           minWidth: "130px",
           overflow: "hidden",
         }}>
-          {options.map((opt) => (
-            <div
-              key={opt}
-              onClick={(e) => { e.stopPropagation(); onChange(opt); setOpen(false); }}
-              style={{
-                padding: "9px 14px",
-                fontFamily: FONT,
-                fontSize: "13px",
-                fontWeight: opt === value ? 600 : 300,
-                color: opt === value ? "#2563eb" : PRIMARY_TEXT,
-                cursor: "pointer",
-                backgroundColor: opt === value ? "#f0f5ff" : "#fff",
-                transition: "background-color 100ms ease-out",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => { if (opt !== value) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9fafb"; }}
-              onMouseLeave={(e) => { if (opt !== value) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#fff"; }}
-            >
-              {opt}
-            </div>
-          ))}
+          {options.map((opt) => {
+            const isSelected = opt === value;
+            let backgroundColor = "#fff";
+            if (isSelected) backgroundColor = "#f0f5ff";
+            else if (hoveredOpt === opt) backgroundColor = "#f9fafb";
+
+            return (
+              <button
+                type="button"
+                key={opt}
+                onClick={(e) => { e.stopPropagation(); onChange(opt); setOpen(false); }}
+                onMouseEnter={() => setHoveredOpt(opt)}
+                onMouseLeave={() => setHoveredOpt(null)}
+                style={{
+                  ...BUTTON_RESET,
+                  padding: "9px 14px",
+                  fontFamily: FONT,
+                  fontSize: "13px",
+                  fontWeight: isSelected ? 600 : 300,
+                  color: isSelected ? "#2563eb" : PRIMARY_TEXT,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  width: "100%",
+                  backgroundColor,
+                  transition: "background-color 100ms ease-out",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {opt}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -961,13 +1022,16 @@ const CrmObjectRow: React.FC<{
   onChange: (key: string, updates: Partial<CrmObjectState>) => void;
 }> = ({ obj, state, onChange }) => {
   const isExpanded = state.expanded;
+  const isEnabled = state.enabled;
 
   return (
     <div style={{ borderBottom: "1px solid #cccccc" }}>
       {/* Header row */}
-      <div
+      <button
+        type="button"
         onClick={() => onChange(obj.key, { expanded: !state.expanded })}
         style={{
+          ...BUTTON_RESET,
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "space-between",
@@ -975,6 +1039,8 @@ const CrmObjectRow: React.FC<{
           cursor: "pointer",
           userSelect: "none",
           gap: "16px",
+          width: "100%",
+          textAlign: "left",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", flex: 1, minWidth: 0 }}>
@@ -995,13 +1061,13 @@ const CrmObjectRow: React.FC<{
             <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: "#666666", margin: "0 0 4px 0", lineHeight: "18px" }}>
               {obj.description}
             </p>
-            <a
-              href="#"
-              onClick={(e) => e.preventDefault()}
-              style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: "#006162", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: "3px" }}
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              style={{ ...BUTTON_RESET, fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: "#006162", textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}
             >
               Manage property access <ExternalLink size={10} />
-            </a>
+            </button>
             {!isExpanded && (
               <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 100, color: "#666666", margin: "4px 0 0 0" }}>
                 View ({state.view})
@@ -1010,14 +1076,11 @@ const CrmObjectRow: React.FC<{
           </div>
         </div>
         {/* ON/OFF toggle */}
-<div
-  onClick={(e) => e.stopPropagation()}
-  style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}
->
+<div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
   <div
     style={{
       display: "flex",
-      border: state.enabled ? "1px solid #000000" : "1px solid #d1d5db",
+      border: isEnabled ? "1px solid #000000" : "1px solid #d1d5db",
       borderRadius: "4px",
       overflow: "hidden",
       flexShrink: 0,
@@ -1026,7 +1089,7 @@ const CrmObjectRow: React.FC<{
     {/* ON BUTTON */}
     <button
       type="button"
-      onClick={() => onChange(obj.key, { enabled: true })}
+      onClick={(e) => { e.stopPropagation(); onChange(obj.key, { enabled: true }); }}
       style={{
         fontFamily: FONT,
         fontSize: "14px",
@@ -1034,38 +1097,38 @@ const CrmObjectRow: React.FC<{
         padding: "8px 16px",
         border: "none",
         borderRight: "1px solid #d1d5db",
-        cursor: state.enabled ? "default" : "pointer",
-        backgroundColor: state.enabled ? "#000000" : "#ffffff",
+        cursor: isEnabled ? "default" : "pointer",
+        backgroundColor: isEnabled ? "#000000" : "#ffffff",
         color: "#ffffff",
         transition: "background-color 150ms ease-out",
         letterSpacing: "0.03em",
       }}
     >
-      {state.enabled ? "ON" : ""}
+      {isEnabled ? "ON" : ""}
     </button>
 
     {/* RIGHT BUTTON */}
     <button
       type="button"
-      onClick={() => onChange(obj.key, { enabled: false })}
+      onClick={(e) => { e.stopPropagation(); onChange(obj.key, { enabled: false }); }}
       style={{
         fontFamily: FONT,
         fontSize: "14px",
         fontWeight: 600,
-        padding: state.enabled ? "8px 9px" : "8px 16px",
+        padding: isEnabled ? "8px 9px" : "8px 16px",
         border: "none",
-        cursor: !state.enabled ? "default" : "pointer",
-        backgroundColor: !state.enabled ? "#f3f4f6" : "#ffffff",
+        cursor: isEnabled ? "pointer" : "default",
+        backgroundColor: isEnabled ? "#ffffff" : "#f3f4f6",
         color: "#374151",
         transition: "background-color 150ms ease-out",
         letterSpacing: "0.03em",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        minWidth: state.enabled ? "34px" : "48px",
+        minWidth: isEnabled ? "34px" : "48px",
       }}
     >
-      {state.enabled ? (
+      {isEnabled ? (
         <svg width="18" height="18" viewBox="0 0 12 12" fill="none">
           <path
             d="M2 6l2.5 2.5L10 3"
@@ -1081,7 +1144,7 @@ const CrmObjectRow: React.FC<{
     </button>
   </div>
 </div>
-      </div>
+      </button>
 
       {/* Expanded permission rows */}
       {isExpanded && (
@@ -1186,28 +1249,41 @@ const NavItem: React.FC<{
   active: boolean;
   onClick: () => void;
   indent?: boolean;
-}> = ({ label, active, onClick, indent }) => (
-  <div
-    onClick={onClick}
-    style={{
-      padding: `8px 12px 8px ${indent ? "24px" : "12px"}`,
-      fontFamily: FONT,
-      fontSize: "13px",
-      fontWeight: active ? 600 : 400,
-      color: active ? PRIMARY_TEXT : "#374151",
-      cursor: "pointer",
-      backgroundColor: active ? "#f3f4f6" : "transparent",
-      borderLeft: active ? "3px solid #374151" : "3px solid transparent",
-      borderRadius: "0 4px 4px 0",
-      transition: "background-color 100ms ease-out",
-      userSelect: "none",
-    }}
-    onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9fafb"; }}
-    onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent"; }}
-  >
-    {label}
-  </div>
-);
+}> = ({ label, active, onClick, indent }) => {
+  const [hovered, setHovered] = useState(false);
+  const padding = `8px 12px 8px ${indent ? "24px" : "12px"}`;
+  let backgroundColor = "transparent";
+  if (active) backgroundColor = "#f3f4f6";
+  else if (hovered) backgroundColor = "#f9fafb";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        ...BUTTON_RESET,
+        padding,
+        fontFamily: FONT,
+        fontSize: "13px",
+        fontWeight: active ? 600 : 400,
+        color: active ? PRIMARY_TEXT : "#374151",
+        cursor: "pointer",
+        backgroundColor,
+        borderLeft: active ? "3px solid #374151" : "3px solid transparent",
+        borderRadius: "0 4px 4px 0",
+        transition: "background-color 100ms ease-out",
+        userSelect: "none",
+        width: "100%",
+        textAlign: "left",
+        boxSizing: "border-box",
+      }}
+    >
+      {label}
+    </button>
+  );
+};
 
 // Full "Choose permissions" UI
 const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => void }> = ({ templateLabel, onReset }) => {
@@ -1221,6 +1297,7 @@ const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => v
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [permissions, setPermissions] = useState<PermissionsState>(initPermissions);
+  const [hoveredNavSectionId, setHoveredNavSectionId] = useState<string | null>(null);
 
   const expandedCount = CRM_OBJECTS.filter((obj) => permissions[obj.key]?.expanded).length;
   const allExpanded = expandedCount === CRM_OBJECTS.length;
@@ -1305,40 +1382,40 @@ const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => v
           Choose permissions
         </h3>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {/* Checkbox */}
-          <div
+          <button
+            type="button"
             onClick={handleExpandAllToggle}
-            style={{
-              width: "18px",
-              height: "18px",
-              border: `2px solid ${(allExpanded || someExpanded) ? "#000" : "#d1d5db"}`,
-              borderRadius: "3px",
-              backgroundColor: "#fff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              transition: "all 150ms ease-out",
-            }}
+            style={{ ...BUTTON_RESET, display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
           >
-            {allExpanded && (
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1.5 5l2.5 2.5L8.5 2" stroke="#000" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-            {!allExpanded && (
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 5h6" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            )}
-          </div>
-          <span
-            onClick={handleExpandAllToggle}
-            style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 300, color: PRIMARY_TEXT, cursor: "pointer", userSelect: "none" }}
-          >
-            Expand all permissions
-          </span>
+            <span
+              aria-hidden="true"
+              style={{
+                width: "18px",
+                height: "18px",
+                border: `2px solid ${(allExpanded || someExpanded) ? "#000" : "#d1d5db"}`,
+                borderRadius: "3px",
+                backgroundColor: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                transition: "all 150ms ease-out",
+              }}
+            >
+              {allExpanded ? (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 5l2.5 2.5L8.5 2" stroke="#000" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5h6" stroke="#000" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
+            </span>
+            <span style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 300, color: PRIMARY_TEXT, userSelect: "none" }}>
+              Expand all permissions
+            </span>
+          </button>
           <Info size={14} color="#9ca3af" style={{ flexShrink: 0, cursor: "help" }} />
         </div>
       </div>
@@ -1386,15 +1463,27 @@ const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => v
           {/* Nav items */}
           {filteredNavSections.map((section) => (
             <div key={section.id}>
-              <div
+              {(() => {
+                const isActiveNonExpandable = !section.expandable && activeNav === section.id;
+                let backgroundColor = "transparent";
+                if (isActiveNonExpandable) backgroundColor = "#f3f4f6";
+                else if (hoveredNavSectionId === section.id) backgroundColor = "#f9fafb";
+
+                return (
+              <button
+                type="button"
                 onClick={() => {
                   if (section.expandable) {
                     toggleNavSection(section.id);
                     setActiveNav(section.id);
+                    return;
                   }
-                  else setActiveNav(section.id);
+                  setActiveNav(section.id);
                 }}
+                onMouseEnter={() => setHoveredNavSectionId(section.id)}
+                onMouseLeave={() => setHoveredNavSectionId(null)}
                 style={{
+                  ...BUTTON_RESET,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -1404,19 +1493,13 @@ const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => v
                   fontWeight: activeNav === section.id ? 600 : 400,
                   color: PRIMARY_TEXT,
                   cursor: "pointer",
-                  backgroundColor: !section.expandable && activeNav === section.id ? "#f3f4f6" : "transparent",
+                  width: "100%",
+                  textAlign: "left",
+                  backgroundColor,
                   borderLeft: !section.expandable && activeNav === section.id ? "3px solid #374151" : "3px solid transparent",
                   transition: "background-color 100ms ease-out",
                   userSelect: "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (section.expandable || activeNav !== section.id)
-                    (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9fafb";
-                }}
-                onMouseLeave={(e) => {
-                  if (!section.expandable || activeNav !== section.id)
-                    (e.currentTarget as HTMLDivElement).style.backgroundColor =
-                      !section.expandable && activeNav === section.id ? "#f3f4f6" : "transparent";
+                  boxSizing: "border-box",
                 }}
               >
                 <span>{section.label}</span>
@@ -1427,7 +1510,9 @@ const ChoosePermissionsPanel: React.FC<{ templateLabel: string; onReset: () => v
                     style={{ transition: "transform 150ms ease-out", transform: expandedNavSections[section.id] ? "rotate(0deg)" : "rotate(-90deg)" }}
                   />
                 )}
-              </div>
+              </button>
+                );
+              })()}
               {/* Children */}
               {section.expandable && expandedNavSections[section.id] && section.children && (
                 <div>
@@ -1517,9 +1602,11 @@ const TemplateSection: React.FC = () => {
       {/* ── Sub-accordion A: Choose a template ── */}
       <div style={{ borderTop: "1px solid #cccccc", borderBottom: "1px solid #cccccc" }}>
         {/* Header */}
-        <div
+        <button
+          type="button"
           onClick={() => setChooseTplOpen((o) => !o)}
           style={{
+            ...BUTTON_RESET,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -1527,6 +1614,8 @@ const TemplateSection: React.FC = () => {
             cursor: "pointer",
             userSelect: "none",
             backgroundColor: "#fff",
+            width: "100%",
+            textAlign: "left",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1544,7 +1633,7 @@ const TemplateSection: React.FC = () => {
               {selectedItem.label}
             </span>
           )}
-        </div>
+        </button>
 
         {/* Body */}
         {chooseTplOpen && (
@@ -1562,7 +1651,7 @@ const TemplateSection: React.FC = () => {
               </div>
 
               <div style={{ minWidth: 0 }}>
-                {!selectedTplId ? <MagnifyPlaceholder /> : <></>}
+                {selectedTplId ? null : <MagnifyPlaceholder />}
               </div>
             </div>
 
@@ -1574,9 +1663,12 @@ const TemplateSection: React.FC = () => {
       {/* ── Sub-accordion B: Choose permissions ── */}
       <div>
         {/* Header */}
-        <div
-          onClick={() => { if (selectedTplId) setChoosePermsOpen((o) => !o); }}
+        <button
+          type="button"
+          onClick={() => setChoosePermsOpen((o) => !o)}
+          disabled={!selectedTplId}
           style={{
+            ...BUTTON_RESET,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -1585,6 +1677,8 @@ const TemplateSection: React.FC = () => {
             userSelect: "none",
             backgroundColor: "#fff",
             opacity: selectedTplId ? 1 : 0.45,
+            width: "100%",
+            textAlign: "left",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1597,7 +1691,7 @@ const TemplateSection: React.FC = () => {
               Choose permissions
             </span>
           </div>
-        </div>
+        </button>
 
         {/* Body — NEW design */}
         {choosePermsOpen && selectedTplId && (
@@ -1624,9 +1718,11 @@ const ScratchPermissionsSection: React.FC = () => {
 
   return (
     <div style={{ borderTop: "1px solid #cccccc", borderBottom: "1px solid #cccccc" }}>
-      <div
+      <button
+        type="button"
         onClick={() => setChoosePermsOpen((o) => !o)}
         style={{
+          ...BUTTON_RESET,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -1634,6 +1730,8 @@ const ScratchPermissionsSection: React.FC = () => {
           cursor: "pointer",
           userSelect: "none",
           backgroundColor: "#fff",
+          width: "100%",
+          textAlign: "left",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1646,7 +1744,7 @@ const ScratchPermissionsSection: React.FC = () => {
             Choose permissions
           </span>
         </div>
-      </div>
+      </button>
 
       {choosePermsOpen && (
         <div style={{ padding: "4px 28px 28px" }}>
@@ -1843,21 +1941,19 @@ const SeatSearchDropdown: React.FC<SeatSearchDropdownProps> = ({ value, onChange
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [hoveredSeatId, setHoveredSeatId] = useState<string | null>(null);
 
   const filtered = SEAT_OPTIONS.filter((s) =>
     s.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setSearch("");
+    setHoveredSeatId(null);
+  }, []);
+
+  useMouseDownOutside({ ref, enabled: open, onOutside: close });
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 10);
@@ -1867,9 +1963,13 @@ const SeatSearchDropdown: React.FC<SeatSearchDropdownProps> = ({ value, onChange
 
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
-      <div
+      <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         style={{
+          ...BUTTON_RESET,
           height: "42px",
           border: `1px solid ${open ? "#2563eb" : "rgb(138,138,138)"}`,
           borderRadius: open ? "4px 4px 0 0" : "4px",
@@ -1882,38 +1982,19 @@ const SeatSearchDropdown: React.FC<SeatSearchDropdownProps> = ({ value, onChange
           boxSizing: "border-box",
           transition: "border-color 150ms ease-out",
           gap: "8px",
+          width: "100%",
+          textAlign: "left",
         }}
       >
-        {open ? (
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              border: "none",
-              outline: "none",
-              flex: 1,
-              fontFamily: FONT,
-              fontSize: "14px",
-              fontWeight: 300,
-              color: PRIMARY_TEXT,
-              backgroundColor: "transparent",
-              padding: 0,
-            }}
-          />
-        ) : (
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: selectedLabel ? PRIMARY_TEXT : "#9ca3af", flex: 1 }}>
-            {selectedLabel || "Search"}
-          </span>
-        )}
+        <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: selectedLabel ? PRIMARY_TEXT : "#9ca3af", flex: 1 }}>
+          {selectedLabel || "Search"}
+        </span>
         <ChevronDown
           size={16}
           color="#555"
           style={{ flexShrink: 0, transition: "transform 150ms ease-out", transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
-      </div>
+      </button>
 
       {open && (
         <div
@@ -1932,31 +2013,59 @@ const SeatSearchDropdown: React.FC<SeatSearchDropdownProps> = ({ value, onChange
             boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
           }}
         >
+          <div style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", border: "1px solid #d1d5db", borderRadius: "6px", padding: "6px 10px" }}>
+              <Search size={14} color="#6b7280" style={{ flexShrink: 0 }} />
+              <input
+                ref={inputRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search"
+                style={{
+                  border: "none",
+                  outline: "none",
+                  flex: 1,
+                  fontFamily: FONT,
+                  fontSize: "13px",
+                  fontWeight: 300,
+                  color: PRIMARY_TEXT,
+                  backgroundColor: "transparent",
+                  padding: 0,
+                }}
+              />
+            </div>
+          </div>
           {filtered.length === 0 ? (
             <div style={{ padding: "14px 16px", fontFamily: FONT, fontSize: "13px", color: "#9ca3af" }}>
               No results found
             </div>
           ) : (
-            filtered.map((seat, idx) => (
-              <div
+            filtered.map((seat, idx) => {
+              const isSelected = seat.id === value;
+              const isHovered = hoveredSeatId === seat.id && !isSelected;
+              let backgroundColor = "#fff";
+              if (isSelected) backgroundColor = "#f0f5ff";
+              else if (isHovered) backgroundColor = "#f9fafb";
+
+              return (
+              <button
+                type="button"
                 key={seat.id}
                 onClick={() => {
                   onChange(seat.id, seat.label);
-                  setSearch("");
-                  setOpen(false);
+                  close();
                 }}
+                onMouseEnter={() => setHoveredSeatId(seat.id)}
+                onMouseLeave={() => setHoveredSeatId(null)}
                 style={{
+                  ...BUTTON_RESET,
                   padding: "12px 16px",
                   borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none",
                   cursor: "pointer",
-                  backgroundColor: seat.id === value ? "#f0f5ff" : "#fff",
+                  width: "100%",
+                  textAlign: "left",
+                  backgroundColor,
                   transition: "background-color 100ms ease-out",
-                }}
-                onMouseEnter={(e) => {
-                  if (seat.id !== value) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#f9fafb";
-                }}
-                onMouseLeave={(e) => {
-                  if (seat.id !== value) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#fff";
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
@@ -1981,8 +2090,9 @@ const SeatSearchDropdown: React.FC<SeatSearchDropdownProps> = ({ value, onChange
                 <div style={{ fontFamily: FONT, fontSize: "12px", fontWeight: 300, color: "#6b7280" }}>
                   {seat.sublabel}
                 </div>
-              </div>
-            ))
+              </button>
+              );
+            })
           )}
         </div>
       )}
@@ -2000,20 +2110,26 @@ interface AccessCardProps {
 
 const AccessCard: React.FC<AccessCardProps> = ({ method, selected, onSelect }) => {
   const [hovered, setHovered] = useState(false);
+  let backgroundColor = "#fff";
+  if (selected) backgroundColor = "#f3f4f6";
+  else if (hovered) backgroundColor = "#fafafa";
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        ...BUTTON_RESET,
         flex: "1 1 0",
         minWidth: 0,
         border: `1px solid ${selected ? "#9ca3af" : "#cccccc"}`,
         borderRadius: "6px",
         padding: "40px 21px 66px",
         cursor: "pointer",
-        backgroundColor: selected ? "#f3f4f6" : hovered ? "#fafafa" : "#fff",
+        backgroundColor,
         transition: "background-color 120ms ease-out, border-color 120ms ease-out",
         display: "flex",
         flexDirection: "column",
@@ -2067,7 +2183,7 @@ const AccessCard: React.FC<AccessCardProps> = ({ method, selected, onSelect }) =
       }}>
         {method.description}
       </p>
-    </div>
+    </button>
   );
 };
 
@@ -2125,9 +2241,10 @@ const StepAccess: React.FC<Step2Props> = ({
 
         {/* ── Section 1: Assign a seat ── */}
         <div style={{ borderBottom: "1px solid #cccccc" }}>
-          <div
+          <button
+            type="button"
             onClick={() => setSeatOpen((o) => !o)}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", cursor: "pointer", userSelect: "none", backgroundColor: "#fff" }}
+            style={{ ...BUTTON_RESET, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", cursor: "pointer", userSelect: "none", backgroundColor: "#fff", width: "100%", textAlign: "left" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <ChevronDown size={16} color="#374151" style={{ transition: "transform 150ms ease-out", transform: seatOpen ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }} />
@@ -2136,7 +2253,7 @@ const StepAccess: React.FC<Step2Props> = ({
             {!seatOpen && seatLabel && (
               <span style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 400, color: PRIMARY_TEXT }}>{seatLabel}</span>
             )}
-          </div>
+          </button>
 
           {seatOpen && (
             <div style={{ padding: "4px 28px 28px" }}>
@@ -2145,22 +2262,24 @@ const StepAccess: React.FC<Step2Props> = ({
               </p>
               <p style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 300, color: "#374151", marginBottom: "14px", marginTop: 0, lineHeight: "20px" }}>
                 Seats give users access to features.{" "}
-                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#006162", textDecoration: "none", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "3px" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}>
+                <button
+                  type="button"
+                  style={{ ...BUTTON_RESET, color: "#006162", textDecoration: "underline", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}
+                >
                   Learn more about seats <ExternalLink size={11} />
-                </a>
+                </button>
               </p>
               <div style={{ maxWidth: "420px" }}>
                 <SeatSearchDropdown value={seatId} onChange={handleSeatChange} />
               </div>
               <p style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 300, color: "#374151", marginTop: "16px", marginBottom: 0, lineHeight: "20px" }}>
                 Visit{" "}
-                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#006162", textDecoration: "none", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "3px" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "underline"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.textDecoration = "none"; }}>
+                <button
+                  type="button"
+                  style={{ ...BUTTON_RESET, color: "#006162", textDecoration: "underline", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "3px", cursor: "pointer" }}
+                >
                   Products &amp; Services Catalog <ExternalLink size={11} />
-                </a>{" "}
+                </button>{" "}
                 to see the features included with each subscription.
               </p>
             </div>
@@ -2169,9 +2288,11 @@ const StepAccess: React.FC<Step2Props> = ({
 
         {/* ── Section 2: Choose how to set access ── */}
         <div style={{ borderBottom: showPermissionsAccordion ? "1px solid #cccccc" : "none" }}>
-          <div
-            onClick={() => { if (seatId) setAccessOpen((o) => !o); }}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", cursor: seatId ? "pointer" : "default", userSelect: "none", backgroundColor: "#fff", opacity: seatId ? 1 : 0.55 }}
+          <button
+            type="button"
+            onClick={() => setAccessOpen((o) => !o)}
+            disabled={!seatId}
+            style={{ ...BUTTON_RESET, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", cursor: seatId ? "pointer" : "default", userSelect: "none", backgroundColor: "#fff", opacity: seatId ? 1 : 0.55, width: "100%", textAlign: "left" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <ChevronDown size={16} color={seatId ? "#374151" : "#9ca3af"} style={{ transition: "transform 150ms ease-out", transform: accessOpen ? "rotate(0deg)" : "rotate(-90deg)", flexShrink: 0 }} />
@@ -2182,7 +2303,7 @@ const StepAccess: React.FC<Step2Props> = ({
             {!accessOpen && accessMethodLabel && seatId && (
               <span style={{ fontFamily: FONT, fontSize: "13px", fontWeight: 400, color: PRIMARY_TEXT }}>{accessMethodLabel}</span>
             )}
-          </div>
+          </button>
 
           {accessOpen && seatId && (
             <div style={{ padding: "4px 20px 24px" }}>
@@ -2296,15 +2417,19 @@ const ReviewSection: React.FC<{
 
   return (
     <div style={{ marginBottom: "4px" }}>
-      <div
+      <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
         style={{
+          ...BUTTON_RESET,
           display: "flex",
           alignItems: "center",
           gap: "8px",
           cursor: "pointer",
           userSelect: "none",
           marginBottom: open ? "10px" : "0",
+          width: "100%",
+          textAlign: "left",
         }}
       >
         <ChevronDown
@@ -2315,7 +2440,7 @@ const ReviewSection: React.FC<{
         <span style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 600, color: PRIMARY_TEXT }}>
           {title} ({count})
         </span>
-      </div>
+      </button>
       {open && <div style={{ paddingLeft: "4px" }}>{children}</div>}
     </div>
   );
@@ -2485,11 +2610,14 @@ const StepReview: React.FC<Step3Props> = ({ emails, seatLabel, accessMethod }) =
               </div>
 
               {/* No email invite checkbox */}
-              <div
-                style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}
-                onClick={() => setNoEmailInvite((v) => !v)}
-              >
-                <div style={{
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={noEmailInvite}
+                  onChange={(e) => setNoEmailInvite(e.target.checked)}
+                  style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}
+                />
+                <span style={{
                   width: "16px",
                   height: "16px",
                   border: `1px solid ${noEmailInvite ? "#374151" : "#9ca3af"}`,
@@ -2509,11 +2637,11 @@ const StepReview: React.FC<Step3Props> = ({ emails, seatLabel, accessMethod }) =
                       <path d="M1.5 4.5l2 2L7.5 2" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   )}
-                </div>
+                </span>
                 <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 100, color: "#141414", margin: "8px 0", lineHeight: "18px", maxWidth: "520px" }}>
                   Don't send an email invite when this user is added. They'll still get access to this account once they log in.
                 </p>
-              </div>
+              </label>
             </div>
           ))}
 
@@ -2619,10 +2747,13 @@ const CreateUsersPage = () => {
     setSubmitting(true);
     try {
       await new Promise((r) => setTimeout(r, 800));
-      toast.success(`${emails.length} user${emails.length !== 1 ? "s" : ""} created successfully!`);
+      const plural = emails.length === 1 ? "" : "s";
+      toast.success(`${emails.length} user${plural} created successfully!`);
       router.push("/settings/users");
-    } catch {
+    } catch (err) {
+      console.error("Failed to create users", err);
       toast.error("Failed to create users. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   }, [submitting, emails, router]);

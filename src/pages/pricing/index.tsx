@@ -1,9 +1,70 @@
-import React, { useState } from "react";
+import React, { useState, ReactElement } from "react";
+import Layout from "@layout/index";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FONT = "Lexend Deca, Helvetica, Arial, sans-serif";
 const PRIMARY = "#141414";
+const BORDER = "#8a8a8a";
+const LINK_COLOR = "#006162";
+
+const LINK_BUTTON_STYLE: React.CSSProperties = {
+  cursor: "pointer",
+  background: "none",
+  border: "none",
+  padding: 0,
+  font: "inherit",
+  color: LINK_COLOR,
+  textDecoration: "underline",
+};
+
+const getButtonStyles = (
+  variant: PlanButton["variant"],
+  isHovered: boolean,
+): React.CSSProperties => {
+  const base: React.CSSProperties = {
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-block",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    textDecoration: "none",
+    borderRadius: "4px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    verticalAlign: "middle",
+    paddingBlock: "10px",
+    paddingInline: "24px",
+    width: "100%",
+    maxWidth: "100%",
+    fontFamily: FONT,
+    fontSize: "14px",
+    fontWeight: 600,
+    letterSpacing: "0px",
+    lineHeight: "18px",
+    textAlign: "center",
+    boxSizing: "border-box",
+  };
+
+  switch (variant) {
+    case "solid":
+      return {
+        ...base,
+        backgroundColor: isHovered ? "#374151" : PRIMARY,
+        borderColor: PRIMARY,
+        color: "#ffffff",
+      };
+    case "outline":
+    case "ghost-outline":
+      return {
+        ...base,
+        backgroundColor: isHovered ? "#f5f5f5" : "#ffffff",
+        borderColor: BORDER,
+        color: PRIMARY,
+      };
+  }
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +91,23 @@ interface Plan {
 interface PlanButton {
   label: string;
   variant: "outline" | "solid" | "ghost-outline";
+}
+
+// ─── Build Pipeline Types ─────────────────────────────────────────────────────
+
+type CellContent =
+  | { type: "text"; value: string; isLink?: boolean }
+  | { type: "check" }
+  | { type: "empty" };
+
+interface PipelineRow {
+  feature: string;
+  isBold?: boolean;
+  hasIcon?: boolean;
+  iconColor?: string;
+  starter: CellContent;
+  professional: CellContent;
+  enterprise: CellContent;
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -118,6 +196,126 @@ const PLANS: Plan[] = [
   },
 ];
 
+// ─── Build Pipeline rows data ─────────────────────────────────────────────────
+
+const PIPELINE_ROWS: PipelineRow[] = [
+  {
+    feature: "1-to-1 email",
+    isBold: true,
+    starter: { type: "text", value: "Prime branding removed" },
+    professional: { type: "text", value: "Prime branding removed" },
+    enterprise: { type: "text", value: "Prime branding removed" },
+  },
+  {
+    feature: "Canned snippets",
+    starter: { type: "text", value: "Up to 5,000 snippets" },
+    professional: { type: "text", value: "Up to 5,000 snippets" },
+    enterprise: { type: "text", value: "Up to 5,000 snippets" },
+  },
+  {
+    feature: "Email templates",
+    starter: { type: "text", value: "5,000 templates" },
+    professional: { type: "text", value: "5,000 templates" },
+    enterprise: { type: "text", value: "5,000 templates" },
+  },
+  {
+    feature: "1:1 video messaging",
+    starter: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Sales email frequency controls",
+    hasIcon: true,
+    iconColor: "#666666",
+    starter: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Calling",
+    isBold: true,
+    starter: { type: "text", value: "500 minutes" },
+    professional: { type: "text", value: "3,000 minutes" },
+    enterprise: { type: "text", value: "12,000 minutes" },
+  },
+  {
+    feature: "Prime-provided phone numbers",
+    starter: { type: "text", value: "1 phone number. Not supported in all countries." },
+    professional: { type: "text", value: "Up to 3 phone numbers. Not supported in all countries." },
+    enterprise: { type: "text", value: "Up to 5 phone numbers. Not supported in all countries." },
+  },
+  {
+    feature: "Call transcription and coaching",
+    starter: { type: "empty" },
+    professional: { type: "text", value: "Search, review, and comment on calls. 750 hours of transcription per account, per month." },
+    enterprise: { type: "text", value: "Search, review, and comment on calls. 1,500 hours of transcription per account, per month." },
+  },
+  {
+    feature: "Coaching Playlists",
+    starter: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Conversation intelligence",
+    hasIcon: true,
+    iconColor: LINK_COLOR,
+    starter: { type: "empty" },
+    professional: { type: "text", value: "Includes stats, insights, and call transcriptions.", isLink: true },
+    enterprise: { type: "text", value: "Includes stats, insights, call transcriptions, and tracked terms.", isLink: true },
+  },
+  {
+    feature: "AI call transcript enrichment (Beta)",
+    hasIcon: true,
+    iconColor: LINK_COLOR,
+    starter: { type: "empty" },
+    professional: { type: "empty" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Interactive Voice Response",
+    hasIcon: true,
+    iconColor: LINK_COLOR,
+    starter: { type: "empty" },
+    professional: { type: "empty" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Prime mobile app",
+    isBold: true,
+    starter: { type: "check" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Live chat",
+    isBold: true,
+    starter: { type: "text", value: "Remove Prime branding", isLink: true },
+    professional: { type: "text", value: "Remove Prime branding", isLink: true },
+    enterprise: { type: "text", value: "Remove Prime branding", isLink: true },
+  },
+  {
+    feature: "Conversational bots",
+    starter: { type: "text", value: "Limited features", isLink: true },
+    professional: { type: "text", value: "Additional features" },
+    enterprise: { type: "text", value: "Additional features" },
+  },
+  {
+    feature: "Facebook Messenger integration",
+    starter: { type: "text", value: "Remove Prime branding", isLink: true },
+    professional: { type: "text", value: "Includes advanced Messenger bot branching and advanced reporting", isLink: true },
+    enterprise: { type: "text", value: "Includes the ability to use code snippets for custom Messenger bot actions", isLink: true },
+  },
+  {
+    feature: "Sales automation",
+    isBold: true,
+    starter: { type: "text", value: "Trigger tasks and email notifications when deals change stages.", isLink: true },
+    professional: { type: "text", value: "Up to 300 fully customizable workflows." },
+    enterprise: { type: "text", value: "Up to 1,000 fully customizable workflows, with the ability to trigger sequences. Also includes quote-based workflows" },
+  },
+];
+
 // ─── Agent carousel data ──────────────────────────────────────────────────────
 
 interface AgentSlide {
@@ -202,6 +400,47 @@ const ExternalLinkIcon: React.FC = () => (
   </svg>
 );
 
+// Dark circle with white checkmark — used in comparison table cells
+const TableCheckIcon: React.FC = () => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{
+      width: "28px",
+      height: "28px",
+      borderRadius: "50%",
+      backgroundColor: "#141414",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    }}>
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <path d="M2 6.5L5 9.5L11 3.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  </div>
+);
+
+// Small [i] icon for feature labels that have an info indicator
+const FeatureIcon: React.FC<{ color?: string }> = ({ color = "#666" }) => (
+  <span style={{
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "14px",
+    height: "14px",
+    border: `1px solid ${color}`,
+    borderRadius: "2px",
+    fontSize: "9px",
+    fontWeight: 700,
+    color,
+    flexShrink: 0,
+    lineHeight: 1,
+    marginRight: "6px",
+  }}>
+    i
+  </span>
+);
+
 // ─── Plan Card ────────────────────────────────────────────────────────────────
 
 interface PlanCardProps {
@@ -209,43 +448,10 @@ interface PlanCardProps {
 }
 
 const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
-  const [hoveredBtn, setHoveredBtn] = useState<number | null>(null);
-
-  const getButtonStyles = (variant: PlanButton["variant"], idx: number): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      cursor: "pointer",
-      transition: "150ms ease-out",
-      display: "inline-block",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      textDecoration: "none",
-      borderRadius: "4px",
-      borderWidth: "1px",
-      borderStyle: "solid",
-      verticalAlign: "middle",
-      paddingBlock: "10px",
-      paddingInline: "24px",
-      width: "100%",
-      maxWidth: "100%",
-      fontFamily: FONT,
-      fontSize: "14px",
-      fontWeight: 600,
-      letterSpacing: "0px",
-      lineHeight: "18px",
-      textAlign: "center",
-      boxSizing: "border-box",
-    };
-    const isHovered = hoveredBtn === idx;
-    if (variant === "solid") {
-      return { ...base, backgroundColor: isHovered ? "#374151" : "#141414", borderColor: "#141414", color: "#ffffff" };
-    }
-    return { ...base, backgroundColor: isHovered ? "#f5f5f5" : "#ffffff", borderColor: "rgb(138, 138, 138)", color: PRIMARY };
-  };
+  const [hoveredBtnKey, setHoveredBtnKey] = useState<string | null>(null);
 
   return (
     <div style={{ flex: "1 1 0", minWidth: 0, backgroundColor: "#ffffff", display: "flex", flexDirection: "column", position: "relative" }}>
-      {/* Badge */}
       {plan.badge && (
         <div style={{ position: "absolute", top: "-36px", left: 0, right: 0, height: "36px", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: plan.badgeDark ? "#141414" : "#8a8a8a", zIndex: 2 }}>
           <span style={{ fontFamily: FONT, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", color: "#ffffff", textTransform: "uppercase" }}>{plan.badge}</span>
@@ -262,9 +468,21 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
           <div style={{ marginBottom: "24px" }} />
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "28px" }}>
-          {plan.buttons.map((btn, idx) => (
-            <button key={idx} type="button" style={getButtonStyles(btn.variant, idx)} onMouseEnter={() => setHoveredBtn(idx)} onMouseLeave={() => setHoveredBtn(null)}>{btn.label}</button>
-          ))}
+          {plan.buttons.map((btn) => {
+            const btnKey = `${plan.id}-${btn.label}`;
+            const isHovered = hoveredBtnKey === btnKey;
+            return (
+              <button
+                key={btnKey}
+                type="button"
+                style={getButtonStyles(btn.variant, isHovered)}
+                onMouseEnter={() => setHoveredBtnKey(btnKey)}
+                onMouseLeave={() => setHoveredBtnKey(null)}
+              >
+                {btn.label}
+              </button>
+            );
+          })}
         </div>
         <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, margin: "0 0 18px 0", lineHeight: "22px" }}>{plan.credits}</p>
         <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, margin: "0 0 10px 0", lineHeight: "22px" }}>{plan.featureIntro}</p>
@@ -278,7 +496,11 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
         {plan.footnote && (
           <p style={{ fontFamily: FONT, fontSize: "12px", fontWeight: 300, color: "rgb(102, 102, 102)", lineHeight: "18px", margin: "20px 0 0 0" }}>
             {plan.footnote}{" "}
-            {plan.id === "enterprise" && <a href="#" onClick={(e) => e.preventDefault()} style={{ color: "#006162", textDecoration: "underline" }}>Learn more</a>}
+            {plan.id === "enterprise" && (
+              <button type="button" style={LINK_BUTTON_STYLE}>
+                Learn more
+              </button>
+            )}
           </p>
         )}
       </div>
@@ -290,15 +512,13 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
 
 const AgentMiniTable: React.FC<{ slide: AgentSlide }> = ({ slide }) => (
   <div style={{ borderRadius: "6px", overflow: "hidden", border: "1px solid #e5e7eb", fontSize: "11px", fontFamily: FONT, marginBottom: "12px" }}>
-    {/* Table header */}
     <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1.2fr 1fr 0.8fr 0.8fr", backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb", padding: "6px 10px", gap: "4px" }}>
       {["FEATURE", "ACTION", "COST PER ACTION", "TOTAL ACTIONS", "CREDITS USED"].map((h) => (
         <span key={h} style={{ fontFamily: FONT, fontSize: "9px", fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase" }}>{h}</span>
       ))}
     </div>
-    {/* Rows */}
     {slide.tableRows.map((row, i) => (
-      <div key={i} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.2fr 1fr 0.8fr 0.8fr", padding: "6px 10px", gap: "4px", borderBottom: i < slide.tableRows.length - 1 ? "1px solid #f3f4f6" : "none", backgroundColor: "#fff" }}>
+      <div key={`${slide.title}-${row.feature}-${row.action}-${i}`} style={{ display: "grid", gridTemplateColumns: "1.6fr 1.2fr 1fr 0.8fr 0.8fr", padding: "6px 10px", gap: "4px", borderBottom: i < slide.tableRows.length - 1 ? "1px solid #f3f4f6" : "none", backgroundColor: "#fff" }}>
         <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 400, color: PRIMARY }}>{row.feature}</span>
         <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 300, color: "#6b7280" }}>{row.action}</span>
         <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 300, color: "#6b7280" }}>{row.costPerAction}</span>
@@ -306,12 +526,10 @@ const AgentMiniTable: React.FC<{ slide: AgentSlide }> = ({ slide }) => (
         <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 300, color: "#6b7280" }}>{row.creditsUsed}</span>
       </div>
     ))}
-    {/* Banner */}
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "#f0fdf4", padding: "8px 10px", borderTop: "1px solid #e5e7eb" }}>
       <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 600, color: PRIMARY }}>{slide.agentBannerLabel}</span>
-      <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 500, color: PRIMARY, backgroundColor: "#141414", padding: "3px 8px", borderRadius: "3px", cursor: "pointer" }}>{slide.agentBannerAction}</span>
+      <span style={{ fontFamily: FONT, fontSize: "10px", fontWeight: 500, color: "#fff", backgroundColor: "#141414", padding: "3px 8px", borderRadius: "3px" }}>{slide.agentBannerAction}</span>
     </div>
-    {/* Total */}
     <div style={{ backgroundColor: "#042729", padding: "10px", textAlign: "center", borderTop: "1px solid #0a3d3f" }}>
       <p style={{ fontFamily: FONT, fontSize: "9px", fontWeight: 600, color: "#9ca3af", letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 2px 0" }}>TOTAL CREDITS USED</p>
       <p style={{ fontFamily: FONT, fontSize: "20px", fontWeight: 700, color: "#ffffff", margin: 0, lineHeight: "1.2" }}>{slide.totalCredits}</p>
@@ -329,394 +547,357 @@ const PrimeCreditsSection: React.FC = () => {
   const goPrev = () => setActiveSlide((s) => (s - 1 + AGENT_SLIDES.length) % AGENT_SLIDES.length);
 
   return (
-    <div
-      style={{
-        borderRadius: "8px",
-        overflow: "hidden",
-        marginTop: "28px",
-        border: "1px solid #e5e7eb",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      {/* Top row: info + dark strip */}
+    <div style={{ borderRadius: "8px", overflow: "hidden", marginTop: "28px", border: "1px solid #e5e7eb", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", minHeight: "320px" }}>
-        {/* Left top: Prime Credits info */}
-        <div
-          style={{
-            flex: "0 0 50%",
-            backgroundColor: "#ffffff",
-            padding: "32px 0px 0 0px",
-            display: "flex",
-            flexDirection: "column",
-            position: "relative",
-          }}
-        >
-          {/* Plant illustration */}
-          
-
-<div style={{ padding: "0 150px 40px 40px" }}>
-          {/* Text content */}
-          <h2
-            style={{
-              fontFamily: FONT,
-              fontSize: "1.375rem",
-              fontWeight: 500,
-              lineHeight: 1.45454545,
-              color: PRIMARY,
-              margin: "0 0 0 0",
-            }}
-          >
-            Prime Credits:
-          </h2>
-          <p
-            style={{
-              fontFamily: FONT,
-              fontSize: "16px",
-              fontWeight: 600,
-              color: PRIMARY,
-              lineHeight: "20px",
-              margin: "8px 0 0 0",
-              paddingInlineEnd: "80px",
-            }}
-          >
-            Fuel powerful features that scale work at your own pace
-          </p>
-          <p
-            style={{
-              fontFamily: FONT,
-              fontSize: "0.875rem",
-              fontWeight: 300,
-              color: PRIMARY,
-              lineHeight: "24px",
-              marginBlockStart: "24px",
-              marginTop: "24px",
-              paddingInlineEnd: "32px",
-              marginBottom: "0",
-            }}
-          >
-            Prime has powerful tools that scale work alongside your teams. You can take advantage of these tools with Prime Credits—a simple, flexible way to pay for what you use.
-          </p>
-</div>
-           {/* Bottom row: Simple + Flexible dark strip */}
-      <div
-        style={{
-          backgroundColor: "#042729",
-          display: "flex",
-          gap: "0",
-        }}
-      >
-        {/* Simple */}
-        <div style={{ flex: 1, padding: "32px 36px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-            <SparkleIcon color="#ff4800" />
-            <h3
-              style={{
-                fontFamily: FONT,
-                fontSize: "1.375rem",
-                fontWeight: 500,
-                lineHeight: 1.45454545,
-                color: "#ffffff",
-                margin: 0,
-              }}
-            >
-              Simple
-            </h3>
+        <div style={{ flex: "0 0 50%", backgroundColor: "#ffffff", padding: "32px 0px 0 0px", display: "flex", flexDirection: "column", position: "relative", minHeight: 0 }}>
+          <div style={{ padding: "10px 218px 56px 40px" }}>
+            <h2 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: PRIMARY, margin: "0 0 0 0" }}>Prime Credits:</h2>
+            <p style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 600, color: PRIMARY, lineHeight: "20px", margin: "8px 0 0 0", paddingInlineEnd: "80px" }}>
+              Fuel powerful features that scale work at your own pace
+            </p>
+            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "24px", marginBlockStart: "24px", marginTop: "24px", paddingInlineEnd: "32px", marginBottom: "0" }}>
+              Prime has powerful tools that scale work alongside your teams. You can take advantage of these tools with Prime Credits—a simple, flexible way to pay for what you use.
+            </p>
           </div>
-          <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-            {[
-              <><strong>Get started fast</strong> and test the latest AI tools with included credits.</>,
-              <>See credit balance, track usage, and more—<strong>all in a single workspace</strong>.</>,
-              <>Report on exactly which tools are <strong>delivering the most value</strong>.</>,
-            ].map((item, i) => (
-              <li
-                key={i}
-                style={{
-                  fontFamily: FONT,
-                  fontSize: "0.875rem",
-                  fontWeight: 300,
-                  color: "#ffffff",
-                  lineHeight: 1.55555556,
-                }}
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Divider */}
-        <div style={{ width: "1px", backgroundColor: "#0f4345", margin: "24px 0" }} />
-
-        {/* Flexible */}
-        <div style={{ flex: 1, padding: "32px 36px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-            <SparkleIcon color="#ff4800" />
-            <h3
-              style={{
-                fontFamily: FONT,
-                fontSize: "1.375rem",
-                fontWeight: 500,
-                lineHeight: 1.45454545,
-                color: "#ffffff",
-                margin: 0,
-              }}
-            >
-              Flexible
-            </h3>
+          <div className="simple-flexible-section" style={{ backgroundColor: "#042729", display: "flex", gap: "0", flex: 1, alignItems: "stretch" }}>
+            <div style={{ flex: 1, padding: "32px 36px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <SparkleIcon color="#ff4800" />
+                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Simple</h3>
+              </div>
+              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
+                  <strong>Get started fast</strong> and test the latest AI tools with included credits.
+                </li>
+                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
+                  See credit balance, track usage, and more—<strong>all in a single workspace</strong>.
+                </li>
+                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
+                  Report on exactly which tools are <strong>delivering the most value</strong>.
+                </li>
+              </ul>
+            </div>
+            <div style={{ width: "1px", backgroundColor: "#0f4345", margin: "24px 0" }} />
+            <div style={{ flex: 1, padding: "32px 36px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <SparkleIcon color="#ff4800" />
+                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Flexible</h3>
+              </div>
+              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
+                  <strong>Easily plan</strong> your spend with credit packs, or enable pay as you go.
+                </li>
+                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
+                  Add more packs, adjust your spend cap, or pause features—<strong>staying in control</strong> without disruption.
+                </li>
+              </ul>
+            </div>
           </div>
-          <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-            {[
-              <><strong>Easily plan</strong> your spend with credit packs, or enable pay as you go.</>,
-              <>Add more packs, adjust your spend cap, or pause features—<strong>staying in control</strong> without disruption.</>,
-            ].map((item, i) => (
-              <li
-                key={i}
-                style={{
-                  fontFamily: FONT,
-                  fontSize: "0.875rem",
-                  fontWeight: 300,
-                  color: "#ffffff",
-                  lineHeight: 1.55555556,
-                }}
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
         </div>
 
-        
-
-        {/* Right top: AI Agent carousel — peach bg */}
-        <div
-          style={{
-            flex: "0 0 50%",
-            backgroundColor: "#fcece6",
-            padding: "55px 60px 55px 60px",
-            position: "relative",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Prev / Next arrows */}
-          <button
-            onClick={goPrev}
-            type="button"
-            style={{
-              position: "absolute",
-              left: "49px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              border: "1px solid #d1d5db",
-              backgroundColor: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 10,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
+        <div style={{ flex: "0 0 50%", backgroundColor: "#fcece6", padding: "55px 60px 55px 60px", position: "relative", display: "flex", flexDirection: "column" }}>
+          <button onClick={goPrev} type="button" style={{ position: "absolute", left: "49px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.5 2L3.5 5L6.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button
-            onClick={goNext}
-            type="button"
-            style={{
-              position: "absolute",
-              right: "52px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              border: "1px solid #d1d5db",
-              backgroundColor: "#ffffff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 10,
-              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
+          <button onClick={goNext} type="button" style={{ position: "absolute", right: "52px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5L3.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-
-          {/* Card */}
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "10px",
-              padding: "40px 50px",
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-              position: "relative",
-              overflow: "visible",
-            }}
-          >
-            {/* AI Agents tag */}
+          <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", padding: "40px 50px", flex: 1, display: "flex", flexDirection: "column", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", position: "relative", overflow: "visible" }}>
             <div style={{ position: "absolute", top: "-14px", left: "24px" }}>
-              <span
-                style={{
-                  fontFamily: FONT,
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#8b3a0f",
-                  backgroundColor: "#fcc6b1",
-                  padding: "3px 10px",
-                  borderRadius: "20px",
-                  display: "inline-block",
-                }}
-              >
-                {slide.tag}
-              </span>
+              <span style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 500, color: "#8b3a0f", backgroundColor: "#fcc6b1", padding: "3px 10px", borderRadius: "20px", display: "inline-block" }}>{slide.tag}</span>
             </div>
-
-            {/* Agent title */}
-            <h3
-              style={{
-                fontFamily: FONT,
-                fontSize: "1.125rem",
-                fontWeight: 500,
-                lineHeight: 1.55555556,
-                color: PRIMARY,
-                margin: "0 0 8px 0",
-              }}
-            >
-              {slide.title}
-            </h3>
-
-            {/* Description */}
-            <p
-              style={{
-                fontFamily: FONT,
-                fontSize: "0.875rem",
-                fontWeight: 300,
-                color: PRIMARY,
-                lineHeight: "22px",
-                margin: "0 0 6px 0",
-              }}
-            >
+            <h3 style={{ fontFamily: FONT, fontSize: "1.125rem", fontWeight: 500, lineHeight: 1.55555556, color: PRIMARY, margin: "0 0 8px 0" }}>{slide.title}</h3>
+            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "22px", margin: "0 0 6px 0" }}>
               {slide.description}{" "}
               {slide.learnMoreHref && (
-                <a
-                  href={slide.learnMoreHref}
-                  onClick={(e) => e.preventDefault()}
-                  style={{ color: "#006162", fontWeight: 500, textDecoration: "underline", display: "inline-flex", alignItems: "center", gap: "3px" }}
-                >
+                <button type="button" style={{ ...LINK_BUTTON_STYLE, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
                   Learn more <ExternalLinkIcon />
-                </a>
+                </button>
               )}
             </p>
-
-            {/* Mini table */}
             <AgentMiniTable slide={slide} />
-
-            {/* Divider */}
             <div style={{ height: "1px", backgroundColor: "#e5e7eb", margin: "4px 0 14px" }} />
-
-            {/* Stats */}
             <div style={{ display: "flex", gap: "0", flex: 1, alignItems: "flex-start" }}>
               {slide.stats.map((stat, i) => (
-                <React.Fragment key={i}>
+                <React.Fragment key={`${stat.value}-${stat.label}`}>
                   <div style={{ flex: 1, textAlign: "center", padding: "0 8px" }}>
-                    <p
-                      style={{
-                        fontFamily: FONT,
-                        fontSize: "2.5rem",
-                        fontWeight: 500,
-                        lineHeight: 1.04545455,
-                        color: "rgb(255, 72, 0)",
-                        margin: "0 0 4px 0",
-                      }}
-                    >
-                      {stat.value}
-                    </p>
-                    <p
-                      style={{
-                        fontFamily: FONT,
-                        fontSize: "0.875rem",
-                        fontWeight: 300,
-                        color: "#374151",
-                        lineHeight: "20px",
-                        margin: 0,
-                        whiteSpace: "pre-line",
-                        textAlign: "center",
-                      }}
-                    >
-                      {stat.label}
-                    </p>
+                    <p style={{ fontFamily: FONT, fontSize: "2.5rem", fontWeight: 500, lineHeight: 1.04545455, color: "rgb(255, 72, 0)", margin: "0 0 4px 0" }}>{stat.value}</p>
+                    <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#374151", lineHeight: "20px", margin: 0, whiteSpace: "pre-line", textAlign: "center" }}>{stat.label}</p>
                   </div>
-                  {i < slide.stats.length - 1 && (
-                    <div style={{ width: "1px", backgroundColor: "#e5e7eb", alignSelf: "stretch", margin: "0 4px" }} />
-                  )}
+                  {i < slide.stats.length - 1 && <div style={{ width: "1px", backgroundColor: "#e5e7eb", alignSelf: "stretch", margin: "0 4px" }} />}
                 </React.Fragment>
               ))}
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
 
-     
+// ─── Build Pipeline Section ───────────────────────────────────────────────────
+
+const BuildPipelineSection: React.FC = () => {
+  const [hoveredPlan, setHoveredPlan] = useState<Plan["id"] | null>(null);
+
+  // Column widths: first col = 35%, remaining 3 cols each = ~21.67%
+  const firstColFlex = "0 0 35%";
+  const dataColFlex = "1 1 0";
+
+  // Cell base styles
+  const featureCellStyle: React.CSSProperties = {
+    flex: firstColFlex,
+    padding: "14px 20px 14px 24px",
+    boxSizing: "border-box",
+    borderRight: `1px solid ${BORDER}`,
+    display: "flex",
+    alignItems: "center",
+    minHeight: "52px",
+  };
+
+  const dataCellStyle: React.CSSProperties = {
+    flex: dataColFlex,
+    padding: "14px 16px",
+    boxSizing: "border-box",
+    borderRight: "1px solid #8a8a8a",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    minHeight: "52px",
+  };
+
+  const lastDataCellStyle: React.CSSProperties = {
+    ...dataCellStyle,
+    borderRight: "none",
+  };
+
+  const renderCellContent = (content: CellContent): React.ReactNode => {
+    if (content.type === "empty") return null;
+    if (content.type === "check") return <TableCheckIcon />;
+    return (
+      <span style={{
+        fontFamily: FONT,
+        fontSize: "14px",
+        fontWeight: 300,
+        lineHeight: "24px",
+        color: content.isLink ? LINK_COLOR : PRIMARY,
+        margin: 0,
+        padding: 0,
+        display: "block",
+        textAlign: "center",
+      }}>
+        {content.value}
+      </span>
+    );
+  };
+
+  return (
+    <div style={{
+      marginTop: "48px",
+      backgroundColor: "#ffffff",
+      overflow: "hidden",
+      padding: "50px 60px",
+    }}>
+
+      {/* ── Sticky-style header row with plan names + buttons ── */}
+      <div style={{ display: "flex", borderBottom: `1px solid ${BORDER}` }}>
+
+        {/* Col 1: Build Pipeline heading */}
+        <div style={{
+          flex: firstColFlex,
+          padding: "24px 20px 24px 24px",
+          boxSizing: "border-box",
+          border: "none",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
+        }}>
+          <h2 style={{
+            fontFamily: FONT,
+            fontSize: "32px",
+            fontWeight: 700,
+            color: PRIMARY,
+            lineHeight: "39px",
+            margin: "0",
+            padding: "0",
+            marginBlockStart: "40px",
+          }}>
+            Build Pipeline
+          </h2>
+        </div>
+
+        {/* Col 2: Starter */}
+        <div style={{
+          flex: dataColFlex,
+          padding: "20px 16px 24px",
+          boxSizing: "border-box",
+          border: "none",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "4px",
+        }}>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Starter</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£9/mo/seat</span>
+          <div style={{ width: "100%", marginTop: "8px" }}>
+            <button
+              type="button"
+              style={getButtonStyles("outline", hoveredPlan === "starter")}
+              onMouseEnter={() => setHoveredPlan("starter")}
+              onMouseLeave={() => setHoveredPlan(null)}
+            >
+              Your current plan
+            </button>
+          </div>
+        </div>
+
+        {/* Col 3: Professional */}
+        <div style={{
+          flex: dataColFlex,
+          padding: "20px 16px 24px",
+          boxSizing: "border-box",
+          border: "none",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "4px",
+        }}>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Professional</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£77/mo/seat</span>
+          <div style={{ width: "100%", marginTop: "8px" }}>
+            <button
+              type="button"
+              style={getButtonStyles("solid", hoveredPlan === "professional")}
+              onMouseEnter={() => setHoveredPlan("professional")}
+              onMouseLeave={() => setHoveredPlan(null)}
+            >
+              Buy now
+            </button>
+          </div>
+        </div>
+
+        {/* Col 4: Enterprise */}
+        <div style={{
+          flex: dataColFlex,
+          padding: "20px 16px 24px",
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "4px",
+        }}>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Enterprise</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£135/mo</span>
+          <div style={{ width: "100%", marginTop: "8px" }}>
+            <button
+              type="button"
+              style={getButtonStyles("solid", hoveredPlan === "enterprise")}
+              onMouseEnter={() => setHoveredPlan("enterprise")}
+              onMouseLeave={() => setHoveredPlan(null)}
+            >
+              Talk to Sales
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Feature comparison rows ── */}
+      {PIPELINE_ROWS.map((row, idx) => {
+        const isLast = idx === PIPELINE_ROWS.length - 1;
+        return (
+          <div
+            key={`${row.feature}-${idx}`}
+            style={{
+              display: "flex",
+              borderBottom: isLast ? "none" : "1px solid #8a8a8a",
+              backgroundColor: "#ffffff",
+            }}
+          >
+            {/* Feature label */}
+            <div style={featureCellStyle}>
+              <span style={{
+                fontFamily: FONT,
+                fontSize: "14px",
+                fontWeight: row.isBold ? 700 : 300,
+                color: row.hasIcon ? LINK_COLOR : PRIMARY,
+                lineHeight: "24px",
+                display: "flex",
+                alignItems: "center",
+              }}>
+                {row.hasIcon && <FeatureIcon color={row.iconColor} />}
+                {row.feature}
+              </span>
+            </div>
+
+            {/* Starter */}
+            <div style={dataCellStyle}>
+              {renderCellContent(row.starter)}
+            </div>
+
+            {/* Professional */}
+            <div style={dataCellStyle}>
+              {renderCellContent(row.professional)}
+            </div>
+
+            {/* Enterprise */}
+            <div style={lastDataCellStyle}>
+              {renderCellContent(row.enterprise)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const SalesHubPage: React.FC = () => {
-  const [activeNavItem, setActiveNavItem] = useState("Sales");
+const SalesHubPage = () => {
+  const defaultNavItem = NAV_GROUPS[0]?.items[0] ?? "";
+  const [activeNavItem, setActiveNavItem] = useState(defaultNavItem);
+  const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f0f0f0", fontFamily: FONT, maxWidth: "1500px", margin: "0 auto" }}>
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f0f0f0", fontFamily: FONT, maxWidth: "1540px", margin: "0 auto" }}>
       {/* ── Left Sidebar ── */}
-      <aside
-        style={{
-          width: "240px",
-          flexShrink: 0,
-          backgroundColor: "#f0f0f0",
-          padding: "28px 0",
-          borderRight: "1px solid #e5e7eb",
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          overflowY: "auto",
-          boxSizing: "border-box",
-        }}
-      >
+      <aside style={{ width: "240px", flexShrink: 0, backgroundColor: "#f0f0f0", padding: "28px 0", borderRight: "1px solid #e5e7eb", position: "sticky", top: 0, height: "100vh", overflowY: "auto", boxSizing: "border-box" }}>
         {NAV_GROUPS.map((group, gIdx) => (
           <div key={group.heading} style={{ marginBottom: gIdx < NAV_GROUPS.length - 1 ? "8px" : "0" }}>
             <p style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 600, color: PRIMARY, margin: "0", padding: "10px 20px 8px", lineHeight: "22px" }}>{group.heading}</p>
             {group.items.map((item) => {
               const isActive = item === activeNavItem;
+              const isHovered = hoveredNavItem === item;
+              let backgroundColor = "transparent";
+              if (isActive) backgroundColor = "#e5e7eb";
+              else if (isHovered) backgroundColor = "#e9eaec";
               return (
-                <div
+                <button
                   key={item}
                   onClick={() => setActiveNavItem(item)}
+                  type="button"
+                  aria-current={isActive ? "page" : undefined}
+                  onMouseEnter={() => setHoveredNavItem(item)}
+                  onMouseLeave={() => setHoveredNavItem(null)}
                   style={{
                     display: "flex",
                     alignItems: "center",
+                    width: "calc(100% - 19px)",
                     padding: "15px",
                     cursor: "pointer",
-                    backgroundColor: isActive ? "#e5e7eb" : "transparent",
+                    backgroundColor,
                     borderLeft: isActive ? "3px solid #141414" : "3px solid transparent",
                     transition: "background-color 120ms ease-out",
                     marginLeft: "19px",
+                    borderTop: "none",
+                    borderRight: "none",
+                    borderBottom: "none",
+                    borderRadius: 0,
+                    boxSizing: "border-box",
                   }}
-                  onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLDivElement).style.backgroundColor = "#e9eaec"; }}
-                  onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLDivElement).style.backgroundColor = "transparent"; }}
                 >
                   <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, letterSpacing: "0px", lineHeight: "24px", whiteSpace: "nowrap" }}>{item}</span>
-                </div>
+                </button>
               );
             })}
             {gIdx < NAV_GROUPS.length - 1 && <div style={{ height: "1px", backgroundColor: "#d1d5db", margin: "10px 20px" }} />}
@@ -726,7 +907,7 @@ const SalesHubPage: React.FC = () => {
 
       {/* ── Main Content ── */}
       <main style={{ flex: 1, minWidth: 0, padding: "36px 100px 48px", overflowX: "auto" }}>
-        {/* Title area */}
+        {/* Title */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "6px" }}>
             <HubIcon />
@@ -748,9 +929,16 @@ const SalesHubPage: React.FC = () => {
 
         {/* Prime Credits Section */}
         <PrimeCreditsSection />
+
+        {/* Build Pipeline Section */}
+        <BuildPipelineSection />
       </main>
     </div>
   );
+};
+
+SalesHubPage.getLayout = (page: ReactElement) => {
+  return <Layout>{page}</Layout>;
 };
 
 export default SalesHubPage;
