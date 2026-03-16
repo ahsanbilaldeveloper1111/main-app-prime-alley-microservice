@@ -2080,9 +2080,9 @@ const MoreActionsModal: React.FC<MoreActionsModalProps> = ({
     const parts = text.split(new RegExp(`(${highlight})`, "gi"));
     return (
       <>
-        {parts.map((part) =>
+        {parts.map((part, index) =>
           part.toLowerCase() === highlight.toLowerCase() ? (
-            <span key={`${part}-${Math.random().toString(36).slice(2)}`} style={{ color: "#0073b1" }}>
+            <span key={`${part}-${index}`} style={{ color: "#0073b1" }}>
               {part}
             </span>
           ) : (

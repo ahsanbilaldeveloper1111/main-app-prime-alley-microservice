@@ -86,6 +86,10 @@ interface ProspectSidebarFooterProps {
   onCreateAndAddAnother?: () => void;
 }
 
+let customFieldIdCounter = 0;
+
+const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
+
 const getUpdatedFormForPhoneChange = (
   value: string | undefined,
   currentForm: ProspectFormState,
@@ -570,7 +574,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
             custom_fields: [
               ...(prev.custom_fields ?? []),
               {
-                id: `${Date.now()}-${Math.random()}`,
+                id: createCustomFieldId(),
                 field_name: "",
                 field_value: "",
               },

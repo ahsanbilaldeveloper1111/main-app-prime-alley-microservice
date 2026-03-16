@@ -121,6 +121,10 @@ import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+
+let customFieldIdCounter = 0;
+
+const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 import {
   ModuleSlug,
   formatDuration,
@@ -854,7 +858,7 @@ const CrmProspectsManagement = () => {
         const customFieldsArray = Object.entries(d)
           .filter(([k]) => !reservedDataKeys.has(k))
           .map(([field_name, field_value]) => ({
-            id: `${Date.now()}-${Math.random()}-${field_name}`,
+            id: createCustomFieldId(),
             field_name,
             field_value: Array.isArray(field_value)
               ? (field_value as string[]).join(", ")

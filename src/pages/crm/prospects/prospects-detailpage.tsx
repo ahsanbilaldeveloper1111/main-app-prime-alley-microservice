@@ -56,6 +56,10 @@ import { GetHierarchyData } from "@utils/users";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 
+let customFieldIdCounter = 0;
+
+const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -494,7 +498,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
               }
 
               return {
-                id: `${Date.now()}-${Math.random()}-${field_name}`,
+                id: createCustomFieldId(),
                 field_name,
                 field_value: normalizedValue,
               };
