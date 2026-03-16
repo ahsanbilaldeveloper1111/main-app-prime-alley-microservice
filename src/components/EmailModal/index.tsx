@@ -74,9 +74,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [currentToInput, setCurrentToInput] = useState("");
   const [currentCcInput, setCurrentCcInput] = useState("");
   const [currentBccInput, setCurrentBccInput] = useState("");
-  const [activeTab, setActiveTab] = useState<
-    "templates" | "sequences" | "documents" | "meetings" | "quotes"
-  >("templates");
   const [createTask, setCreateTask] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
   const [activityDate, setActivityDate] = useState(
@@ -386,43 +383,49 @@ const EmailModal: React.FC<EmailModalProps> = ({
     setIsMaximized(!isMaximized);
   };
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const emailStateByType = {
+    to: {
+      emails: toEmails,
+      setEmails: setToEmails,
+      currentInput: currentToInput,
+      setCurrentInput: setCurrentToInput,
+    },
+    cc: {
+      emails: ccEmails,
+      setEmails: setCcEmails,
+      currentInput: currentCcInput,
+      setCurrentInput: setCurrentCcInput,
+    },
+    bcc: {
+      emails: bccEmails,
+      setEmails: setBccEmails,
+      currentInput: currentBccInput,
+      setCurrentInput: setCurrentBccInput,
+    },
+  } as const;
+
   const addEmail = (email: string, type: "to" | "cc" | "bcc") => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) return;
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
       alert("Please enter a valid email address");
       return;
     }
 
-    if (type === "to") {
-      if (!toEmails.includes(trimmedEmail)) {
-        setToEmails([...toEmails, trimmedEmail]);
-      }
-      setCurrentToInput("");
-    } else if (type === "cc") {
-      if (!ccEmails.includes(trimmedEmail)) {
-        setCcEmails([...ccEmails, trimmedEmail]);
-      }
-      setCurrentCcInput("");
-    } else if (type === "bcc") {
-      if (!bccEmails.includes(trimmedEmail)) {
-        setBccEmails([...bccEmails, trimmedEmail]);
-      }
-      setCurrentBccInput("");
-    }
+    const { setEmails, setCurrentInput } = emailStateByType[type];
+
+    setEmails((prev) =>
+      prev.includes(trimmedEmail) ? prev : [...prev, trimmedEmail],
+    );
+    setCurrentInput("");
   };
 
   const removeEmail = (email: string, type: "to" | "cc" | "bcc") => {
-    if (type === "to") {
-      setToEmails(toEmails.filter((e) => e !== email));
-    } else if (type === "cc") {
-      setCcEmails(ccEmails.filter((e) => e !== email));
-    } else if (type === "bcc") {
-      setBccEmails(bccEmails.filter((e) => e !== email));
-    }
+    const { setEmails } = emailStateByType[type];
+    setEmails((prev) => prev.filter((e) => e !== email));
   };
 
   const handleKeyDown = (
@@ -431,13 +434,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   ) => {
     if (e.key === "Enter" || e.key === "," || e.key === " ") {
       e.preventDefault();
-      const value =
-        type === "to"
-          ? currentToInput
-          : type === "cc"
-            ? currentCcInput
-            : currentBccInput;
-      addEmail(value, type);
+      const { currentInput } = emailStateByType[type];
+      addEmail(currentInput, type);
     }
   };
 
@@ -621,42 +619,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <X size={20} />
           </button>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "24px",
-          padding: "12px 20px",
-          borderBottom: "1px solid #e2e8f0",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        {["Templates", "Meetings"].map(
-          (tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab.toLowerCase() as any)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px 0",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: activeTab === tab.toLowerCase() ? "600" : "400",
-                color: "#141414",
-                borderBottom:
-                  activeTab === tab.toLowerCase()
-                    ? "2px solid #ff7a59"
-                    : "2px solid transparent",
-                transition: "all 0.2s",
-              }}
-            >
-              {tab}
-            </button>
-          ),
-        )}
       </div>
 
       {/* Email Form */}
