@@ -2,28 +2,19 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useEffect, useState, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-import { useSession } from "next-auth/react";
+import GenericTable, {
+  FilterPill,
+  TableAction,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
 import { getJourneys } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import {
-  Search,
-  ChevronDown,
-  FileText,
-  User,
-  Settings,
-  Info,
-  CheckCircle,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import OnboardingDetailSidebar from "./sidebar";
 
 interface OnboardingEmployee {
@@ -33,12 +24,17 @@ interface OnboardingEmployee {
   startDate: string;
   stages: string[];
   progress: number;
-  status: 'In Progress' | 'On Track' | 'Overdue' | 'Completed';
+  status: "In Progress" | "On Track" | "Overdue" | "Completed";
   role?: string;
   department?: string;
   total_steps_count?: string | number;
   completed_steps_count?: string | number;
 }
+
+type LookupUser = {
+  id: string | number;
+  name?: string | null;
+} & Record<string, unknown>;
 
 
 /** API journey item shape (matches API response) */
@@ -77,6 +73,29 @@ const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Overdue" | "C
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
 
+const ITEMS_PER_PAGE = 15;
+
+const getInitials = (name: string): string => {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (words.length === 0) return "NA";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+};
+
+const getAvatarColor = (name: string): string => {
+  let hash = 0;
+  for (const ch of name) {
+    const code = ch.codePointAt(0) ?? 0;
+    hash = code + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsla(${hue}, 55%, 45%, 0.6)`;
+};
+
 function hierarchyLabel(item: unknown): string {
   if (item == null) return "—";
   if (typeof item === "string") return item;
@@ -84,20 +103,33 @@ function hierarchyLabel(item: unknown): string {
     const o = item as { name?: string; id?: string | number; [key: string]: unknown };
     return String(o.name ?? o.id ?? "—");
   }
-  return String(item);
+  if (typeof item === "number" || typeof item === "boolean" || typeof item === "bigint") return String(item);
+  if (typeof item === "symbol") return item.description ?? "—";
+  if (typeof item === "function") return item.name || "—";
+  return "—";
 }
 
+const getStatusColor = (status: OnboardingEmployee["status"]) => {
+  switch (status) {
+    case "In Progress":
+      return { bg: "#f3f4f6", color: "#6b7280", dot: "#9ca3af" };
+    case "On Track":
+      return { bg: "#fef3c7", color: "#92400e", dot: "#fbbf24" };
+    case "Overdue":
+      return { bg: "#fee2e2", color: "#991b1b", dot: "#ef4444" };
+    case "Completed":
+      return { bg: "#ecfdf5", color: "#065f46", dot: "#10b981" };
+  }
+};
+
 const EmployeesOnboarding = () => {
-  const { data: session } = useSession();
-  const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
-  const [activeTab, setActiveTab] = useState<"Onboarding" | "Audit & Risk Center">("Onboarding");
+  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
   const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
   const [appliedContract, setAppliedContract] = useState("");
-  const [openDropdown, setOpenDropdown] = useState<"employment" | "contract" | "users" | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState("");
@@ -105,36 +137,40 @@ const EmployeesOnboarding = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const toggleDropdown = (key: "employment" | "contract" | "users" | null) => {
-    setOpenDropdown((prev) => (prev === key ? null : key));
-  };
-
-  const managers = mainAppUsers ?? [];
-
-  const itemsPerPage = 15;
+  const users = useMemo(() => (mainAppUsers ?? []) as LookupUser[], [mainAppUsers]);
+  const managers = users;
   const [journeysData, setJourneysData] = useState<JourneyRecord[]>([]);
   const [journeysPagination, setJourneysPagination] = useState<JourneysPagination | null>(null);
   const [loadingJourneys, setLoadingJourneys] = useState(true);
   const [refreshJourneysKey, setRefreshJourneysKey] = useState(0);
 
+  const toggleSelectedUserId = (idStr: string, isSelected: boolean) => {
+    setSelectedUserIds((prev) => {
+      if (isSelected) return prev.filter((id) => id !== idStr);
+      return [...prev, idStr];
+    });
+  };
+
+  const filteredManagers = useMemo(() => {
+    const needle = userSearchTerm.trim().toLowerCase();
+    if (!needle) return managers;
+    return managers.filter((mgr) => hierarchyLabel(mgr).toLowerCase().includes(needle));
+  }, [managers, userSearchTerm]);
+
   useEffect(() => {
-    if (!companyIdentifier) {
-      setLoadingJourneys(false);
-      return;
-    }
+    if (!companyIdentifier) return;
     const fetchJourneys = async () => {
       setLoadingJourneys(true);
       try {
         const params: { page: number; limit: number; search?: string; employment_type?: string; contract_type?: string; user_ids?: string[] } = {
           page: currentPage,
-          limit: itemsPerPage,
+          limit: ITEMS_PER_PAGE,
         };
         if (appliedSearch?.trim()) params.search = appliedSearch.trim();
         if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
         if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
         if (appliedUserIds.length > 0) params.user_ids = appliedUserIds;
         const journeysResult = await getJourneys(params);
-        console.log("[Onboarding] getJourneys response (page " + currentPage + "):", journeysResult);
         const data = Array.isArray(journeysResult?.data) ? (journeysResult.data as JourneyRecord[]) : [];
         setJourneysData(data);
         setJourneysPagination((journeysResult?.pagination as JourneysPagination) ?? null);
@@ -149,16 +185,21 @@ const EmployeesOnboarding = () => {
     fetchJourneys();
   }, [companyIdentifier, currentPage, refreshJourneysKey, appliedSearch, appliedEmploymentType, appliedContract, appliedUserIds]);
 
+  useEffect(() => {
+    if (companyIdentifier) return;
+    setLoadingJourneys(false);
+  }, [companyIdentifier]);
+
   const employees: OnboardingEmployee[] = useMemo(() => {
     return journeysData.map((j) => {
-      const userId = j.user_id != null ? String(j.user_id) : "";
-      const name = mainAppUsers.find((u) => String(u.id) === userId)?.name ?? (userId || "—");
-      const statusKey = (j.status ?? "in_progress").toLowerCase().replace(/\s/g, "_");
+      const userId = j.user_id == null ? "" : String(j.user_id);
+      const name = users.find((u) => String(u.id) === userId)?.name ?? (userId || "—");
+      const statusKey = (j.status ?? "in_progress").toLowerCase().replaceAll(/\s/g, "_");
       const status: OnboardingEmployee["status"] =
         STATUS_DISPLAY[statusKey] ?? "In Progress";
       const totalSteps = Math.max(1, Number(j.total_steps_count ?? 0));
       const completedSteps = Number(j.completed_steps_count ?? 0);
-      const progress = Math.round((completedSteps / totalSteps) * 100);
+      const progress = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
       const steps = Array.isArray(j.steps) ? j.steps : [];
       const stepNames = steps.length
         ? steps.map((s) => (s.name ?? "document").toLowerCase())
@@ -180,47 +221,7 @@ const EmployeesOnboarding = () => {
         completed_steps_count: j.completed_steps_count,
       };
     });
-  }, [journeysData, mainAppUsers]);
-
-  const filteredEmployees = employees;
-
-  const totalPages = Math.max(1, journeysPagination?.last_page ?? 1);
-  const paginatedEmployees = filteredEmployees;
-  const paginationFrom = journeysPagination?.from ?? 0;
-  const paginationTo = journeysPagination?.to ?? 0;
-  const paginationTotal = journeysPagination?.total ?? 0;
-  
-    const getStageIcon = (stage: string) => {
-      switch (stage) {
-        case 'document':
-          return <FileText size={16} color="#8b5cf6" />;
-        case 'profile':
-          return <User size={16} color="#8b5cf6" />;
-        case 'settings':
-          return <Settings size={16} color="#8b5cf6" />;
-        case 'info':
-          return <Info size={16} color="#ec4899" />;
-        case 'check':
-          return <CheckCircle size={16} color="#8b5cf6" />;
-        default:
-          return <FileText size={16} color="#8b5cf6" />;
-      }
-    };
-  
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'In Progress':
-          return { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
-        case 'On Track':
-          return { bg: '#fef3c7', color: '#92400e', dot: '#fbbf24' };
-        case 'Overdue':
-          return { bg: '#fee2e2', color: '#991b1b', dot: '#ef4444' };
-        case 'Completed':
-          return { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
-        default:
-          return { bg: '#f3f4f6', color: '#6b7280', dot: '#9ca3af' };
-      }
-    };
+  }, [journeysData, users]);
 
   const handleApply = () => {
     setAppliedSearch(searchTerm);
@@ -228,7 +229,6 @@ const EmployeesOnboarding = () => {
     setAppliedContract(selectedContract);
     setAppliedUserIds(selectedUserIds);
     setCurrentPage(1);
-    setOpenDropdown(null);
   };
 
   const resetFilters = () => {
@@ -240,16 +240,377 @@ const EmployeesOnboarding = () => {
     setAppliedContract("");
     setSelectedUserIds([]);
     setAppliedUserIds([]);
+    setUserSearchTerm("");
     setCurrentPage(1);
-    setOpenDropdown(null);
   };
+
+  const appliedUserNames = useMemo(
+    () =>
+      appliedUserIds
+        .map((id) => users.find((u) => String(u.id) === id)?.name ?? id)
+        .join(", "),
+    [appliedUserIds, users],
+  );
+
+  const onboardingColumns = useMemo<TableColumn<OnboardingEmployee>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Employee Name",
+        type: "avatar",
+        sortable: false,
+        avatar: {
+          getInitials: (row) => getInitials(row.name),
+          getColor: (row) => getAvatarColor(row.name),
+        },
+      },
+      {
+        key: "startDate",
+        label: "Start Date",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "stages",
+        label: "Stages",
+        type: "custom",
+        sortable: false,
+        render: (row) => (
+          <span>{row.completed_steps_count ?? 0}/{row.total_steps_count ?? 0}</span>
+        ),
+      },
+      {
+        key: "progress",
+        label: "Progress",
+        type: "custom",
+        sortable: false,
+        render: (row) => (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                flex: 1,
+                height: "8px",
+                backgroundColor: "#e5e7eb",
+                borderRadius: "4px",
+                overflow: "hidden",
+                maxWidth: "120px",
+              }}
+            >
+              <div
+                style={{
+                  width: `${row.progress}%`,
+                  height: "100%",
+                  backgroundColor: "#8b5cf6",
+                  borderRadius: "4px",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <span
+              style={{
+                fontSize: "14px",
+                fontWeight: "500",
+                color: "#1f2937",
+                minWidth: "40px",
+              }}
+            >
+              {row.progress}%
+            </span>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        type: "custom",
+        sortable: false,
+        render: (row) => {
+          const statusColors = getStatusColor(row.status);
+          return (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 12px",
+                backgroundColor: statusColors.bg,
+                borderRadius: "16px",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: statusColors.dot,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: "500",
+                  color: statusColors.color,
+                }}
+              >
+                {row.status}
+              </span>
+            </div>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
+  const onboardingActions = useMemo<TableAction<OnboardingEmployee>[]>(
+    () => [
+      {
+        label: "View",
+        icon: <ChevronRight size={16} />,
+        onClick: (row) => {
+          setSelectedEmployee(row);
+          setIsSidebarOpen(true);
+        },
+        variant: "link",
+      },
+    ],
+    [],
+  );
+
+  const employmentFilterOptions = useMemo(
+    () => [
+      {
+        label: "All employment types",
+        value: "__all__",
+        onClick: () => setSelectedEmploymentType(""),
+      },
+      ...EMPLOYMENT_TYPES.map((type) => ({
+        label: type,
+        value: type,
+        onClick: () => setSelectedEmploymentType(type),
+      })),
+    ],
+    [],
+  );
+
+  const contractFilterOptions = useMemo(
+    () => [
+      {
+        label: "All contract types",
+        value: "__all__",
+        onClick: () => setSelectedContract(""),
+      },
+      ...CONTRACT_TYPES.map((type) => ({
+        label: type,
+        value: type,
+        onClick: () => setSelectedContract(type),
+      })),
+    ],
+    [],
+  );
+
+  const usersDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+        <input
+          type="text"
+          placeholder="Search user..."
+          value={userSearchTerm}
+          onChange={(e) => setUserSearchTerm(e.target.value)}
+          style={{
+            width: "100%",
+            marginBottom: "8px",
+            padding: "8px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "6px",
+            fontSize: "13px",
+          }}
+        />
+        <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+          {filteredManagers.map((mgr, idx) => {
+              const label = hierarchyLabel(mgr);
+              const idStr = String((mgr as { id?: string | number }).id ?? label ?? idx);
+              const isSelected = selectedUserIds.includes(idStr);
+              return (
+                <label
+                  key={idStr}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "6px 4px",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                      toggleSelectedUserId(idStr, isSelected);
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setAppliedUserIds(selectedUserIds);
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "none",
+              backgroundColor: "#6366f1",
+              color: "white",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedUserIds([]);
+              setAppliedUserIds([]);
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "1px solid #d1d5db",
+              backgroundColor: "white",
+              color: "#374151",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    ),
+    [filteredManagers, selectedUserIds],
+  );
+
+  const filterPills = useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "journey-employment",
+        label: "Employment",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(appliedEmploymentType),
+        activeLabel: appliedEmploymentType || undefined,
+        onClear: appliedEmploymentType
+          ? () => {
+              setSelectedEmploymentType("");
+              setAppliedEmploymentType("");
+              setCurrentPage(1);
+            }
+          : undefined,
+        dropdownOptions: employmentFilterOptions,
+      },
+      {
+        id: "journey-contract",
+        label: "Contract",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(appliedContract),
+        activeLabel: appliedContract || undefined,
+        onClear: appliedContract
+          ? () => {
+              setSelectedContract("");
+              setAppliedContract("");
+              setCurrentPage(1);
+            }
+          : undefined,
+        dropdownOptions: contractFilterOptions,
+      },
+      {
+        id: "journey-users",
+        label: "Users",
+        showDropdown: true,
+        active: appliedUserIds.length > 0,
+        activeLabel: appliedUserIds.length > 0 ? `${appliedUserIds.length} selected` : undefined,
+        onClear:
+          appliedUserIds.length > 0
+            ? () => {
+                setSelectedUserIds([]);
+                setAppliedUserIds([]);
+                setCurrentPage(1);
+              }
+            : undefined,
+        dropdownContent: usersDropdownContent,
+      },
+    ],
+    [
+      appliedEmploymentType,
+      appliedContract,
+      appliedUserIds,
+      employmentFilterOptions,
+      contractFilterOptions,
+      usersDropdownContent,
+    ],
+  );
+
+  const onboardingToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: searchTerm,
+      searchPlaceholder: "Search employee (extension/designation/department)...",
+      onSearchChange: setSearchTerm,
+      onSearch: handleApply,
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      customActions: (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={handleApply}
+            style={{
+              border: "none",
+              backgroundColor: "#6366f1",
+              color: "white",
+              borderRadius: "6px",
+              padding: "7px 12px",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            onClick={resetFilters}
+            style={{
+              border: "1px solid #d1d5db",
+              backgroundColor: "white",
+              color: "#374151",
+              borderRadius: "6px",
+              padding: "7px 12px",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      ),
+    }),
+    [searchTerm, filterPills],
+  );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
-      <div >
-        
-        <div >
+      <div>
+        <div>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -259,703 +620,52 @@ const EmployeesOnboarding = () => {
             gap: '16px'
           }}>
             <h1 style={{
-              fontSize: '28px',
-              fontWeight: '600',
-              color: '#111827',
+              fontSize: "28px",
+              fontWeight: "600",
+              color: "#111827",
               margin: 0
             }}>Employees Journey</h1>
           </div>
 
-          {/* Filters: Search, Employment Type, Contract Type */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '12px',
-            marginBottom: '24px',
-            alignItems: 'center'
-          }}>
-            <div style={{ position: 'relative', flex: '1 1 300px', minWidth: '250px' }}>
-              <Search
-                size={20}
-                style={{
-                  position: 'absolute',
-                  left: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9ca3af'
-                }}
-              />
-              <input
-                type="text"
-                placeholder="Search employee (extension/designation/department)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px 10px 48px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                  backgroundColor: 'white',
-                }}
-              />
-            </div>
+          <GenericTable<OnboardingEmployee>
+            data={employees}
+            columns={onboardingColumns}
+            actions={onboardingActions}
+            showActions={true}
+            actionsLabel="View"
+            loading={loadingJourneys}
+            loadingMessage="Loading onboarding data..."
+            emptyMessage="No onboarding journeys found"
+            hover={true}
+            uniqueKey="id"
+            pagination={
+              journeysPagination
+                ? {
+                    currentPage: journeysPagination.page ?? currentPage,
+                    rowsPerPage: ITEMS_PER_PAGE,
+                    totalRows: journeysPagination.total ?? 0,
+                    pageSizeOptions: [ITEMS_PER_PAGE],
+                  }
+                : undefined
+            }
+            onPaginationChange={(page) => setCurrentPage(page)}
+            onRowClick={(row) => {
+              setSelectedEmployee(row);
+              setIsSidebarOpen(true);
+            }}
+            showToolbar={true}
+            toolbar={onboardingToolbar}
+            showToolbarActions={false}
+          />
 
-            {/* Employment Type Filter */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleDropdown('employment');
-                }}
-                style={{
-                  padding: '10px 16px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <span>{selectedEmploymentType || 'Employment'}</span>
-                <ChevronDown size={16} />
-              </button>
-              {openDropdown === 'employment' && (
-                <div onClick={(e) => e.stopPropagation()} style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  zIndex: 10,
-                  minWidth: '150px'
-                }}>
-                  <div
-                    onClick={() => {
-                      setSelectedEmploymentType("");
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: !selectedEmploymentType ? '#f3f4f6' : 'white',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedEmploymentType ? '#f3f4f6' : 'white'}
-                  >
-                    All employment types
-                  </div>
-                  {EMPLOYMENT_TYPES.map(type => (
-                    <div
-                      key={type}
-                      onClick={() => {
-                        setSelectedEmploymentType(type);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedEmploymentType === type ? '#f3f4f6' : 'white'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedEmploymentType === type ? '#f3f4f6' : 'white'}
-                    >
-                      {type}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Contract Type Filter */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleDropdown('contract');
-                }}
-                style={{
-                  padding: '10px 16px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <span>{selectedContract || 'Contract'}</span>
-                <ChevronDown size={16} />
-              </button>
-              {openDropdown === 'contract' && (
-                <div onClick={(e) => e.stopPropagation()} style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  zIndex: 10,
-                  minWidth: '150px'
-                }}>
-                  <div
-                    onClick={() => {
-                      setSelectedContract("");
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: !selectedContract ? '#f3f4f6' : 'white',
-                      borderBottom: '1px solid #e5e7eb'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedContract ? '#f3f4f6' : 'white'}
-                  >
-                    All contract types
-                  </div>
-                  {CONTRACT_TYPES.map(type => (
-                    <div
-                      key={type}
-                      onClick={() => {
-                        setSelectedContract(type);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedContract === type ? '#f3f4f6' : 'white'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedContract === type ? '#f3f4f6' : 'white'}
-                    >
-                      {type}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Users Filter (multi-select); API receives user_ids */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleDropdown('users');
-                }}
-                style={{
-                  padding: '10px 16px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  backgroundColor: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                <span>{selectedUserIds.length > 0 ? `Users (${selectedUserIds.length})` : 'Users'}</span>
-                <ChevronDown size={16} />
-              </button>
-              {openDropdown === 'users' && (
-                <div onClick={(e) => e.stopPropagation()} style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                  zIndex: 10,
-                  minWidth: '200px',
-                  maxHeight: '280px',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
-                  <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
-                    <input
-                      type="text"
-                      placeholder="Search user..."
-                      value={userSearchTerm}
-                      onChange={(e) => setUserSearchTerm(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                    <div
-                      onClick={() => {
-                        setSelectedUserIds([]);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedUserIds.length === 0 ? '#f3f4f6' : 'white',
-                        borderBottom: '1px solid #e5e7eb',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedUserIds.length === 0 ? '#f3f4f6' : 'white'}
-                    >
-                      All users
-                    </div>
-                    {managers
-                      .filter((mgr) => {
-                        const label = hierarchyLabel(mgr);
-                        return !userSearchTerm.trim() || label.toLowerCase().includes(userSearchTerm.trim().toLowerCase());
-                      })
-                      .map((mgr, idx) => {
-                        const label = hierarchyLabel(mgr);
-                        const idStr = String((mgr as { id?: number }).id ?? idx);
-                        const isSelected = selectedUserIds.includes(idStr);
-                        return (
-                          <div
-                            key={idStr}
-                            onClick={() => {
-                              setSelectedUserIds((prev) =>
-                                isSelected ? prev.filter((id) => id !== idStr) : [...prev, idStr]
-                              );
-                            }}
-                            style={{
-                              padding: '10px 16px',
-                              cursor: 'pointer',
-                              backgroundColor: isSelected ? '#e0e7ff' : 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#c7d2fe' : '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#e0e7ff' : 'white'}
-                          >
-                            {isSelected && <span style={{ color: '#6366f1', fontWeight: 600 }}>✓</span>}
-                            {label}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleApply}
-              style={{
-                padding: '10px 32px',
-                border: 'none',
-                borderRadius: '8px',
-                backgroundColor: '#6366f1',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Apply
-            </button>
-          </div>
-
-          {/* Active Filters - show when any applied filter is set */}
           {(appliedSearch.trim() || appliedEmploymentType || appliedContract || appliedUserIds.length > 0) && (
-            <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#6b7280' }}>Active filters:</span>
-              {appliedSearch.trim() && (
-                <span style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#e0e7ff',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  Search: {appliedSearch}
-                  <button
-                    onClick={() => { setSearchTerm(''); setAppliedSearch(''); setCurrentPage(1); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {appliedEmploymentType && (
-                <span style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#e0e7ff',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  {appliedEmploymentType}
-                  <button
-                    onClick={() => { setSelectedEmploymentType(''); setAppliedEmploymentType(''); setCurrentPage(1); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {appliedContract && (
-                <span style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#e0e7ff',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  {appliedContract}
-                  <button
-                    onClick={() => { setSelectedContract(''); setAppliedContract(''); setCurrentPage(1); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {appliedUserIds.length > 0 && (
-                <span
-                  title={appliedUserIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
-                  style={{
-                    padding: '4px 12px',
-                    backgroundColor: '#e0e7ff',
-                    borderRadius: '16px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  Users: {appliedUserIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
-                  <button
-                    onClick={() => { setSelectedUserIds([]); setAppliedUserIds([]); setCurrentPage(1); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              <button
-                onClick={resetFilters}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#6366f1',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  textDecoration: 'underline'
-                }}
-              >
-                Clear all
-              </button>
+            <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280" }}>
+              {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
+              {appliedEmploymentType ? `Employment: ${appliedEmploymentType} | ` : ""}
+              {appliedContract ? `Contract: ${appliedContract} | ` : ""}
+              {appliedUserIds.length > 0 ? `Users: ${appliedUserNames}` : ""}
             </div>
           )}
-
-          {/* Onboarding Table */}
-          <div style={{
-            backgroundColor: "white",
-            borderRadius: "12px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            overflow: "hidden",
-          }}>
-            {loadingJourneys ? (
-              <div style={{ padding: "24px", textAlign: "center", color: "#6b7280" }}>
-                Loading onboarding data…
-              </div>
-            ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Employee Name</th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Start Date</th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Stages</th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Progress</th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Status</th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>View</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedEmployees.map((employee, index) => {
-                    const statusColors = getStatusColor(employee.status);
-                    return (
-                      <tr 
-                        key={employee.id}
-                        onClick={() => {
-                          setSelectedEmployee(employee);
-                          setIsSidebarOpen(true);
-                        }}
-                        style={{ 
-                          borderBottom: index < paginatedEmployees.length - 1 ? '1px solid #f3f4f6' : 'none',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                      >
-                        <td style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: '#e0e7ff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '20px'
-                          }}>
-                            {employee.avatar}
-                          </div>
-                            <div>
-                              <div style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>
-                                {employee.name}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px', fontSize: '14px', color: '#1f2937' }}>
-                          {employee.startDate}
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {employee?.completed_steps_count ?? 0}/{employee?.total_steps_count ?? 0}
-                            {/* {employee.stages.map((stage, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  borderRadius: '8px',
-                                  backgroundColor: '#f3e8ff',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                              >
-                                {getStageIcon(stage)}
-                              </div>
-                            ))} */}
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ 
-                              flex: 1, 
-                              height: '8px', 
-                              backgroundColor: '#e5e7eb', 
-                              borderRadius: '4px',
-                              overflow: 'hidden',
-                              maxWidth: '120px'
-                            }}>
-                              <div style={{
-                                width: `${employee.progress}%`,
-                                height: '100%',
-                                backgroundColor: '#8b5cf6',
-                                borderRadius: '4px',
-                                transition: 'width 0.3s ease'
-                              }} />
-                            </div>
-                            <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937', minWidth: '40px' }}>
-                              {employee.progress}%
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 12px',
-                            backgroundColor: statusColors.bg,
-                            borderRadius: '16px'
-                          }}>
-                            <span style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              backgroundColor: statusColors.dot
-                            }} />
-                            <span style={{ 
-                              fontSize: '13px', 
-                              fontWeight: '500', 
-                              color: statusColors.color 
-                            }}>
-                              {employee.status}
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEmployee(employee);
-                              setIsSidebarOpen(true);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '6px 12px',
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: '500',
-                              color: '#6b7280',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f3f4f6';
-                              e.currentTarget.style.color = '#1f2937';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                              e.currentTarget.style.color = '#6b7280';
-                            }}
-                          >
-                            View
-                            <ChevronRight size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            )}
-
-            {/* Footer */}
-            <div style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #e5e7eb",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "16px",
-            }}>
-              <div style={{ fontSize: "14px", color: "#6b7280" }}>
-                Showing {paginationFrom}-{paginationTo} of {paginationTotal} documents
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === 1 ? 0.5 : 1
-                  }}
-                >
-                  <ChevronsLeft size={16} />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === 1 ? 0.5 : 1
-                  }}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                
-                {[...Array(totalPages)].map((_, idx) => {
-                  const pageNum = idx + 1;
-                  if (
-                    pageNum === 1 ||
-                    pageNum === totalPages ||
-                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        style={{
-                          padding: '8px 14px',
-                          border: '1px solid #e5e7eb',
-                          borderRadius: '6px',
-                          backgroundColor: currentPage === pageNum ? '#8b5cf6' : 'white',
-                          color: currentPage === pageNum ? 'white' : '#1f2937',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: currentPage === pageNum ? '600' : '400'
-                        }}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                    return <span key={pageNum} style={{ padding: '8px 4px', color: '#6b7280' }}>...</span>;
-                  }
-                  return null;
-                })}
-  
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === totalPages ? 0.5 : 1
-                  }}
-                >
-                  <ChevronRight size={16} />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === totalPages ? 0.5 : 1
-                  }}
-                >
-                  <ChevronsRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
   
         {/* Sidebar Overlay */}
@@ -967,21 +677,32 @@ const EmployeesOnboarding = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.4)',
               zIndex: 9999,
               display: 'flex',
               justifyContent: 'flex-end'
             }}
-            onClick={() => {
-              setIsSidebarOpen(false);
-              setSelectedEmployee(null);
-            }}
           >
+            <button
+              type="button"
+              aria-label="Close onboarding sidebar"
+              onClick={() => {
+                setIsSidebarOpen(false);
+                setSelectedEmployee(null);
+              }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                border: "none",
+                padding: 0,
+                margin: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                cursor: "pointer",
+              }}
+            />
             <div
-              onClick={(e) => e.stopPropagation()}
               style={{
                 position: 'relative',
-                zIndex: 1000
+                zIndex: 1000,
               }}
             >
               <OnboardingDetailSidebar

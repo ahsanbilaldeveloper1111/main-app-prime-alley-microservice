@@ -1,8 +1,19 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import PageHeader from "@components/PageHeader";
+import GenericTable, {
+  FilterPill,
+  TableAction,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import {
   getAttendance,
@@ -14,12 +25,12 @@ import {
   type AttendanceStatusData,
 } from "@utils/staffManagement";
 import { toast } from "react-toastify";
-import { Button, Spinner } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Trash2, User } from "lucide-react";
+import { Calendar, Clock, LogIn, LogOut, Trash2 } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -27,6 +38,32 @@ import "@assets/scss/tabs.scss";
 const ITEMS_PER_PAGE = 15;
 
 const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
+
+type MainAppUser = {
+  id: string | number;
+  name?: string | null;
+};
+
+const getInitials = (name: string): string => {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+  if (words.length === 0) return "NA";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+};
+
+const getAvatarColor = (name: string): string => {
+  let hash = 0;
+  for (const ch of name) {
+    const code = ch.codePointAt(0) ?? 0;
+    hash = code + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsla(${hue}, 55%, 45%, 0.6)`;
+};
 
 function getDateRangeForOption(option: string): { date_from: string; date_to: string } | null {
   if (!option?.trim()) return null;
@@ -37,7 +74,6 @@ function getDateRangeForOption(option: string): { date_from: string; date_to: st
   const from = new Date(now);
   switch (option.trim()) {
     case "Today":
-      from.setHours(0, 0, 0, 0);
       return { date_from: toStr, date_to: toStr };
     case "Last 7 days":
       from.setDate(from.getDate() - 7);
@@ -57,25 +93,24 @@ function getDateRangeForOption(option: string): { date_from: string; date_to: st
   return { date_from: fromStr, date_to: toStr };
 }
 
-const Attendences = () => {
+const AttendancePage = () => {
   const { data: session } = useSession();
   const { mainAppUsers } = useMainAppLookups();
+
+  const users = useMemo(() => (mainAppUsers ?? []) as MainAppUser[], [mainAppUsers]);
 
   const getDisplayName = useCallback(
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
       const idStr = String(userId);
-      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
+      const u = users.find((x) => String(x.id) === idStr);
       return u?.name ?? idStr;
     },
-    [mainAppUsers]
+    [users]
   );
 
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState("");
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +137,7 @@ const Attendences = () => {
         page,
         limit: ITEMS_PER_PAGE,
       };
-      if (selectedUserId != null && selectedUserId.trim()) params.user_id = selectedUserId.trim();
+      if (selectedUserId.trim()) params.user_id = selectedUserId.trim();
       const dateRange = getDateRangeForOption(selectedDate ?? "");
       if (dateRange) {
         params.date_from = dateRange.date_from;
@@ -120,7 +155,9 @@ const Attendences = () => {
       } else {
         setPagination(null);
       }
-    } catch {
+    } catch (err) {
+      // Avoid failing silently; keep UI usable and emit diagnostics.
+      console.error("Failed to load attendance records", err);
       setRecords([]);
       setPagination(null);
     } finally {
@@ -133,7 +170,8 @@ const Attendences = () => {
     try {
       const data = await getAttendanceStatus();
       setStatus(data);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load attendance status", err);
       setStatus(null);
     } finally {
       setStatusLoading(false);
@@ -155,12 +193,15 @@ const Attendences = () => {
   const handleCheckIn = async () => {
     setCheckInOutLoading(true);
     try {
-      const userId = session?.user?.id != null ? String(session.user.id) : undefined;
-      const payload = userId ? { user_id: userId } : {};
+      const sessionUserId = session?.user?.id;
+      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
       await attendanceCheckIn(payload);
       toast.success("Checked in successfully");
       await loadStatus();
       await loadAttendance(currentPage);
+    } catch (err) {
+      console.error("Check-in failed", err);
+      toast.error("Check-in failed");
     } finally {
       setCheckInOutLoading(false);
     }
@@ -169,21 +210,24 @@ const Attendences = () => {
   const handleCheckOut = async () => {
     setCheckInOutLoading(true);
     try {
-      const userId = session?.user?.id != null ? String(session.user.id) : undefined;
-      const payload = userId ? { user_id: userId } : {};
+      const sessionUserId = session?.user?.id;
+      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
       await attendanceCheckOut(payload);
       toast.success("Checked out successfully");
       await loadStatus();
       await loadAttendance(currentPage);
+    } catch (err) {
+      console.error("Check-out failed", err);
+      toast.error("Check-out failed");
     } finally {
       setCheckInOutLoading(false);
     }
   };
 
-  const openDeleteModal = (record: AttendanceRecord) => {
+  const openDeleteModal = useCallback((record: AttendanceRecord) => {
     setRecordToDelete(record);
     setShowDeleteModal(true);
-  };
+  }, []);
 
   const handleConfirmDelete = async () => {
     if (!recordToDelete) return;
@@ -194,6 +238,9 @@ const Attendences = () => {
       setShowDeleteModal(false);
       setRecordToDelete(null);
       await loadAttendance(currentPage);
+    } catch (err) {
+      console.error("Delete attendance record failed", err);
+      toast.error("Failed to delete attendance record");
     } finally {
       setDeleting(false);
     }
@@ -202,11 +249,197 @@ const Attendences = () => {
   const statusAccent = status?.is_checked_in ? "#059669" : "#d97706";
   const statusBg = status?.is_checked_in ? "#ecfdf5" : "#fffbeb";
 
+  const userFilterOptions = useMemo(
+    () => [
+      {
+        label: "All Users",
+        value: "__all__",
+        onClick: () => setSelectedUserId(""),
+      },
+      ...users.map((user) => ({
+        label: user.name ?? String(user.id),
+        value: String(user.id),
+        onClick: () => setSelectedUserId(String(user.id)),
+      })),
+    ],
+    [users],
+  );
+
+  const dateFilterOptions = useMemo(
+    () => [
+      {
+        label: "All Dates",
+        value: "__all__",
+        onClick: () => setSelectedDate(""),
+      },
+      ...dateOptions.map((option) => ({
+        label: option,
+        value: option,
+        onClick: () => setSelectedDate(option),
+      })),
+    ],
+    [],
+  );
+
+  const attendanceFilterPills = useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "attendance-user-filter",
+        label: "User",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(selectedUserId),
+        activeLabel: selectedUserId ? getDisplayName(selectedUserId) : undefined,
+        onClear: selectedUserId ? () => setSelectedUserId("") : undefined,
+        dropdownOptions: userFilterOptions,
+      },
+      {
+        id: "attendance-date-filter",
+        label: "Date",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(selectedDate),
+        activeLabel: selectedDate || undefined,
+        onClear: selectedDate ? () => setSelectedDate("") : undefined,
+        dropdownOptions: dateFilterOptions,
+      },
+    ],
+    [
+      selectedUserId,
+      selectedDate,
+      getDisplayName,
+      userFilterOptions,
+      dateFilterOptions,
+    ],
+  );
+
+  const attendanceColumns = useMemo<TableColumn<AttendanceRecord>[]>(
+    () => [
+      {
+        key: "user_id",
+        label: "User Name",
+        type: "avatar",
+        sortable: false,
+        accessor: (row) => getDisplayName(row.user_id),
+        avatar: {
+          getInitials: (row) => getInitials(getDisplayName(row.user_id)),
+          getColor: (row) => getAvatarColor(getDisplayName(row.user_id)),
+        },
+      },
+      {
+        key: "work_date",
+        label: "Work Date",
+        type: "text",
+        sortable: false,
+        accessor: (row) =>
+          row.work_date ? moment(row.work_date).format("DD MMM YYYY") : "-",
+      },
+      {
+        key: "check_in_at",
+        label: "Check In",
+        type: "text",
+        sortable: false,
+        accessor: (row) =>
+          row.check_in_at
+            ? moment(row.check_in_at).format(GlobalDateTimeFormat)
+            : "-",
+      },
+      {
+        key: "check_out_at",
+        label: "Check Out",
+        type: "text",
+        sortable: false,
+        accessor: (row) =>
+          row.check_out_at
+            ? moment(row.check_out_at).format(GlobalDateTimeFormat)
+            : "-",
+      },
+    ],
+    [getDisplayName],
+  );
+
+  const attendanceActions = useMemo<TableAction<AttendanceRecord>[]>(
+    () => [
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (row) => openDeleteModal(row),
+        variant: "link",
+        className: "text-danger",
+      },
+    ],
+    [openDeleteModal],
+  );
+
+  const attendanceToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showFilterPills: true,
+      filterPills: attendanceFilterPills,
+      showMoreFiltersButton: false,
+    }),
+    [attendanceFilterPills],
+  );
+
+  const isCheckedIn = status?.is_checked_in === true;
+  const statusContent = (() => {
+    if (statusLoading) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Clock size={20} style={{ color: "#9ca3af" }} />
+          <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading status…</span>
+        </div>
+      );
+    }
+
+    if (!status) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#6b7280" }}>
+          <Clock size={18} />
+          Status unavailable
+        </div>
+      );
+    }
+
+    const statusText = isCheckedIn ? "Checked in" : "Checked out";
+    const statusColor = isCheckedIn ? "#065f46" : "#92400e";
+    return (
+      <>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 16px",
+            borderRadius: "10px",
+            fontSize: "14px",
+            fontWeight: "600",
+            backgroundColor: statusBg,
+            color: statusColor,
+          }}
+        >
+          <Clock size={18} />
+          {statusText}
+        </div>
+        {status.work_date && (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#6b7280" }}>
+            <Calendar size={16} />
+            {moment(status.work_date).format("dddd, DD MMM YYYY")}
+          </div>
+        )}
+        {isCheckedIn && status.attendance?.check_in_at && (
+          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+            Since {moment(status.attendance.check_in_at).format("hh:mm A")}
+          </span>
+        )}
+      </>
+    );
+  })();
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendance" />
 
-      <PageHeader title="Attendance" showSearch={false} />
+      {/* <PageHeader title="Attendance" showSearch={false} /> */}
 
       {/* Current status & Check In / Out */}
       <div
@@ -222,56 +455,14 @@ const Attendences = () => {
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
-            {statusLoading ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Clock size={20} style={{ color: "#9ca3af" }} />
-                <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading status…</span>
-              </div>
-            ) : status ? (
-              <>
-              {records.length > 0 && (
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "8px 16px",
-                    borderRadius: "10px",
-                    fontSize: "14px",
-                    fontWeight: "600",
-                    backgroundColor: statusBg,
-                    color: status.is_checked_in ? "#065f46" : "#92400e",
-                  }}
-                >
-                  <Clock size={18} />
-                  {status.is_checked_in ? "Checked in" : "Checked out"}
-                </div>
-                )}
-                {status.work_date && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#6b7280" }}>
-                    <Calendar size={16} />
-                    {moment(status.work_date).format("dddd, DD MMM YYYY")}
-                  </div>
-                )}
-                {status.is_checked_in && status.attendance?.check_in_at && (
-                  <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                    Since {moment(status.attendance.check_in_at).format("hh:mm A")}
-                  </span>
-                )}
-              </>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#6b7280" }}>
-                <Clock size={18} />
-                Status unavailable
-              </div>
-            )}
+            {statusContent}
           </div>
-          {session?.user?.permissions?.includes('check-in-out-attendence-staff-management') && (
+          {session?.user?.permissions?.includes("check-in-out-attendence-staff-management") && (
           <div style={{ display: "flex", gap: "10px" }}>
             <Button
               variant="success"
               size="sm"
-              disabled={statusLoading || checkInOutLoading || (status?.is_checked_in === true)}
+              disabled={statusLoading || checkInOutLoading || isCheckedIn}
               onClick={handleCheckIn}
               style={{
                 fontWeight: "600",
@@ -288,7 +479,7 @@ const Attendences = () => {
             <Button
               variant="warning"
               size="sm"
-              disabled={statusLoading || checkInOutLoading || (status?.is_checked_in !== true)}
+              disabled={statusLoading || checkInOutLoading || !isCheckedIn}
               onClick={handleCheckOut}
               style={{
                 fontWeight: "600",
@@ -305,205 +496,6 @@ const Attendences = () => {
           </div>
           )}
 
-        </div>
-      </div>
-
-      {/* Filters: User + Date */}
-      <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-        <div style={{ position: "relative", display: "inline-block" }}>
-          <button
-            type="button"
-            onClick={() => setShowUserDropdown(!showUserDropdown)}
-            style={{
-              padding: "10px 16px",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              backgroundColor: "white",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
-              minWidth: "180px",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <User size={16} />
-              <span>
-                {selectedUserId != null
-                  ? (mainAppUsers?.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId)
-                  : "All Users"}
-              </span>
-            </div>
-            <ChevronDown size={16} />
-          </button>
-          {showUserDropdown && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                marginTop: "4px",
-                backgroundColor: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-                zIndex: 10,
-                minWidth: "220px",
-                maxHeight: "280px",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <div style={{ padding: "8px", borderBottom: "1px solid #e5e7eb" }}>
-                <input
-                  type="text"
-                  placeholder="Search user..."
-                  value={userSearchTerm}
-                  onChange={(e) => setUserSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-              <div style={{ maxHeight: "220px", overflowY: "auto" }}>
-                <div
-                  onClick={() => {
-                    setSelectedUserId(null);
-                    setShowUserDropdown(false);
-                    setUserSearchTerm("");
-                  }}
-                  style={{
-                    padding: "10px 16px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    color: "#6366f1",
-                    backgroundColor: selectedUserId === null ? "#f3f4f6" : "white",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = selectedUserId === null ? "#f3f4f6" : "white")}
-                >
-                  All Users
-                </div>
-                {(mainAppUsers ?? [])
-                  .filter((u) => !userSearchTerm.trim() || (u.name?.toLowerCase().includes(userSearchTerm.trim().toLowerCase()) ?? false))
-                  .map((u) => {
-                    const uid = String(u.id);
-                    const isSelected = selectedUserId != null && uid === selectedUserId;
-                    return (
-                      <div
-                        key={u.id}
-                        onClick={() => {
-                          setSelectedUserId(uid);
-                          setShowUserDropdown(false);
-                          setUserSearchTerm("");
-                        }}
-                        style={{
-                          padding: "10px 16px",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          backgroundColor: isSelected ? "#f3f4f6" : "white",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "#f3f4f6" : "white")}
-                      >
-                        {u.name}
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Date filter dropdown */}
-        <div style={{ position: "relative" }}>
-          <button
-            type="button"
-            onClick={() => setShowDateDropdown(!showDateDropdown)}
-            style={{
-              padding: "10px 16px",
-              border: "1px solid #e5e7eb",
-              borderRadius: "8px",
-              backgroundColor: "white",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
-              minWidth: "140px",
-              justifyContent: "space-between",
-            }}
-          >
-            <span>{selectedDate || "All Dates"}</span>
-            <ChevronDown size={16} />
-          </button>
-          {showDateDropdown && (
-            <div
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: 0,
-                marginTop: "4px",
-                backgroundColor: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-                zIndex: 10,
-                minWidth: "180px",
-              }}
-            >
-              <div
-                onClick={() => {
-                  setSelectedDate("");
-                  setShowDateDropdown(false);
-                }}
-                style={{
-                  padding: "10px 16px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: "#6366f1",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
-              >
-                All Dates
-              </div>
-              {dateOptions.map((option) => (
-                <div
-                  key={option}
-                  onClick={() => {
-                    setSelectedDate(option);
-                    setShowDateDropdown(false);
-                  }}
-                  style={{
-                    padding: "10px 16px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    backgroundColor: selectedDate === option ? "#f3f4f6" : "white",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = selectedDate === option ? "#f3f4f6" : "white")
-                  }
-                >
-                  {option}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -537,185 +529,32 @@ const Attendences = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div
-        style={{
-          backgroundColor: "white",
-          borderRadius: "12px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          border: "1px solid #e5e7eb",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <User size={14} />
-                    User Name
-                  </span>
-                </th>
-                <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <Calendar size={14} />
-                    Work Date
-                  </span>
-                </th>
-                <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Check In
-                </th>
-                <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Check Out
-                </th>
-                <th style={{ padding: "14px 16px", textAlign: "center", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", width: 100 }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                      <Spinner animation="border" size="sm" style={{ color: "#6366f1" }} />
-                      <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading records…</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                      <div style={{ padding: "16px", backgroundColor: "#f3f4f6", borderRadius: "12px" }}>
-                        <Calendar size={32} style={{ color: "#9ca3af" }} />
-                      </div>
-                      <span style={{ fontSize: "15px", fontWeight: "500", color: "#374151" }}>No attendance records</span>
-                      <span style={{ fontSize: "13px", color: "#6b7280" }}>Check in to create your first record</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                records.map((record, index) => (
-                  <tr
-                    key={record.id}
-                    style={{
-                      borderBottom: index < records.length - 1 ? "1px solid #f3f4f6" : "none",
-                      transition: "background-color 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
-                  >
-                    <td style={{ padding: "16px" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
-                        <User size={16} style={{ color: "#9ca3af", flexShrink: 0 }} />
-                        {getDisplayName(record.user_id)}
-                      </span>
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "14px", color: "#6b7280" }}>
-                      {record.work_date ? moment(record.work_date).format("DD MMM YYYY") : "—"}
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "13px", color: "#4b5563" }}>
-                      {record.check_in_at
-                        ? moment(record.check_in_at).format(GlobalDateTimeFormat)
-                        : "—"}
-                    </td>
-                    <td style={{ padding: "16px", fontSize: "13px", color: "#4b5563" }}>
-                      {record.check_out_at
-                        ? moment(record.check_out_at).format(GlobalDateTimeFormat)
-                        : "—"}
-                    </td>
-                    <td style={{ padding: "16px", textAlign: "center" }}>
-                      {/* {session?.user?.permissions?.includes('delete-attendence-staff-management') && ( */}
-                      <button
-                        type="button"
-                        onClick={() => openDeleteModal(record)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: "8px",
-                          color: "#6b7280",
-                          borderRadius: "8px",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          transition: "background-color 0.15s ease, color 0.15s ease",
-                        }}
-                        title="Delete record"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#fef2f2";
-                          e.currentTarget.style.color = "#dc2626";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                          e.currentTarget.style.color = "#6b7280";
-                        }}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                      {/* )} */}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {pagination && pagination.last_page > 1 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: "12px",
-              padding: "14px 20px",
-              borderTop: "1px solid #e5e7eb",
-              backgroundColor: "#fafafa",
-            }}
-          >
-            <span style={{ fontSize: "13px", color: "#6b7280" }}>
-              Showing page {pagination.page} of {pagination.last_page}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                disabled={pagination.page <= 1 || loading}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                style={{ minWidth: 36 }}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              <span
-                style={{
-                  padding: "6px 14px",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  color: "#374151",
-                  minWidth: 72,
-                  textAlign: "center",
-                }}
-              >
-                {pagination.page} / {pagination.last_page}
-              </span>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                disabled={pagination.page >= pagination.last_page || loading}
-                onClick={() => setCurrentPage((p) => Math.min(pagination.last_page, p + 1))}
-                style={{ minWidth: 36 }}
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+        <GenericTable<AttendanceRecord>
+          data={records}
+          columns={attendanceColumns}
+          actions={attendanceActions}
+          showActions={true}
+          actionsLabel="Actions"
+          loading={loading}
+          loadingMessage="Loading records..."
+          emptyMessage="No attendance records"
+          hover={true}
+          uniqueKey="id"
+          pagination={
+            pagination
+              ? {
+                  currentPage: pagination.page,
+                  rowsPerPage: ITEMS_PER_PAGE,
+                  totalRows: pagination.total,
+                  pageSizeOptions: [ITEMS_PER_PAGE],
+                }
+              : undefined
+          }
+          onPaginationChange={(page) => setCurrentPage(page)}
+          showToolbar={true}
+          toolbar={attendanceToolbar}
+          showToolbarActions={false}
+        />
 
       <DeleteConfirmationModal
         show={showDeleteModal}
@@ -732,8 +571,8 @@ const Attendences = () => {
   );
 };
 
-Attendences.getLayout = (page: ReactElement) => {
+AttendancePage.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default Attendences;
+export default AttendancePage;
