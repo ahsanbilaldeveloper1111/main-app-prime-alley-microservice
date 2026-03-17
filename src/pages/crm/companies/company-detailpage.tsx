@@ -30,8 +30,6 @@ import {
 } from "@components/renderCreateCompany";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import moment from "moment-timezone";
-import { usePermissions } from "@utils/permissionUtils";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCti } from "@hooks/useCti";
@@ -81,10 +79,6 @@ interface RevenueSection {
 const CompanyDetailPage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id: companyId } = router.query;
-  const { hasPermission } = usePermissions();
-  const canSendWhatsApp = hasPermission(
-    HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM,
-  );
 
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
@@ -119,7 +113,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     const add = (n: string | null | undefined) => {
       const v = (n ?? "").trim();
       if (!v) return;
-      const key = v.replace(/\s/g, "");
+      const key = v.replaceAll(" ", "");
       if (seen.has(key)) return;
       seen.add(key);
       out.push(v);
@@ -292,7 +286,6 @@ const CompanyDetailPage: NextPageWithLayout = () => {
   ];
 
   const enrichment = company?.enrichment_data;
-  const struct = enrichment?.structured_data;
   const websiteUrl =
     enrichment?.discovered_website ||
     (company?.domain
@@ -513,7 +506,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                   "--"
                 ) : (
                   allPhones.map((num, i) => (
-                    <a key={i} href={`tel:${num.replace(/\s/g, "")}`} style={{ color: "#006162", textDecoration: "none" }}>{num}</a>
+                    <a key={i} href={`tel:${num.replaceAll(" ", "")}`} style={{ color: "#006162", textDecoration: "none" }}>{num}</a>
                   ))
                 )}
               </div>
@@ -531,10 +524,17 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             <div>
               <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>LinkedIn</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>
-                {firstLinkedIn !== "--" ? (
-                  <a href={firstLinkedIn} target="_blank" rel="noopener noreferrer" style={{ color: "#006162", textDecoration: "none" }}>{firstLinkedIn}</a>
-                ) : (
+                {firstLinkedIn === "--" ? (
                   "--"
+                ) : (
+                  <a
+                    href={firstLinkedIn}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#006162", textDecoration: "none" }}
+                  >
+                    {firstLinkedIn}
+                  </a>
                 )}
               </div>
             </div>
@@ -1035,7 +1035,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                       } else if (action === "Delete") {
                         handleOpenDeleteCompany();
                       } else if (action === "Export") {
-                        void handleCompanyExport();
+                        handleCompanyExport();
                       }
                       setShowActionsDropdown(false);
                     }}

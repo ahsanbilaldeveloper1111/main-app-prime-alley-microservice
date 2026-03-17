@@ -19,11 +19,7 @@ import GenericTable, {
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -42,8 +38,6 @@ import {
   updateLead,
   getCampaigns,
   getCampaignById,
-  getCrmData,
-  getCrmDataById,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
@@ -52,7 +46,6 @@ import type {
   StageData,
   CampaignData,
   CrmDataItem,
-  IndustryData,
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -61,11 +54,8 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Popover,
   OverlayTrigger,
@@ -89,17 +79,14 @@ import {
   Target,
   CheckCircle,
   TrendingUp,
-  BarChart3,
   Plus,
   Eye,
   Edit,
   Trash2,
   Handshake,
-  MoreVertical,
   X,
   Users,
   Clock,
-  Search,
   Filter,
   Layers,
   Calendar,
@@ -123,8 +110,6 @@ import {
   UserCheck,
   AlertCircle,
   RotateCcw,
-  CheckSquare,
-  Download,
 } from "lucide-react";
 import {
   PieChart,
@@ -716,8 +701,6 @@ const CrmLeads = () => {
   const [editCrmData, setEditCrmData] = useState<CrmDataItem[]>([]);
   const [editSelectedCampaign, setEditSelectedCampaign] =
     useState<CampaignData | null>(null);
-  const [editSelectedCrmData, setEditSelectedCrmData] =
-    useState<CrmDataItem | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editFetching, setEditFetching] = useState(false);
   const [editBusinessTypes, setEditBusinessTypes] = useState<
@@ -1496,203 +1479,8 @@ const CrmLeads = () => {
     }
   };
 
-  // Helper functions
-  const handleSort = (
-    column: string,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-  ) => {
-    const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPaginationState({
-      ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
   const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
     return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-  ) => {
-    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
-    const { currentPage, rowsPerPage } = paginationState;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {dataLength} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return paginationState.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
   };
   // Transform API lead data to UI format
   const transformLeadData = (lead: any): LeadData => {

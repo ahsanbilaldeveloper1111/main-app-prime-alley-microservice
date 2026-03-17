@@ -20,27 +20,8 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "react-icons/fi";
 import {
   getOrders,
   getOrder,
@@ -64,11 +45,9 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
   Table,
-  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -82,9 +61,6 @@ import {
 import {
   Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -92,12 +68,6 @@ import {
   MoreVertical,
   X,
   Users,
-  PlusCircle,
-  Zap,
-  Star,
-  Clock,
-  Search,
-  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -111,21 +81,14 @@ import {
   Activity,
   FileText,
   ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
   History,
   Mail,
-  Phone,
   Building2,
-  Package,
-  Link2,
   User,
   Paperclip,
   Upload,
   Download as DownloadIcon,
   RotateCcw,
-  AlertCircle,
-  Handshake,
   Info,
   Phone as PhoneIcon,
 } from "lucide-react";
@@ -141,7 +104,6 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -492,26 +454,10 @@ const CrmOrders = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
-  const [isOrderEditModeAccount, setIsOrderEditModeAccount] = useState(false);
-  const [isOrderEditModeDelivery, setIsOrderEditModeDelivery] = useState(false);
 
   const [isAccountRole, setIsAccountRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "account") {
-  //     setIsAccountRole(true);
-  //   } else {
-  //     setIsAccountRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
 
   const [isDeliveryRole, setIsDeliveryRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "delivery") {
-  //     setIsDeliveryRole(true);
-  //   } else {
-  //     setIsDeliveryRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
 
   // Which edit mode to show: root (full), account, or delivery — three separate modals
 
@@ -555,7 +501,6 @@ const CrmOrders = () => {
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
 
   // Attachments Modal
@@ -3062,7 +3007,7 @@ const CrmOrders = () => {
                     <KanbanBoard
                       columns={ordersToKanbanColumns(filteredOrders, stages)}
                       onCardClick={(order) =>
-                        handleViewOrder((order.raw as any)?.id ?? order.id)
+                        handleViewOrder(order.raw?.id ?? order.id)
                       }
                       onCardMove={(orderId, fromCol, toCol) => {
                         const order = filteredOrders.find(
