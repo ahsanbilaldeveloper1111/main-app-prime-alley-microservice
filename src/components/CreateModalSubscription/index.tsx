@@ -156,7 +156,7 @@ export default function CreateSubscriptionModal({
     setUploadedImage(url);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
@@ -365,9 +365,14 @@ export default function CreateSubscriptionModal({
           {/* Info icon */}
           <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="When active, this product is available for use in quotes">ⓘ</span>
           {/* Toggle */}
-          <div
+          <button
+            type="button"
+            aria-label="Toggle active"
+            aria-pressed={isActive}
             onClick={() => setIsActive(v => !v)}
             style={{
+              padding: 0,
+              border: "none",
               width: "44px",
               height: "24px",
               borderRadius: "12px",
@@ -389,7 +394,7 @@ export default function CreateSubscriptionModal({
               transition: "left 150ms ease-out",
               boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
             }} />
-          </div>
+          </button>
           {/* Checkmark */}
           {isActive && (
             <span style={{ fontSize: "14px", color: "#2d6ae0" }}>✓</span>
@@ -450,11 +455,14 @@ export default function CreateSubscriptionModal({
             </div>
 
             {/* Image upload */}
-            <div
+            <button
+              type="button"
+              aria-label="Upload product image"
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               style={{
+                padding: 0,
                 width: "180px",
                 height: "120px",
                 border: `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`,
@@ -469,6 +477,7 @@ export default function CreateSubscriptionModal({
                 transition: "150ms ease-out",
                 flexShrink: 0,
                 overflow: "hidden",
+                borderStyle: "dashed",
               }}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -483,20 +492,13 @@ export default function CreateSubscriptionModal({
                 <img src={uploadedImage} alt="product" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <>
-                  <button
-                    style={{ ...BASE_BUTTON }}
-                    onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
-                  >
-                    Upload
-                  </button>
+                  <span style={{ ...BASE_BUTTON }}>Upload</span>
                   <span style={{ fontSize: "12px", color: "#2d6ae0", fontWeight: 300, textDecoration: "underline", cursor: "pointer" }}>
                     Browse images
                   </span>
                 </>
               )}
-            </div>
+            </button>
           </div>
 
           {/* Product description */}
@@ -570,9 +572,10 @@ export default function CreateSubscriptionModal({
 
           {/* Product type */}
           <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
-            <label style={FIELD_LABEL}>Product type</label>
+            <label style={FIELD_LABEL} htmlFor="cms-product-type">Product type</label>
             <div style={{ position: "relative" }}>
               <select
+                id="cms-product-type"
                 value={productType}
                 onChange={e => setProductType(e.target.value)}
                 style={FIELD_SELECT}
@@ -621,27 +624,28 @@ export default function CreateSubscriptionModal({
                 transform: additionalOpen ? "rotate(90deg)" : "rotate(0deg)",
                 fontSize: "11px",
               }}>›</span>
+              {" "}
               Additional product information
             </button>
 
             {additionalOpen && (
               <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div>
-                  <label style={FIELD_LABEL}>Brand</label>
-                  <input type="text" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL} htmlFor="cms-product-brand">Brand</label>
+                  <input id="cms-product-brand" type="text" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
                
                 <div>
-                  <label style={FIELD_LABEL}>URL</label>
-                  <input type="url" placeholder="https://" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL} htmlFor="cms-product-url">URL</label>
+                  <input id="cms-product-url" type="url" placeholder="https://" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
                 <div>
-                  <label style={FIELD_LABEL}>Terms &amp; conditions URL</label>
-                  <input type="url" placeholder="https://" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL} htmlFor="cms-product-terms-url">Terms &amp; conditions URL</label>
+                  <input id="cms-product-terms-url" type="url" placeholder="https://" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
@@ -658,9 +662,10 @@ export default function CreateSubscriptionModal({
           <p style={SECTION_TITLE}>Billing details</p>
 
           <div style={{ maxWidth: "380px" }}>
-            <label style={FIELD_LABEL}>Billing frequency</label>
+            <label style={FIELD_LABEL} htmlFor="cms-product-billing-frequency">Billing frequency</label>
             <div style={{ position: "relative" }}>
               <select
+                id="cms-product-billing-frequency"
                 value={billingFrequency}
                 onChange={e => setBillingFrequency(e.target.value)}
                 style={FIELD_SELECT}
@@ -765,6 +770,7 @@ export default function CreateSubscriptionModal({
                 }}
               >
                 Manage currencies
+                {" "}
                 <span style={{ fontSize: "10px" }}>↗</span>
               </a>
             </div>
@@ -830,11 +836,16 @@ export default function CreateSubscriptionModal({
               {/* Unit cost + Margin */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div>
-                  <label style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
+                  <label
+                    style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}
+                    htmlFor="cms-product-unit-cost"
+                  >
                     Unit cost
+                    {" "}
                     <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="The cost to produce this unit">ⓘ</span>
                   </label>
                   <input
+                    id="cms-product-unit-cost"
                     type="number"
                     value={unitCost}
                     onChange={e => setUnitCost(e.target.value)}
@@ -845,10 +856,10 @@ export default function CreateSubscriptionModal({
                   />
                 </div>
                 <div>
-                  <label style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
-                    Margin
+                  <div style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
+                    Margin{" "}
                     <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="Calculated margin based on price and unit cost">ⓘ</span>
-                  </label>
+                  </div>
                   <div style={{
                     height: "42px",
                     border: "1px solid #e0e0e0",

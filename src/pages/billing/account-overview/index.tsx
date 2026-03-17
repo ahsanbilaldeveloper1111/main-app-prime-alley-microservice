@@ -179,7 +179,11 @@ const AccountOverview = () => {
   }, [selectedCompanyId, currencyOptions.length, normalizeCurrencyOptions]);
 
   useEffect(() => {
-    void loadCustomerAndCurrencies();
+    loadCustomerAndCurrencies().catch((err) => {
+      toast.error(`Failed to load customer/currencies: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_customer_currencies_failed",
+      });
+    });
   }, [loadCustomerAndCurrencies]);
 
   const isCurrencyLocked = useMemo(() => {
@@ -269,7 +273,11 @@ const AccountOverview = () => {
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    void getPaymentMethods();
+    getPaymentMethods().catch((err) => {
+      toast.error(`Failed to load payment methods: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_payment_methods_failed_unhandled",
+      });
+    });
   }, [getPaymentMethods]);
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
@@ -290,7 +298,11 @@ const AccountOverview = () => {
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    void getPaymentHistory();
+    getPaymentHistory().catch((err) => {
+      toast.error(`Failed to load payment history: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_payment_history_failed_unhandled",
+      });
+    });
   }, [getPaymentHistory]);
 
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
@@ -311,7 +323,11 @@ const AccountOverview = () => {
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    void getRecentInvoices();
+    getRecentInvoices().catch((err) => {
+      toast.error(`Failed to load recent invoices: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_recent_invoices_failed_unhandled",
+      });
+    });
   }, [getRecentInvoices]);
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
@@ -376,24 +392,24 @@ const AccountOverview = () => {
 
   useEffect(() => {
     if (selectedCompanyId) {
-      void getDashboardCounters(selectedCompanyId);
+      getDashboardCounters(selectedCompanyId).then(() => undefined);
     }
   }, [selectedCompanyId, getDashboardCounters]);
 
   const goToInvoices = useCallback(() => {
-    void router.push(BILLING_ROUTES.invoices);
+    router.push(BILLING_ROUTES.invoices).then(() => undefined);
   }, []);
 
   const goToBillingSettings = useCallback(() => {
-    void router.push(BILLING_ROUTES.billingSettings);
+    router.push(BILLING_ROUTES.billingSettings).then(() => undefined);
   }, []);
 
   const goToPaymentHistory = useCallback(() => {
-    void router.push(BILLING_ROUTES.paymentHistory);
+    router.push(BILLING_ROUTES.paymentHistory).then(() => undefined);
   }, []);
 
   const goToSubscriptions = useCallback(() => {
-    void router.push(BILLING_ROUTES.subscriptions);
+    router.push(BILLING_ROUTES.subscriptions).then(() => undefined);
   }, []);
 
   const paymentMethodContent = useMemo(() => {
@@ -506,7 +522,9 @@ const AccountOverview = () => {
               value={customerCurrency}
               disabled={isLoadingCustomer || isLoadingCurrencies || isSavingCurrency || isCurrencyLocked}
               title={isCurrencyLocked ? "Currency is already set and cannot be changed." : undefined}
-              onChange={(e) => void handleCurrencyChange(e.target.value)}
+              onChange={(e) => {
+                handleCurrencyChange(e.target.value).then(() => undefined);
+              }}
             >
               <option value="">
                 {isLoadingCustomer || isLoadingCurrencies ? "Loading currencies..." : "Select currency"}
@@ -1186,7 +1204,9 @@ const AccountOverview = () => {
             </Button>
             <Button
               variant="primary"
-              onClick={() => void handleSaveBillingInfo()}
+              onClick={() => {
+                handleSaveBillingInfo().then(() => undefined);
+              }}
               disabled={isSavingBillingInfo}
             >
               Save Changes

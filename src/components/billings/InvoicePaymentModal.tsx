@@ -193,7 +193,7 @@ const DirectCardPaymentForm: React.FC<{
         },
         {
           onSuccess: (paymentResult: any) => {
-            void (async () => {
+            (async () => {
               if (paymentResult?.already_completed) {
                 setIsProcessing(false);
                 onPaymentSuccess();
@@ -224,7 +224,10 @@ const DirectCardPaymentForm: React.FC<{
               setIsProcessing(false);
               onPaymentSuccess();
               toast.success("Payment processed successfully!");
-            })();
+            })().catch((err) => {
+              setCardError(err?.message || "Payment processing failed");
+              setIsProcessing(false);
+            });
           },
           onError: (err) => {
             setCardError(err?.message || "Payment processing failed");
@@ -355,7 +358,9 @@ export function InvoicePaymentModal({
   useEffect(() => {
     if (!show) return;
     loadStripePublishableKey();
-    void getPaymentMethods();
+    getPaymentMethods().catch((err) => {
+      console.error("InvoicePaymentModal getPaymentMethods failed:", err);
+    });
   }, [show, loadStripePublishableKey, getPaymentMethods]);
 
   useEffect(() => {
@@ -557,7 +562,9 @@ export function InvoicePaymentModal({
         <Button
           variant="success"
           className="w-100"
-          onClick={() => void handlePaymentWithSavedCard()}
+          onClick={() => {
+            handlePaymentWithSavedCard().then(() => undefined);
+          }}
           disabled={
             isLoadingPaymentMethods ||
             isProcessingPayment ||

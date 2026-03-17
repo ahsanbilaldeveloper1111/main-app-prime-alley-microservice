@@ -108,7 +108,9 @@ export default function SubscriptionsPage() {
                   type="button"
                   style={styles.btnLight}
                   onClick={() => {
-                    void router.push("/billing/account-billing/billing-history");
+                    router
+                      .push("/billing/account-billing/billing-history")
+                      .then(() => undefined);
                   }}
                 >
                   View invoices
