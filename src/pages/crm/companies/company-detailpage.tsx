@@ -34,6 +34,7 @@ import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCti } from "@hooks/useCti";
 import { toast } from "react-toastify";
+import { exportRecordAsCsv } from "@utils/csvExport";
 import {
   sidebarContainerStyle,
   sidebarCardStyle,
@@ -648,38 +649,15 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     );
   };
 
-  const handleCompanyExport = useCallback(async () => {
+  const handleCompanyExport = useCallback(() => {
     if (!company) return;
     const id = company.id ?? companyRecordId;
-    const name = `company_${id}.csv`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
-      const row = company as any;
-      const headers = Object.keys(row).filter(
-        (k) => typeof row[k] !== "object",
-      );
-      const csvRows = [
-        headers.join(","),
-        headers
-          .map((h) => {
-            const val = row[h];
-            if (val == null) return "";
-            if (typeof val === "object") return "";
-            const s = String(val).replaceAll('"', '""');
-            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-          })
-          .join(","),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
+      exportRecordAsCsv({
+        row: company as unknown as Record<string, unknown>,
+        fileName: `company_${id}.csv`,
       });
-      const url = globalThis.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      globalThis.URL.revokeObjectURL(url);
       toast.success("Exported company successfully!");
     } catch (err) {
       toast.error("Failed to export company");

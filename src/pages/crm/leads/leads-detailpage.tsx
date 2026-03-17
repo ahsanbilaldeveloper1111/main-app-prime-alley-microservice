@@ -41,6 +41,7 @@ import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
+import { exportRecordAsCsv } from "@utils/csvExport";
 import {
   sidebarContainerStyle,
   sidebarCardStyle,
@@ -366,39 +367,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
     }
   }, [leadToDelete, router]);
 
-  const handleLeadsExport = useCallback(async () => {
+  const handleLeadsExport = useCallback(() => {
     if (!lead) return;
-    const name = `lead_${lead.id}.csv`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
-      const row = lead as any;
-      const headers = Object.keys(row).filter(
-        (k) =>
-          !["campaign", "stage", "contact_persons", "audit_trail"].includes(k) &&
-          typeof row[k] !== "object",
-      );
-      const csvRows = [
-        headers.join(","),
-        headers
-          .map((h) => {
-            const val = row[h];
-            if (val == null) return "";
-            if (typeof val === "object") return "";
-            const s = String(val).replaceAll('"', '""');
-            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-          })
-          .join(","),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
+      exportRecordAsCsv({
+        row: lead as unknown as Record<string, unknown>,
+        fileName: `lead_${lead.id}.csv`,
+        excludeKeys: ["campaign", "stage", "contact_persons", "audit_trail"],
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      URL.revokeObjectURL(url);
       toast.success("Exported lead successfully!");
     } catch (err) {
       toast.error("Failed to export lead");
