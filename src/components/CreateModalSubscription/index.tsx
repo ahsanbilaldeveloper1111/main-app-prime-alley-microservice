@@ -26,10 +26,9 @@ import {
   onDarkBorderLeave,
   onLightBgEnter,
   onLightBgLeave,
-  onSubBarBtnEnter,
-  onSubBarBtnLeave,
   SelectCaret,
 } from "@components/shared/modalUiHelpers";
+import { FullScreenModalShell, SubBarButton } from "@components/shared/FullScreenModalShell";
 
 interface CreateSubscriptionModalProps {
   customerId: string | number;
@@ -208,158 +207,52 @@ export default function CreateSubscriptionModal({
     [submitCreateProduct],
   );
 
+  const topBarActions = (
+    <>
+      <button
+        onClick={() => handleSubmitMode("create_and_add_another")}
+        style={{
+          ...BASE_BUTTON,
+          backgroundColor: "transparent",
+          borderColor: "rgba(255,255,255,0.35)",
+          color: "#fff",
+        }}
+        onMouseEnter={onDarkBorderEnter}
+        onMouseLeave={onDarkBorderLeave}
+        disabled={submitting}
+      >
+        Create and add another
+      </button>
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => handleSubmitMode("create")}
+          style={{
+            ...BASE_BUTTON,
+            backgroundColor: "#fff",
+            color: "#141414",
+            fontWeight: 400,
+            paddingInline: "20px",
+          }}
+          onMouseEnter={onLightBgEnter}
+          onMouseLeave={onLightBgLeave}
+          disabled={submitting}
+        >
+          Create
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 99999,
-      backgroundColor: "#f0f0f0",
-      display: "flex",
-      flexDirection: "column",
-      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-    }}>
-      {/* ── Top bar ── */}
-      <div style={{
-        height: "52px",
-        backgroundColor: "#1a1a1a",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingInline: "20px",
-        flexShrink: 0,
-      }}>
-        {/* Exit */}
-        <button
-          onClick={onClose}
-          style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-          onMouseEnter={onDarkBorderEnter}
-          onMouseLeave={onDarkBorderLeave}
-        >
-          Exit
-        </button>
-
-        {/* Title */}
-        <span style={{ color: "#fff", fontSize: "14px", fontWeight: 400, fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
-          Create Subscription
-        </span>
-
-        {/* Right actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            onClick={() => handleSubmitMode("create_and_add_another")}
-            style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-            onMouseEnter={onDarkBorderEnter}
-            onMouseLeave={onDarkBorderLeave}
-            disabled={submitting}
-          >
-            Create and add another
-          </button>
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => handleSubmitMode("create")}
-              style={{ ...BASE_BUTTON, backgroundColor: "#fff", color: "#141414", fontWeight: 400, paddingInline: "20px" }}
-              onMouseEnter={onLightBgEnter}
-              onMouseLeave={onLightBgLeave}
-              disabled={submitting}
-            >
-              Create
-            </button>
-            {/* Badge
-            <span style={{
-              position: "absolute",
-              top: "-8px",
-              right: "-8px",
-              width: "18px",
-              height: "18px",
-              borderRadius: "50%",
-              backgroundColor: "#e53e3e",
-              color: "#fff",
-              fontSize: "10px",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "2px solid #1a1a1a",
-            }}>2</span> */}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Sub bar ── */}
-      <div style={{
-        height: "44px",
-        backgroundColor: "#fff",
-        borderBottom: "1px solid #e0e0e0",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingInline: "20px",
-        flexShrink: 0,
-      }}>
-        <button
-          style={{ ...BASE_BUTTON }}
-          onMouseEnter={onSubBarBtnEnter}
-          onMouseLeave={onSubBarBtnLeave}
-        >
-          Edit this form
-        </button>
-
-        {/* Active toggle */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "12px", color: "#141414", fontWeight: 300 }}>Active:</span>
-          {/* Info icon */}
-          <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="When active, this product is available for use in quotes">ⓘ</span>
-          {/* Toggle */}
-          <button
-            type="button"
-            aria-label="Toggle active"
-            aria-pressed={isActive}
-            onClick={() => setIsActive(v => !v)}
-            style={{
-              padding: 0,
-              border: "none",
-              width: "44px",
-              height: "24px",
-              borderRadius: "12px",
-              backgroundColor: isActive ? "#2d6ae0" : "#ccc",
-              cursor: "pointer",
-              transition: "background-color 150ms ease-out",
-              position: "relative",
-              flexShrink: 0,
-            }}
-          >
-            <div style={{
-              position: "absolute",
-              top: "3px",
-              left: isActive ? "23px" : "3px",
-              width: "18px",
-              height: "18px",
-              borderRadius: "50%",
-              backgroundColor: "#fff",
-              transition: "left 150ms ease-out",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-            }} />
-          </button>
-          {/* Checkmark */}
-          {isActive && (
-            <span style={{ fontSize: "14px", color: "#2d6ae0" }}>✓</span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Scrollable body ── */}
-      <div style={{
-        flex: 1,
-        overflowY: "auto",
-        padding: "24px",
-        maxWidth: "90%",
-        width: "90%",
-        margin: "0 auto",
-        boxSizing: "border-box",
-      }}>
-
-        {/* ── Product information ── */}
-        <div style={SECTION_CARD}>
+    <FullScreenModalShell
+      title="Create Subscription"
+      onClose={onClose}
+      topBarActions={topBarActions}
+      subBarLeft={<SubBarButton>Edit this form</SubBarButton>}
+      isActive={isActive}
+      onToggleActive={() => setIsActive((v) => !v)}
+    >
+      <div style={SECTION_CARD}>
           <p style={SECTION_TITLE}>Product information</p>
 
           {submitError && (
@@ -791,20 +684,15 @@ export default function CreateSubscriptionModal({
               fontWeight: 300,
             }}>
               <p style={{ margin: 0 }}>Tiered pricing lets you set different rates based on quantity ranges.</p>
-              <button
-                style={{ ...BASE_BUTTON, marginTop: "16px" }}
-                onMouseEnter={onSubBarBtnEnter}
-                onMouseLeave={onSubBarBtnLeave}
-              >
-                + Add tier
-              </button>
+              <div style={{ marginTop: "16px" }}>
+                <SubBarButton>+ Add tier</SubBarButton>
+              </div>
             </div>
           )}
         </div>
 
         {/* Bottom spacing */}
         <div style={{ height: "40px" }} />
-      </div>
-    </div>
+    </FullScreenModalShell>
   );
 }
