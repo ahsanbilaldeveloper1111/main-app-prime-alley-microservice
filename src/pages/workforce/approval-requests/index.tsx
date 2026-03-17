@@ -10,7 +10,8 @@ import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
-  getUserRequests,getUserRequest,
+  getUserRequests,
+  getUserRequest,
   updateUserRequest,
   deleteUserRequest,
   downloadUserRequestAttachment,
@@ -18,25 +19,18 @@ import {
   type UserRequestCategoryField,
   type UserRequest,
 } from "@utils/staffManagement";
-import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Badge, Button, Modal, Form } from "react-bootstrap";
+import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
 
 import {
-  Search,
-  ChevronDown,
   FileText,
   Calendar,
   UserPlus,
   User,
   File,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Plus,
-  Pencil,
-  Trash2,
   Download,
 } from "lucide-react";
 import ApprovalDetailSidebar from "./sidebar";
@@ -53,17 +47,7 @@ function formatRequestDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "—";
-  }
-}
-
-function formatRequestDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return "—";
   }
@@ -73,7 +57,7 @@ function getAgingLabel(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return "—";
+    if (Number.isNaN(d.getTime())) return "—";
     const days = Math.floor((Date.now() - d.getTime()) / (24 * 60 * 60 * 1000));
     if (days < 1) return "Less than 1 day";
     if (days <= 3) return "1-3 days";
@@ -113,6 +97,200 @@ function getDateRangeForOption(option: string): { start_date_from: string; start
   return { start_date_from: fromStr, start_date_to: toStr };
 }
 
+function parseOpenIdFromQuery(openId: string | string[] | undefined): string | undefined {
+  if (typeof openId === "string") return openId;
+  if (Array.isArray(openId)) return openId[0];
+  return undefined;
+}
+
+function requestStatusBadgeVariant(status: string | null | undefined): "success" | "danger" | "info" {
+  const s = status?.toLowerCase();
+  if (s === "approved") return "success";
+  if (s === "rejected") return "danger";
+  return "info";
+}
+
+function getMultiselectValues(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[];
+  if (typeof raw === "string") return raw.split(",").filter(Boolean);
+  return [];
+}
+
+function dynamicFieldInputType(fieldType: string): "number" | "date" | "text" {
+  if (fieldType === "number") return "number";
+  if (fieldType === "date") return "date";
+  return "text";
+}
+
+function isFileOrAttachmentField(field: UserRequestCategoryField): boolean {
+  const t = String(field.type);
+  return t === "file" || t === "attachment";
+}
+
+type EditDynamicFieldsProps = {
+  fields: UserRequestCategoryField[];
+  dynamic_fields: Record<string, unknown>;
+  onDynamicFieldChange: (key: string, value: unknown) => void;
+  onDynamicFileChange: (key: string, file: File | null) => void;
+};
+
+type EditDynamicFieldRowProps = {
+  field: UserRequestCategoryField;
+  dynamic_fields: Record<string, unknown>;
+  onDynamicFieldChange: (key: string, value: unknown) => void;
+  onDynamicFileChange: (key: string, file: File | null) => void;
+};
+
+function EditRequestDynamicFieldRow({
+  field,
+  dynamic_fields,
+  onDynamicFieldChange,
+  onDynamicFileChange,
+}: Readonly<EditDynamicFieldRowProps>) {
+  const fieldKey = field.key ?? "";
+
+  if (field.type === "textarea") {
+    return (
+      <Form.Control
+        as="textarea"
+        rows={2}
+        value={(dynamic_fields[fieldKey] as string) ?? ""}
+        onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
+        placeholder={field.config?.placeholder ?? undefined}
+      />
+    );
+  }
+
+  if (isFileOrAttachmentField(field)) {
+    return (
+      <Form.Control
+        type="file"
+        onChange={(e) => {
+          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+          onDynamicFileChange(fieldKey, file);
+        }}
+      />
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <Form.Select
+        value={(dynamic_fields[fieldKey] as string) ?? ""}
+        onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
+      >
+        <option value="">Select...</option>
+        {(field.options ?? []).map((opt: { value: string; label: string }) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </Form.Select>
+    );
+  }
+
+  if (field.type === "multiselect") {
+    return (
+      <Form.Select
+        multiple
+        value={getMultiselectValues(dynamic_fields[fieldKey])}
+        onChange={(e) => {
+          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (o) => o.value);
+          onDynamicFieldChange(fieldKey, selected);
+        }}
+      >
+        {(field.options ?? []).map((opt: { value: string; label: string }) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </Form.Select>
+    );
+  }
+
+  if (field.type === "radio") {
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {(field.options ?? []).map((opt: { value: string; label: string }) => (
+          <Form.Check
+            key={opt.value}
+            type="radio"
+            id={`edit-${field.key}-${opt.value}`}
+            name={fieldKey}
+            label={opt.label}
+            value={opt.value}
+            checked={(dynamic_fields[fieldKey] as string) === opt.value}
+            onChange={() => onDynamicFieldChange(fieldKey, opt.value)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {(field.options ?? []).map((opt: { value: string; label: string }) => {
+          const arr = getMultiselectValues(dynamic_fields[fieldKey]);
+          const checked = arr.includes(opt.value);
+          const next = checked ? arr.filter((v) => v !== opt.value) : [...arr, opt.value];
+          return (
+            <Form.Check
+              key={opt.value}
+              type="checkbox"
+              id={`edit-${field.key}-${opt.value}`}
+              label={opt.label}
+              checked={checked}
+              onChange={() => onDynamicFieldChange(fieldKey, next)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <Form.Control
+      type={dynamicFieldInputType(field.type)}
+      value={(dynamic_fields[fieldKey] as string) ?? ""}
+      onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
+      placeholder={field.config?.placeholder ?? undefined}
+    />
+  );
+}
+
+function EditRequestAdditionalFieldsSection(props: Readonly<EditDynamicFieldsProps>) {
+  const { fields, dynamic_fields, onDynamicFieldChange, onDynamicFileChange } = props;
+  return (
+    <Form.Group className="mb-3">
+      <Form.Label>Additional fields</Form.Label>
+      <div className="border rounded p-3 bg-light">
+        {fields.map((field) => (
+          <div key={field.id} className="mb-2">
+            <Form.Label className="small mb-1">
+              {field.label ?? field.key}
+              {field.required ? " *" : ""}
+            </Form.Label>
+            <EditRequestDynamicFieldRow
+              field={field}
+              dynamic_fields={dynamic_fields}
+              onDynamicFieldChange={onDynamicFieldChange}
+              onDynamicFileChange={onDynamicFileChange}
+            />
+          </div>
+        ))}
+      </div>
+    </Form.Group>
+  );
+}
+
+type UserRequestAttachmentRow = {
+  id: number;
+  original_name?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+};
+
 const ApprovalRequest = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -122,7 +300,7 @@ const ApprovalRequest = () => {
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
       const idStr = String(userId);
-      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
+      const u = mainAppUsers?.find((x: MainAppUserLookup) => String(x.id) === idStr);
       return u?.name ?? idStr;
     },
     [mainAppUsers]
@@ -134,11 +312,6 @@ const ApprovalRequest = () => {
   const [selectedRequestedByUserId, setSelectedRequestedByUserId] = useState<string | null>(null);
   const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedAging, setSelectedAging] = useState("");
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  const [showRequestedByDropdown, setShowRequestedByDropdown] = useState(false);
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
-  const [showAgingDropdown, setShowAgingDropdown] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState<UserRequest | null>(null);
 
@@ -180,12 +353,13 @@ const ApprovalRequest = () => {
         setCategories(data ?? []);
         setCategoryFields({});
         if (data?.length) {
-          const fieldsByCategory = await Promise.all(
-            data.map(async (cat) => {
+          const fieldsByCategory: Array<{ id: number; fields: UserRequestCategoryField[] }> = await Promise.all(
+            data.map(async (cat: UserRequestCategory) => {
               try {
                 const fields = await getUserRequestCategoryFields(cat.id);
                 return { id: cat.id, fields };
-              } catch {
+              } catch (err) {
+                console.error(`Failed to load fields for category ${cat.id}`, err);
                 return { id: cat.id, fields: [] };
               }
             })
@@ -196,7 +370,8 @@ const ApprovalRequest = () => {
           });
           setCategoryFields(map);
         }
-      } catch {
+      } catch (err) {
+        console.error("Failed to load request categories", err);
         setCategories([]);
         setCategoryFields({});
       } finally {
@@ -223,8 +398,8 @@ const ApprovalRequest = () => {
         if (searchTerm?.trim()) params.search = searchTerm.trim();
         const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
-        if (selectedRequestedByUserId != null && selectedRequestedByUserId.trim())
-          params.user_ids = [selectedRequestedByUserId.trim()];
+        const requestedByTrimmed = selectedRequestedByUserId?.trim();
+        if (requestedByTrimmed) params.user_ids = [requestedByTrimmed];
         const dateRange = getDateRangeForOption(selectedDate ?? "");
         if (dateRange) {
           params.created_at_from = dateRange.start_date_from;
@@ -234,7 +409,8 @@ const ApprovalRequest = () => {
         setRequests(data ?? []);
         if (p) setRequestsPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
         else setRequestsPagination(null);
-      } catch {
+      } catch (err) {
+        console.error("Failed to load approval requests", err);
         setRequests([]);
         setRequestsPagination(null);
       } finally {
@@ -255,16 +431,15 @@ const ApprovalRequest = () => {
   // Open sidebar when navigating from notification with ?openId= (target_id)
   useEffect(() => {
     if (!router.isReady || !router.query.openId) return;
-    const openId = router.query.openId;
-    const id = typeof openId === "string" ? openId : Array.isArray(openId) ? openId[0] : undefined;
+    const id = parseOpenIdFromQuery(router.query.openId);
     if (!id || Number.isNaN(Number(id))) return;
     let cancelled = false;
     (async () => {
       try {
         const request = await getUserRequest(Number(id));
         if (!cancelled && request) setSelectedRequest(request);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error("Failed to open request from notification", err);
       } finally {
         if (!cancelled) {
           const { openId: _, ...rest } = router.query;
@@ -278,22 +453,6 @@ const ApprovalRequest = () => {
   const refreshRequests = useCallback(() => {
     loadRequests(currentPage);
   }, [loadRequests, currentPage]);
-
-  const handleDeleteRequest = useCallback(
-    async (request: UserRequest, e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!globalThis.confirm("Delete this request? This action cannot be undone.")) return;
-      try {
-        await deleteUserRequest(request.id);
-        toast.success("Request deleted");
-        refreshRequests();
-        if (selectedRequest?.id === request.id) setSelectedRequest(null);
-      } catch {
-        // toast handled in API
-      }
-    },
-    [refreshRequests, selectedRequest?.id]
-  );
 
   const openCreateModal = useCallback(() => {
     setShowCreateModal(true);
@@ -341,8 +500,8 @@ const ApprovalRequest = () => {
         setShowEditModal(false);
         setEditingRequest(null);
         refreshRequests();
-      } catch {
-        // toast handled in API
+      } catch (err) {
+        console.error("Failed to update request", err);
       } finally {
         setEditSubmitting(false);
       }
@@ -355,13 +514,11 @@ const ApprovalRequest = () => {
   const types = typeOptionsFromCategories.length > 0 ? typeOptionsFromCategories : ["Leave", "Document", "Onboarding", "Profile"];
   const requestedByUsers = Array.isArray(mainAppUsers) ? mainAppUsers : [];
   const selectedRequestedByName =
-    selectedRequestedByUserId != null
-      ? (requestedByUsers.find((u) => String(u.id) === selectedRequestedByUserId)?.name ?? selectedRequestedByUserId)
-      : "";
-  const dateOptions = ["Today","Last 7 days", "Last 30 days", "Last 3 months", "All time"];
-  const agingOptions = ["Less than 1 day", "1-3 days", "3-7 days", "More than 7 days"];
-
-  const totalPages = requestsPagination?.last_page ?? 1;
+    selectedRequestedByUserId == null
+      ? ""
+      : (requestedByUsers.find((u: MainAppUserLookup) => String(u.id) === selectedRequestedByUserId)?.name ??
+        selectedRequestedByUserId);
+  const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
 
   const getCategoryName = (categoryId: number | string | null): string => {
@@ -379,775 +536,526 @@ const ApprovalRequest = () => {
     if (name.includes("profile")) return "profile";
     return "file";
   };
-  
-    const getTypeIcon = (iconType: string) => {
-      switch (iconType) {
-        case 'leave':
-          return <Calendar size={16} color="#6366f1" />;
-        case 'document':
-          return <FileText size={16} color="#8b5cf6" />;
-        case 'onboarding':
-          return <UserPlus size={16} color="#10b981" />;
-        case 'profile':
-          return <User size={16} color="#6366f1" />;
-        default:
-          return <File size={16} color="#6b7280" />;
-      }
-    };
-  
-    const getTypeColor = (type: string) => {
-      switch (type) {
-        case 'Leave':
-          return '#dbeafe';
-        case 'Document':
-          return '#f3e8ff';
-        case 'Onboarding':
-          return '#d1fae5';
-        case 'Profile':
-          return '#dbeafe';
-        default:
-          return '#f3f4f6';
-      }
-    };
-  
 
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
-      <div >
-      <div >
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-          flexWrap: "wrap",
-          gap: "16px",
-        }}>
-          <h1 style={{ fontSize: "28px", fontWeight: "600", color: "#111827", margin: 0 }}>
-            Approval Requests
-          </h1>
-          {session?.user?.permissions?.includes('add-approval-request-staff-management') && (
-          <button
-            type="button"
-            onClick={openCreateModal}
+  const getTypeIcon = (iconType: string) => {
+    switch (iconType) {
+      case "leave":
+        return <Calendar size={16} color="#6366f1" />;
+      case "document":
+        return <FileText size={16} color="#8b5cf6" />;
+      case "onboarding":
+        return <UserPlus size={16} color="#10b981" />;
+      case "profile":
+        return <User size={16} color="#6366f1" />;
+      default:
+        return <File size={16} color="#6b7280" />;
+    }
+  };
+
+  const getTypeColor = (iconType: string) => {
+    switch (iconType) {
+      case "leave":
+        return "#dbeafe";
+      case "document":
+        return "#f3e8ff";
+      case "onboarding":
+        return "#d1fae5";
+      case "profile":
+        return "#dbeafe";
+      default:
+        return "#f3f4f6";
+    }
+  };
+
+  const requestTabs = useMemo(
+    () => [
+      { id: "All", label: "All", removable: false },
+      { id: "Pending", label: "Pending", removable: false },
+      { id: "Approved", label: "Approved", removable: false },
+      { id: "Rejected", label: "Rejected", removable: false },
+    ],
+    []
+  );
+
+  const requestColumns = useMemo<TableColumn<UserRequest>[]>(
+    () => [
+      {
+        key: "subject",
+        label: "Request",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <div style={{ fontSize: "14px", fontWeight: 500, color: "#1f2937" }}>
+            {request.subject ?? "—"}
+          </div>
+        ),
+      },
+      {
+        key: "type",
+        label: "Type",
+        type: "custom",
+        sortable: false,
+        render: (request) => {
+          const iconType = getTypeIconFromCategory(request.user_request_category_id);
+          const categoryName = getCategoryName(request.user_request_category_id);
+          return (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 10px",
+                backgroundColor: getTypeColor(iconType),
+                borderRadius: "6px",
+              }}
+            >
+              {getTypeIcon(iconType)}
+              <span style={{ fontSize: "13px", fontWeight: 500, color: "#1f2937" }}>
+                {categoryName}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        key: "requested_by",
+        label: "Requested By",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>{getDisplayName(request.user_id)}</span>
+        ),
+      },
+      {
+        key: "submitted_on",
+        label: "Submitted On",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>
+            {formatRequestDate((request as UserRequest & { created_at?: string }).created_at)}
+          </span>
+        ),
+      },
+      {
+        key: "aging",
+        label: "Aging",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <span
+            style={{
+              padding: "4px 12px",
+              backgroundColor: "#fef3c7",
+              color: "#92400e",
+              borderRadius: "16px",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            {getAgingLabel((request as UserRequest & { created_at?: string }).created_at)}
+          </span>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <Badge bg={requestStatusBadgeVariant(request.status)} className="text-capitalize">
+            {request.status}
+          </Badge>
+        ),
+      },
+      {
+        key: "approved_rejected_by",
+        label: "Approved/Rejected By",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>
+            {getDisplayName(request.approved_by_user_id)}
+          </span>
+        ),
+      },
+      {
+        key: "approved_rejected_on",
+        label: "Approved/Rejected On",
+        type: "custom",
+        sortable: false,
+        render: (request) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>{formatRequestDate(request.approved_at)}</span>
+        ),
+      },
+    ],
+    [getDisplayName, categories]
+  );
+
+  const requestedByDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+        <input
+          type="text"
+          placeholder="Search user..."
+          value={requestedBySearchTerm}
+          onChange={(e) => setRequestedBySearchTerm(e.target.value)}
+          style={{
+            width: "100%",
+            marginBottom: "8px",
+            padding: "8px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "6px",
+            fontSize: "13px",
+          }}
+        />
+        <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+          <label
             style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              padding: "10px 20px",
-              backgroundColor: categories.length === 0 ? "#e5e7eb" : "#6366f1",
-              color: categories.length === 0 ? "#9ca3af" : "white",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: categories.length === 0 ? "not-allowed" : "pointer",
+              padding: "6px 4px",
+              fontSize: "13px",
+              cursor: "pointer",
             }}
           >
-            <Plus size={18} />
-            New Request
-          </button>
-          )}
-        </div>
-        {/* Tabs */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          marginBottom: '24px',
-          borderBottom: '2px solid #e5e7eb'
-        }}>
-          {(['All','Pending', 'Approved', 'Rejected'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                setCurrentPage(1);
-              }}
-              style={{
-                padding: '12px 24px',
-                background: activeTab === tab ? '#6366f1' : '#e5e7eb',
-                color: activeTab === tab ? 'white' : '#6b7280',
-                border: 'none',
-                borderRadius: '8px 8px 0 0',
-                cursor: 'pointer',
-                fontSize: '15px',
-                fontWeight: '500',
-                transition: 'all 0.2s'
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "12px",
-          marginBottom: "24px",
-          alignItems: "center",
-        }}>
-          {/* Search Bar */}
-          <div style={{ position: "relative", flex: "1 1 300px", minWidth: "250px" }}>
-            <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: '16px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }} 
-            />
             <input
-              type="text"
-              placeholder="Search keyword ..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 16px 10px 48px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                backgroundColor: 'white',
-              }}
+              type="radio"
+              name="approval-request-user-filter"
+              checked={selectedRequestedByUserId == null}
+              onChange={() => setSelectedRequestedByUserId(null)}
             />
-          </div>
-
-          {/* Type Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                minWidth: '140px',
-                justifyContent: 'space-between'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileText size={16} />
-                <span>{selectedType || 'Type'}</span>
-              </div>
-              <ChevronDown size={16} />
-            </button>
-            {showTypeDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '200px'
-              }}>
-                <div
-                  onClick={() => {
-                    setSelectedType('');
-                    setShowTypeDropdown(false);
-                  }}
+            <span>All Users</span>
+          </label>
+          {requestedByUsers
+            .filter((u: MainAppUserLookup) => {
+              const name = String(u.name ?? "");
+              const q = requestedBySearchTerm.trim().toLowerCase();
+              return q.length === 0 || name.toLowerCase().includes(q);
+            })
+            .map((u: MainAppUserLookup) => {
+              const uid = String(u.id);
+              const isSelected = selectedRequestedByUserId != null && uid === selectedRequestedByUserId;
+              return (
+                <label
+                  key={uid}
                   style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#6366f1'
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "6px 4px",
+                    fontSize: "13px",
+                    cursor: "pointer",
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
-                  All Types
-                </div>
-                {types.map(type => (
-                  <div
-                    key={type}
-                    onClick={() => {
-                      setSelectedType(type);
-                      setShowTypeDropdown(false);
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      backgroundColor: selectedType === type ? '#f3f4f6' : 'white'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedType === type ? '#f3f4f6' : 'white'}
-                  >
-                    {type}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Requested By Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowRequestedByDropdown(!showRequestedByDropdown)}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                minWidth: '160px',
-                justifyContent: 'space-between'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <User size={16} />
-                <span>{selectedRequestedByName || 'Requested by'}</span>
-              </div>
-              <ChevronDown size={16} />
-            </button>
-            {showRequestedByDropdown && (
-              <div onClick={(e) => e.stopPropagation()} style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '200px',
-                maxHeight: '280px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
                   <input
-                    type="text"
-                    placeholder="Search user..."
-                    value={requestedBySearchTerm}
-                    onChange={(e) => setRequestedBySearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
+                    type="radio"
+                    name="approval-request-user-filter"
+                    checked={isSelected}
+                    onChange={() => setSelectedRequestedByUserId(uid)}
                   />
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  <div
-                    onClick={() => {
-                      setSelectedRequestedByUserId(null);
-                      setShowRequestedByDropdown(false);
-                      setRequestedBySearchTerm('');
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      color: '#6366f1',
-                      backgroundColor: selectedRequestedByUserId === null ? '#f3f4f6' : 'white'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedRequestedByUserId === null ? '#f3f4f6' : 'white'}
-                  >
-                    All Users
-                  </div>
-                  {requestedByUsers
-                    .filter((u) => !requestedBySearchTerm.trim() || (u.name?.toLowerCase().includes(requestedBySearchTerm.trim().toLowerCase()) ?? false))
-                    .map((u) => {
-                      const uid = String(u.id);
-                      const isSelected = selectedRequestedByUserId != null && uid === selectedRequestedByUserId;
-                      return (
-                        <div
-                          key={u.id}
-                          onClick={() => {
-                            setSelectedRequestedByUserId(uid);
-                            setShowRequestedByDropdown(false);
-                            setRequestedBySearchTerm('');
-                          }}
-                          style={{
-                            padding: '10px 16px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            backgroundColor: isSelected ? '#f3f4f6' : 'white'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'}
-                        >
-                          {u.name}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* All Dates Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowDateDropdown(!showDateDropdown)}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                minWidth: '140px',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span>{selectedDate || 'All Dates'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {showDateDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '180px'
-              }}>
-                <div
-                  onClick={() => {
-                    setSelectedDate('');
-                    setShowDateDropdown(false);
-                  }}
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#6366f1'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  All Dates
-                </div>
-                {dateOptions.map(option => (
-                  <div
-                    key={option}
-                    onClick={() => {
-                      setSelectedDate(option);
-                      setShowDateDropdown(false);
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      backgroundColor: selectedDate === option ? '#f3f4f6' : 'white'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDate === option ? '#f3f4f6' : 'white'}
-                  >
-                    {option}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* All Aging Filter */}
-          {/* <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowAgingDropdown(!showAgingDropdown)}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                minWidth: '140px',
-                justifyContent: 'space-between'
-              }}
-            >
-              <span>{selectedAging || 'All Aging'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {showAgingDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '180px'
-              }}>
-                <div
-                  onClick={() => {
-                    setSelectedAging('');
-                    setShowAgingDropdown(false);
-                  }}
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#6366f1'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  All Aging
-                </div>
-                {agingOptions.map(option => (
-                  <div
-                    key={option}
-                    onClick={() => {
-                      setSelectedAging(option);
-                      setShowAgingDropdown(false);
-                    }}
-                    style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      backgroundColor: selectedAging === option ? '#f3f4f6' : 'white'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedAging === option ? '#f3f4f6' : 'white'}
-                  >
-                    {option}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div> */}
-
+                  <span>{u.name}</span>
+                </label>
+              );
+            })}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
           <button
+            type="button"
+            onClick={() => {
+              setCurrentPage(1);
+              setRequestedBySearchTerm("");
+            }}
+            style={{
+              border: "none",
+              backgroundColor: "#6366f1",
+              color: "white",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedRequestedByUserId(null);
+              setRequestedBySearchTerm("");
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "1px solid #d1d5db",
+              backgroundColor: "white",
+              color: "#374151",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    ),
+    [requestedBySearchTerm, selectedRequestedByUserId, requestedByUsers]
+  );
+
+  const filterPills = useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "approval-type",
+        label: "Type",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(selectedType),
+        activeLabel: selectedType || undefined,
+        onClear: selectedType
+          ? () => {
+              setSelectedType("");
+              setCurrentPage(1);
+            }
+          : undefined,
+        dropdownOptions: [
+          {
+            label: "All Types",
+            value: "__all__",
+            onClick: () => {
+              setSelectedType("");
+              setCurrentPage(1);
+            },
+          },
+          ...types.map((type) => ({
+            label: type,
+            value: type,
+            onClick: () => {
+              setSelectedType(type);
+              setCurrentPage(1);
+            },
+          })),
+        ],
+      },
+      {
+        id: "approval-requested-by",
+        label: "Requested by",
+        showDropdown: true,
+        active: Boolean(selectedRequestedByUserId),
+        activeLabel: selectedRequestedByName || undefined,
+        onClear: selectedRequestedByUserId
+          ? () => {
+              setSelectedRequestedByUserId(null);
+              setRequestedBySearchTerm("");
+              setCurrentPage(1);
+            }
+          : undefined,
+        dropdownContent: requestedByDropdownContent,
+      },
+      {
+        id: "approval-date",
+        label: "Dates",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(selectedDate),
+        activeLabel: selectedDate || undefined,
+        onClear: selectedDate
+          ? () => {
+              setSelectedDate("");
+              setCurrentPage(1);
+            }
+          : undefined,
+        dropdownOptions: [
+          {
+            label: "All Dates",
+            value: "__all__",
+            onClick: () => {
+              setSelectedDate("");
+              setCurrentPage(1);
+            },
+          },
+          ...dateOptions.map((option) => ({
+            label: option,
+            value: option,
+            onClick: () => {
+              setSelectedDate(option);
+              setCurrentPage(1);
+            },
+          })),
+        ],
+      },
+    ],
+    [
+      selectedType,
+      types,
+      selectedRequestedByUserId,
+      selectedRequestedByName,
+      requestedByDropdownContent,
+      selectedDate,
+      dateOptions,
+    ]
+  );
+
+  const approvalToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: searchTerm,
+      searchPlaceholder: "Search keyword ...",
+      onSearchChange: setSearchTerm,
+      onSearch: () => {
+        setCurrentPage(1);
+        loadRequests(1);
+      },
+      showTabs: true,
+      tabs: requestTabs,
+      activeTab,
+      onTabChange: (tabId: string) => {
+        if (tabId === "All" || tabId === "Pending" || tabId === "Approved" || tabId === "Rejected") {
+          setActiveTab(tabId);
+          setCurrentPage(1);
+        }
+      },
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      customActions: (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            type="button"
             onClick={() => {
               setCurrentPage(1);
               loadRequests(1);
             }}
             style={{
-              padding: "10px 24px",
+              border: "none",
               backgroundColor: "#6366f1",
               color: "white",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: "500",
-              marginLeft: "auto",
+              borderRadius: "6px",
+              padding: "7px 12px",
+              fontSize: "13px",
+              fontWeight: 500,
             }}
           >
             Search
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm("");
+              setSelectedType("");
+              setSelectedRequestedByUserId(null);
+              setRequestedBySearchTerm("");
+              setSelectedDate("");
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "1px solid #d1d5db",
+              backgroundColor: "white",
+              color: "#374151",
+              borderRadius: "6px",
+              padding: "7px 12px",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            Clear
+          </button>
         </div>
+      ),
+    }),
+    [
+      searchTerm,
+      loadRequests,
+      requestTabs,
+      activeTab,
+      filterPills,
+    ]
+  );
 
-        
+  const requestsSummary =
+    totalRequests === 0
+      ? "Showing 0 of 0 requests"
+      : `Showing ${((currentPage - 1) * (requestsPagination?.limit ?? 10)) + 1}-${Math.min(currentPage * (requestsPagination?.limit ?? 10), totalRequests)} of ${totalRequests} requests`;
 
-        {/* Inbox Header */}
-        {/* <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '16px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937', margin: 0 }}>
-              Inbox
-            </h2>
-            <div style={{
-              padding: '4px 12px',
-              backgroundColor: '#e5e7eb',
-              borderRadius: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                {totalRequests}
-              </span>
-            </div>
-          </div>
-          <div style={{ fontSize: '14px', color: '#6b7280' }}>
-            {totalRequests} {activeTab}
-          </div>
-        </div> */}
-
-        {/* Requests Table */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '12px', 
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          overflow: 'hidden'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Request</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Type
-                      <ChevronDown size={14} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Requested By</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Submitted On</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      Aging
-                      <ChevronDown size={14} />
-                    </div>
-                  </th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Status</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Approved/Rejected By</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Approved/Rejected On</th>
-                 
-                </tr>
-              </thead>
-              <tbody>
-                {loadingRequests ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", textAlign: "center", color: "#6b7280" }}>
-                      Loading…
-                    </td>
-                  </tr>
-                ) : requests.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", textAlign: "center", color: "#6b7280" }}>
-                      No requests
-                    </td>
-                  </tr>
-                ) : (
-                  requests.map((request, index) => {
-                    const created_at = (request as UserRequest & { created_at?: string }).created_at;
-                    const categoryName = getCategoryName(request.user_request_category_id);
-                    const typeIcon = getTypeIconFromCategory(request.user_request_category_id);
-                    return (
-                      <tr
-                        key={request.id}
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          getUserRequest(request.id).then((request) => {
-                            setSelectedRequest(request);
-                          });
-                        }}
-                        style={{
-                          borderBottom: index < requests.length - 1 ? "1px solid #f3f4f6" : "none",
-                          cursor: "pointer",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
-                      >
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937", marginBottom: "4px" }}>
-                            {request.subject ?? "—"}
-                          </div>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <div
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              padding: "4px 10px",
-                              backgroundColor: getTypeColor(categoryName),
-                              borderRadius: "6px",
-                            }}
-                          >
-                            {getTypeIcon(typeIcon)}
-                            <span style={{ fontSize: "13px", fontWeight: "500", color: "#1f2937" }}>
-                              {categoryName}
-                            </span>
-                          </div>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: "14px", color: "#1f2937", marginBottom: "4px" }}>
-                            {getDisplayName(request.user_id)}
-                          </div>
-                        </td>
-                        <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                          {formatRequestDate(created_at)}
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <span
-                            style={{
-                              padding: "4px 12px",
-                              backgroundColor: "#fef3c7",
-                              color: "#92400e",
-                              borderRadius: "16px",
-                              fontSize: "13px",
-                              fontWeight: "500",
-                            }}
-                          >
-                            {getAgingLabel(created_at)}
-                          </span>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <Badge
-                            bg={
-                              request.status?.toLowerCase() === "approved"
-                                ? "success"
-                                : request.status?.toLowerCase() === "rejected"
-                                  ? "danger"
-                                  : "info"
-                            }
-                            className="text-capitalize"
-                          >
-                            {request.status}
-                          </Badge>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          {getDisplayName(request.approved_by_user_id)}
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          {formatRequestDate(request.approved_at)}
-                        </td>
-                       
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
+  return (
+    <React.Fragment>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
+      <div>
+        <div>
           <div style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            marginBottom: '24px',
             flexWrap: 'wrap',
             gap: '16px'
           }}>
-            <div style={{ fontSize: '14px', color: '#6b7280' }}>
-              Showing {totalRequests === 0 ? 0 : ((currentPage - 1) * (requestsPagination?.limit ?? 10)) + 1}-
-              {Math.min(currentPage * (requestsPagination?.limit ?? 10), totalRequests)} of {totalRequests} requests
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <h1 style={{
+              fontSize: '28px',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0
+            }}>
+              Approval Requests
+            </h1>
+            {session?.user?.permissions?.includes("add-approval-request-staff-management") && (
               <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
+                type="button"
+                onClick={openCreateModal}
+                disabled={categories.length === 0 || loadingCategories}
                 style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 14px",
+                  backgroundColor: categories.length === 0 || loadingCategories ? "#e5e7eb" : "#6366f1",
+                  color: categories.length === 0 || loadingCategories ? "#9ca3af" : "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: categories.length === 0 || loadingCategories ? "not-allowed" : "pointer",
                 }}
               >
-                <ChevronsLeft size={16} />
+                <Plus size={16} />
+                New Request
               </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1
-                }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              
-              {[...Array(totalPages)].map((_, idx) => {
-                const pageNum = idx + 1;
-                if (
-                  pageNum === 1 ||
-                  pageNum === totalPages ||
-                  (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      style={{
-                        padding: '8px 14px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        backgroundColor: currentPage === pageNum ? '#6366f1' : 'white',
-                        color: currentPage === pageNum ? 'white' : '#1f2937',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: currentPage === pageNum ? '600' : '400'
-                      }}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                  return <span key={pageNum} style={{ padding: '8px 4px', color: '#6b7280' }}>...</span>;
-                }
-                return null;
-              })}
+            )}
+          </div>
 
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1
-                }}
-              >
-                <ChevronRight size={16} />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1
-                }}
-              >
-                <ChevronsRight size={16} />
-              </button>
-            </div>
+          <GenericTable<UserRequest>
+            data={requests}
+            columns={requestColumns}
+            showActions={false}
+            loading={loadingRequests}
+            loadingMessage="Loading requests..."
+            emptyMessage="No requests"
+            hover={true}
+            uniqueKey="id"
+            pagination={{
+              currentPage,
+              rowsPerPage: requestsPagination?.limit ?? 10,
+              totalRows: totalRequests,
+              pageSizeOptions: [10],
+            }}
+            onPaginationChange={(page) => setCurrentPage(page)}
+            onRowClick={(request) => {
+              setSelectedRequest(request);
+              getUserRequest(request.id)
+                .then((nextRequest: UserRequest) => {
+                  setSelectedRequest(nextRequest);
+                })
+                .catch((err: unknown) => {
+                  console.error("Failed to load request details", err);
+                  toast.error("Could not load request details");
+                });
+            }}
+            showToolbar={true}
+            toolbar={approvalToolbar}
+            showToolbarActions={false}
+          />
+
+          <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280" }}>
+            {requestsSummary}
           </div>
         </div>
       </div>
@@ -1227,7 +1135,7 @@ const ApprovalRequest = () => {
               {editingRequest && (editingRequest.attachments ?? []).length > 0 && (
                 <div className="mb-2 p-2 border rounded bg-light">
                   <div className="small text-muted mb-2">Current attachments</div>
-                  {(editingRequest.attachments ?? []).map((att) => (
+                  {(editingRequest.attachments ?? []).map((att: UserRequestAttachmentRow) => (
                     <div
                       key={att.id}
                       style={{
@@ -1264,10 +1172,11 @@ const ApprovalRequest = () => {
                             a.download = att.original_name || "attachment";
                             document.body.appendChild(a);
                             a.click();
-                            document.body.removeChild(a);
+                            a.remove();
                             URL.revokeObjectURL(url);
                             toast.success("Download started");
-                          } catch {
+                          } catch (err) {
+                            console.error("Attachment download failed", err);
                             toast.error("Download failed");
                           }
                         }}
@@ -1305,146 +1214,25 @@ const ApprovalRequest = () => {
                 </Form.Text>
               )}
             </Form.Group>
-            {editingRequest &&
-              (editingRequest.user_request_category_id != null) &&
+            {editingRequest?.user_request_category_id != null &&
               (categoryFields[editingRequest.user_request_category_id] ?? []).length > 0 && (
-              <Form.Group className="mb-3">
-                <Form.Label>Additional fields</Form.Label>
-                <div className="border rounded p-3 bg-light">
-                  {(categoryFields[editingRequest.user_request_category_id] ?? []).map((field) => (
-                    <div key={field.id} className="mb-2">
-                      <Form.Label className="small mb-1">
-                        {field.label ?? field.key}
-                        {field.required && " *"}
-                      </Form.Label>
-                      {field.type === "textarea" ? (
-                        <Form.Control
-                          as="textarea"
-                          rows={2}
-                          value={(editForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setEditForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                          placeholder={field.config?.placeholder ?? undefined}
-                        />
-                      ) : (field.type === "file" || (field as { type: string }).type === "attachment") ? (
-                        <Form.Control
-                          type="file"
-                          onChange={(e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-                            setEditForm((f) => ({
-                              ...f,
-                              dynamic_files: { ...f.dynamic_files, [field.key ?? ""]: file },
-                            }));
-                          }}
-                        />
-                      ) : field.type === "select" ? (
-                        <Form.Select
-                          value={(editForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setEditForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                        >
-                          <option value="">Select...</option>
-                          {(field.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      ) : field.type === "multiselect" ? (
-                        <Form.Select
-                          multiple
-                          value={
-                            Array.isArray(editForm.dynamic_fields[field.key ?? ""])
-                              ? (editForm.dynamic_fields[field.key ?? ""] as string[])
-                              : typeof editForm.dynamic_fields[field.key ?? ""] === "string"
-                                ? (editForm.dynamic_fields[field.key ?? ""] as string).split(",").filter(Boolean)
-                                : []
-                          }
-                          onChange={(e) => {
-                            const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (o) => o.value);
-                            setEditForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: selected },
-                            }));
-                          }}
-                        >
-                          {(field.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      ) : field.type === "radio" ? (
-                        <div className="d-flex flex-wrap gap-2">
-                          {(field.options ?? []).map((opt) => (
-                            <Form.Check
-                              key={opt.value}
-                              type="radio"
-                              id={`edit-${field.key}-${opt.value}`}
-                              name={field.key ?? ""}
-                              label={opt.label}
-                              value={opt.value}
-                              checked={(editForm.dynamic_fields[field.key ?? ""] as string) === opt.value}
-                              onChange={() =>
-                                setEditForm((f) => ({
-                                  ...f,
-                                  dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: opt.value },
-                                }))
-                              }
-                            />
-                          ))}
-                        </div>
-                      ) : field.type === "checkbox" ? (
-                        <div className="d-flex flex-wrap gap-2">
-                          {(field.options ?? []).map((opt) => {
-                            const arr = (Array.isArray(editForm.dynamic_fields[field.key ?? ""])
-                              ? (editForm.dynamic_fields[field.key ?? ""] as string[])
-                              : []) as string[];
-                            const checked = arr.includes(opt.value);
-                            return (
-                              <Form.Check
-                                key={opt.value}
-                                type="checkbox"
-                                id={`edit-${field.key}-${opt.value}`}
-                                label={opt.label}
-                                checked={checked}
-                                onChange={() => {
-                                  const next = checked ? arr.filter((v) => v !== opt.value) : [...arr, opt.value];
-                                  setEditForm((f) => ({
-                                    ...f,
-                                    dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: next },
-                                  }));
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <Form.Control
-                          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                          value={(editForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setEditForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                          placeholder={field.config?.placeholder ?? undefined}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Form.Group>
-            )}
+                <EditRequestAdditionalFieldsSection
+                  fields={categoryFields[editingRequest.user_request_category_id] ?? []}
+                  dynamic_fields={editForm.dynamic_fields}
+                  onDynamicFieldChange={(key, value) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      dynamic_fields: { ...f.dynamic_fields, [key]: value },
+                    }))
+                  }
+                  onDynamicFileChange={(key, file) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      dynamic_files: { ...f.dynamic_files, [key]: file },
+                    }))
+                  }
+                />
+              )}
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => { setShowEditModal(false); setEditingRequest(null); }} type="button">
@@ -1460,20 +1248,33 @@ const ApprovalRequest = () => {
       {/* Approval Detail Sidebar */}
       {selectedRequest && (
         <div
-          onClick={() => setSelectedRequest(null)}
           style={{
             position: "fixed",
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
             zIndex: 9999,
             display: "flex",
             justifyContent: "flex-end",
+            alignItems: "stretch",
           }}
         >
-          <div onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            aria-label="Close request details"
+            onClick={() => setSelectedRequest(null)}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              border: "none",
+              padding: 0,
+              margin: 0,
+              cursor: "pointer",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+            }}
+          />
+          <div style={{ flexShrink: 0, maxWidth: "100%", overflow: "auto" }}>
             <ApprovalDetailSidebar
               request={selectedRequest}
               categoryName={getCategoryName(selectedRequest.user_request_category_id)}
@@ -1481,7 +1282,7 @@ const ApprovalRequest = () => {
               onSuccess={refreshRequests}
               onEditClick={openEditModal}
               
-              onDeleteClick={(request) => {
+              onDeleteClick={(request: UserRequest) => {
                 setRequestToDelete(request);
                 setSelectedRequest(null);
                 setShowDeleteModal(true);
@@ -1508,8 +1309,8 @@ const ApprovalRequest = () => {
             refreshRequests();
             setShowDeleteModal(false);
             setRequestToDelete(null);
-          } catch {
-            // toast handled in API
+          } catch (err) {
+            console.error("Failed to delete request", err);
           } finally {
             setDeleting(false);
           }
@@ -1518,8 +1319,6 @@ const ApprovalRequest = () => {
         itemType="request"
         loading={deleting}
       />
-    </div>
-
     </React.Fragment>
   );
 };
