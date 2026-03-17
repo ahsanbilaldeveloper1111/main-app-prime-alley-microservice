@@ -17,44 +17,17 @@ import {
   SECTION_CARD,
   SECTION_TITLE,
 } from "@components/shared/productModalStyles";
-
-const BORDER_COLOR_DEFAULT = "rgb(138,138,138)";
-const BORDER_COLOR_FOCUS = "#2d6ae0";
-
-const handleFocusBorder = (
-  e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-) => {
-  e.currentTarget.style.borderColor = BORDER_COLOR_FOCUS;
-};
-
-const handleBlurBorder = (
-  e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-) => {
-  e.currentTarget.style.borderColor = BORDER_COLOR_DEFAULT;
-};
-
-const hoverBackgroundColor =
-  (color: string) => (e: React.MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.backgroundColor = color;
-  };
-
-const hoverBorderColor =
-  (color: string) => (e: React.MouseEvent<HTMLElement>) => {
-    e.currentTarget.style.borderColor = color;
-  };
-
-const selectCaretBaseStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "50%",
-  transform: "translateY(-50%)",
-  pointerEvents: "none",
-  fontSize: "10px",
-  color: "#555",
-};
-
-function SelectCaret({ right = 12 }: Readonly<{ right?: number }>) {
-  return <span style={{ ...selectCaretBaseStyle, right }}>▾</span>;
-}
+import {
+  onBorderBlur,
+  onBorderFocus,
+  onDarkBorderEnter,
+  onDarkBorderLeave,
+  onLightBgEnter,
+  onLightBgLeave,
+  onSubBarBtnEnter,
+  onSubBarBtnLeave,
+  SelectCaret,
+} from "@components/shared/modalUiHelpers";
 
 interface CreateProductModalProps {
   onClose: () => void;
@@ -272,8 +245,8 @@ export default function CreateProductModal({
         <button
           onClick={onClose}
           style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-          onMouseEnter={hoverBorderColor("rgba(255,255,255,0.7)")}
-          onMouseLeave={hoverBorderColor("rgba(255,255,255,0.35)")}
+          onMouseEnter={onDarkBorderEnter}
+          onMouseLeave={onDarkBorderLeave}
         >
           Exit
         </button>
@@ -297,8 +270,8 @@ export default function CreateProductModal({
                 fontWeight: 400,
                 paddingInline: "20px",
               }}
-              onMouseEnter={hoverBackgroundColor("#f0f0f0")}
-              onMouseLeave={hoverBackgroundColor("#fff")}
+              onMouseEnter={onLightBgEnter}
+              onMouseLeave={onLightBgLeave}
               disabled={submitting}
             >
               Update
@@ -315,8 +288,8 @@ export default function CreateProductModal({
                   borderColor: "rgba(255,255,255,0.35)",
                   color: "#fff",
                 }}
-                onMouseEnter={hoverBorderColor("rgba(255,255,255,0.7)")}
-                onMouseLeave={hoverBorderColor("rgba(255,255,255,0.35)")}
+                onMouseEnter={onDarkBorderEnter}
+                onMouseLeave={onDarkBorderLeave}
                 disabled={submitting}
               >
                 Create and add another
@@ -333,8 +306,8 @@ export default function CreateProductModal({
                     fontWeight: 400,
                     paddingInline: "20px",
                   }}
-                  onMouseEnter={hoverBackgroundColor("#f0f0f0")}
-                  onMouseLeave={hoverBackgroundColor("#fff")}
+                  onMouseEnter={onLightBgEnter}
+                  onMouseLeave={onLightBgLeave}
                   disabled={submitting}
                 >
                   Create
@@ -376,8 +349,8 @@ export default function CreateProductModal({
         {isEditMode && (
         <button
           style={{ ...BASE_BUTTON }}
-          onMouseEnter={hoverBackgroundColor("#f5f5f5")}
-          onMouseLeave={hoverBackgroundColor("#fff")}
+          onMouseEnter={onSubBarBtnEnter}
+          onMouseLeave={onSubBarBtnLeave}
         >
           Edit product
         </button>
@@ -386,8 +359,8 @@ export default function CreateProductModal({
         {!isEditMode && (
           <button
             style={{ ...BASE_BUTTON }}
-            onMouseEnter={hoverBackgroundColor("#f5f5f5")}
-            onMouseLeave={hoverBackgroundColor("#fff")}
+            onMouseEnter={onSubBarBtnEnter}
+            onMouseLeave={onSubBarBtnLeave}
           >
             Create new product
             </button>
@@ -469,8 +442,8 @@ export default function CreateProductModal({
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 style={FIELD_INPUT}
-                onFocus={handleFocusBorder}
-                onBlur={handleBlurBorder}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               />
             </div>
 
@@ -483,8 +456,8 @@ export default function CreateProductModal({
                 value={productSku}
                 onChange={(e) => setProductSku(e.target.value)}
                 style={FIELD_INPUT}
-                onFocus={handleFocusBorder}
-                onBlur={handleBlurBorder}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               />
             </div>
 
@@ -546,27 +519,10 @@ export default function CreateProductModal({
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
               style={FIELD_TEXTAREA}
-              onFocus={handleFocusBorder}
-              onBlur={handleBlurBorder}
+              onFocus={onBorderFocus}
+              onBlur={onBorderBlur}
             />
           </div>
-
-          <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
-            <label style={FIELD_LABEL} htmlFor="cmp-product-base-price">
-              Base price <span style={{ color: "#e53e3e" }}>*</span>
-            </label>
-            <input
-                      id="cmp-product-base-price"
-                      type="number"
-                      value={priceAED}
-                      onChange={e => setPriceAED(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleFocusBorder}
-                      onBlur={handleBlurBorder}
-                      placeholder="0.00"
-                    />
-          </div>
-
 
           <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
                   <label style={FIELD_LABEL} htmlFor="cmp-product-category">
@@ -578,8 +534,8 @@ export default function CreateProductModal({
                       value={categoryId}
                       onChange={(e) => setCategoryId(e.target.value)}
                       style={FIELD_SELECT}
-                      onFocus={handleFocusBorder}
-                      onBlur={handleBlurBorder}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       disabled={loadingCategories || submitting}
                     >
                       <option value="">
@@ -606,8 +562,8 @@ export default function CreateProductModal({
                 value={productType}
                 onChange={e => setProductType(e.target.value)}
                 style={FIELD_SELECT}
-                onFocus={handleFocusBorder}
-                onBlur={handleBlurBorder}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               >
                 <option value=""></option>
                 <option value="physical">Physical</option>
@@ -652,21 +608,21 @@ export default function CreateProductModal({
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cmp-product-brand">Brand</label>
                   <input id="cmp-product-brand" type="text" style={FIELD_INPUT}
-                    onFocus={handleFocusBorder}
-                    onBlur={handleBlurBorder} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cmp-product-url">URL</label>
                   <input id="cmp-product-url" type="url" placeholder="https://" style={FIELD_INPUT}
-                    onFocus={handleFocusBorder}
-                    onBlur={handleBlurBorder} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cmp-product-terms-url">Terms &amp; conditions URL</label>
                   <input id="cmp-product-terms-url" type="url" placeholder="https://" style={FIELD_INPUT}
-                    onFocus={handleFocusBorder}
-                    onBlur={handleBlurBorder} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                 
 
@@ -688,8 +644,8 @@ export default function CreateProductModal({
                 value={billingFrequency}
                 onChange={e => setBillingFrequency(e.target.value)}
                 style={FIELD_SELECT}
-                onFocus={handleFocusBorder}
-                onBlur={handleBlurBorder}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               >
                 <option value="one-time">One-time</option>
                 <option value="monthly">Monthly</option>
@@ -749,8 +705,8 @@ export default function CreateProductModal({
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value as "AED" | "USD")}
                     style={{ ...FIELD_SELECT, height: "34px", paddingInline: "10px", paddingRight: "28px" }}
-                    onFocus={handleFocusBorder}
-                    onBlur={handleBlurBorder}
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur}
                     disabled={submitting}
                   >
                     <option value="AED">AED</option>
@@ -816,9 +772,9 @@ export default function CreateProductModal({
                       type="number"
                       value={priceAED}
                       onChange={e => setPriceAED(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleFocusBorder}
-                      onBlur={handleBlurBorder}
+                      style={FIELD_INPUT}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
@@ -827,9 +783,9 @@ export default function CreateProductModal({
                       type="number"
                       value={priceUSD}
                       onChange={e => setPriceUSD(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleFocusBorder}
-                      onBlur={handleBlurBorder}
+                      style={FIELD_INPUT}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
@@ -853,8 +809,8 @@ export default function CreateProductModal({
                     onChange={e => setUnitCost(e.target.value)}
                     style={FIELD_INPUT}
                     placeholder="0.00"
-                    onFocus={handleFocusBorder}
-                    onBlur={handleBlurBorder}
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur}
                   />
                 </div>
                 <div>
@@ -895,8 +851,8 @@ export default function CreateProductModal({
               <p style={{ margin: 0 }}>Tiered pricing lets you set different rates based on quantity ranges.</p>
               <button
                 style={{ ...BASE_BUTTON, marginTop: "16px" }}
-                onMouseEnter={hoverBackgroundColor("#f5f5f5")}
-                onMouseLeave={hoverBackgroundColor("#fff")}
+                onMouseEnter={onSubBarBtnEnter}
+                onMouseLeave={onSubBarBtnLeave}
               >
                 + Add tier
               </button>
