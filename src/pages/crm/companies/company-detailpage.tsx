@@ -505,9 +505,18 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 {allPhones.length === 0 ? (
                   "--"
                 ) : (
-                  allPhones.map((num, i) => (
-                    <a key={i} href={`tel:${num.replaceAll(" ", "")}`} style={{ color: "#006162", textDecoration: "none" }}>{num}</a>
-                  ))
+                  allPhones.map((num) => {
+                    const normalized = num.replaceAll(" ", "");
+                    return (
+                      <a
+                        key={normalized}
+                        href={`tel:${normalized}`}
+                        style={{ color: "#006162", textDecoration: "none" }}
+                      >
+                        {num}
+                      </a>
+                    );
+                  })
                 )}
               </div>
             </div>

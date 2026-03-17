@@ -92,11 +92,8 @@ import {
   Calendar,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Mail,
   Phone as PhoneIcon,
   Phone,
@@ -1479,9 +1476,6 @@ const CrmLeads = () => {
     }
   };
 
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
   // Transform API lead data to UI format
   const transformLeadData = (lead: any): LeadData => {
     // Parse contact_persons - it can be a JSON string or an array
@@ -1588,13 +1582,7 @@ const CrmLeads = () => {
       }
 
       try {
-        const result = await dialNumber(phone);
-
-        if (result.success) {
-          // toast.success(`Calling ${lead.name || phone}...`);
-        } else {
-          // toast.error(result.error || "Failed to make call");
-        }
+        await dialNumber(phone);
       } catch (error) {
         console.error("Call error:", error);
         toast.error("Failed to make call");
@@ -3776,7 +3764,7 @@ const CrmLeads = () => {
                     <KanbanBoard
                       columns={leadsToKanbanColumns(filteredLeads, stages)}
                       onCardClick={(lead) =>
-                        handleViewLead((lead.raw as any)?.id ?? lead.id)
+                        handleViewLead(lead.raw?.id ?? lead.id)
                       }
                       onCardMove={(leadId, fromCol, toCol) => {
                         const lead = filteredLeads.find(
