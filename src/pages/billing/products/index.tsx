@@ -1688,25 +1688,7 @@ const BillingManagement = () => {
                     label: "Tax Category",
                     value: selectedProspect?.tax_category || selectedProspect?.data?.tax_category || "Standard",
                   },
-                  {
-                    label: "Stock Quantity",
-                    value: selectedProspect?.data?.stock_quantity != null
-                      ? String(selectedProspect.data.stock_quantity)
-                      : "N/A",
-                  },
-                  {
-                    label: "Category",
-                    value: selectedProspect?.data?.category || "N/A",
-                    show: !!selectedProspect?.data?.category,
-                  },
-                  {
-                    label: "Product Owner",
-                    value: selectedProspect?.user_extension
-                      ? getNameByExtension(selectedProspect.user_extension)
-                      : "—",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
-                  },
+                 
                   {
                     label: "Description",
                     value: selectedProspect?.description || "N/A",
@@ -1909,8 +1891,9 @@ const BillingManagement = () => {
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (typeof globalThis.window !== "undefined") {
-            globalThis.window.localStorage.setItem(
+          const w = (globalThis as unknown as { window?: Window }).window;
+          if (w) {
+            w.localStorage.setItem(
               "crmDataSelectedColumns",
               JSON.stringify(keys),
             );
@@ -1929,7 +1912,7 @@ const BillingManagement = () => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "scheduled")) {
+                if (!customTabs.some((t) => t.id === "scheduled")) {
                   setCustomTabs([
                     ...customTabs,
                     {
@@ -1951,7 +1934,7 @@ const BillingManagement = () => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "has_leads")) {
+                if (!customTabs.some((t) => t.id === "has_leads")) {
                   setCustomTabs([
                     ...customTabs,
                     {
