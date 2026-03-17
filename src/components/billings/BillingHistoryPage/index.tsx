@@ -946,7 +946,7 @@ export default function BillingHistoryPage() {
 
   const { openInvoicePayment: openInvoicePaymentModal, invoicePaymentModal } = useInvoicePaymentModal({
     onPaymentSuccess: () => {
-      void fetchInvoices(searchQuery);
+      fetchInvoices(searchQuery).then(() => undefined);
     },
   });
 
@@ -963,7 +963,9 @@ export default function BillingHistoryPage() {
   );
 
   useEffect(() => {
-    void fetchInvoices(searchQuery);
+    fetchInvoices(searchQuery).catch((err) => {
+      console.error("BillingHistoryPage fetchInvoices effect error:", err);
+    });
   }, [fetchInvoices, searchQuery, dateFrom, dateTo, statusFilter, paymentStatusFilter]);
 
   const filters = [
@@ -1117,7 +1119,7 @@ export default function BillingHistoryPage() {
                   />
                 ))}
 
-              <OrderCard
+              {/* <OrderCard
                 id="22970930"
                 product={
                   invoice.items
@@ -1126,7 +1128,7 @@ export default function BillingHistoryPage() {
                     .join(", ") || ""
                 }
                 amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
-              />
+              /> */}
             </div>
           ))
         )}

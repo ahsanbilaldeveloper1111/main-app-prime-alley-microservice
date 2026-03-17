@@ -760,8 +760,8 @@ export default function CreateSubscriptionModal({
                   }}>▾</span>
                 </div>
               </div>
-              <a
-                href="#"
+              <button
+                type="button"
                 style={{
                   fontSize: "12px",
                   color: "#2d6ae0",
@@ -771,12 +771,16 @@ export default function CreateSubscriptionModal({
                   display: "flex",
                   alignItems: "center",
                   gap: "4px",
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
                 }}
               >
                 Manage currencies
                 {" "}
                 <span style={{ fontSize: "10px" }}>↗</span>
-              </a>
+              </button>
             </div>
           </div>
 
