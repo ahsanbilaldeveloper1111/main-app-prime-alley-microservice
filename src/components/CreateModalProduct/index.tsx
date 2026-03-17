@@ -9,8 +9,7 @@ import {
 import { getErrorMessage } from "@utils/errors";
 import { toast } from "react-toastify";
 import {
-  BASE_BUTTON,
-  SECTION_CARD,
+  BASE_BUTTON
 } from "@components/shared/productModalStyles";
 import {
   onDarkBorderEnter,

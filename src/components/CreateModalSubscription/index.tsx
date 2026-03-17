@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import {
@@ -39,19 +38,6 @@ export default function CreateSubscriptionModal({
   onCreateAndAddAnother,
 }: Readonly<CreateSubscriptionModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
-
-  const handlePricingTabEnter = useCallback(
-    (tabId: string, e: React.MouseEvent<HTMLButtonElement>) => {
-      if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#f9f9f9";
-    },
-    [pricingTab],
-  );
-  const handlePricingTabLeave = useCallback(
-    (tabId: string, e: React.MouseEvent<HTMLButtonElement>) => {
-      if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#fff";
-    },
-    [pricingTab],
-  );
 
   const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");

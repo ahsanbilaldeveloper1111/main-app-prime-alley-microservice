@@ -25,6 +25,7 @@ export function PricingConfigurationCard({
   onUnitCostChange,
   marginText,
   submitting,
+  onManageCurrencies,
   idPrefix = "cmp",
 }: Readonly<{
   pricingTab: PricingTabId;
@@ -39,6 +40,7 @@ export function PricingConfigurationCard({
   onUnitCostChange: (value: string) => void;
   marginText: string;
   submitting: boolean;
+  onManageCurrencies?: () => void;
   idPrefix?: string;
 }>) {
   const handlePricingTabEnter = useCallback(
@@ -53,6 +55,14 @@ export function PricingConfigurationCard({
       if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#fff";
     },
     [pricingTab],
+  );
+
+  const handleManageCurrenciesClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      onManageCurrencies?.();
+    },
+    [onManageCurrencies],
   );
 
   return (
@@ -121,8 +131,9 @@ export function PricingConfigurationCard({
             </div>
           </div>
 
-          <a
-            href="#"
+          <button
+            type="button"
+            onClick={handleManageCurrenciesClick}
             style={{
               fontSize: "12px",
               color: "#2d6ae0",
@@ -132,10 +143,14 @@ export function PricingConfigurationCard({
               display: "flex",
               alignItems: "center",
               gap: "4px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
             }}
           >
             Manage currencies <span style={{ fontSize: "10px" }}>↗</span>
-          </a>
+          </button>
         </div>
       </div>
 
