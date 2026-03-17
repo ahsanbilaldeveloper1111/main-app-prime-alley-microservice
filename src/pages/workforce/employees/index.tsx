@@ -10,26 +10,25 @@ import EditEmployeeModal from "@pages/workforce/EditEmployeeModal";
 import {
   getUserProfiles,
   getUserProfile,
-  updateUserProfile,
   deleteUserProfile,
   getEmployeeDashboardCounters,
   getEmployeeDashboardGraphDepartmentHeadcount,
   createJourney,
   type UserProfile,
   type UserProfileAddress,
-  type UserProfilePayload,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Form, Modal } from "react-bootstrap";
+import GenericTable, { TableAction, TableColumn } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Search, ChevronDown, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
+import { Search, ChevronDown, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
-import Select, { SingleValue } from "react-select";
+import Select from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -53,7 +52,6 @@ interface EmployeeDashboardCountersData {
 }
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useSession } from "next-auth/react";
-import { Country, State, City } from "country-state-city";
 
 interface Document {
   id: string;
@@ -95,7 +93,7 @@ const E164_MAX_DIGITS = 15;
 /** Format phone input to E.164: optional leading +, then digits only, max 15 digits */
 function toE164Phone(value: string): string {
   const hasPlus = value.trimStart().startsWith("+");
-  const digits = value.replace(/\D/g, "").slice(0, E164_MAX_DIGITS);
+  const digits = value.replaceAll(/\D/g, "").slice(0, E164_MAX_DIGITS);
   const prefix = hasPlus ? "+" : "";
   return digits.length ? prefix + digits : prefix;
 }
@@ -170,14 +168,18 @@ function hierarchyLabel(item: unknown): string {
     const o = item as { name?: string; id?: string | number; [key: string]: unknown };
     return String(o.name ?? o.id ?? "—");
   }
-  return String(item);
+  if (typeof item === "number" || typeof item === "boolean" || typeof item === "bigint") return String(item);
+  if (typeof item === "symbol") return item.description ?? "—";
+  if (typeof item === "function") return item.name || "—";
+  return "—";
 }
 
 const Employees = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const { mainAppDepartments, mainAppUsers, loadingDepartments, loadingUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
 
+  const filtersRef = useRef<HTMLDivElement>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -197,10 +199,8 @@ const Employees = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
-  const [statusSearchTerm, setStatusSearchTerm] = useState("");
   const [managerSearchTerm, setManagerSearchTerm] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState("Personal");
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,24 +218,15 @@ const Employees = () => {
   const [journeyForm, setJourneyForm] = useState<{ startDate: string; status: string }>({ startDate: "", status: "in_progress" });
   const [journeySubmitting, setJourneySubmitting] = useState(false);
 
-  const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
-
-  useEffect(() => {
-    try {
-      setAddressCountries(Country.getAllCountries());
-    } catch {
-      setAddressCountries([]);
-    }
-  }, []);
-
   const DEPARTMENT_CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
 
   useEffect(() => {
     const fetchDepartmentHeadcount = async () => {
       try {
         const data = await getEmployeeDashboardGraphDepartmentHeadcount();
-        console.log("[Employees] department headcount graph", data);
-        const raw = Array.isArray(data) ? data : (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data) ? (data as { data: unknown[] }).data : []);
+        let raw: unknown[] = [];
+        if (Array.isArray(data)) raw = data;
+        else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
         const list = (raw as { name?: string; count?: number }[]).map((item, i) => ({
           name: String(item.name ?? "—"),
           count: Number(item.count ?? 0),
@@ -254,7 +245,6 @@ const Employees = () => {
     const fetchCounters = async () => {
       try {
         const data = await getEmployeeDashboardCounters();
-        console.log("[Employees] dashboard counters", data);
         setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
       } catch (e) {
         console.error("[Employees] getEmployeeDashboardCounters error", e);
@@ -264,10 +254,6 @@ const Employees = () => {
     fetchCounters();
   }, []);
 
-  const [locationsList, setLocationsList] = useState<Location[]>([]);
-  const [filterLocations, setFilterLocations] = useState<Location[]>([]);
-  const [loadingFilterLocations, setLoadingFilterLocations] = useState(false);
-  const [loadingLocations, setLoadingLocations] = useState(false);
   const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number; color: string }[]>([]);
   const [dashboardCounters, setDashboardCounters] = useState<EmployeeDashboardCountersData | null>(null);
 
@@ -290,7 +276,8 @@ const Employees = () => {
       setProfiles(data ?? []);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
       else setPagination(null);
-    } catch {
+    } catch (err) {
+      console.error("[Employees] getUserProfiles error", err);
       setProfiles([]);
       setPagination(null);
     } finally {
@@ -306,15 +293,17 @@ const Employees = () => {
   useEffect(() => {
     if (!router.isReady || !router.query.openId) return;
     const openId = router.query.openId;
-    const id = typeof openId === "string" ? openId : Array.isArray(openId) ? openId[0] : undefined;
+    let id: string | undefined;
+    if (typeof openId === "string") id = openId;
+    else if (Array.isArray(openId)) id = openId[0];
     if (!id || Number.isNaN(Number(id))) return;
     let cancelled = false;
     (async () => {
       try {
         const profile = await getUserProfile(Number(id));
         if (!cancelled && profile) setSelectedProfile(profile);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error("[Employees] getUserProfile(openId) error", err);
       } finally {
         if (!cancelled) {
           const { openId: _openId, ...rest } = router.query;
@@ -328,35 +317,46 @@ const Employees = () => {
   const loadProfilesRef = useRef(loadProfiles);
   loadProfilesRef.current = loadProfiles;
 
-  const toggleDropdown = (dropdown: string) => {
-    setOpenDropdown(openDropdown === dropdown ? null : dropdown);
-  };
+  const toggleDropdown = useCallback((dropdown: string) => {
+    setOpenDropdown((current) => (current === dropdown ? null : dropdown));
+  }, []);
 
-  const handleClickOutside = () => {
-    setOpenDropdown(null);
-  };
+  useEffect(() => {
+    if (openDropdown == null) return;
+    const handler = (e: MouseEvent) => {
+      const root = filtersRef.current;
+      if (!root) {
+        setOpenDropdown(null);
+        return;
+      }
+      const target = e.target as Node | null;
+      if (target && root.contains(target)) return;
+      setOpenDropdown(null);
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [openDropdown]);
 
-  const handleProfileClick = async (profile: UserProfile) => {
+  const handleProfileClick = useCallback(async (profile: UserProfile) => {
     try {
       const fullProfile = await getUserProfile(profile.id);
-      console.log(fullProfile);
       setSelectedProfile(fullProfile);
-    } catch {
+    } catch (err) {
+      console.error("[Employees] getUserProfile error", err);
       setSelectedProfile(profile);
     }
-  };
+  }, []);
 
-  const closeSidebar = () => {
+  const closeSidebar = useCallback(() => {
     setSelectedProfile(null);
-    setActiveTab("Personal");
-  };
+  }, []);
 
 
-  const openCreateModal = () => {
+  const openCreateModal = useCallback(() => {
     setShowCreateModal(true);
-  };
+  }, []);
 
-  const openJourneyModal = (profile: UserProfile, e?: React.MouseEvent) => {
+  const openJourneyModal = useCallback((profile: UserProfile, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setJourneyModalProfile(profile);
     setJourneyForm({
@@ -364,30 +364,33 @@ const Employees = () => {
       status: "in_progress",
     });
     setShowJourneyModal(true);
-  };
+  }, []);
 
-  const closeJourneyModal = () => {
+  const closeJourneyModal = useCallback(() => {
     setShowJourneyModal(false);
     setJourneyModalProfile(null);
     setJourneyForm({ startDate: "", status: "in_progress" });
-  };
+  }, []);
 
   const handleCreateJourney = async () => {
-    if (!journeyModalProfile) return;
-    if (!journeyForm.startDate.trim()) {
-      toast.warning("Please select a start date.");
+    if (journeyModalProfile == null) return;
+    const startDate = journeyForm.startDate.trim();
+    if (startDate === "") {
+      toast.warn("Please select a start date.");
       return;
     }
-    const departmentName =
-      journeyModalProfile.department_id != null
-        ? (mainAppDepartments.find((d) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "")
-        : "";
+    const departmentId = journeyModalProfile.department_id;
+    let departmentName = "";
+    if (departmentId != null) {
+      departmentName =
+        mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(departmentId))?.name ?? "";
+    }
     const payload = {
       user_profile_id: journeyModalProfile.id,
       user_id: String(journeyModalProfile.user_id ?? ""),
       job_title: journeyModalProfile.job_title ?? "",
       department_name: departmentName,
-      start_date: journeyForm.startDate,
+      start_date: startDate,
       status: journeyForm.status,
  
     };
@@ -396,41 +399,36 @@ const Employees = () => {
       await createJourney(payload);
       toast.success("Journey created successfully.");
       closeJourneyModal();
-    } catch {
-      // createJourney handles error toast via handleApiError
+    } catch (err) {
+      console.error("[Employees] createJourney error", err);
     } finally {
       setJourneySubmitting(false);
     }
   };
 
   /** Single list of user options for both Create and Edit modals; value is user id (stored as user_id in form) */
-  const mainAppUserOptions = useMemo(
-    () => mainAppUsers.map((u) => ({ value: String(u.id), label: u.name })),
-    [mainAppUsers]
-  );
-
   /** Resolve display name from MainAppUser (by user_id), then profile fields */
   const getDisplayName = useCallback((p: UserProfile): string => {
     const userId = p.user_id ?? (p as UserProfile & { extension_number?: string }).extension_number ?? p.employee_code;
     if (userId != null && mainAppUsers.length > 0) {
-      const mainUser = mainAppUsers.find((u) => String(u.id) === String(userId));
+      const mainUser = mainAppUsers.find((u: any) => String(u.id) === String(userId));
       if (mainUser?.name) return mainUser.name;
     }
     return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
   }, [mainAppUsers]);
 
 
-  const openEditModal = (profile: UserProfile, e?: React.MouseEvent) => {
+  const openEditModal = useCallback((profile: UserProfile, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEditingProfile(profile);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleDeleteClick = (profile: UserProfile, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteClick = useCallback((profile: UserProfile, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setProfileToDelete(profile);
     setShowDeleteModal(true);
-  };
+  }, []);
 
   const handleDeleteConfirm = async () => {
     if (!profileToDelete) return;
@@ -442,76 +440,44 @@ const Employees = () => {
       setProfileToDelete(null);
       loadProfiles(currentPage);
       if (selectedProfile?.id === profileToDelete.id) setSelectedProfile(null);
-    } catch {
-      // toast handled in API
+    } catch (err) {
+      console.error("[Employees] deleteUserProfile error", err);
     } finally {
       setDeleting(false);
     }
   };
-  
-    const documents: Document[] = [
-      {
-        id: '1',
-        name: 'Data Protection Policy',
-        uploadedBy: 'HR Admin',
-        uploadedDate: '2 days ago',
-        tags: ['Role-Based']
-      },
-      {
-        id: '2',
-        name: 'Employment Contract Template',
-        uploadedBy: 'HR Admin',
-        uploadedDate: 'Fully ago',
-        tags: ['Role-Based'],
-        role: 'HR Admin'
-      },
-      {
-        id: '3',
-        name: 'Remote Work Agreement',
-        uploadedBy: 'France',
-        uploadedDate: 'Recently',
-        tags: ['Role-Based'],
-        location: 'France'
-      }
-    ];
-  
   /** API returns data for applied filters; no extra client-side filter */
   const filteredProfiles = profiles;
 
-  const totalPages = pagination?.last_page ?? 1;
-  const totalCount = pagination?.total ?? filteredProfiles.length;
   const departments = mainAppDepartments ?? [];
   const statuses = ["Active", "Inactive"];
   
   /** Resolve department id to display label (for dropdown button and filter chip) */
   const selectedDepartmentLabel = useMemo(() => {
-    if (!selectedDepartment) return "";
-    const d = departments.find((d) => String((d as { id?: number }).id) === selectedDepartment);
-    return d != null ? hierarchyLabel(d) : selectedDepartment;
+    if (selectedDepartment === "") return "";
+    const d = departments.find((d: MainAppDepartment) => String((d as { id?: number }).id) === selectedDepartment);
+    if (d == null) return selectedDepartment;
+    return hierarchyLabel(d);
   }, [selectedDepartment, departments]);
 
   const appliedDepartmentLabel = useMemo(() => {
-    if (!appliedDepartment) return "";
-    const d = departments.find((d) => String((d as { id?: number }).id) === appliedDepartment);
-    return d != null ? hierarchyLabel(d) : appliedDepartment;
+    if (appliedDepartment === "") return "";
+    const d = departments.find((d: MainAppDepartment) => String((d as { id?: number }).id) === appliedDepartment);
+    if (d == null) return appliedDepartment;
+    return hierarchyLabel(d);
   }, [appliedDepartment, departments]);
 
   const managers = mainAppUsers ?? [];
 
   
-  /** Single list of department options for both Create and Edit modals; value is department id */
-  const mainAppDepartmentOptions = useMemo(() => {
-    return (mainAppDepartments ?? []).map((d) => ({
-      value: String(d.id),
-      label: String(d.name ?? "—"),
-    }));
-  }, [mainAppDepartments]);
+  const toggleSelectedManagerId = useCallback((idStr: string, isSelected: boolean) => {
+    setSelectedManagerIds((prev) => {
+      if (isSelected) return prev.filter((id) => id !== idStr);
+      return [...prev, idStr];
+    });
+  }, []);
 
-  const handleExport = () => {
-      console.log('Exporting data...');
-      alert('Export functionality triggered');
-    };
-  
+
     const handleApply = () => {
       setAppliedSearch(searchTerm);
       setAppliedDepartment(selectedDepartment);
@@ -542,24 +508,181 @@ const Employees = () => {
       setAppliedContract("");
       setAppliedManagerIds([]);
       setCurrentPage(1);
-      // loadProfilesRef.current(1);
     };
+
+  const employeeColumns = useMemo<TableColumn<UserProfile>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Employee",
+        type: "custom",
+        sortable: false,
+        render: (profile: UserProfile) => {
+          const statusText = String(profile.status ?? "Active");
+          const isActive = statusText.toLowerCase() === "active";
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: "#e0e7ff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <User size={20} color="#6366f1" />
+              </div>
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
+                  {getDisplayName(profile)}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    marginTop: "2px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      backgroundColor: isActive ? "#10b981" : "#ef4444",
+                      display: "inline-block",
+                    }}
+                  />
+                  {statusText}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "identification_number",
+        label: "CNIC/ID",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "designation",
+        label: "Designation",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "department_id",
+        label: "Department",
+        type: "custom",
+        sortable: false,
+        render: (profile: UserProfile) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>
+            {profile.department_id == null
+              ? "—"
+              : mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(profile.department_id))?.name ?? String(profile.department_id)}
+          </span>
+        ),
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "status",
+        label: "Status",
+        type: "custom",
+        sortable: false,
+        render: (profile: UserProfile) => {
+          const statusText = String(profile.status ?? "");
+          const isActive = statusText.toLowerCase() === "active";
+          return (
+            <span
+              style={{
+                padding: "4px 12px",
+                backgroundColor: isActive ? "#d1fae5" : "#fee2e2",
+                color: isActive ? "#065f46" : "#991b1b",
+                borderRadius: "16px",
+                fontSize: "13px",
+                fontWeight: "500",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                textTransform: "capitalize",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: isActive ? "#10b981" : "#ef4444",
+                }}
+              />
+              {statusText}
+            </span>
+          );
+        },
+      },
+      {
+        key: "updated_at",
+        label: "Last Updated",
+        type: "custom",
+        sortable: false,
+        render: (profile: UserProfile) => (
+          <span style={{ fontSize: "14px", color: "#6b7280" }}>
+            {(profile as UserProfile & { updated_at?: string }).updated_at
+              ? moment((profile as UserProfile & { updated_at?: string }).updated_at).format(GlobalDateTimeFormat)
+              : "—"}
+          </span>
+        ),
+      },
+    ],
+    [getDisplayName, mainAppDepartments],
+  );
+
+  const employeeActions = useMemo<TableAction<UserProfile>[]>(
+    () => [
+      {
+        label: "Edit",
+        icon: <Pencil size={16} />,
+        onClick: (profile: UserProfile) => openEditModal(profile),
+        show: () => Boolean(session?.user?.permissions?.includes("update-employee-staff-management")),
+        variant: "link",
+      },
+      {
+        label: "Create Journey",
+        icon: <Calendar size={16} />,
+        onClick: (profile: UserProfile) => openJourneyModal(profile),
+        show: () => Boolean(session?.user?.permissions?.includes("update-employee-staff-management")),
+        disabled: (profile: UserProfile) => (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null,
+        disabledTitle: "Journey already started",
+        variant: "link",
+      },
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (profile: UserProfile) => handleDeleteClick(profile),
+        show: () => Boolean(session?.user?.permissions?.includes("delete-employee-staff-management")),
+        variant: "link",
+      },
+    ],
+    [handleDeleteClick, openEditModal, openJourneyModal, session?.user?.permissions],
+  );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees" />
-
-
-      <div 
-      onClick={handleClickOutside}
-      style={{ 
-        
-        backgroundColor: '#F9FAFB',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        overflow: selectedProfile ? "hidden" : "auto",
-        
-      }}>
-      <div >
+      <div>
+        <div>
         {/* Header */}
         <div style={{
           display: "flex",
@@ -598,7 +721,9 @@ const Employees = () => {
         </div>
 
         {/* Search Bar & Filters */}
-        <div style={{ 
+        <div
+          ref={filtersRef}
+          style={{ 
           display: 'flex', 
           flexWrap: 'wrap', 
           gap: '12px', 
@@ -637,6 +762,7 @@ const Employees = () => {
           {/* Department Filter */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDropdown('department');
@@ -658,7 +784,7 @@ const Employees = () => {
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'department' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -680,7 +806,6 @@ const Employees = () => {
                     placeholder="Search department..."
                     value={departmentSearchTerm}
                     onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -693,33 +818,36 @@ const Employees = () => {
                   />
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  <div
+                  <button
+                    type="button"
                     onClick={() => {
                       setSelectedDepartment('');
                       setOpenDropdown(null);
                       setDepartmentSearchTerm('');
                     }}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
                       padding: '10px 16px',
                       cursor: 'pointer',
-                      backgroundColor: !selectedDepartment ? '#f3f4f6' : 'white',
+                      backgroundColor: selectedDepartment === "" ? '#f3f4f6' : 'white',
                       borderBottom: '1px solid #e5e7eb',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedDepartment ? '#f3f4f6' : 'white'}
                   >
                     All departments
-                  </div>
+                  </button>
                   {departments
-                    .filter((dept) => {
+                    .filter((dept: MainAppDepartment) => {
                       const label = hierarchyLabel(dept);
                       return !departmentSearchTerm.trim() || label.toLowerCase().includes(departmentSearchTerm.trim().toLowerCase());
                     })
-                    .map((dept, idx) => {
+                    .map((dept: MainAppDepartment, idx: number) => {
                       const label = hierarchyLabel(dept);
                       const deptId = typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? "") : "";
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={deptId || String(idx)}
                           onClick={() => {
                             setSelectedDepartment(deptId);
@@ -727,15 +855,16 @@ const Employees = () => {
                             setDepartmentSearchTerm('');
                           }}
                           style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
                             padding: '10px 16px',
                             cursor: 'pointer',
                             backgroundColor: selectedDepartment === deptId ? '#f3f4f6' : 'white'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === deptId ? '#f3f4f6' : 'white'}
                         >
                           {label}
-                        </div>
+                        </button>
                       );
                     })}
                 </div>
@@ -748,6 +877,7 @@ const Employees = () => {
           {/* Status Filter */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDropdown('status');
@@ -768,7 +898,7 @@ const Employees = () => {
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'status' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -780,39 +910,43 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
-                <div
+                <button
+                  type="button"
                   onClick={() => {
                     setSelectedStatus('');
                     setOpenDropdown(null);
                   }}
                   style={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
                     padding: '10px 16px',
                     cursor: 'pointer',
-                    backgroundColor: !selectedStatus ? '#f3f4f6' : 'white',
+                    backgroundColor: selectedStatus === "" ? '#f3f4f6' : 'white',
                     borderBottom: '1px solid #e5e7eb',
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedStatus ? '#f3f4f6' : 'white'}
                 >
                   All Statuses
-                </div>
+                </button>
                 {statuses.map(status => (
-                  <div
+                  <button
+                    type="button"
                     key={status}
                     onClick={() => {
                       setSelectedStatus(status);
                       setOpenDropdown(null);
                     }}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
                       padding: '10px 16px',
                       cursor: 'pointer',
                       backgroundColor: selectedStatus === status ? '#f3f4f6' : 'white'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedStatus === status ? '#f3f4f6' : 'white'}
                   >
                     {status}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -821,6 +955,7 @@ const Employees = () => {
           {/* Manager Filter (multi-select); API receives user_ids: ["id1", "id2"] */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDropdown('manager');
@@ -841,7 +976,7 @@ const Employees = () => {
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'manager' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -863,7 +998,6 @@ const Employees = () => {
                     placeholder="Search user..."
                     value={managerSearchTerm}
                     onChange={(e) => setManagerSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -876,40 +1010,44 @@ const Employees = () => {
                   />
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  <div
+                  <button
+                    type="button"
                     onClick={() => {
                       setSelectedManagerIds([]);
                       setOpenDropdown(null);
                     }}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
                       padding: '10px 16px',
                       cursor: 'pointer',
                       backgroundColor: selectedManagerIds.length === 0 ? '#f3f4f6' : 'white',
                       borderBottom: '1px solid #e5e7eb',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedManagerIds.length === 0 ? '#f3f4f6' : 'white'}
                   >
                     All users
-                  </div>
+                  </button>
                   {managers
-                    .filter((mgr) => {
+                    .filter((mgr: any) => {
                       const label = hierarchyLabel(mgr);
                       return !managerSearchTerm.trim() || label.toLowerCase().includes(managerSearchTerm.trim().toLowerCase());
                     })
-                    .map((mgr, idx) => {
+                    .map((mgr: any, idx: number) => {
                       const label = hierarchyLabel(mgr);
                       const idStr = String((mgr as { id?: number }).id ?? idx);
                       const isSelected = selectedManagerIds.includes(idStr);
                       return (
-                        <div
+                        <button
+                          type="button"
                           key={idStr}
                           onClick={() => {
-                            setSelectedManagerIds((prev) =>
-                              isSelected ? prev.filter((id) => id !== idStr) : [...prev, idStr]
-                            );
+                            toggleSelectedManagerId(idStr, isSelected);
                           }}
                           style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
                             padding: '10px 16px',
                             cursor: 'pointer',
                             backgroundColor: isSelected ? '#e0e7ff' : 'white',
@@ -917,12 +1055,10 @@ const Employees = () => {
                             alignItems: 'center',
                             gap: '8px',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#c7d2fe' : '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#e0e7ff' : 'white'}
                         >
                           {isSelected && <span style={{ color: '#6366f1', fontWeight: 600 }}>✓</span>}
                           {label}
-                        </div>
+                        </button>
                       );
                     })}
                 </div>
@@ -933,6 +1069,7 @@ const Employees = () => {
           {/* Employment Type Filter */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDropdown('employment');
@@ -953,7 +1090,7 @@ const Employees = () => {
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'employment' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -965,39 +1102,43 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
-                <div
+                <button
+                  type="button"
                   onClick={() => {
                     setSelectedEmploymentType("");
                     setOpenDropdown(null);
                   }}
                   style={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
                     padding: '10px 16px',
                     cursor: 'pointer',
-                    backgroundColor: !selectedEmploymentType ? '#f3f4f6' : 'white',
+                    backgroundColor: selectedEmploymentType === "" ? '#f3f4f6' : 'white',
                     borderBottom: '1px solid #e5e7eb'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedEmploymentType ? '#f3f4f6' : 'white'}
                 >
                   All employment types
-                </div>
+                </button>
                 {EMPLOYMENT_TYPES.map(type => (
-                  <div
+                  <button
+                    type="button"
                     key={type}
                     onClick={() => {
                       setSelectedEmploymentType(type);
                       setOpenDropdown(null);
                     }}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
                       padding: '10px 16px',
                       cursor: 'pointer',
                       backgroundColor: selectedEmploymentType === type ? '#f3f4f6' : 'white'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedEmploymentType === type ? '#f3f4f6' : 'white'}
                   >
                     {type}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -1006,6 +1147,7 @@ const Employees = () => {
           {/* Contract Type Filter */}
           <div style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleDropdown('contract');
@@ -1026,7 +1168,7 @@ const Employees = () => {
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'contract' && (
-              <div onClick={(e) => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -1038,39 +1180,43 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
-                <div
+                <button
+                  type="button"
                   onClick={() => {
                     setSelectedContract("");
                     setOpenDropdown(null);
                   }}
                   style={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
                     padding: '10px 16px',
                     cursor: 'pointer',
-                    backgroundColor: !selectedContract ? '#f3f4f6' : 'white',
+                    backgroundColor: selectedContract === "" ? '#f3f4f6' : 'white',
                     borderBottom: '1px solid #e5e7eb'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedContract ? '#f3f4f6' : 'white'}
                 >
                   All contract types
-                </div>
+                </button>
                 {CONTRACT_TYPES.map(type => (
-                  <div
+                  <button
+                    type="button"
                     key={type}
                     onClick={() => {
                       setSelectedContract(type);
                       setOpenDropdown(null);
                     }}
                     style={{
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
                       padding: '10px 16px',
                       cursor: 'pointer',
                       backgroundColor: selectedContract === type ? '#f3f4f6' : 'white'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedContract === type ? '#f3f4f6' : 'white'}
                   >
                     {type}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -1214,7 +1360,7 @@ const Employees = () => {
             )}
             {appliedManagerIds.length > 0 && (
               <span
-                title={appliedManagerIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                title={appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
                 style={{
                   padding: '4px 12px',
                   backgroundColor: '#e0e7ff',
@@ -1225,7 +1371,7 @@ const Employees = () => {
                   gap: '6px'
                 }}
               >
-                Managers: {appliedManagerIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                Managers: {appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
                 <button
                   onClick={() => { setSelectedManagerIds([]); setAppliedManagerIds([]); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
@@ -1250,330 +1396,28 @@ const Employees = () => {
           </div>
         )}
 
-        {/* Employee Table */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '12px', 
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          overflow: 'hidden',
-          marginBottom: '24px'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Employee</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>CNIC/ID</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Designation</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Dept</th>
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Phone</th>
-                  {/* <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Location</th> */}
-                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Status</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>
-                    Last Updated
-                  </th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: "32px", textAlign: "center", color: "#6b7280" }}>
-                      Loading...
-                    </td>
-                  </tr>
-                ) : filteredProfiles.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: "32px", textAlign: "center", color: "#6b7280" }}>
-                      No employees found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProfiles.map((profile, index) => (
-                    <tr
-                      key={profile.id}
-                      onClick={() => handleProfileClick(profile)}
-                      style={{
-                        borderBottom: index < filteredProfiles.length - 1 ? "1px solid #f3f4f6" : "none",
-                        cursor: "pointer",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f9fafb")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
-                    >
-                      <td style={{ padding: "16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div
-                            style={{
-                              width: "40px",
-                              height: "40px",
-                              borderRadius: "50%",
-                              backgroundColor: "#e0e7ff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <User size={20} color="#6366f1" />
-                          </div>
-                          <div>
-                            <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
-                              {getDisplayName(profile)}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: "#6b7280",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                marginTop: "2px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  width: "8px",
-                                  height: "8px",
-                                  borderRadius: "50%",
-                                  backgroundColor: "#10b981",
-                                  display: "inline-block",
-                                }}
-                              />
-                              {String(profile.status ?? "Active")}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {profile.identification_number ?? "—"}
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {profile.designation ?? "—"}
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {profile.department_id != null
-                          ? (mainAppDepartments.find((d) => Number(d.id) === Number(profile.department_id))?.name ?? String(profile.department_id))
-                          : "—"}
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>{profile.phone ?? "—"}</td>
-                      {/* <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {(profile as UserProfile & { location?: string }).location ??
-                          (profile.location_id != null ? String((profile as { address_locations?: { name?: string } }).address_locations?.name ?? profile.location_id) : "—")}
-                      </td> */}
-                      <td style={{ padding: "16px" }}>
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            backgroundColor: String(profile.status ?? "").toLowerCase() === "active" ? "#d1fae5" : "#fee2e2",
-                            color: String(profile.status ?? "").toLowerCase() === "active" ? "#065f46" : "#991b1b",
-                            borderRadius: "16px",
-                            fontSize: "13px",
-                            fontWeight: "500",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            textTransform: "capitalize",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: "6px",
-                              height: "6px",
-                              borderRadius: "50%",
-                              backgroundColor: String(profile.status ?? "").toLowerCase() === "active" ? "#10b981" : "#ef4444",
-                            }}
-                          />
-                          {String(profile.status ?? "")}
-                        </span>
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#6b7280" }}>
-                        {(profile as UserProfile & { updated_at?: string }).updated_at
-                          ? moment((profile as UserProfile & { updated_at?: string }).updated_at).format(GlobalDateTimeFormat)
-                          : "—"}
-                      </td>
-                      <td style={{ padding: "16px" }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                          {session?.user?.permissions?.includes('update-employee-staff-management') && (
-                          <button
-                            type="button"
-                            onClick={(e) => openEditModal(profile, e)}
-                            style={{
-                              padding: "6px",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "6px",
-                              background: "white",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                            title="Edit"
-                          >
-                            <Pencil size={16} color="#6366f1" />
-                          </button>
-                          )}
-
-{session?.user?.permissions?.includes('update-employee-staff-management') && (() => {
-                            const profileHasJourney = (profile as UserProfile & { journey?: { id?: number } }).journey?.id != null;
-                            return (
-                          <button
-                            type="button"
-                            onClick={(e) => !profileHasJourney && openJourneyModal(profile, e)}
-                            disabled={profileHasJourney}
-                            style={{
-                              padding: "6px",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "6px",
-                              background: profileHasJourney ? "#f3f4f6" : "white",
-                              cursor: profileHasJourney ? "not-allowed" : "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              opacity: profileHasJourney ? 0.8 : 1,
-                            }}
-                            title={profileHasJourney ? "Journey started" : "Create Journey"}
-                          >
-                            <Calendar size={16} color={profileHasJourney ? "#9ca3af" : "#6366f1"} />
-                            <span>{profileHasJourney ? " Journey started" : " Create Journey"}</span>
-                          </button>
-                            );
-                          })()}
-
-
-                          {session?.user?.permissions?.includes('delete-employee-staff-management') && (
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteClick(profile, e)}
-                            style={{
-                              padding: "6px",
-                              border: "1px solid #fecaca",
-                              borderRadius: "6px",
-                              background: "#fef2f2",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                            title="Delete"
-                          >
-                            <Trash2 size={16} color="#dc2626" />
-                          </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div style={{ 
-            padding: '16px 24px', 
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <div style={{ fontSize: "14px", color: "#6b7280" }}>
-              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} employees
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1
-                }}
-              >
-                <ChevronsLeft size={16} />
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === 1 ? '#f9fafb' : 'white',
-                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 1 ? 0.5 : 1
-                }}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              
-              {[...Array(totalPages)].map((_, idx) => {
-                const pageNum = idx + 1;
-                if (
-                  pageNum === 1 ||
-                  pageNum === totalPages ||
-                  (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      style={{
-                        padding: '8px 14px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '6px',
-                        backgroundColor: currentPage === pageNum ? '#6366f1' : 'white',
-                        color: currentPage === pageNum ? 'white' : '#1f2937',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: currentPage === pageNum ? '600' : '400'
-                      }}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                  return <span key={pageNum} style={{ padding: '8px 4px', color: '#6b7280' }}>...</span>;
-                }
-                return null;
-              })}
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1
-                }}
-              >
-                <ChevronRight size={16} />
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                style={{
-                  padding: '8px 12px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  backgroundColor: currentPage === totalPages ? '#f9fafb' : 'white',
-                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages ? 0.5 : 1
-                }}
-              >
-                <ChevronsRight size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Employee Table - Using GenericTable Component */}
+        <GenericTable<UserProfile>
+          data={filteredProfiles}
+          columns={employeeColumns}
+          actions={employeeActions}
+          showActions={true}
+          actionsLabel="Actions"
+          loading={loading}
+          loadingMessage="Loading employees..."
+          emptyMessage="No employees found"
+          hover={true}
+          uniqueKey="id"
+          pagination={{
+            currentPage,
+            rowsPerPage: ITEMS_PER_PAGE,
+            totalRows: pagination?.total ?? 0,
+            pageSizeOptions: [15],
+          }}
+          onPaginationChange={(page) => setCurrentPage(page)}
+          onRowClick={(profile: UserProfile) => handleProfileClick(profile)}
+          showToolbar={false}
+        />
 
         {/* Two Column Layout for Charts and Documents */}
         <div style={{ 
@@ -1662,8 +1506,8 @@ const Employees = () => {
                   dataKey="count" 
                   radius={[8, 8, 0, 0]}
                 >
-                  {departmentHeadcountData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {departmentHeadcountData.map((entry) => (
+                    <Cell key={`${entry.name}-${entry.color}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -1826,7 +1670,7 @@ const Employees = () => {
                   Phone: {journeyModalProfile.extension_number ?? journeyModalProfile.phone ?? "—"}
                 </div>
                 <div className="text-muted small">
-                  Department: {mainAppDepartments.find((d) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "—"}
+                  Department: {mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "—"}
                 </div>
               </Form.Group>
               <Form.Group className="mb-3">
@@ -1868,7 +1712,7 @@ const Employees = () => {
         show={showEditModal}
         onHide={() => { setShowEditModal(false); setEditingProfile(null); }}
         profile={editingProfile}
-        onSuccess={(id) => {
+        onSuccess={(id: number) => {
           loadProfiles(currentPage);
           if (id != null && selectedProfile?.id === id) setSelectedProfile(null);
         }}
@@ -1887,7 +1731,6 @@ const Employees = () => {
       {/* Employee Detail Sidebar */}
       {selectedProfile && (
         <div
-          onClick={closeSidebar}
           style={{
             position: "fixed",
             top: "80px",
@@ -1900,7 +1743,21 @@ const Employees = () => {
             justifyContent: "flex-end",
           }}
         >
-          <div onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            aria-label="Close employee sidebar"
+            onClick={closeSidebar}
+            style={{
+              position: "absolute",
+              inset: 0,
+              border: "none",
+              padding: 0,
+              margin: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              cursor: "pointer",
+            }}
+          />
+          <div style={{ position: "relative", zIndex: 1 }}>
             <EmployeeDetailSidebar
               profile={selectedProfile}
               departments={mainAppDepartments}
@@ -1910,9 +1767,7 @@ const Employees = () => {
           </div>
         </div>
       )}
-    </div>
-    
-
+      </div>
     </React.Fragment>
   );
 };
