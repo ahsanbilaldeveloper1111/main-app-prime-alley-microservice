@@ -37,6 +37,85 @@ import {
 } from 'lucide-react';
 import { generateSms } from '@utils/communication';
 
+// ── Shared styles (local only, to reduce duplication) ─────────────────────────
+
+const modalContainerStyle: React.CSSProperties = {
+  position: 'fixed',
+  height: 'auto',
+  backgroundColor: '#ffffff',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e0',
+  overflow: 'hidden',
+  animation: 'slideInUp 0.3s ease-out',
+};
+
+const headerContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '6px',
+  color: '#141414',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const closeChevronButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  padding: '4px',
+};
+
+const headerTitleStyle: React.CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#141414',
+  margin: 0,
+};
+
+const smallLabelStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#718096',
+  marginBottom: '6px',
+  fontWeight: '500',
+};
+
+const sectionRowBorderedStyle: React.CSSProperties = {
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  padding: '8px 20px',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: '4px',
+  fontSize: '14px',
+  fontWeight: '500',
+  transition: 'background-color 0.2s',
+};
+
+const dropdownItemButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 16px',
+  backgroundColor: 'transparent',
+  border: 'none',
+  textAlign: 'left',
+  fontSize: '14px',
+  cursor: 'pointer',
+};
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Contact {
@@ -321,61 +400,35 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   return (
     <div
       style={{
-        position: 'fixed',
+        ...modalContainerStyle,
         inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 0.5vh auto',
-        height: 'auto',
         width: isMaximized ? 'auto' : '650px',
-        backgroundColor: '#ffffff',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-        borderRadius: '8px',
-        border: '1px solid #cbd5e0',
-        overflow: 'hidden',
-        animation: 'slideInUp 0.3s ease-out',
       }}
     >
       {/* ── Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 20px',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
+      <div style={headerContainerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#141414',
-              padding: '4px',
-            }}
+            style={closeChevronButtonStyle}
           >
             <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
           </button>
-          <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+          <h2 style={headerTitleStyle}>
             Send SMS
           </h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
             <Maximize2 size={18} />
           </button>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
           >
             <X size={20} />
           </button>
@@ -397,7 +450,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             borderRight: '1px solid #e2e8f0',
           }}
         >
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '6px', fontWeight: '500' }}>
+          <div style={smallLabelStyle}>
             Contacted
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', minHeight: '28px' }}>
@@ -475,7 +528,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
 
         {/* Activity date */}
         <div style={{ padding: '12px 20px' }}>
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '6px', fontWeight: '500' }}>
+          <div style={smallLabelStyle}>
             Activity date
           </div>
           <div style={{ position: 'relative' }}>
@@ -522,16 +575,16 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
       </div>
 
       {/* ── Generate SMS (AI) ── */}
-      <div
-        style={{
-          padding: '12px 20px',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ fontSize: '12px', color: '#718096', fontWeight: '500' }}>
+        <div
+          style={{
+            padding: '12px 20px',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+        <div style={{ ...smallLabelStyle, marginBottom: 0 }}>
           Query for AI (optional)
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -612,7 +665,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
         </div>
 
         {/* ── Associated Records ── */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={sectionRowBorderedStyle}>
           <button
             style={{
               background: 'transparent',
@@ -724,14 +777,8 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
                             }
                           }}
                           style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            textAlign: 'left',
-                            fontSize: '14px',
+                            ...dropdownItemButtonStyle,
                             color: '#33475b',
-                            cursor: 'pointer',
                             transition: 'background-color 0.2s',
                           }}
                           onMouseEnter={(e) => {
@@ -830,15 +877,9 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
           onClick={handleSave}
           disabled={!messageText.trim()}
           style={{
-            padding: '8px 20px',
+            ...primaryButtonStyle,
             backgroundColor: messageText.trim() ? '#141414' : '#cbd5e0',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
             cursor: messageText.trim() ? 'pointer' : 'not-allowed',
-            transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
             if (messageText.trim()) e.currentTarget.style.backgroundColor = '#ff6347';

@@ -19,6 +19,20 @@ import { ChevronDown, Maximize2, X } from 'lucide-react';
 import { getWhatsAppTemplates } from '@utils/communication';
 import type { WhatsAppTemplateItem } from '@utils/communication';
 
+const modalContainerStyle: React.CSSProperties = {
+  position: 'fixed',
+  height: 'auto',
+  backgroundColor: '#ffffff',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e0',
+  overflow: 'hidden',
+  animation: 'slideInUp 0.3s ease-out',
+};
+
 const sectionBoxStyle: React.CSSProperties = {
   padding: '16px 20px',
   borderBottom: '1px solid #e2e8f0',
@@ -37,6 +51,65 @@ const footerContainerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-end',
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '6px',
+  color: '#141414',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const closeChevronButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  padding: '4px',
+};
+
+const headerTitleStyle: React.CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#141414',
+  margin: 0,
+};
+
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  border: '1px solid #cbd5e0',
+  borderRadius: '6px',
+  fontSize: '14px',
+  color: '#141414',
+  backgroundColor: '#fff',
+};
+
+const textInputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 12px',
+  border: '1px solid #cbd5e0',
+  borderRadius: '6px',
+  fontSize: '14px',
+  color: '#141414',
+  boxSizing: 'border-box',
+};
+
+const associatedTextStyle: React.CSSProperties = {
+  fontSize: '13px',
+  color: '#718096',
+  fontWeight: '500',
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  padding: '8px 20px',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: '4px',
+  fontSize: '14px',
+  fontWeight: '500',
+  transition: 'background-color 0.2s',
 };
 
 interface WhatsAppMessageModalProps {
@@ -138,19 +211,9 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
   return (
     <div
       style={{
-        position: 'fixed',
+        ...modalContainerStyle,
         inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 0.5vh auto',
-        height: isMaximized ? 'auto' : 'auto',
         width: isMaximized ? 'auto' : '650px',
-        backgroundColor: '#ffffff',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-        borderRadius: '8px',
-        border: '1px solid #cbd5e0',
-        overflow: 'hidden',
-        animation: 'slideInUp 0.3s ease-out',
       }}
     >
       {/* ── Header ── */}
@@ -165,33 +228,25 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#141414',
-              padding: '4px',
-            }}
+            style={closeChevronButtonStyle}
           >
             <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
           </button>
-          <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+          <h2 style={headerTitleStyle}>
             Send WhatsApp (Template)
           </h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
             <Maximize2 size={18} />
           </button>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
           >
             <X size={20} />
           </button>
@@ -208,13 +263,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
           onChange={handleTemplateChange}
           disabled={templatesLoading}
           style={{
-            width: '100%',
-            padding: '10px 12px',
-            border: '1px solid #cbd5e0',
-            borderRadius: '6px',
-            fontSize: '14px',
-            color: '#141414',
-            backgroundColor: '#fff',
+            ...selectStyle,
             cursor: templatesLoading ? 'wait' : 'pointer',
           }}
           aria-label="Select WhatsApp template"
@@ -260,15 +309,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
                     }
                     placeholder={paramLabel}
                     required
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #cbd5e0',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      color: '#141414',
-                      boxSizing: 'border-box',
-                    }}
+                    style={textInputStyle}
                   />
                 </div>
               );
@@ -292,7 +333,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       {/* ── Associated Records ── */}
       {associatedRecords.length > 0 && (
         <div style={sectionBoxStyle}>
-          <div style={{ fontSize: '13px', color: '#718096', fontWeight: '500' }}>
+          <div style={associatedTextStyle}>
             Associated with {associatedRecords.length} record{associatedRecords.length !== 1 ? 's' : ''}
           </div>
         </div>
@@ -304,15 +345,9 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
           onClick={handleSave}
           disabled={!canSend}
           style={{
-            padding: '8px 20px',
+            ...primaryButtonStyle,
             backgroundColor: canSend ? '#25D366' : '#cbd5e0',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
             cursor: canSend ? 'pointer' : 'not-allowed',
-            transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
             if (canSend) e.currentTarget.style.backgroundColor = '#1da851';

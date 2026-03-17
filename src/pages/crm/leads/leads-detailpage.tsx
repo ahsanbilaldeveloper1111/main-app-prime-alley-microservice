@@ -111,16 +111,6 @@ const quickActionCircleButtonBaseStyle: React.CSSProperties = {
   color: "#141414",
 };
 
-const viewAllLinkStyle: React.CSSProperties = {
-  fontSize: "13px",
-  color: "#006162",
-  textDecoration: "none",
-  fontWeight: "500",
-  display: "flex",
-  alignItems: "center",
-  gap: "4px",
-};
-
 const borderedPillButtonStyle: React.CSSProperties = {
   padding: "8px 16px",
   backgroundColor: "transparent",
@@ -133,6 +123,16 @@ const borderedPillButtonStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "6px",
+};
+
+const viewAllLinkStyle: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#006162",
+  textDecoration: "none",
+  fontWeight: "500",
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
 };
 
 // ============================================================================
@@ -621,9 +621,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
       <div
         key={section.id}
         style={{
-          backgroundColor: "#ffffff",
-          border: "1px solid #eaf0f6",
-          borderRadius: "5px",
+          ...sidebarCardStyle,
+          borderColor: "#eaf0f6",
           padding: "20px",
           marginBottom: "16px",
         }}
@@ -631,9 +630,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {/* Section Header */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             marginBottom: section.items ? "16px" : "12px",
           }}
         >
@@ -652,15 +649,14 @@ const ContactRecordPage: NextPageWithLayout = () => {
               onClick={section.onAddClick}
               style={{
                 padding: "6px 12px",
-                backgroundColor: "transparent",
                 border: "none",
                 fontSize: "14px",
-                fontWeight: "500",
                 color: "#006162",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "4px",
+                cursor: "pointer",
+                backgroundColor: "transparent",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.textDecoration = "underline";
@@ -784,19 +780,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
             {/* View All Link */}
             <button
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                border: "1px solid #cbd5e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
+              style={borderedPillButtonStyle}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = "#f7fafc";
               }}
@@ -825,19 +809,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             {section.buttonText && (
               <button
                 onClick={section.onButtonClick}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: "#141414",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
+                style={borderedPillButtonStyle}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#f7fafc";
                 }}
@@ -1927,15 +1899,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                             : "/crm/deals";
                           window.open(href, "_blank", "noopener,noreferrer");
                         }}
-                        style={{
-                          fontSize: "13px",
-                          color: "#006162",
-                          textDecoration: "none",
-                          fontWeight: "500",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
+                        style={viewAllLinkStyle}
                       >
                         View all associated Deals
                         <ExternalLink size={12} />

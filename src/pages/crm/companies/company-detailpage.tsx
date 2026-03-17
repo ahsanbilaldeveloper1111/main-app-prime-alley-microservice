@@ -36,6 +36,87 @@ import { useCti } from "@hooks/useCti";
 import { toast } from "react-toastify";
 
 // ============================================================================
+// SHARED STYLES (LOCAL ONLY, TO REDUCE DUPLICATION)
+// ============================================================================
+
+const sidebarContainerStyle: React.CSSProperties = {
+  backgroundColor: "#f0f0f0",
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  flexShrink: 0,
+  overflowY: "auto",
+};
+
+const sidebarCardStyle: React.CSSProperties = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #cccccc",
+  borderRadius: "10px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+};
+
+const sectionHeaderRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const chevronTitleRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+};
+
+const ghostActionButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "6px",
+  cursor: "pointer",
+  color: "#141414",
+  display: "flex",
+  alignItems: "center",
+  borderRadius: "3px",
+};
+
+const dropdownItemButtonStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 16px",
+  backgroundColor: "transparent",
+  border: "none",
+  textAlign: "left",
+  fontSize: "14px",
+  color: "#141414",
+  cursor: "pointer",
+};
+
+const quickActionCircleButtonStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "9px 7px",
+  background: "#ffffff",
+  border: "1px solid #8a8a8a",
+  borderRadius: "50%",
+  width: "30px",
+  height: "30px",
+  color: "#141414",
+};
+
+const borderedPillButtonStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  backgroundColor: "transparent",
+  border: "1px solid #cbd5e0",
+  borderRadius: "4px",
+  fontSize: "14px",
+  fontWeight: "500",
+  color: "#141414",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+};
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -739,18 +820,14 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     <div
       key={section.id}
       style={{
-        backgroundColor: "#ffffff",
-        border: "1px solid #eaf0f6",
-        borderRadius: "5px",
+        ...cardStyle,
         padding: "20px",
         marginBottom: "16px",
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          ...sectionHeaderRowStyle,
           marginBottom: section.items ? "16px" : "12px",
         }}
       >
@@ -877,19 +954,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             </div>
           ))}
           <button
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "transparent",
-              border: "1px solid #cbd5e0",
-              borderRadius: "4px",
-              fontSize: "14px",
-              fontWeight: "500",
-              color: "#141414",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
+            style={borderedPillButtonStyle}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#f7fafc";
             }}
@@ -916,19 +981,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           {section.buttonText && (
             <button
               onClick={section.onButtonClick}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                border: "1px solid #cbd5e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
+              style={borderedPillButtonStyle}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = "#f7fafc";
               }}
@@ -951,29 +1004,20 @@ const CompanyDetailPage: NextPageWithLayout = () => {
       className="sidebar-scrollbar"
       style={{
         width: "385px",
-        backgroundColor: "#f0f0f0",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        flexShrink: 0,
-        overflowY: "auto",
         marginRight: "10px",
+        ...sidebarContainerStyle,
       }}
     >
       <div
         style={{
           padding: "10px 0px",
-          borderRadius: "10px",
-          backgroundColor: "#ffffff",
           marginBottom: "12px",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             paddingBottom: "10px",
             borderBottom: "1px solid #cccccc",
             paddingLeft: "24px",
@@ -1002,16 +1046,12 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             <button
               style={{
                 padding: "6px 14px",
-                backgroundColor: "transparent",
-                border: "none",
                 fontSize: "14px",
                 fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                borderRadius: "3px",
+                ...ghostActionButtonStyle,
               }}
               onClick={() => setShowActionsDropdown(!showActionsDropdown)}
             >
@@ -1048,16 +1088,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                       }
                       setShowActionsDropdown(false);
                     }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
-                    }}
+                    style={dropdownItemButtonStyle}
                   >
                     {action === "Export" && exporting ? "Exporting..." : action}
                   </button>
@@ -1165,17 +1196,8 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                   disabled={action.disabled}
                   onClick={action.onClick}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "9px 7px",
-                    background: "#ffffff",
-                    border: "1px solid #8a8a8a",
-                    borderRadius: "50%",
+                    ...quickActionCircleButtonStyle,
                     cursor: action.disabled ? "not-allowed" : "pointer",
-                    width: "30px",
-                    height: "30px",
-                    color: "#141414",
                   }}
                 >
                   <Icon size={20} />
@@ -1197,17 +1219,8 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             <button
               onClick={() => setShowMoreActivities(!showMoreActivities)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "9px 7px",
-                background: "#ffffff",
-                border: "1px solid #8a8a8a",
-                borderRadius: "50%",
+                ...quickActionCircleButtonStyle,
                 cursor: "pointer",
-                width: "30px",
-                height: "30px",
-                color: "#141414",
               }}
             >
               <MoreHorizontal size={20} />
@@ -1239,16 +1252,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                       setShowMoreActivities(false);
                       onClick();
                     }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
-                    }}
+                    style={dropdownItemButtonStyle}
                   >
                     {label}
                   </button>
@@ -1262,19 +1266,14 @@ const CompanyDetailPage: NextPageWithLayout = () => {
       {/* Key Information Card */}
       <div
         style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "5px",
           marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             padding: "14px 20px",
             cursor: "pointer",
             backgroundColor: "#ffffff",
@@ -1282,7 +1281,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           }}
           onClick={() => toggleSection("key-info")}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={chevronTitleRowStyle}>
             <ChevronDown
               size={18}
               style={{
