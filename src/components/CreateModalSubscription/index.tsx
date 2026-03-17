@@ -3,8 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type FocusEvent,
-  type MouseEvent,
 } from "react";
 import {
   createProduct,
@@ -21,6 +19,17 @@ import {
   SECTION_CARD,
   SECTION_TITLE,
 } from "@components/shared/productModalStyles";
+import {
+  onBorderBlur,
+  onBorderFocus,
+  onDarkBorderEnter,
+  onDarkBorderLeave,
+  onLightBgEnter,
+  onLightBgLeave,
+  onSubBarBtnEnter,
+  onSubBarBtnLeave,
+  SelectCaret,
+} from "@components/shared/modalUiHelpers";
 
 interface CreateSubscriptionModalProps {
   customerId: string | number;
@@ -35,47 +44,16 @@ export default function CreateSubscriptionModal({
   onCreate,
   onCreateAndAddAnother,
 }: Readonly<CreateSubscriptionModalProps>) {
-  const handleBorderFocus = useCallback(
-    (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      e.currentTarget.style.borderColor = "#2d6ae0";
-    },
-    [],
-  );
-  const handleBorderBlur = useCallback(
-    (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      e.currentTarget.style.borderColor = "rgb(138,138,138)";
-    },
-    [],
-  );
-  const handleDarkBorderEnter = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)";
-  }, []);
-  const handleDarkBorderLeave = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
-  }, []);
-  const handleLightBgEnter = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.backgroundColor = "#f0f0f0";
-  }, []);
-  const handleLightBgLeave = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.backgroundColor = "#fff";
-  }, []);
-  const handleSubBarBtnEnter = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.backgroundColor = "#f5f5f5";
-  }, []);
-  const handleSubBarBtnLeave = useCallback((e: MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.backgroundColor = "#fff";
-  }, []);
-
   const [pricingTab, setPricingTab] = useState("flat");
 
   const handlePricingTabEnter = useCallback(
-    (tabId: string, e: MouseEvent<HTMLButtonElement>) => {
+    (tabId: string, e: React.MouseEvent<HTMLButtonElement>) => {
       if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#f9f9f9";
     },
     [pricingTab],
   );
   const handlePricingTabLeave = useCallback(
-    (tabId: string, e: MouseEvent<HTMLButtonElement>) => {
+    (tabId: string, e: React.MouseEvent<HTMLButtonElement>) => {
       if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#fff";
     },
     [pricingTab],
@@ -254,8 +232,8 @@ export default function CreateSubscriptionModal({
         <button
           onClick={onClose}
           style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-          onMouseEnter={handleDarkBorderEnter}
-          onMouseLeave={handleDarkBorderLeave}
+          onMouseEnter={onDarkBorderEnter}
+          onMouseLeave={onDarkBorderLeave}
         >
           Exit
         </button>
@@ -270,8 +248,8 @@ export default function CreateSubscriptionModal({
           <button
             onClick={() => handleSubmitMode("create_and_add_another")}
             style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-            onMouseEnter={handleDarkBorderEnter}
-            onMouseLeave={handleDarkBorderLeave}
+            onMouseEnter={onDarkBorderEnter}
+            onMouseLeave={onDarkBorderLeave}
             disabled={submitting}
           >
             Create and add another
@@ -280,8 +258,8 @@ export default function CreateSubscriptionModal({
             <button
               onClick={() => handleSubmitMode("create")}
               style={{ ...BASE_BUTTON, backgroundColor: "#fff", color: "#141414", fontWeight: 400, paddingInline: "20px" }}
-              onMouseEnter={handleLightBgEnter}
-              onMouseLeave={handleLightBgLeave}
+              onMouseEnter={onLightBgEnter}
+              onMouseLeave={onLightBgLeave}
               disabled={submitting}
             >
               Create
@@ -320,8 +298,8 @@ export default function CreateSubscriptionModal({
       }}>
         <button
           style={{ ...BASE_BUTTON }}
-          onMouseEnter={handleSubBarBtnEnter}
-          onMouseLeave={handleSubBarBtnLeave}
+          onMouseEnter={onSubBarBtnEnter}
+          onMouseLeave={onSubBarBtnLeave}
         >
           Edit this form
         </button>
@@ -402,8 +380,8 @@ export default function CreateSubscriptionModal({
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
                 style={FIELD_INPUT}
-                onFocus={handleBorderFocus}
-                onBlur={handleBorderBlur}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               />
             </div>
 
@@ -416,8 +394,8 @@ export default function CreateSubscriptionModal({
                 value={productSku}
                 onChange={(e) => setProductSku(e.target.value)}
                 style={FIELD_INPUT}
-                onFocus={handleBorderFocus}
-                onBlur={handleBorderBlur}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               />
             </div>
 
@@ -478,27 +456,10 @@ export default function CreateSubscriptionModal({
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
               style={FIELD_TEXTAREA}
-              onFocus={handleBorderFocus}
-              onBlur={handleBorderBlur}
+              onFocus={onBorderFocus}
+              onBlur={onBorderBlur}
             />
           </div>
-
-          <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
-            <label style={FIELD_LABEL} htmlFor="cmp-product-base-price">
-              Base price <span style={{ color: "#e53e3e" }}>*</span>
-            </label>
-            <input
-                      id="cmp-product-base-price"
-                      type="number"
-                      value={priceAED}
-                      onChange={e => setPriceAED(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleBorderFocus}
-                      onBlur={handleBorderBlur}
-                      placeholder="0.00"
-                    />
-          </div>
-
 
           <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
                   <label style={FIELD_LABEL} htmlFor="cmp-product-category">
@@ -510,8 +471,8 @@ export default function CreateSubscriptionModal({
                       value={categoryId}
                       onChange={(e) => setCategoryId(e.target.value)}
                       style={FIELD_SELECT}
-                      onFocus={handleBorderFocus}
-                      onBlur={handleBorderBlur}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       disabled={loadingCategories || submitting}
                     >
                       <option value="">
@@ -523,15 +484,7 @@ export default function CreateSubscriptionModal({
                         </option>
                       ))}
                     </select>
-                    <span style={{
-                      position: "absolute",
-                      right: "12px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      pointerEvents: "none",
-                      fontSize: "10px",
-                      color: "#555",
-                    }}>▾</span>
+                    <SelectCaret />
                   </div>
                 </div>
 
@@ -546,8 +499,8 @@ export default function CreateSubscriptionModal({
                 value={productType}
                 onChange={e => setProductType(e.target.value)}
                 style={FIELD_SELECT}
-                onFocus={handleBorderFocus}
-                onBlur={handleBorderBlur}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               >
                 <option value=""></option>
                 <option value="physical">Physical</option>
@@ -555,15 +508,7 @@ export default function CreateSubscriptionModal({
                 <option value="service">Service</option>
                 <option value="subscription">Subscription</option>
               </select>
-              <span style={{
-                position: "absolute",
-                right: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-                fontSize: "10px",
-                color: "#555",
-              }}>▾</span>
+              <SelectCaret />
             </div>
           </div>
 
@@ -600,21 +545,21 @@ export default function CreateSubscriptionModal({
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cms-product-brand">Brand</label>
                   <input id="cms-product-brand" type="text" style={FIELD_INPUT}
-                    onFocus={handleBorderFocus}
-                    onBlur={handleBorderBlur} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cms-product-url">URL</label>
                   <input id="cms-product-url" type="url" placeholder="https://" style={FIELD_INPUT}
-                    onFocus={handleBorderFocus}
-                    onBlur={handleBorderBlur} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                 <div>
                   <label style={FIELD_LABEL} htmlFor="cms-product-terms-url">Terms &amp; conditions URL</label>
                   <input id="cms-product-terms-url" type="url" placeholder="https://" style={FIELD_INPUT}
-                    onFocus={handleBorderFocus}
-                    onBlur={handleBorderBlur} />
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur} />
                 </div>
                 
 
@@ -636,23 +581,15 @@ export default function CreateSubscriptionModal({
                 value={billingFrequency}
                 onChange={e => setBillingFrequency(e.target.value)}
                 style={FIELD_SELECT}
-                onFocus={handleBorderFocus}
-                onBlur={handleBorderBlur}
+                onFocus={onBorderFocus}
+                onBlur={onBorderBlur}
               >
                 <option value="one-time">One-time</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="annually">Annually</option>
               </select>
-              <span style={{
-                position: "absolute",
-                right: "12px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-                fontSize: "10px",
-                color: "#555",
-              }}>▾</span>
+              <SelectCaret />
             </div>
           </div>
         </div>
@@ -705,22 +642,14 @@ export default function CreateSubscriptionModal({
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value as "AED" | "USD")}
                     style={{ ...FIELD_SELECT, height: "34px", paddingInline: "10px", paddingRight: "28px" }}
-                    onFocus={handleBorderFocus}
-                    onBlur={handleBorderBlur}
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur}
                     disabled={submitting}
                   >
                     <option value="AED">AED</option>
                     <option value="USD">USD</option>
                   </select>
-                  <span style={{
-                    position: "absolute",
-                    right: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none",
-                    fontSize: "10px",
-                    color: "#555",
-                  }}>▾</span>
+                  <SelectCaret right={10} />
                 </div>
               </div>
               <button
@@ -784,9 +713,9 @@ export default function CreateSubscriptionModal({
                       type="number"
                       value={priceAED}
                       onChange={e => setPriceAED(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleBorderFocus}
-                      onBlur={handleBorderBlur}
+                      style={FIELD_INPUT}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
@@ -795,9 +724,9 @@ export default function CreateSubscriptionModal({
                       type="number"
                       value={priceUSD}
                       onChange={e => setPriceUSD(e.target.value)}
-                      style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={handleBorderFocus}
-                      onBlur={handleBorderBlur}
+                      style={FIELD_INPUT}
+                      onFocus={onBorderFocus}
+                      onBlur={onBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
@@ -822,8 +751,8 @@ export default function CreateSubscriptionModal({
                     onChange={e => setUnitCost(e.target.value)}
                     style={FIELD_INPUT}
                     placeholder="0.00"
-                    onFocus={handleBorderFocus}
-                    onBlur={handleBorderBlur}
+                    onFocus={onBorderFocus}
+                    onBlur={onBorderBlur}
                   />
                 </div>
                 <div>
@@ -864,8 +793,8 @@ export default function CreateSubscriptionModal({
               <p style={{ margin: 0 }}>Tiered pricing lets you set different rates based on quantity ranges.</p>
               <button
                 style={{ ...BASE_BUTTON, marginTop: "16px" }}
-                onMouseEnter={handleSubBarBtnEnter}
-                onMouseLeave={handleSubBarBtnLeave}
+                onMouseEnter={onSubBarBtnEnter}
+                onMouseLeave={onSubBarBtnLeave}
               >
                 + Add tier
               </button>
