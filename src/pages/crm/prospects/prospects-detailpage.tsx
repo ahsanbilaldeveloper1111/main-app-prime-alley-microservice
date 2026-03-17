@@ -55,6 +55,7 @@ import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { exportRecordAsCsv } from "@utils/csvExport";
 
 let customFieldIdCounter = 0;
 
@@ -296,38 +297,14 @@ const ContactRecordPage: NextPageWithLayout = () => {
     }
   }, [hasPhone, numberToCall, handleCall]);
 
-  const handleProspectExport = useCallback(async () => {
+  const handleProspectExport = useCallback(() => {
     if (!prospect?.data) return;
-    const id = prospect.data.id ?? prospectRecordId;
-    const name = `prospect_${id}.csv`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
-      const row = prospect.data as any;
-      const headers = Object.keys(row).filter(
-        (k) => typeof row[k] !== "object",
-      );
-      const csvRows = [
-        headers.join(","),
-        headers
-          .map((h) => {
-            const val = row[h];
-            if (val == null) return "";
-            if (typeof val === "object") return "";
-            const s = String(val).replaceAll('"', '""');
-            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-          })
-          .join(","),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
+      exportRecordAsCsv({
+        row: prospect.data as unknown as Record<string, unknown>,
+        fileName: `prospect_${prospect.data.id ?? prospectRecordId}.csv`,
       });
-      const url = globalThis.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      globalThis.URL.revokeObjectURL(url);
       toast.success("Exported prospect successfully!");
     } catch (err) {
       toast.error("Failed to export prospect");

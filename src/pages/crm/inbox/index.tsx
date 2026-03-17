@@ -3,8 +3,10 @@
 import React, { useState, useRef, useEffect, useCallback, ReactElement } from "react";
 import Layout from "@layout/index";
 import '../../../app/generic-style.css';
-import { getChats, getWhatsAppChatMessages, sendWhatsApp } from "@utils/communication";
+import { getChats, getWhatsAppChatMessages, sendWhatsApp, getWhatsAppTemplates, type WhatsAppTemplateItem } from "@utils/communication";
 import { useWhatsAppSocket, type WhatsAppSocketPayload } from "@hooks/useWhatsAppSocket";
+import { useRouter } from "next/router";
+import parsePhoneNumber from "libphonenumber-js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SidebarSection {
@@ -227,7 +229,7 @@ const Dropdown = ({
 };
 
 // ── Left Sidebar (Grid 1) ──────────────────────────────────────────────────
-const LeftSidebar = () => {
+const LeftSidebar = ({ onNewChat }: { onNewChat: () => void }) => {
   const [activeSection, setActiveSection] = useState("All open");
   const sections = [
     { label: "Unassigned", count: 0 },
@@ -305,9 +307,13 @@ const LeftSidebar = () => {
             { label: "Filter conversations" },
           ]}
         />
-        <button className="btn btn-secondary" style={{ flex: 1, fontWeight: 300 }}>
-          Compose
-        </button>
+          <button
+            className="btn btn-primary"
+            style={{ flex: 1, fontWeight: 300 }}
+            onClick={onNewChat}
+          >
+            New chat
+          </button>
       </div>
       <div style={{ padding: "8px 16px 12px", borderTop: "1px solid #cccccc" }}>
         <button style={{
@@ -396,11 +402,16 @@ const ConversationList = ({
   const initialPhoneFromUrl = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
+    if (globalThis.window === undefined) {
+      return;
+    }
+    const params = new URLSearchParams(globalThis.window.location.search);
     const rawChatId = params.get("chat_id") ?? params.get("chatId");
     const rawPhone = params.get("phone") ?? params.get("phone_number");
-    const chatIdNum = rawChatId != null ? Number(rawChatId) : NaN;
+    let chatIdNum = Number.NaN;
+    if (rawChatId !== null) {
+      chatIdNum = Number(rawChatId);
+    }
     initialChatIdFromUrl.current =
       Number.isFinite(chatIdNum) && chatIdNum > 0 ? chatIdNum : null;
     initialPhoneFromUrl.current = rawPhone ? String(rawPhone).trim() : null;
@@ -444,11 +455,13 @@ const ConversationList = ({
       setDidAutoSelectFromUrl(true);
       return;
     }
-    const match =
-      (wantId != null ? chats.find((c) => c.id === wantId) : undefined) ??
-      (wantPhone
-        ? chats.find((c) => String(c.phone_number).trim() === wantPhone)
-        : undefined);
+    let match: WhatsAppChatItem | undefined;
+    if (wantId !== null && wantId !== undefined) {
+      match = chats.find((c) => c.id === wantId);
+    }
+    if (!match && wantPhone) {
+      match = chats.find((c) => String(c.phone_number).trim() === wantPhone);
+    }
     if (match) {
       onSelectChat(match);
     }
@@ -1197,10 +1210,418 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
   );
 };
 
+const NewChatModal = ({
+  isOpen,
+  onClose,
+  onSend,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSend: (data: {
+    number: string;
+    content_sid: string;
+    content_variables: Record<string, string>;
+  }) => void;
+}) => {
+  const [phone, setPhone] = useState("");
+  const [templates, setTemplates] = useState<WhatsAppTemplateItem[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplateItem | null>(null);
+  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTemplatesLoading(true);
+    getWhatsAppTemplates()
+      .then((list) => setTemplates(Array.isArray(list) ? list : []))
+      .catch((e) => {
+        console.error("Failed to fetch WhatsApp templates", e);
+        setTemplates([]);
+      })
+      .finally(() => setTemplatesLoading(false));
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedTemplate(null);
+    setParamValues({});
+    setPhone("");
+  }, [isOpen]);
+
+  useEffect(() => {
+    setParamValues({});
+  }, [selectedTemplate?.content_sid]);
+
+  const isPhoneE164 = (value: string): boolean => {
+    if (!value.trim()) return false;
+    const parsed = parsePhoneNumber(value.trim());
+    return parsed?.isValid() ?? false;
+  };
+
+  const sanitizePhoneInput = (value: string): string => {
+    const hasPlus = value.startsWith("+");
+    const digits = value.replaceAll(/\D/g, "");
+    return hasPlus ? `+${digits}` : digits;
+  };
+
+  if (!isOpen) return null;
+
+  const params = selectedTemplate?.params ?? [];
+  const allParamsFilled = params.every(
+    (_, i) => (paramValues[String(i + 1)] ?? "").trim() !== "",
+  );
+  const canTemplateSend =
+    selectedTemplate?.content_sid && (params.length === 0 || allParamsFilled);
+
+  const templateContent = (selectedTemplate as { content?: string } | null)?.content;
+  const previewContent =
+    templateContent && params.length > 0
+      ? params.reduce((acc, _label, index) => {
+          const key = String(index + 1);
+          const value = (paramValues[key] ?? "").trim();
+          if (!value) {
+            return acc;
+          }
+          const pattern = new RegExp(String.raw`{{\s*${key}\s*}}`, "g");
+          return acc.replace(pattern, value);
+        }, templateContent)
+      : templateContent;
+
+  const trimmed = phone.trim();
+  const canStart = trimmed.length > 0 && canTemplateSend && isPhoneE164(trimmed);
+
+  const handleStart = () => {
+    if (!canStart) return;
+    if (!selectedTemplate?.content_sid) return;
+
+    const content_variables: Record<string, string> = {};
+    (selectedTemplate.params ?? []).forEach((_, index) => {
+      const key = String(index + 1);
+      content_variables[key] = paramValues[key] ?? "";
+    });
+
+    onSend({
+      number: trimmed,
+      content_sid: selectedTemplate.content_sid,
+      content_variables:
+        Object.keys(content_variables).length > 0 ? content_variables : {},
+    });
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.35)",
+        zIndex: 1400,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          width: 650,
+          background: "#ffffff",
+          borderRadius: 8,
+          boxShadow: "0 10px 40px rgba(15, 23, 42, 0.35)",
+          border: "1px solid #cbd5e0",
+          display: "flex",
+          flexDirection: "column",
+          maxWidth: "90vw",
+        }}
+      >
+        <div
+          style={{
+            padding: "14px 18px",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon name="whatsapp" size={16} color="#141414" />
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#141414" }}>
+              Start new WhatsApp chat
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 4,
+            }}
+          >
+            <Icon name="x" size={14} color="#141414" />
+          </button>
+        </div>
+
+        <div style={{ padding: "16px 18px 4px" }}>
+          <label
+            htmlFor="customer-phone-input"
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#4a5568",
+              marginBottom: 6,
+            }}
+          >
+            Customer phone number
+          </label>
+          <input
+            id="customer-phone-input"
+            value={phone}
+            type="tel"
+            onChange={(e) => {
+              const raw = e.target.value;
+              const cleaned = sanitizePhoneInput(raw);
+              setPhone(cleaned);
+            }}
+            placeholder="+97143035555"
+            autoFocus
+            style={{
+              width: "100%",
+              padding: "9px 10px",
+              borderRadius: 6,
+              border: "1px solid #cbd5e0",
+              fontSize: 14,
+              color: "#1a202c",
+            }}
+          />
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 11,
+              color: "#a0aec0",
+            }}
+          >
+            Enter a full WhatsApp-enabled phone number, including country code.
+          </div>
+        </div>
+
+        {/* Template selection and variables (same as WhatsAppMessageModalNew) */}
+        <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #e2e8f0" }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: "#718096",
+              marginBottom: 8,
+              fontWeight: 500,
+            }}
+          >
+            Template
+          </div>
+          <select
+            value={selectedTemplate?.content_sid ?? ""}
+            onChange={(e) => {
+              const contentSid = e.target.value;
+              const template = contentSid
+                ? templates.find((t) => t.content_sid === contentSid) ?? null
+                : null;
+              setSelectedTemplate(template);
+            }}
+            disabled={templatesLoading}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              border: "1px solid #cbd5e0",
+              borderRadius: 6,
+              fontSize: 14,
+              color: "#141414",
+              backgroundColor: "#fff",
+              cursor: templatesLoading ? "wait" : "pointer",
+            }}
+          >
+            <option value="">
+              {templatesLoading ? "Loading templates..." : "Select a template"}
+            </option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.content_sid}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedTemplate &&
+          Array.isArray(selectedTemplate.params) &&
+          selectedTemplate.params.length > 0 && (
+            <div
+              style={{
+                padding: "0 18px 16px",
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#718096",
+                  marginBottom: 8,
+                  fontWeight: 500,
+                }}
+              >
+                Template variables (all required)
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {selectedTemplate.params.map((paramLabel, index) => {
+                  const key = String(index + 1);
+                  return (
+                    <div key={key}>
+                      <label
+                        style={{
+                          display: "block",
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: "#141414",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {paramLabel}
+                      </label>
+                      <input
+                        type="text"
+                        value={paramValues[key] ?? ""}
+                        onChange={(e) =>
+                          setParamValues((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        placeholder={paramLabel}
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          border: "1px solid #cbd5e0",
+                          borderRadius: 6,
+                          fontSize: 14,
+                          color: "#141414",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        {previewContent && (
+          <div
+            style={{
+              padding: "12px 18px 4px",
+              borderTop: "1px solid #e2e8f0",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "#718096",
+                marginBottom: 8,
+                fontWeight: 500,
+              }}
+            >
+              Template content
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                color: "#141414",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {previewContent}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            padding: "12px 18px",
+            borderTop: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 4,
+              border: "1px solid #e2e8f0",
+              background: "#ffffff",
+              fontSize: 13,
+              color: "#4a5568",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleStart}
+            disabled={!canStart}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 4,
+              border: "none",
+              background: canStart ? "#25D366" : "#cbd5e0",
+              color: "#ffffff",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: canStart ? "pointer" : "not-allowed",
+            }}
+          >
+            Send WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Root Component ─────────────────────────────────────────────────────────
 function CRMInbox() {
   const [selectedChat, setSelectedChat] = useState<WhatsAppChatItem | null>(null);
   const refreshChatsRef = useRef<() => void>(() => {});
+
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const router = useRouter();
+
+  const handleNewChatSend = async (data: {
+    number: string;
+    content_sid: string;
+    content_variables: Record<string, string>;
+  }) => {
+    const number = data.number.trim();
+    if (!number || !data.content_sid) return;
+    try {
+      await sendWhatsApp({
+        number,
+        content_sid: data.content_sid,
+        content_variables:
+          Object.keys(data.content_variables || {}).length > 0
+            ? data.content_variables
+            : undefined,
+      });
+      setSelectedChat(null);
+      router.push(`/crm/inbox?phone=${encodeURIComponent(number)}`);
+      refreshChatsRef.current();
+      setShowNewChatModal(false);
+    } catch {
+      // sendWhatsApp shows toast on error
+    }
+  };
 
   return (
     <div style={{
@@ -1213,13 +1634,19 @@ function CRMInbox() {
       marginTop: "-15px", marginLeft: "-15px"
     }}>
       {/* Grid 1: Left sidebar */}
-      <LeftSidebar />
+      <LeftSidebar onNewChat={() => setShowNewChatModal(true)} />
 
       {/* Grid 2: Conversation list (WhatsApp chats from API) */}
       <ConversationList
         selectedChat={selectedChat}
         onSelectChat={setSelectedChat}
         refreshChatsRef={refreshChatsRef}
+      />
+
+      <NewChatModal
+        isOpen={showNewChatModal}
+        onClose={() => setShowNewChatModal(false)}
+        onSend={handleNewChatSend}
       />
 
       {/* Grids 3+4 share a column with top bar */}

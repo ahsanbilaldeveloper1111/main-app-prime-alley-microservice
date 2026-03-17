@@ -298,6 +298,14 @@ const RecentActivitiesSection = ({
           const description = buildAuditLinesForEntry
             ? buildAuditLinesForEntry(entry, resolveFieldVal, humanizeDataKey)
             : "";
+            const userName =
+              (entry.user_extension &&
+                resolveUserLabel?.(entry.user_extension)) ||
+              entry.user_extension ||
+              "";
+            const timestampWithUser = userName
+              ? `${timestamp} by ${userName}`
+              : timestamp;
           return (
             <div
               key={entry.id ?? index}
@@ -320,7 +328,7 @@ const RecentActivitiesSection = ({
                 dangerouslySetInnerHTML={{ __html: description }}
               />
               <span style={{ fontSize: "12px", color: "#718096" }}>
-                {timestamp}
+                {timestampWithUser}
               </span>
             </div>
           );
@@ -6320,7 +6328,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             : undefined,
       });
       setShowWhatsAppModal(false);
-      // if (onWhatsAppLog) onWhatsAppLog(whatsappData);
+      router.push(`/crm/inbox?phone=${encodeURIComponent(number)}`);
     } catch {
       // sendWhatsApp shows toast on error
     }
@@ -6602,6 +6610,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     description?: string | null;
     created_at?: string;
     changes?: Record<string, { old?: unknown; new?: unknown }>;
+    user_extension?: string;
   };
 
   const getAuditTrailFromRecord = (

@@ -635,7 +635,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                   overflow: 'hidden',
                 }}>
-                  {['Edit', 'Delete', 'Export'].map((action) => (
+                  {['Export'].map((action) => (
                     <button
                       key={action}
                       onClick={() => {

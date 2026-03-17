@@ -19,11 +19,7 @@ import GenericTable, {
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -42,8 +38,6 @@ import {
   updateLead,
   getCampaigns,
   getCampaignById,
-  getCrmData,
-  getCrmDataById,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
@@ -52,7 +46,6 @@ import type {
   StageData,
   CampaignData,
   CrmDataItem,
-  IndustryData,
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -61,11 +54,8 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Popover,
   OverlayTrigger,
@@ -89,27 +79,21 @@ import {
   Target,
   CheckCircle,
   TrendingUp,
-  BarChart3,
   Plus,
   Eye,
   Edit,
   Trash2,
   Handshake,
-  MoreVertical,
   X,
   Users,
   Clock,
-  Search,
   Filter,
   Layers,
   Calendar,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Mail,
   Phone as PhoneIcon,
   Phone,
@@ -123,8 +107,6 @@ import {
   UserCheck,
   AlertCircle,
   RotateCcw,
-  CheckSquare,
-  Download,
 } from "lucide-react";
 import {
   PieChart,
@@ -153,6 +135,7 @@ import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
+import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -179,6 +162,42 @@ interface LeadData {
 }
 
 const ignoredKeys = ["stage_id", "contact_persons"];
+
+function leadsToKanbanColumns(
+  leads: LeadData[],
+  stages: Array<{ id: number | string; name: string }>
+): KanbanColumnDef[] {
+  const buckets: Record<string, KanbanCardData[]> = {};
+
+  stages.forEach((stage) => {
+    buckets[String(stage.id)] = [];
+  });
+
+  for (const lead of leads) {
+    const stageId = String(lead.rawData?.stage_id ?? lead.stage ?? "");
+    const bucketKey = buckets[stageId] ? stageId : String(stages[0]?.id ?? "");
+
+    buckets[bucketKey].push({
+      id: lead.rawData?.id ?? lead.id,
+      name: lead.name || "--",
+      email: lead.email,
+      avatarInitials: lead.email ? getInitials(lead.name || "") : undefined,
+      avatarColor: lead.email ? getRandomColor(lead.name || "") : undefined,
+      metaLines: [
+        lead.company || "",
+        lead.leadPotential ? `Potential: ${lead.leadPotential}` : "",
+        lead.assignedUser ? `Owner: ${lead.assignedUser}` : "",
+      ].filter(Boolean),
+      raw: lead,
+    });
+  }
+
+  return stages.map((stage) => ({
+    id: String(stage.id),
+    title: stage.name,
+    cards: buckets[String(stage.id)] ?? [],
+  }));
+}
 // Phone Container Component (with Badge for tables)
 const PhoneContainer = ({
   phone,
@@ -679,8 +698,6 @@ const CrmLeads = () => {
   const [editCrmData, setEditCrmData] = useState<CrmDataItem[]>([]);
   const [editSelectedCampaign, setEditSelectedCampaign] =
     useState<CampaignData | null>(null);
-  const [editSelectedCrmData, setEditSelectedCrmData] =
-    useState<CrmDataItem | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editFetching, setEditFetching] = useState(false);
   const [editBusinessTypes, setEditBusinessTypes] = useState<
@@ -895,6 +912,11 @@ const CrmLeads = () => {
           params.include_archived = currentFilters.include_archived;
         }
 
+        if (leadsPagination.sortColumn) {
+          params.sort_column = leadsPagination.sortColumn;
+          params.sort_direction = leadsPagination.sortDirection;
+        }
+
         const response: any = await getLeads(params);
         console.log("Raw response from getLeads:", response);
 
@@ -936,7 +958,11 @@ const CrmLeads = () => {
         setLoading(false);
       }
     },
-    [currentFilters], // Only currentFilters as dependency
+    [
+      currentFilters,
+      leadsPagination.sortColumn,
+      leadsPagination.sortDirection,
+    ],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -1450,204 +1476,6 @@ const CrmLeads = () => {
     }
   };
 
-  // Helper functions
-  const handleSort = (
-    column: string,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-  ) => {
-    const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPaginationState({
-      ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-  ) => {
-    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
-    const { currentPage, rowsPerPage } = paginationState;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {dataLength} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return paginationState.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
   // Transform API lead data to UI format
   const transformLeadData = (lead: any): LeadData => {
     // Parse contact_persons - it can be a JSON string or an array
@@ -1754,13 +1582,7 @@ const CrmLeads = () => {
       }
 
       try {
-        const result = await dialNumber(phone);
-
-        if (result.success) {
-          // toast.success(`Calling ${lead.name || phone}...`);
-        } else {
-          // toast.error(result.error || "Failed to make call");
-        }
+        await dialNumber(phone);
       } catch (error) {
         console.error("Call error:", error);
         toast.error("Failed to make call");
@@ -3939,19 +3761,33 @@ const CrmLeads = () => {
                 statsCards={leadsStatsCards}
                 customBody={
                   leadsViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
+                    <KanbanBoard
+                      columns={leadsToKanbanColumns(filteredLeads, stages)}
+                      onCardClick={(lead) =>
+                        handleViewLead(lead.raw?.id ?? lead.id)
+                      }
+                      onCardMove={(leadId, fromCol, toCol) => {
+                        const lead = filteredLeads.find(
+                          (l) => l.id === Number(leadId) || l.id === leadId
+                        );
+                        if (lead) {
+                          updateLead(Number(lead.id), {
+                            stage_id: Number(toCol),
+                          })
+                            .then(() => {
+                              fetchLeads(
+                                leadsPagination.currentPage,
+                                leadsPagination.rowsPerPage
+                              );
+                            })
+                            .catch((err) => {
+                              console.error("Failed to update lead stage:", err);
+                              toast.error("Failed to update lead stage");
+                            });
+                        }
+                      }}
+                      searchValue={leadsSearch}
+                    />
                   ) : undefined
                 }
               />
@@ -4104,6 +3940,11 @@ const CrmLeads = () => {
                     show: !!(
                       selectedLead?.email || selectedLead?.rawData?.email
                     ),
+                  },
+                  {
+                    label: "Description",
+                    value: selectedLead?.description || "N/A",
+                    show: !!selectedLead?.description,
                   },
                   {
                     label: "Company",

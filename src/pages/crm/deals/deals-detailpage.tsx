@@ -333,7 +333,7 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   const dealRecordId = Number(dealId) || deal?.id || 0;
   const dealRecordName = deal?.name ?? 'Deal';
-  const dealRecordEmail = (deal as any)?.contact_email ??  (deal as any)?.decision_maker_email  ?? '';
+  const dealRecordEmail = (deal as any)?.contact_email ??  (deal as any)?.decision_maker_email  ?? (deal as any)?.main_decision_maker?.email ?? '';
 
   const dealRecordPhone = (deal as any)?.phone ?? deal?.decision_maker_phone ?? "";
 
