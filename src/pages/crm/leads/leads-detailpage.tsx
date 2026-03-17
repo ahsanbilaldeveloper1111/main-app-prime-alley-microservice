@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useRef, useEffect, ReactElement } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  ReactElement,
+} from "react";
 import { useRouter } from "next/router";
 import {
   ChevronDown,
@@ -27,9 +34,11 @@ import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
 import CreateLeadModal from "@components/CreateLeadModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
@@ -234,6 +243,31 @@ const ContactRecordPage: NextPageWithLayout = () => {
     lead?.company_contact ??
     "";
 
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+
+  const phoneList = useMemo(() => {
+    const phone = leadRecordPhone;
+    if (!phone || typeof phone !== "string") return [];
+    return phone
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [leadRecordPhone]);
+
+  const hasPhone = phoneList.length > 0;
+  const numberToCall = hasPhone ? phoneList[0] : "";
+
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+
   const activityModals = useCrmActivityModals({
     recordType: "lead",
     recordId: leadRecordId,
@@ -245,6 +279,76 @@ const ContactRecordPage: NextPageWithLayout = () => {
     onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall],
+  );
+
+  const handleCallClick = useCallback(() => {
+    if (hasPhone) {
+      handleCall(numberToCall);
+    } else {
+      toast.error("No phone number available");
+    }
+  }, [hasPhone, numberToCall, handleCall]);
 
   const handleOpenEditLead = useCallback(() => {
     if (!leadRecordId) return;
@@ -946,7 +1050,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
               disabled: false,
               onClick: activityModals.openEmail,
             },
-            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            {
+              icon: Phone,
+              label: "Call",
+              disabled: !hasPhone || isDialing,
+              onClick: handleCallClick,
+            },
             {
               icon: ClipboardList,
               label: "Task",
@@ -1945,6 +2054,19 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {/* Right Sidebar - Associated Records */}
         {renderRightSidebar()}
       </div>
+
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
+      />
 
       {activityModals.modals}
 

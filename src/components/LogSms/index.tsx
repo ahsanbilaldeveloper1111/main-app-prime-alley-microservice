@@ -847,7 +847,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             if (messageText.trim()) e.currentTarget.style.backgroundColor = '#141414';
           }}
         >
-          Log sms message
+          Send SMS
         </button>
       </div>
     </div>

@@ -298,13 +298,14 @@ const RecentActivitiesSection = ({
           const description = buildAuditLinesForEntry
             ? buildAuditLinesForEntry(entry, resolveFieldVal, humanizeDataKey)
             : "";
-          const userLabel =
-            isActivityRecordType &&
-            entry.user_extension &&
-            resolveUserLabel &&
-            typeof entry.user_extension !== "object"
-              ? resolveUserLabel(String(entry.user_extension))
-              : null;
+            const userName =
+              (entry.user_extension &&
+                resolveUserLabel?.(entry.user_extension)) ||
+              entry.user_extension ||
+              "";
+            const timestampWithUser = userName
+              ? `${timestamp} by ${userName}`
+              : timestamp;
           return (
             <div
               key={entry.id ?? index}
@@ -327,8 +328,7 @@ const RecentActivitiesSection = ({
                 dangerouslySetInnerHTML={{ __html: description }}
               />
               <span style={{ fontSize: "12px", color: "#718096" }}>
-                {timestamp}
-                {userLabel ? ` • ${userLabel}` : ""}
+                {timestampWithUser}
               </span>
             </div>
           );

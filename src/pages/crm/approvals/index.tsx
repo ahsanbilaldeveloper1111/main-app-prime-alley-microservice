@@ -14,12 +14,14 @@ import GenericTable, {
   TableColumn,
   TableAction,
   TabConfig,
-  ToolbarConfig,
-  FilterPill,
 } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
+import KanbanBoard, {
+  KanbanColumnDef,
+  KanbanCardData,
+} from "@components/KanbanBoard";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { EditDealApprovalSidebar } from "@components/EditDealApprovalSidebar";
 import {
@@ -260,6 +262,43 @@ const getInitials = (name: string): string => {
   }
 
   return "NA";
+};
+
+const dealsToKanbanColumns = (
+  deals: any[],
+  stagesData: any[]
+): KanbanColumnDef[] => {
+  const buckets: Record<string | number, KanbanCardData[]> = {};
+
+  stagesData.forEach((stage) => {
+    buckets[stage.id] = [];
+  });
+
+  deals.forEach((deal: any) => {
+    const stageId = deal.stage_id || deal.stage?.id;
+    if (stageId && buckets[stageId]) {
+      const dealName = deal.name || "";
+      buckets[stageId].push({
+        id: deal.id,
+        name: dealName,
+        email: deal.company_name || "",
+        avatarInitials: getInitials(dealName),
+        avatarColor: getRandomColor(dealName),
+        metaLines: [
+          deal.net_value || deal.grand_total
+            ? `${deal.currency || "AED"} ${deal.net_value || deal.grand_total}`
+            : "",
+        ].filter(Boolean),
+        raw: deal,
+      });
+    }
+  });
+
+  return stagesData.map((stage) => ({
+    id: String(stage.id),
+    title: stage.name || "No Stage",
+    cards: buckets[stage.id] || [],
+  }));
 };
 
 // Helper function to generate a random background color based on name
@@ -713,6 +752,11 @@ const CrmDeals = () => {
           params.approval_status = currentFilters.approval_status;
         }
 
+        if (dealsPagination.sortColumn) {
+          params.sort_column = dealsPagination.sortColumn;
+          params.sort_direction = dealsPagination.sortDirection;
+        }
+
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
 
@@ -748,7 +792,7 @@ const CrmDeals = () => {
         setLoading(false);
       }
     },
-    [currentFilters],
+    [currentFilters, dealsPagination.sortColumn, dealsPagination.sortDirection],
   );
 
   // Sync export modal filters from current table filters when modal opens
@@ -2590,9 +2634,9 @@ const CrmDeals = () => {
   ]);
 
   const approvalsToolbarConfig = useCrmToolbarConfig({
-    entity: "deals",
+    entity: "approvals",
     searchValue: dealsSearch,
-    searchPlaceholder: "Search deals by name, company, value...",
+    searchPlaceholder: "Search approvals by name, company, value...",
     onSearchChange: setDealsSearch,
     onSearch: () => {},
     currentFilters,
@@ -2601,7 +2645,7 @@ const CrmDeals = () => {
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
-      { id: "all", label: "All deals", count: filterCounts.all, removable: false },
+      { id: "all", label: "All approvals", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
@@ -2609,7 +2653,7 @@ const CrmDeals = () => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
-    tabsDropdownLabel: "Deals",
+    tabsDropdownLabel: "Approvals",
     onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => setShowExportModal(true),
     onEditColumnsClick: () => setShowColumnEditor(true),
@@ -3304,23 +3348,33 @@ const CrmDeals = () => {
               showToolbar={true}
               toolbar={approvalsToolbarConfig}
               statsCards={dealsStatsCards}
-              customBody={
-                approvalsViewMode === "board" ? (
-                  <div
-                    className="d-flex align-items-center justify-content-center p-5"
-                    style={{ minHeight: "400px", background: "#f8f9fa" }}
-                  >
-                    <div className="text-center text-muted">
-                      <Layers size={48} className="mb-3 opacity-50" />
-                      <h5 className="mb-2">Board View</h5>
-                      <p className="mb-0 small">
-                        Switch to Table view from the dropdown to see the
-                        table.
-                      </p>
-                    </div>
-                  </div>
-                ) : undefined
-              }
+                customBody={
+                  approvalsViewMode === "board" ? (
+                    <KanbanBoard
+                      columns={dealsToKanbanColumns(dealsData, stages)}
+                      onCardClick={(card) => handleViewDeal(Number(card.id))}
+                      onCardMove={(cardId, fromCol, toCol) => {
+                        const deal = dealsData.find(
+                          (d) => d.id === Number(cardId) || d.id === cardId
+                        );
+                        if (deal) {
+                          approveDeal(Number(deal.id))
+                            .then(() => {
+                              fetchDeals(
+                                dealsPagination.currentPage,
+                                dealsPagination.rowsPerPage
+                              );
+                            })
+                            .catch((err) => {
+                              console.error("Failed to update approval stage:", err);
+                              toast.error("Failed to update approval stage");
+                            });
+                        }
+                      }}
+                      searchValue={dealsSearch}
+                    />
+                  ) : undefined
+                }
             />
           </div>
         </div>

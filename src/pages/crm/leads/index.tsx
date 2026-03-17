@@ -153,6 +153,7 @@ import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
+import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -179,6 +180,42 @@ interface LeadData {
 }
 
 const ignoredKeys = ["stage_id", "contact_persons"];
+
+function leadsToKanbanColumns(
+  leads: LeadData[],
+  stages: Array<{ id: number | string; name: string }>
+): KanbanColumnDef[] {
+  const buckets: Record<string, KanbanCardData[]> = {};
+
+  stages.forEach((stage) => {
+    buckets[String(stage.id)] = [];
+  });
+
+  for (const lead of leads) {
+    const stageId = String(lead.rawData?.stage_id ?? lead.stage ?? "");
+    const bucketKey = buckets[stageId] ? stageId : String(stages[0]?.id ?? "");
+
+    buckets[bucketKey].push({
+      id: lead.rawData?.id ?? lead.id,
+      name: lead.name || "--",
+      email: lead.email,
+      avatarInitials: lead.email ? getInitials(lead.name || "") : undefined,
+      avatarColor: lead.email ? getRandomColor(lead.name || "") : undefined,
+      metaLines: [
+        lead.company || "",
+        lead.leadPotential ? `Potential: ${lead.leadPotential}` : "",
+        lead.assignedUser ? `Owner: ${lead.assignedUser}` : "",
+      ].filter(Boolean),
+      raw: lead,
+    });
+  }
+
+  return stages.map((stage) => ({
+    id: String(stage.id),
+    title: stage.name,
+    cards: buckets[String(stage.id)] ?? [],
+  }));
+}
 // Phone Container Component (with Badge for tables)
 const PhoneContainer = ({
   phone,
@@ -895,6 +932,11 @@ const CrmLeads = () => {
           params.include_archived = currentFilters.include_archived;
         }
 
+        if (leadsPagination.sortColumn) {
+          params.sort_column = leadsPagination.sortColumn;
+          params.sort_direction = leadsPagination.sortDirection;
+        }
+
         const response: any = await getLeads(params);
         console.log("Raw response from getLeads:", response);
 
@@ -936,7 +978,11 @@ const CrmLeads = () => {
         setLoading(false);
       }
     },
-    [currentFilters], // Only currentFilters as dependency
+    [
+      currentFilters,
+      leadsPagination.sortColumn,
+      leadsPagination.sortDirection,
+    ],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -3939,19 +3985,33 @@ const CrmLeads = () => {
                 statsCards={leadsStatsCards}
                 customBody={
                   leadsViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
+                    <KanbanBoard
+                      columns={leadsToKanbanColumns(filteredLeads, stages)}
+                      onCardClick={(lead) =>
+                        handleViewLead((lead.raw as any)?.id ?? lead.id)
+                      }
+                      onCardMove={(leadId, fromCol, toCol) => {
+                        const lead = filteredLeads.find(
+                          (l) => l.id === Number(leadId) || l.id === leadId
+                        );
+                        if (lead) {
+                          updateLead(Number(lead.id), {
+                            stage_id: Number(toCol),
+                          })
+                            .then(() => {
+                              fetchLeads(
+                                leadsPagination.currentPage,
+                                leadsPagination.rowsPerPage
+                              );
+                            })
+                            .catch((err) => {
+                              console.error("Failed to update lead stage:", err);
+                              toast.error("Failed to update lead stage");
+                            });
+                        }
+                      }}
+                      searchValue={leadsSearch}
+                    />
                   ) : undefined
                 }
               />
@@ -4104,6 +4164,11 @@ const CrmLeads = () => {
                     show: !!(
                       selectedLead?.email || selectedLead?.rawData?.email
                     ),
+                  },
+                  {
+                    label: "Description",
+                    value: selectedLead?.description || "N/A",
+                    show: !!selectedLead?.description,
                   },
                   {
                     label: "Company",

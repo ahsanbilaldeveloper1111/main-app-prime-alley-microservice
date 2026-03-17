@@ -583,7 +583,7 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("board");
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -963,6 +963,11 @@ const CrmDeals = () => {
           params.sort_order = currentFilters.sort_order;
         }
 
+        if (dealsPagination.sortColumn) {
+          params.sort_column = dealsPagination.sortColumn;
+          params.sort_direction = dealsPagination.sortDirection;
+        }
+
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
 
@@ -998,7 +1003,7 @@ const CrmDeals = () => {
         setLoading(false);
       }
     },
-    [currentFilters],
+    [currentFilters, dealsPagination.sortColumn, dealsPagination.sortDirection],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown

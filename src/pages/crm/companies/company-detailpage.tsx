@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useRef, useEffect, ReactElement, useCallback } from "react";
 import { useRouter } from "next/router";
 import {
   ChevronDown,
@@ -17,7 +17,18 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getCompany, type CompanyData, type EnrichmentData } from "@utils/crm";
+import {
+  getCompany,
+  deleteCompany,
+  updateCompany,
+  type CompanyData,
+  type EnrichmentData,
+} from "@utils/crm";
+import {
+  CreateCompanySidebar,
+  type CompanyFormPayload,
+} from "@components/renderCreateCompany";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import moment from "moment-timezone";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -151,6 +162,16 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     recordEmail: enrichmentEmail,
     recordPhone: enrichmentPhone,
   });
+
+  const [exporting, setExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<{
+    id: number;
+    name?: string | null;
+  } | null>(null);
+  const [showEditCompanySidebar, setShowEditCompanySidebar] = useState(false);
+  const [editingCompanyForm, setEditingCompanyForm] =
+    useState<CompanyFormPayload | null>(null);
 
   // Load company by ID from URL
   useEffect(() => {
@@ -608,6 +629,103 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     );
   };
 
+  const handleCompanyExport = useCallback(async () => {
+    if (!company) return;
+    const id = company.id ?? companyRecordId;
+    const name = `company_${id}.csv`;
+    const ext = name.endsWith(".csv") ? "" : ".csv";
+    setExporting(true);
+    try {
+      const row = company as any;
+      const headers = Object.keys(row).filter(
+        (k) => typeof row[k] !== "object",
+      );
+      const csvRows = [
+        headers.join(","),
+        headers
+          .map((h) => {
+            const val = row[h];
+            if (val == null) return "";
+            if (typeof val === "object") return "";
+            const s = String(val).replaceAll('"', '""');
+            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+          })
+          .join(","),
+      ];
+      const blob = new Blob([csvRows.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = globalThis.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name + ext;
+      a.click();
+      globalThis.URL.revokeObjectURL(url);
+      toast.success("Exported company successfully!");
+    } catch (err) {
+      toast.error("Failed to export company");
+      // eslint-disable-next-line no-console
+      console.error("Failed to export company:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, [company, companyRecordId]);
+
+  const handleOpenDeleteCompany = useCallback(() => {
+    if (!companyRecordId || !company) return;
+    setCompanyToDelete({ id: companyRecordId, name: company.name });
+    setShowDeleteModal(true);
+  }, [companyRecordId, company]);
+
+  const confirmDeleteCompany = useCallback(async () => {
+    if (!companyToDelete) return;
+    try {
+      await deleteCompany(companyToDelete.id);
+      setShowDeleteModal(false);
+      setCompanyToDelete(null);
+      router.push("/crm/companies");
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error("Delete company error:", error);
+    }
+  }, [companyToDelete, router]);
+
+  const handleOpenEditCompany = useCallback(() => {
+    if (!company) return;
+    setEditingCompanyForm({
+      name: company.name ?? "",
+      domain: company.domain ?? "",
+      industry: company.industry ?? "",
+      country: company.country ?? "",
+      city: company.city ?? "",
+      email: company.email ?? "",
+      phone: company.phone ?? "",
+    });
+    setShowEditCompanySidebar(true);
+  }, [company]);
+
+  const handleCompanySave = useCallback(
+    async (data: CompanyFormPayload, id?: number) => {
+      const targetId = id ?? companyRecordId;
+      if (!targetId) return;
+      try {
+        const updated = await updateCompany(targetId, {
+          name: data.name,
+          phone: data.phone,
+          city: data.city,
+          country: data.country,
+          industry: data.industry,
+          domain: data.domain,
+          email: data.email,
+        });
+        setCompany(updated);
+      } catch {
+        // errors/toasts handled in updateCompany
+      }
+    },
+    [companyRecordId],
+  );
+
   const renderRevenueSection = (section: RevenueSection) => (
     <div
       key={section.id}
@@ -873,7 +991,6 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           </button>
           <div style={{ position: "relative" }} ref={dropdownRef}>
             <button
-              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
               style={{
                 padding: "6px 14px",
                 backgroundColor: "transparent",
@@ -887,6 +1004,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 gap: "6px",
                 borderRadius: "3px",
               }}
+              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
             >
               Actions
               <ChevronDown size={14} />
@@ -910,7 +1028,17 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
-                    onClick={() => setShowActionsDropdown(false)}
+                    disabled={action === "Export" && exporting}
+                    onClick={() => {
+                      if (action === "Edit") {
+                        handleOpenEditCompany();
+                      } else if (action === "Delete") {
+                        handleOpenDeleteCompany();
+                      } else if (action === "Export") {
+                        void handleCompanyExport();
+                      }
+                      setShowActionsDropdown(false);
+                    }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -922,7 +1050,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                       cursor: "pointer",
                     }}
                   >
-                    {action}
+                    {action === "Export" && exporting ? "Exporting..." : action}
                   </button>
                 ))}
               </div>
@@ -1540,7 +1668,25 @@ const CompanyDetailPage: NextPageWithLayout = () => {
         {renderMainContent()}
         {renderRightSidebar()}
       </div>
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setCompanyToDelete(null);
+        }}
+        onConfirm={confirmDeleteCompany}
+        itemName={companyToDelete?.name ?? company?.name}
+        itemType="company"
+      />
       {activityModals.modals}
+      {showEditCompanySidebar && (
+        <CreateCompanySidebar
+          onClose={() => setShowEditCompanySidebar(false)}
+          initialData={editingCompanyForm}
+          editingId={companyRecordId || undefined}
+          onSave={handleCompanySave}
+        />
+      )}
     </>
   );
 };

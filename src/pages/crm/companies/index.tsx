@@ -1774,6 +1774,8 @@ const CrmCompanyManagement = () => {
         search?: string;
         industry?: string;
         country?: string;
+        sort_column?: string;
+        sort_direction?: "asc" | "desc";
       } = {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
@@ -1781,6 +1783,10 @@ const CrmCompanyManagement = () => {
       if (currentFilters.search) params.search = currentFilters.search;
       if (currentFilters.industry) params.industry = currentFilters.industry;
       if (currentFilters.country) params.country = currentFilters.country;
+      if (pagination.sortColumn) {
+        params.sort_column = pagination.sortColumn;
+        params.sort_direction = pagination.sortDirection;
+      }
 
       const response = await getCompanies(params);
       if (currentRequestId !== requestIdRef.current) return;
@@ -1807,6 +1813,8 @@ const CrmCompanyManagement = () => {
   }, [
     pagination.currentPage,
     pagination.rowsPerPage,
+    pagination.sortColumn,
+    pagination.sortDirection,
     currentFilters.search,
     currentFilters.industry,
     currentFilters.country,

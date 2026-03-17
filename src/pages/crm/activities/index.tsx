@@ -137,6 +137,8 @@ const HistoryPage = () => {
     last_page: 1,
     per_page: 15,
     total: 0,
+    sort_column: "",
+    sort_direction: "asc" as "asc" | "desc",
   });
   const [historyChain, setHistoryChain] = useState<HistoryChainRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -179,14 +181,27 @@ const HistoryPage = () => {
 
   // Fetch history data from API
   const fetchHistoryData = useCallback(
-    async (page: number = 1, perPage?: number) => {
+    async (
+      page: number = 1,
+      perPage?: number,
+      sortColumn?: string,
+      sortDirection?: "asc" | "desc",
+    ) => {
       try {
         setLoading(true);
         const currentPerPage = perPage ?? pagination.per_page;
+        const effectiveSortColumn = sortColumn ?? pagination.sort_column;
+        const effectiveSortDirection = sortDirection ?? pagination.sort_direction;
         const params: any = {
           page,
           per_page: currentPerPage,
         };
+
+        // Add sorting if available
+        if (effectiveSortColumn) {
+          params.sort_column = effectiveSortColumn;
+          params.sort_direction = effectiveSortDirection;
+        }
 
         // Add search if available
         if (activitySearch) {
@@ -287,6 +302,8 @@ const HistoryPage = () => {
           last_page: paginationInfo.last_page || 1,
           per_page: paginationInfo.per_page || currentPerPage,
           total: paginationInfo.total || 0,
+          sort_column: effectiveSortColumn || "",
+          sort_direction: effectiveSortDirection || "asc",
         });
       } catch (error) {
         console.error("Failed to fetch history data:", error);
@@ -303,6 +320,8 @@ const HistoryPage = () => {
       activityFilters.dateRange,
       activityFilters.agents,
       pagination.per_page,
+      pagination.sort_column,
+      pagination.sort_direction,
       extensions,
       activityTypeFilter,
     ],
@@ -503,6 +522,7 @@ const HistoryPage = () => {
       key: "customer",
       label: "Record Name",
       type: "multi-field",
+      sortable: true,
       fields: {
         primary: "customer",
         secondary: "tags",
@@ -533,6 +553,7 @@ const HistoryPage = () => {
       key: "agent",
       label: "Agent",
       type: "avatar",
+      sortable: true,
       avatar: {
         getInitials: (row) => getInitials(row.agent),
         getColor: (row) => getRandomColor(row.agent),
@@ -543,6 +564,7 @@ const HistoryPage = () => {
       key: "lastActivity",
       label: "Last Activity",
       type: "date",
+      sortable: true,
       render: (row) => (
         <div className="small text-uppercase">
           {row.dateTime ? moment(row.dateTime).format(GlobalDateFormat) : "-"}
@@ -562,6 +584,7 @@ const HistoryPage = () => {
       key: "type",
       label: "Type",
       type: "badge",
+      sortable: true,
       render: (row) => (
         <Badge
           bg={
@@ -582,6 +605,7 @@ const HistoryPage = () => {
       key: "stage",
       label: "Stage",
       type: "text",
+      sortable: false,
       render: (row) => <div className="small fw-semibold">{row.stage}</div>,
     },
   ];
@@ -727,6 +751,18 @@ const HistoryPage = () => {
             }));
             fetchHistoryData(page, rowsPerPage);
           }}
+          sortable={true}
+          defaultSortColumn={pagination.sort_column}
+          defaultSortDirection={pagination.sort_direction}
+          onSort={(column, direction) => {
+            setPagination((prev) => ({
+              ...prev,
+              sort_column: column,
+              sort_direction: direction,
+              current_page: 1,
+            }));
+            fetchHistoryData(1, pagination.per_page, column, direction);
+          }}
           onPreviewClick={handlePreviewClick}
           onRowClick={(row) => {
             setSelectedActivityRecord(row);
@@ -771,7 +807,6 @@ const HistoryPage = () => {
             showAdvancedFilters: true,
             onAdvancedFiltersClick: handleOpenFiltersSidebar,
             showSortButton: true,
-            onSortClick: () => {},
             showExportButton: true,
             onExportClick: () => {},
           }}
