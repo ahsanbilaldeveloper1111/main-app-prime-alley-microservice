@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Mail,
   Phone,
+  MoreHorizontal,
   Calendar,
   ClipboardList,
   ExternalLink,
@@ -34,7 +35,6 @@ import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { useCti } from "@hooks/useCti";
-import CrmActivityQuickActionsRow from "@components/CrmActivityQuickActionsRow";
 import CreateLeadModal from "@components/CreateLeadModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
@@ -194,9 +194,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
     new Set(),
   );
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Edit Lead sidebar (same CreateLeadModal as list page)
@@ -295,6 +297,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setShowActionsDropdown(false);
+      }
+      if (
+        moreActivitiesRef.current &&
+        !moreActivitiesRef.current.contains(event.target as Node)
+      ) {
+        setShowMoreActivities(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -1057,8 +1065,19 @@ const ContactRecordPage: NextPageWithLayout = () => {
         </div>
 
         {/* Quick Actions */}
-        <CrmActivityQuickActionsRow
-          actions={[
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "17px",
+            paddingTop: "6px",
+            paddingBottom: "4px",
+            paddingLeft: "24px",
+            paddingRight: "24px",
+          }}
+        >
+          {[
             {
               icon: ClipboardList,
               label: "Note",
@@ -1089,14 +1108,111 @@ const ContactRecordPage: NextPageWithLayout = () => {
               disabled: false,
               onClick: activityModals.openMeeting,
             },
-          ]}
-          moreActions={[
-            { label: "SMS", onClick: activityModals.openSms },
-            { label: "WhatsApp", onClick: activityModals.openWhatsApp },
-          ]}
-          quickActionCircleButtonStyle={quickActionCircleButtonBaseStyle}
-          dropdownMenuItemStyle={dropdownMenuItemStyle}
-        />
+          ].map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <div
+                key={action.label}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onClick}
+                  style={{
+                    ...quickActionCircleButtonBaseStyle,
+                    cursor: action.disabled ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <Icon size={20} />
+                </button>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "#141414",
+                    fontWeight: "300",
+                  }}
+                >
+                  {action.label}
+                </span>
+              </div>
+            );
+          })}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "6px",
+              position: "relative",
+            }}
+            ref={moreActivitiesRef}
+          >
+            <button
+              onClick={() => setShowMoreActivities(!showMoreActivities)}
+              style={{
+                ...quickActionCircleButtonBaseStyle,
+                cursor: "pointer",
+              }}
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#141414",
+                fontWeight: "300",
+              }}
+            >
+              More
+            </span>
+
+            {showMoreActivities && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: "4px",
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "5px",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  minWidth: "150px",
+                  zIndex: 1000,
+                }}
+              >
+                {[
+                  { label: "SMS", onClick: activityModals.openSms },
+                  { label: "WhatsApp", onClick: activityModals.openWhatsApp },
+                ].map(({ label, onClick }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setShowMoreActivities(false);
+                      onClick();
+                    }}
+                    style={dropdownMenuItemStyle}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* <div style={{
