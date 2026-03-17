@@ -1395,7 +1395,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                             ? "Loading products..."
                             : lineItemInput || "Add a line item"}
                         </Dropdown.Toggle>
-                        <Dropdown.Menu style={{ width: "100%" }}>
+                        <Dropdown.Menu
+                          style={{
+                            width: "100%",
+                            maxHeight: "260px",
+                            overflowY: "auto",
+                          }}
+                        >
                           {lineItemProducts.length === 0 && !loadingLineItemProducts ? (
                             <Dropdown.Item disabled>No products available</Dropdown.Item>
                           ) : (
@@ -1403,8 +1409,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                               <Dropdown.Item
                                 key={p.id}
                                 onClick={() => setLineItemInput(p.name)}
+                                style={{ display: "flex", alignItems: "center" }}
                               >
-                                {p.name} – {formData.currency} {p.price || "0"}
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    maxWidth: "100%",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                  title={`${p.name} – ${formData.currency} ${p.price || "0"}`}
+                                >
+                                  {p.name} – {formData.currency} {p.price || "0"}
+                                </span>
                               </Dropdown.Item>
                             ))
                           )}
@@ -1426,7 +1444,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         type="number"
                         min={0}
                         max={100}
-                        step={0.01}
+                        step={1}
                         value={lineItemTax || ""}
                         placeholder="0"
                         onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}

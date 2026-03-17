@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useRef, useEffect, ReactElement } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  ReactElement,
+} from "react";
 import { useRouter } from "next/router";
 import {
   ChevronDown,
@@ -12,7 +19,6 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  FileText,
   AlertCircle,
 } from "lucide-react";
 import Layout from "@layout/index";
@@ -27,12 +33,25 @@ import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
 import CreateLeadModal from "@components/CreateLeadModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
+import { exportRecordAsCsv } from "@utils/csvExport";
+import {
+  sidebarContainerStyle,
+  sidebarCardStyle,
+  sectionHeaderRowStyle,
+  chevronTitleRowStyle,
+  ghostActionButtonStyle,
+  dropdownMenuItemStyle,
+  quickActionCircleButtonBaseStyle,
+  viewAllLinkStyle,
+} from "@components/CrmDetailSharedStyles";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -47,29 +66,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface SubscriptionItem {
-  id: string;
-  name: string;
-  status: "active" | "inactive" | "cancelled";
-  nextBillingDate: string;
-  nextPaymentAmount: string;
-  contactEmail: string;
-  link: string;
-}
-
-interface RevenueSection {
-  id: string;
-  title: string;
-  count: number;
-  description: string;
-  buttonText: string;
-  buttonIcon?: React.ComponentType<{ size?: number }>;
-  items?: SubscriptionItem[];
-  onButtonClick: () => void;
-  addButtonText?: string;
-  onAddClick?: () => void;
-}
 
 // Add this function to toggle activity expansion
 
@@ -234,6 +230,31 @@ const ContactRecordPage: NextPageWithLayout = () => {
     lead?.company_contact ??
     "";
 
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+
+  const phoneList = useMemo(() => {
+    const phone = leadRecordPhone;
+    if (!phone || typeof phone !== "string") return [];
+    return phone
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [leadRecordPhone]);
+
+  const hasPhone = phoneList.length > 0;
+  const numberToCall = hasPhone ? phoneList[0] : "";
+
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+
   const activityModals = useCrmActivityModals({
     recordType: "lead",
     recordId: leadRecordId,
@@ -245,6 +266,76 @@ const ContactRecordPage: NextPageWithLayout = () => {
     onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall],
+  );
+
+  const handleCallClick = useCallback(() => {
+    if (hasPhone) {
+      handleCall(numberToCall);
+    } else {
+      toast.error("No phone number available");
+    }
+  }, [hasPhone, numberToCall, handleCall]);
 
   const handleOpenEditLead = useCallback(() => {
     if (!leadRecordId) return;
@@ -276,39 +367,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
     }
   }, [leadToDelete, router]);
 
-  const handleLeadsExport = useCallback(async () => {
+  const handleLeadsExport = useCallback(() => {
     if (!lead) return;
-    const name = `lead_${lead.id}.csv`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
-      const row = lead as any;
-      const headers = Object.keys(row).filter(
-        (k) =>
-          !["campaign", "stage", "contact_persons", "audit_trail"].includes(k) &&
-          typeof row[k] !== "object",
-      );
-      const csvRows = [
-        headers.join(","),
-        headers
-          .map((h) => {
-            const val = row[h];
-            if (val == null) return "";
-            if (typeof val === "object") return "";
-            const s = String(val).replaceAll('"', '""');
-            return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-          })
-          .join(","),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
+      exportRecordAsCsv({
+        row: lead as unknown as Record<string, unknown>,
+        fileName: `lead_${lead.id}.csv`,
+        excludeKeys: ["campaign", "stage", "contact_persons", "audit_trail"],
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      URL.revokeObjectURL(url);
       toast.success("Exported lead successfully!");
     } catch (err) {
       toast.error("Failed to export lead");
@@ -419,245 +486,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
   ];
 
   // Intelligence tab is now a shared component (CrmIntelligenceTab)
-
-  const renderRevenueSection = (section: RevenueSection) => {
-    return (
-      <div
-        key={section.id}
-        style={{
-          backgroundColor: "#ffffff",
-          border: "1px solid #eaf0f6",
-          borderRadius: "5px",
-          padding: "20px",
-          marginBottom: "16px",
-        }}
-      >
-        {/* Section Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: section.items ? "16px" : "12px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "16px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
-            {section.title} ({section.count})
-          </h3>
-          {section.addButtonText && (
-            <button
-              onClick={section.onAddClick}
-              style={{
-                padding: "6px 12px",
-                backgroundColor: "transparent",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#006162",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = "none";
-              }}
-            >
-              +{section.addButtonText}
-              <ChevronDown size={14} />
-            </button>
-          )}
-        </div>
-
-        {/* Section Content */}
-        {section.items && section.items.length > 0 ? (
-          <>
-            {/* Subscription Items */}
-            {section.items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "16px",
-                  backgroundColor: "#f7fafc",
-                  border: "1px solid #eaf0f6",
-                  borderRadius: "5px",
-                  marginBottom: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "10px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <FileText size={18} color="#7c98b6" />
-                  <a
-                    href={item.link}
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: "600",
-                      color: "#006162",
-                      textDecoration: "none",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.textDecoration = "none";
-                    }}
-                  >
-                    {item.name}
-                  </a>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                    fontSize: "14px",
-                  }}
-                >
-                  <div>
-                    <span style={{ color: "#141414" }}>Status: </span>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        color: "#141414",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor:
-                            item.status === "active" ? "#10b981" : "#ef4444",
-                          display: "inline-block",
-                        }}
-                      />
-                      {item.status.charAt(0).toUpperCase() +
-                        item.status.slice(1)}
-                    </span>
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next billing date: {item.nextBillingDate}
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next payment amount: {item.nextPaymentAmount}
-                  </div>
-                  <div>
-                    <span style={{ color: "#141414" }}>Contact email: </span>
-                    <a
-                      href={`mailto:${item.contactEmail}`}
-                      style={{
-                        color: "#006162",
-                        textDecoration: "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = "underline";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = "none";
-                      }}
-                    >
-                      {item.contactEmail}
-                    </a>
-                    <ExternalLink
-                      size={12}
-                      style={{ marginLeft: "4px", display: "inline" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* View All Link */}
-            <button
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                border: "1px solid #cbd5e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              View all associated {section.title}
-              <ExternalLink size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Empty State */}
-            <p
-              style={{
-                fontSize: "14px",
-                color: "#141414",
-                lineHeight: "1.6",
-                marginBottom: "16px",
-              }}
-            >
-              {section.description}
-            </p>
-
-            {section.buttonText && (
-              <button
-                onClick={section.onButtonClick}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: "#141414",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {section.buttonIcon && <section.buttonIcon size={16} />}
-                {section.buttonText}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
   // ============================================================================
   // LEFT SIDEBAR (Contact Info)
   // ============================================================================
@@ -667,31 +495,22 @@ const ContactRecordPage: NextPageWithLayout = () => {
       className="sidebar-scrollbar"
       style={{
         width: "385px",
-        backgroundColor: "#f0f0f0",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        flexShrink: 0,
-        overflowY: "auto",
         marginRight: "10px",
+        ...sidebarContainerStyle,
       }}
     >
       {/* Header Card */}
       <div
         style={{
           padding: "10px 0px",
-          borderRadius: "10px",
-          backgroundColor: "#ffffff",
           marginBottom: "12px",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         {/* Top Bar - Breadcrumb and Actions */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             paddingBottom: "10px",
             borderBottom: "1px solid #cccccc",
             paddingLeft: "24px",
@@ -722,17 +541,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
               onClick={() => setShowActionsDropdown(!showActionsDropdown)}
               style={{
                 padding: "6px 14px",
-                backgroundColor: "transparent",
-                border: "none",
                 fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                borderRadius: "3px",
-                transition: "all 0.2s",
+                ...ghostActionButtonStyle,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = "#f5f8fa";
@@ -765,26 +578,17 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   <button
                     key={action}
                     disabled={action === "Export" && exporting}
-            onClick={() => {
-              setShowActionsDropdown(false);
-              if (action === "Edit") {
-                handleOpenEditLead();
-              } else if (action === "Delete") {
-                handleOpenDeleteLead();
-              } else if (action === "Export") {
-                handleOpenExport();
-              }
-            }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
+                    onClick={() => {
+                      setShowActionsDropdown(false);
+                      if (action === "Edit") {
+                        handleOpenEditLead();
+                      } else if (action === "Delete") {
+                        handleOpenDeleteLead();
+                      } else if (action === "Export") {
+                        handleOpenExport();
+                      }
                     }}
+                    style={dropdownMenuItemStyle}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = "#f7fafc";
                     }}
@@ -946,7 +750,12 @@ const ContactRecordPage: NextPageWithLayout = () => {
               disabled: false,
               onClick: activityModals.openEmail,
             },
-            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            {
+              icon: Phone,
+              label: "Call",
+              disabled: !hasPhone || isDialing,
+              onClick: handleCallClick,
+            },
             {
               icon: ClipboardList,
               label: "Task",
@@ -976,17 +785,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   disabled={action.disabled}
                   onClick={action.onClick}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "9px 7px",
-                    background: "#ffffff",
-                    border: "1px solid #8a8a8a",
-                    borderRadius: "50%",
+                    ...quickActionCircleButtonBaseStyle,
                     cursor: action.disabled ? "not-allowed" : "pointer",
-                    width: "30px",
-                    height: "30px",
-                    color: "#141414",
                   }}
                 >
                   <Icon size={20} />
@@ -1016,17 +816,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
             <button
               onClick={() => setShowMoreActivities(!showMoreActivities)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "9px 7px",
-                background: "#ffffff",
-                border: "1px solid #8a8a8a",
-                borderRadius: "50%",
+                ...quickActionCircleButtonBaseStyle,
                 cursor: "pointer",
-                width: "30px",
-                height: "30px",
-                color: "#141414",
               }}
             >
               <MoreHorizontal size={20} />
@@ -1067,16 +858,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       setShowMoreActivities(false);
                       onClick();
                     }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
-                    }}
+                    style={dropdownMenuItemStyle}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = "#f7fafc";
                     }}
@@ -1162,19 +944,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
       {/* Key Information Card */}
       <div
         style={{
-          backgroundColor: "#ffffff",
           borderRadius: "5px",
           marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             padding: "14px 20px",
             cursor: "pointer",
             backgroundColor: "#ffffff",
@@ -1184,7 +962,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
           onClick={() => toggleSection("key-info")}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={chevronTitleRowStyle}>
             <ChevronDown
               size={18}
               style={{
@@ -1781,15 +1559,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                             : "/crm/deals";
                           window.open(href, "_blank", "noopener,noreferrer");
                         }}
-                        style={{
-                          fontSize: "13px",
-                          color: "#006162",
-                          textDecoration: "none",
-                          fontWeight: "500",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
+                        style={viewAllLinkStyle}
                       >
                         View all associated Deals
                         <ExternalLink size={12} />
@@ -1945,6 +1715,19 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {/* Right Sidebar - Associated Records */}
         {renderRightSidebar()}
       </div>
+
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
+      />
 
       {activityModals.modals}
 

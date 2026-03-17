@@ -74,9 +74,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [currentToInput, setCurrentToInput] = useState("");
   const [currentCcInput, setCurrentCcInput] = useState("");
   const [currentBccInput, setCurrentBccInput] = useState("");
-  const [activeTab, setActiveTab] = useState<
-    "templates" | "sequences" | "documents" | "meetings" | "quotes"
-  >("templates");
   const [createTask, setCreateTask] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
   const [activityDate, setActivityDate] = useState(
@@ -92,6 +89,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
     new Date().toTimeString().slice(0, 5),
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Generate email (AI) state – same options as EmailSection
   const [generatePrompt, setGeneratePrompt] = useState("");
@@ -185,6 +184,33 @@ const EmailModal: React.FC<EmailModalProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMoreFormattingDropdown]);
+
+  // Reset state when modal is closed (mirrors NotesModal behavior, including attachments)
+  useEffect(() => {
+    if (!isOpen) {
+      setToEmails(initialTo);
+      setCcEmails([]);
+      setBccEmails([]);
+      setShowCc(false);
+      setShowBcc(false);
+      setSubject("");
+      setEmailBody("");
+      if (bodyEditorRef.current) {
+        bodyEditorRef.current.innerHTML = "";
+      }
+      setCreateTask(false);
+      setIsMaximized(false);
+      setAttachments([]);
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const timeStr = now.toTimeString().slice(0, 5);
+      setActivityDate("In 3 business days (Friday)");
+      setActivityTime(timeStr);
+      setCustomDate(today);
+      setCustomTime(timeStr);
+      setShowDatePicker(false);
+    }
+  }, [isOpen, initialTo]);
 
   const handleGenerateEmail = async () => {
     const query = generatePrompt.trim();
@@ -386,43 +412,49 @@ const EmailModal: React.FC<EmailModalProps> = ({
     setIsMaximized(!isMaximized);
   };
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const emailStateByType = {
+    to: {
+      emails: toEmails,
+      setEmails: setToEmails,
+      currentInput: currentToInput,
+      setCurrentInput: setCurrentToInput,
+    },
+    cc: {
+      emails: ccEmails,
+      setEmails: setCcEmails,
+      currentInput: currentCcInput,
+      setCurrentInput: setCurrentCcInput,
+    },
+    bcc: {
+      emails: bccEmails,
+      setEmails: setBccEmails,
+      currentInput: currentBccInput,
+      setCurrentInput: setCurrentBccInput,
+    },
+  } as const;
+
   const addEmail = (email: string, type: "to" | "cc" | "bcc") => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) return;
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
       alert("Please enter a valid email address");
       return;
     }
 
-    if (type === "to") {
-      if (!toEmails.includes(trimmedEmail)) {
-        setToEmails([...toEmails, trimmedEmail]);
-      }
-      setCurrentToInput("");
-    } else if (type === "cc") {
-      if (!ccEmails.includes(trimmedEmail)) {
-        setCcEmails([...ccEmails, trimmedEmail]);
-      }
-      setCurrentCcInput("");
-    } else if (type === "bcc") {
-      if (!bccEmails.includes(trimmedEmail)) {
-        setBccEmails([...bccEmails, trimmedEmail]);
-      }
-      setCurrentBccInput("");
-    }
+    const { setEmails, setCurrentInput } = emailStateByType[type];
+
+    setEmails((prev) =>
+      prev.includes(trimmedEmail) ? prev : [...prev, trimmedEmail],
+    );
+    setCurrentInput("");
   };
 
   const removeEmail = (email: string, type: "to" | "cc" | "bcc") => {
-    if (type === "to") {
-      setToEmails(toEmails.filter((e) => e !== email));
-    } else if (type === "cc") {
-      setCcEmails(ccEmails.filter((e) => e !== email));
-    } else if (type === "bcc") {
-      setBccEmails(bccEmails.filter((e) => e !== email));
-    }
+    const { setEmails } = emailStateByType[type];
+    setEmails((prev) => prev.filter((e) => e !== email));
   };
 
   const handleKeyDown = (
@@ -431,13 +463,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   ) => {
     if (e.key === "Enter" || e.key === "," || e.key === " ") {
       e.preventDefault();
-      const value =
-        type === "to"
-          ? currentToInput
-          : type === "cc"
-            ? currentCcInput
-            : currentBccInput;
-      addEmail(value, type);
+      const { currentInput } = emailStateByType[type];
+      addEmail(currentInput, type);
     }
   };
 
@@ -489,6 +516,23 @@ const EmailModal: React.FC<EmailModalProps> = ({
     syncBodyFromEditor();
   };
 
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) {
+      return;
+    }
+    setAttachments((prev) => [...prev, ...files]);
+    e.target.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
     if (toEmails.length === 0) {
       alert("Please add at least one recipient");
@@ -514,6 +558,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         body: bodyToSend,
         createTask,
         taskDueDate: createTask ? `${dateToSend} ${timeToSend}` : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       });
       setToEmails([]);
       setCcEmails([]);
@@ -533,6 +578,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setCustomDate(today);
       setCustomTime(timeStr);
       setShowDatePicker(false);
+      setAttachments([]);
       onClose();
     } finally {
       setSendLoading(false);
@@ -621,42 +667,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <X size={20} />
           </button>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "24px",
-          padding: "12px 20px",
-          borderBottom: "1px solid #e2e8f0",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        {["Templates", "Meetings"].map(
-          (tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab.toLowerCase() as any)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px 0",
-                cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: activeTab === tab.toLowerCase() ? "600" : "400",
-                color: "#141414",
-                borderBottom:
-                  activeTab === tab.toLowerCase()
-                    ? "2px solid #ff7a59"
-                    : "2px solid transparent",
-                transition: "all 0.2s",
-              }}
-            >
-              {tab}
-            </button>
-          ),
-        )}
       </div>
 
       {/* Email Form */}
@@ -1295,8 +1305,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
           borderTop: "1px solid #e2e8f0",
           borderBottom: "1px solid #e2e8f0",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          alignItems: "stretch",
           backgroundColor: "#ffffff",
         }}
       >
@@ -1514,31 +1524,6 @@ const EmailModal: React.FC<EmailModalProps> = ({
             style={{
               background: "transparent",
               border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
-              fontWeight: "500",
-              gap: "4px",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
-          >
-            Insert
-            <ChevronDown size={14} />
-          </button>
-          <button
-            type="button"
-            style={{
-              background: "transparent",
-              border: "none",
               padding: "6px",
               cursor: "pointer",
               color: "#141414",
@@ -1547,6 +1532,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
               borderRadius: "3px",
             }}
             title="Attach file"
+            onClick={handleAttachmentClick}
             onMouseEnter={(e) =>
               (e.currentTarget.style.backgroundColor = "#f5f8fa")
             }
@@ -1556,34 +1542,111 @@ const EmailModal: React.FC<EmailModalProps> = ({
           >
             <Paperclip size={16} />
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            style={{ display: "none" }}
+          />
         </div>
-        {/* Associated with 1 record - temporarily hidden */}
-        <div style={{ display: "none" }}>
-          <button
+
+        {/* Attachments */}
+        {attachments.length > 0 && (
+          <div
             style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px 10px",
-              cursor: "pointer",
-              color: "#141414",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "3px",
-              fontSize: "13px",
-              fontWeight: "500",
-              gap: "4px",
+              padding: "12px 0px",
+              borderTop: "1px solid #e2e8f0",
+              borderBottom: "1px solid #e2e8f0",
+              backgroundColor: "#ffffff",
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.backgroundColor = "#f5f8fa")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.backgroundColor = "transparent")
-            }
           >
-            Associated with 1 record
-            <ChevronDown size={14} />
-          </button>
-        </div>
+            <div
+              style={{
+                fontSize: "13px",
+                color: "#666",
+                marginBottom: "8px",
+                fontWeight: "600",
+              }}
+            >
+              Attachments ({attachments.length})
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+              }}
+            >
+              {attachments.map((file, index) => (
+                <div
+                  key={`${file.name}-${index}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 10px",
+                    backgroundColor: "#f5f8fa",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      flex: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Paperclip size={14} style={{ flexShrink: 0 }} />
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {file.name}
+                    </span>
+                    <span
+                      style={{
+                        color: "#666",
+                        fontSize: "12px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {`(${(file.size / 1024).toFixed(1)} KB)`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(index)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: "4px",
+                      cursor: "pointer",
+                      color: "#718096",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                    title="Remove attachment"
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = "#f44336")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = "#718096")
+                    }
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer - Task Creation and Send */}

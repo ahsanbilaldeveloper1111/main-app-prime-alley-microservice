@@ -56,6 +56,7 @@ export interface WhatsAppTemplateItem {
   name: string;
   id: number;
   content_sid: string;
+  content?: string;
   params: string[];
 }
 

@@ -20,27 +20,8 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "react-icons/fi";
 import {
   getOrders,
   getOrder,
@@ -56,6 +37,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
+  updateOrder,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -63,11 +45,9 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
   Table,
-  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -81,9 +61,6 @@ import {
 import {
   Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -91,12 +68,6 @@ import {
   MoreVertical,
   X,
   Users,
-  PlusCircle,
-  Zap,
-  Star,
-  Clock,
-  Search,
-  Filter,
   Layers,
   Calendar,
   ArrowUp,
@@ -110,21 +81,14 @@ import {
   Activity,
   FileText,
   ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
   History,
   Mail,
-  Phone,
   Building2,
-  Package,
-  Link2,
   User,
   Paperclip,
   Upload,
   Download as DownloadIcon,
   RotateCcw,
-  AlertCircle,
-  Handshake,
   Info,
   Phone as PhoneIcon,
 } from "lucide-react";
@@ -140,7 +104,6 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 
 import "@assets/scss/common.scss";
@@ -151,9 +114,50 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { useCti } from "@hooks/useCti";
+import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 
 // Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
+
+function ordersToKanbanColumns(
+  orders: any[],
+  stages: Array<{ id: number | string; name: string }>
+): KanbanColumnDef[] {
+  const buckets: Record<string, KanbanCardData[]> = {};
+
+  stages.forEach((stage) => {
+    buckets[String(stage.id)] = [];
+  });
+
+  for (const order of orders) {
+    const stageId = String(order.stageId ?? order.stage ?? "");
+    const bucketKey = buckets[stageId] ? stageId : String(stages[0]?.id ?? "");
+
+    buckets[bucketKey].push({
+      id: order.id,
+      name: order.orderNumber || `Order #${order.id}`,
+      email: order.customerEmail,
+      avatarInitials: order.customerEmail
+        ? getInitials(order.customer || "")
+        : undefined,
+      avatarColor: order.customerEmail
+        ? getRandomColor(order.customer || "")
+        : undefined,
+      metaLines: [
+        order.customer || "",
+        order.value ? `Value: ${order.value} ${order.currency}` : "",
+        order.assignedUser ? `Owner: ${order.assignedUser}` : "",
+      ].filter(Boolean),
+      raw: order,
+    });
+  }
+
+  return stages.map((stage) => ({
+    id: String(stage.id),
+    title: stage.name,
+    cards: buckets[String(stage.id)] ?? [],
+  }));
+}
 const PhoneContainer = ({ phone }: { phone: string }) => {
   const parsePhone = useCallback((phone: string) => {
     if (!phone)
@@ -450,26 +454,10 @@ const CrmOrders = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
-  const [isOrderEditModeAccount, setIsOrderEditModeAccount] = useState(false);
-  const [isOrderEditModeDelivery, setIsOrderEditModeDelivery] = useState(false);
 
   const [isAccountRole, setIsAccountRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "account") {
-  //     setIsAccountRole(true);
-  //   } else {
-  //     setIsAccountRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
 
   const [isDeliveryRole, setIsDeliveryRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "delivery") {
-  //     setIsDeliveryRole(true);
-  //   } else {
-  //     setIsDeliveryRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
 
   // Which edit mode to show: root (full), account, or delivery — three separate modals
 
@@ -513,7 +501,6 @@ const CrmOrders = () => {
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
 
   // Attachments Modal
@@ -764,6 +751,11 @@ const CrmOrders = () => {
         if (currentFilters.sort_by) params.sort_by = currentFilters.sort_by;
         if (currentFilters.sort_order) params.sort_order = currentFilters.sort_order;
 
+        if (ordersPagination.sortColumn) {
+          params.sort_column = ordersPagination.sortColumn;
+          params.sort_direction = ordersPagination.sortDirection;
+        }
+
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
 
@@ -782,7 +774,7 @@ const CrmOrders = () => {
         setLoading(false);
       }
     },
-    [currentFilters],
+    [currentFilters, ordersPagination.sortColumn, ordersPagination.sortDirection],
   );
 
   // initiate call
@@ -2290,7 +2282,6 @@ const CrmOrders = () => {
       { id: "all", label: "All orders", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
-    onTabAdd: () => setShowTabModal(true),
     onTabRemove: (tabId) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
@@ -3013,19 +3004,33 @@ const CrmOrders = () => {
                 statsCards={ordersStatsCards}
                 customBody={
                   ordersViewMode === "board" ? (
-                    <div
-                      className="d-flex align-items-center justify-content-center p-5"
-                      style={{ minHeight: "400px", background: "#f8f9fa" }}
-                    >
-                      <div className="text-center text-muted">
-                        <Layers size={48} className="mb-3 opacity-50" />
-                        <h5 className="mb-2">Board View</h5>
-                        <p className="mb-0 small">
-                          Switch to Table view from the dropdown to see the
-                          table.
-                        </p>
-                      </div>
-                    </div>
+                    <KanbanBoard
+                      columns={ordersToKanbanColumns(filteredOrders, stages)}
+                      onCardClick={(order) =>
+                        handleViewOrder(order.raw?.id ?? order.id)
+                      }
+                      onCardMove={(orderId, fromCol, toCol) => {
+                        const order = filteredOrders.find(
+                          (o) => o.id === Number(orderId) || o.id === orderId
+                        );
+                        if (order) {
+                          updateOrder(Number(order.id), {
+                            order_stage_id: toCol,
+                          })
+                            .then(() => {
+                              fetchOrders(
+                                ordersPagination.currentPage,
+                                ordersPagination.rowsPerPage
+                              );
+                            })
+                            .catch((err) => {
+                              console.error("Failed to update order stage:", err);
+                              toast.error("Failed to update order stage");
+                            });
+                        }
+                      }}
+                      searchValue={ordersSearch}
+                    />
                   ) : undefined
                 }
               />
