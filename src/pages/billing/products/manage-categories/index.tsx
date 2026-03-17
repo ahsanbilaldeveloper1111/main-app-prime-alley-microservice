@@ -32,12 +32,16 @@ import {
 } from "@utils/accounts";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
+type ProductCategoryRow = ProductCategoryData & {
+  is_active?: boolean;
+};
+
 const ManageCategories = () => {
 
   const requestIdRef = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<ProductCategoryData[]>([]);
+  const [categories, setCategories] = useState<ProductCategoryRow[]>([]);
 
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryPayload, setAddCategoryPayload] = useState<{
@@ -53,7 +57,7 @@ const ManageCategories = () => {
   const [addCategoryError, setAddCategoryError] = useState<string | null>(null);
 
   const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<ProductCategoryData | null>(
+  const [editingCategory, setEditingCategory] = useState<ProductCategoryRow | null>(
     null,
   );
   const [editCategoryPayload, setEditCategoryPayload] = useState<{
@@ -69,7 +73,7 @@ const ManageCategories = () => {
   const [editCategoryError, setEditCategoryError] = useState<string | null>(null);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<ProductCategoryData | null>(
+  const [categoryToDelete, setCategoryToDelete] = useState<ProductCategoryRow | null>(
     null,
   );
   const [deletingCategory, setDeletingCategory] = useState(false);
@@ -114,18 +118,18 @@ const ManageCategories = () => {
     setShowAddCategoryModal(true);
   }, []);
 
-  const openEditCategoryModal = useCallback((category: ProductCategoryData) => {
+  const openEditCategoryModal = useCallback((category: ProductCategoryRow) => {
     setEditingCategory(category);
     setEditCategoryPayload({
       name: category.name ?? "",
       description: category.description ?? "",
-      is_active: (category as any)?.is_active ?? true,
+      is_active: category.is_active ?? true,
     });
     setEditCategoryError(null);
     setShowEditCategoryModal(true);
   }, []);
 
-  const openDeleteCategoryModal = useCallback((category: ProductCategoryData) => {
+  const openDeleteCategoryModal = useCallback((category: ProductCategoryRow) => {
     setCategoryToDelete(category);
     setShowDeleteModal(true);
   }, []);
@@ -261,7 +265,7 @@ const ManageCategories = () => {
                           <td>{c.id}</td>
                           <td>{c.name}</td>
                           <td>{c.description ?? "-"}</td>
-                          <td>{(c as any)?.is_active === false ? "Inactive" : "Active"}</td>
+                          <td>{c.is_active === false ? "Inactive" : "Active"}</td>
                           <td>
                             <div className="d-flex gap-2">
                               <Button

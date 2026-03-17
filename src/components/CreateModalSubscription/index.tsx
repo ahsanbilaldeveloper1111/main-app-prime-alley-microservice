@@ -301,7 +301,9 @@ export default function CreateSubscriptionModal({
         {/* Right actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
-            onClick={() => void submitCreateProduct("create_and_add_another")}
+            onClick={() => {
+              submitCreateProduct("create_and_add_another").then(() => undefined);
+            }}
             style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
             onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)"}
             onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"}
@@ -311,7 +313,9 @@ export default function CreateSubscriptionModal({
           </button>
           <div style={{ position: "relative" }}>
             <button
-              onClick={() => void submitCreateProduct("create")}
+              onClick={() => {
+                submitCreateProduct("create").then(() => undefined);
+              }}
               style={{ ...BASE_BUTTON, backgroundColor: "#fff", color: "#141414", fontWeight: 400, paddingInline: "20px" }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f0f0f0"}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
