@@ -6,7 +6,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -33,12 +32,8 @@ import {
 } from "@utils/accounts";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
-
-
-
-
 const ManageCategories = () => {
-  const router = useRouter();
+
   const requestIdRef = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
