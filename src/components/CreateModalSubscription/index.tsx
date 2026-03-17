@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createProduct,
-  getProduct,
+  createCustomerProductPricing,
   getProductCategoriesList,
   type ProductCategoryData,
-  updateProduct,
 } from "@utils/accounts";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
 
 const BASE_BUTTON = {
   cursor: "pointer",
@@ -110,23 +107,19 @@ const SECTION_TITLE = {
   marginTop: 0,
 };
 
-interface CreateProductModalProps {
+interface CreateSubscriptionModalProps {
+  customerId: string | number;
   onClose: () => void;
   onCreate: () => void;
   onCreateAndAddAnother: () => void;
-  /** When provided, modal will load product data and update instead of creating. */
-  productId?: number;
-  /** Optional callback for edit mode. */
-  onUpdated?: () => void;
 }
 
-export default function CreateProductModal({
+export default function CreateSubscriptionModal({
+  customerId,
   onClose,
   onCreate,
   onCreateAndAddAnother,
-  productId,
-  onUpdated,
-}: Readonly<CreateProductModalProps>) {
+}: Readonly<CreateSubscriptionModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
   const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");
@@ -149,8 +142,6 @@ export default function CreateProductModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const isEditMode = typeof productId === "number" && Number.isFinite(productId);
-
   const margin = (() => {
     const cost = Number.parseFloat(unitCost) || 0;
     const price = Number.parseFloat(priceAED) || 0;
@@ -165,7 +156,7 @@ export default function CreateProductModal({
     setUploadedImage(url);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
@@ -182,7 +173,7 @@ export default function CreateProductModal({
       })
       .catch((e) => {
         if (cancelled) return;
-        toast.error(getErrorMessage(e, "Failed to load product categories"));
+        console.error("Failed to load product categories:", e);
         setCategories([]);
       })
       .finally(() => {
@@ -195,41 +186,6 @@ export default function CreateProductModal({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isEditMode) return;
-    let cancelled = false;
-    setSubmitting(true);
-    setSubmitError(null);
-    getProduct(productId)
-      .then((p) => {
-        if (cancelled) return;
-        setProductName(p?.name ?? "");
-        setProductSku((p as { sku?: string }).sku ?? "");
-        setProductDescription(p?.description ?? "");
-        setCategoryId(String(p?.category_id ?? ""));
-        setPriceAED(p?.base_price == null ? "" : String(p.base_price));
-        const currencyCode =
-          (p as { currency_code?: string }).currency_code ?? p?.currency ?? "AED";
-        setCurrency(currencyCode === "USD" ? "USD" : "AED");
-        setProductType(p?.is_service ? "service" : "");
-        const maybeRecord = p as unknown as Record<string, unknown>;
-        const maybeIsActive = maybeRecord["is_active"];
-        if (typeof maybeIsActive === "boolean") setIsActive(maybeIsActive);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        toast.error(getErrorMessage(e, "Failed to load product"));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setSubmitting(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isEditMode, productId]);
-
   const validatePayload = useCallback((): string | null => {
     if (!productName.trim()) return "Name is mandatory";
     if (!categoryId) {
@@ -240,7 +196,7 @@ export default function CreateProductModal({
     return null;
   }, [categoryId, priceAED, productName, setAdditionalOpen]);
 
-  const submitProduct = useCallback(
+  const submitCreateProduct = useCallback(
     async (mode: "create" | "create_and_add_another") => {
       const validationError = validatePayload();
       if (validationError) {
@@ -251,6 +207,11 @@ export default function CreateProductModal({
       setSubmitting(true);
       setSubmitError(null);
       try {
+        if (customerId === "") {
+          setSubmitError("Please select a company first");
+          return;
+        }
+
         const payload = {
           name: productName.trim(),
           sku: productSku.trim() ? productSku.trim() : undefined,
@@ -261,42 +222,42 @@ export default function CreateProductModal({
           is_service: productType === "service",
           currency,
         };
+        const created = await createProduct(payload);
+        console.log("Created product:", created);
 
-        if (isEditMode) {
-          await updateProduct(productId, payload);
-          toast.success("Product updated successfully!");
-          onUpdated?.();
-          if (!onUpdated) onCreate();
-          return;
+        const createdProductId = created?.id;
+        if (createdProductId == null) {
+          throw new Error("Product created but id is missing");
         }
 
-        await createProduct(payload);
-        toast.success("Product created successfully!");
-        if (mode === "create_and_add_another") onCreateAndAddAnother();
-        else onCreate();
-      } catch (e) {
-        const msg = getErrorMessage(
-          e,
-          isEditMode ? "Failed to update product" : "Failed to create product",
-        );
-        setSubmitError(msg);
+        await createCustomerProductPricing(customerId, {
+          product_id: String(createdProductId),
+          selling_price: String(payload.base_price ?? 0),
+        });
+
+        if (mode === "create_and_add_another") {
+          onCreateAndAddAnother();
+        } else {
+          onCreate();
+        }
+      } catch (e: any) {
+        console.error("Failed to create product:", e);
+        setSubmitError(e?.message || "Failed to create product");
       } finally {
         setSubmitting(false);
       }
     },
     [
       categoryId,
+      customerId,
       currency,
       isActive,
-      isEditMode,
       onCreate,
       onCreateAndAddAnother,
-      onUpdated,
       priceAED,
       productDescription,
       productName,
       productSku,
-      productId,
       productType,
       validatePayload,
     ],
@@ -339,80 +300,43 @@ export default function CreateProductModal({
 
         {/* Right actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {isEditMode ? (
+          <button
+            onClick={() => void submitCreateProduct("create_and_add_another")}
+            style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)"}
+            onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"}
+            disabled={submitting}
+          >
+            Create and add another
+          </button>
+          <div style={{ position: "relative" }}>
             <button
-              onClick={() => void submitProduct("create")}
-              style={{
-                ...BASE_BUTTON,
-                backgroundColor: "#fff",
-                color: "#141414",
-                fontWeight: 400,
-                paddingInline: "20px",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f0f0f0")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#fff")}
+              onClick={() => void submitCreateProduct("create")}
+              style={{ ...BASE_BUTTON, backgroundColor: "#fff", color: "#141414", fontWeight: 400, paddingInline: "20px" }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f0f0f0"}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
               disabled={submitting}
             >
-              Update
+              Create
             </button>
-          ) : (
-            <>
-              <button
-                onClick={() => void submitProduct("create_and_add_another")}
-                style={{
-                  ...BASE_BUTTON,
-                  backgroundColor: "transparent",
-                  borderColor: "rgba(255,255,255,0.35)",
-                  color: "#fff",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)")
-                }
-                disabled={submitting}
-              >
-                Create and add another
-              </button>
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => void submitProduct("create")}
-                  style={{
-                    ...BASE_BUTTON,
-                    backgroundColor: "#fff",
-                    color: "#141414",
-                    fontWeight: 400,
-                    paddingInline: "20px",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#f0f0f0")
-                  }
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#fff")}
-                  disabled={submitting}
-                >
-                  Create
-                </button>
-                {/* Badge
-                <span style={{
-                  position: "absolute",
-                  top: "-8px",
-                  right: "-8px",
-                  width: "18px",
-                  height: "18px",
-                  borderRadius: "50%",
-                  backgroundColor: "#e53e3e",
-                  color: "#fff",
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "2px solid #1a1a1a",
-                }}>2</span> */}
-              </div>
-            </>
-          )}
+            {/* Badge
+            <span style={{
+              position: "absolute",
+              top: "-8px",
+              right: "-8px",
+              width: "18px",
+              height: "18px",
+              borderRadius: "50%",
+              backgroundColor: "#e53e3e",
+              color: "#fff",
+              fontSize: "10px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "2px solid #1a1a1a",
+            }}>2</span> */}
+          </div>
         </div>
       </div>
 
@@ -427,25 +351,13 @@ export default function CreateProductModal({
         paddingInline: "20px",
         flexShrink: 0,
       }}>
-        {isEditMode && (
         <button
           style={{ ...BASE_BUTTON }}
           onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f5f5f5"}
           onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
         >
-          Edit product
+          Edit this form
         </button>
-        )}
-
-        {!isEditMode && (
-          <button
-            style={{ ...BASE_BUTTON }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
-          >
-            Create new product
-            </button>
-        )}
 
         {/* Active toggle */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -453,14 +365,9 @@ export default function CreateProductModal({
           {/* Info icon */}
           <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="When active, this product is available for use in quotes">ⓘ</span>
           {/* Toggle */}
-          <button
-            type="button"
-            aria-label="Toggle active"
-            aria-pressed={isActive}
-            onClick={() => setIsActive((v) => !v)}
+          <div
+            onClick={() => setIsActive(v => !v)}
             style={{
-              padding: 0,
-              border: "none",
               width: "44px",
               height: "24px",
               borderRadius: "12px",
@@ -482,7 +389,7 @@ export default function CreateProductModal({
               transition: "left 150ms ease-out",
               boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
             }} />
-          </button>
+          </div>
           {/* Checkmark */}
           {isActive && (
             <span style={{ fontSize: "14px", color: "#2d6ae0" }}>✓</span>
@@ -543,17 +450,14 @@ export default function CreateProductModal({
             </div>
 
             {/* Image upload */}
-            <button
-              type="button"
-              aria-label="Upload product image"
+            <div
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               style={{
-                padding: 0,
-                border: `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`,
                 width: "180px",
                 height: "120px",
+                border: `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`,
                 borderRadius: "4px",
                 display: "flex",
                 flexDirection: "column",
@@ -579,15 +483,20 @@ export default function CreateProductModal({
                 <img src={uploadedImage} alt="product" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <>
-                  <span style={{ ...BASE_BUTTON }}>
+                  <button
+                    style={{ ...BASE_BUTTON }}
+                    onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
+                  >
                     Upload
-                  </span>
+                  </button>
                   <span style={{ fontSize: "12px", color: "#2d6ae0", fontWeight: 300, textDecoration: "underline", cursor: "pointer" }}>
                     Browse images
                   </span>
                 </>
               )}
-            </button>
+            </div>
           </div>
 
           {/* Product description */}
@@ -661,10 +570,9 @@ export default function CreateProductModal({
 
           {/* Product type */}
           <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
-            <label style={FIELD_LABEL} htmlFor="cmp-product-type">Product type</label>
+            <label style={FIELD_LABEL}>Product type</label>
             <div style={{ position: "relative" }}>
               <select
-                id="cmp-product-type"
                 value={productType}
                 onChange={e => setProductType(e.target.value)}
                 style={FIELD_SELECT}
@@ -713,28 +621,27 @@ export default function CreateProductModal({
                 transform: additionalOpen ? "rotate(90deg)" : "rotate(0deg)",
                 fontSize: "11px",
               }}>›</span>
-              {" "}
               Additional product information
             </button>
 
             {additionalOpen && (
               <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div>
-                  <label style={FIELD_LABEL} htmlFor="cmp-product-brand">Brand</label>
-                  <input id="cmp-product-brand" type="text" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL}>Brand</label>
+                  <input type="text" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
                
                 <div>
-                  <label style={FIELD_LABEL} htmlFor="cmp-product-url">URL</label>
-                  <input id="cmp-product-url" type="url" placeholder="https://" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL}>URL</label>
+                  <input type="url" placeholder="https://" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
                 <div>
-                  <label style={FIELD_LABEL} htmlFor="cmp-product-terms-url">Terms &amp; conditions URL</label>
-                  <input id="cmp-product-terms-url" type="url" placeholder="https://" style={FIELD_INPUT}
+                  <label style={FIELD_LABEL}>Terms &amp; conditions URL</label>
+                  <input type="url" placeholder="https://" style={FIELD_INPUT}
                     onFocus={e => e.target.style.borderColor = "#2d6ae0"}
                     onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"} />
                 </div>
@@ -751,10 +658,9 @@ export default function CreateProductModal({
           <p style={SECTION_TITLE}>Billing details</p>
 
           <div style={{ maxWidth: "380px" }}>
-            <label style={FIELD_LABEL} htmlFor="cmp-product-billing-frequency">Billing frequency</label>
+            <label style={FIELD_LABEL}>Billing frequency</label>
             <div style={{ position: "relative" }}>
               <select
-                id="cmp-product-billing-frequency"
                 value={billingFrequency}
                 onChange={e => setBillingFrequency(e.target.value)}
                 style={FIELD_SELECT}
@@ -859,7 +765,6 @@ export default function CreateProductModal({
                 }}
               >
                 Manage currencies
-                {" "}
                 <span style={{ fontSize: "10px" }}>↗</span>
               </a>
             </div>
@@ -925,15 +830,11 @@ export default function CreateProductModal({
               {/* Unit cost + Margin */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 <div>
-                  <label
-                    style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}
-                    htmlFor="cmp-product-unit-cost"
-                  >
-                    Unit cost{" "}
+                  <label style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
+                    Unit cost
                     <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="The cost to produce this unit">ⓘ</span>
                   </label>
                   <input
-                    id="cmp-product-unit-cost"
                     type="number"
                     value={unitCost}
                     onChange={e => setUnitCost(e.target.value)}
@@ -944,10 +845,10 @@ export default function CreateProductModal({
                   />
                 </div>
                 <div>
-                  <div style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
-                    Margin{" "}
+                  <label style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
+                    Margin
                     <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="Calculated margin based on price and unit cost">ⓘ</span>
-                  </div>
+                  </label>
                   <div style={{
                     height: "42px",
                     border: "1px solid #e0e0e0",

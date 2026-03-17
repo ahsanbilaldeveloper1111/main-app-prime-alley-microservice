@@ -1,27 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   Key,
-  Mail,
   Calendar,
-  Heart,
-  Download,
-  Globe,
   Flag,
-  Moon,
   User,
-  Star,
-  Bell,
   Settings,
-  PlusCircle,
   LogOut,
-  ChevronDown,
   Ticket,
   Shield,
   History
 } from 'lucide-react';
 
-import { useSession, signOut } from "next-auth/react";
-import { getLogoutCallbackUrl } from '../../utils/logoutRedirect';
+import { useSession } from "next-auth/react";
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
 import ResetPasswordModal from '@components/ResetPasswordModal';
@@ -36,8 +26,6 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   isOpen = true, 
   onClose 
 }) => {
-  const [darkMode, setDarkMode] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
 
   const router = useRouter();
@@ -52,15 +40,13 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [loggedInUserCountry, setLoggedInUserCountry] = useState('');
 
 	useEffect(() => {
-		if (status !=="loading" && session) {
-		  if (typeof window !== "undefined") {
-		    setLoggedInName(session.user.name || '');
-		    setLoggedInUserUsername(session.user.username || '');
-		    setLoggedInUserRole(session.user.role || '');
-        setLoggedInUserProfilePicture(session.user?.profile_picture || '');
-        setLoggedInUserUserType(session.user.user_type || '');
-        setLoggedInUserCountry(session.user.country || '');
-		  }
+		if (status !== "loading" && session?.user) {
+		  setLoggedInName(session.user.name || '');
+		  setLoggedInUserUsername(session.user.username || '');
+		  setLoggedInUserRole(session.user.role || '');
+      setLoggedInUserProfilePicture(session.user?.profile_picture || '');
+      setLoggedInUserUserType(session.user.user_type || '');
+      setLoggedInUserCountry(session.user.country || '');
 		}
 	    }, [ status, session]);
 
@@ -68,6 +54,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const profileImageUrl = loggedInUserProfilePicture 
     ? (getStorageImageUrl(loggedInUserProfilePicture) || null)
     : null;
+
+  const profileSubtitle = loggedInUserRole || loggedInUserUsername;
 
   return (
     <>
@@ -384,16 +372,18 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
       {/* Overlay */}
       {isOpen && onClose && (
-        <div 
+        <button
+          type="button"
+          aria-label="Close profile sidebar"
           className={`profile-sidebar-overlay ${isOpen ? 'show' : ''}`}
           onClick={onClose}
+          style={{ border: "none", padding: 0, cursor: "default" }}
         />
       )}
 
       {/* Sidebar */}
       <div 
         className={`profile-sidebar ${isOpen ? 'show' : ''}`}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         {/* <div className="profile-sidebar-header">
@@ -410,12 +400,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             <div className="profile-user-info">
               <h5 className="profile-user-name">{loggedInName}</h5>
               <small className="text-muted">
-                  {loggedInUserRole !== '' ? (
-                      <span>{loggedInUserRole}</span>
-                    ) : (
-                      <span>{loggedInUserUsername}</span>
-                    )}
-                    
+                <span>{profileSubtitle}</span>
                 </small>
             </div>
             {loggedInUserUserType && (
@@ -487,7 +472,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     <div className="profile-menu-icon">
                       <Flag size={20} />
                     </div>
-                    <span className="profile-menu-text">{loggedInUserCountry ? loggedInUserCountry : 'Unknown'}</span>
+                    <span className="profile-menu-text">{loggedInUserCountry || 'Unknown'}</span>
                   </div>
                 </button>
               </li>

@@ -5,31 +5,35 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import Layout from "@layout/index";
-import { useRouter } from "next/router";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
-import { useState } from "react";
 import { Button, Form } from "react-bootstrap";
 
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-import "@assets/scss/datatable-style.scss";
-import { GetProducts } from "@utils/accounting";
+import {
+  createCustomer,
+  deleteCustomerProductPricing,
+  getCustomer,
+  getCustomerProductPricingList,
+} from "@utils/accounts";
+import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import { getMinifiedCompanies } from "@utils/crm";
-import { useSession } from "next-auth/react";
 import moment from "moment";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 import { Package, FileText, Calendar, Plus } from "lucide-react";
+import { toast } from "react-toastify";
+import { getErrorMessage } from "@utils/errors";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import GenericSidebar from "@components/GenericSidebarNew";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 interface Product {
   id: number;
@@ -43,13 +47,20 @@ interface Product {
 }
 
 const ProductDetails = () => {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(false);
-  const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | "">("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  // we resolve customer id in background; no UI needed for this state currently
+  const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] =
+    useState(false);
+  const [createSubscriptionModalKey, setCreateSubscriptionModalKey] =
+    useState(0);
+  const [deletingProductId, setDeletingProductId] = useState<string | number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    productId: string | number;
+    name?: string;
+  } | null>(null);
 
 
   useEffect(() => {
@@ -58,18 +69,53 @@ const ProductDetails = () => {
         const result = await getMinifiedCompanies({ send_all: "true" });
         setCompanyOptions(result ?? []);
       } catch (e) {
-        console.error("Error fetching company options:", e);
+        toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
+          toastId: "billing_subscriptions_load_companies_failed",
+        });
       }
     };
     fetchCompanyOptions();
   }, []);
+
+  // Resolve selected customer first (mandatory)
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    (async () => {
+      try {
+        const customer: any = await getCustomer(selectedCompanyId);
+        if (cancelled) return;
+
+        if (customer?.success === false && customer?.message === "Not Found") {
+          await createCustomer({
+            crm_company_id: selectedCompanyId,
+            profile: { vat_exemption: false },
+          });
+          if (cancelled) return;
+          // Customer created for this selectedCompanyId; refetch pricing list
+          setRefreshKey((k) => k + 1);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        toast.error(`Failed to load customer: ${getErrorMessage(e)}`, {
+          toastId: "billing_subscriptions_load_customer_failed",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCompanyId, setRefreshKey]);
     
 
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [totalAllSubscriptions, setTotalAllSubscriptions] = useState(0);
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
     status?: string;
@@ -112,26 +158,41 @@ const ProductDetails = () => {
     const currentRequestId = requestIdRef.current;
     setLoading(true);
     try {
-      const response = await GetProducts({
+      if (!selectedCompanyId) {
+        setDataList([]);
+        setTotalRecords(0);
+        setTotalAllSubscriptions(0);
+        setPagination((prev) => ({ ...prev, totalRows: 0 }));
+        return;
+      }
+
+      const response = (await getCustomerProductPricingList(selectedCompanyId, {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
         search: currentFilters.search || "",
         status: currentFilters.status || undefined,
+        sort_direction: "desc",
         billing_cycle: currentFilters.billing_cycle || undefined,
-        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      }) as any;
+      } as any)) as any;
 
       if (currentRequestId !== requestIdRef.current) return;
 
-      const list = response?.dataList ?? response?.data ?? [];
-      const total = response?.meta?.total ?? response?.recordsTotal ?? response?.recordsFiltered ?? 0;
+      const list = Array.isArray(response) ? response : response?.dataList ?? response?.data ?? [];
+      const total =
+        response?.meta?.total ??
+        response?.recordsTotal ??
+        response?.recordsFiltered ??
+        (Array.isArray(list) ? list.length : 0);
+
       setDataList(list);
       setTotalRecords(total);
       setTotalAllSubscriptions(total);
       setPagination((prev) => ({ ...prev, totalRows: total }));
     } catch (error) {
       if (currentRequestId !== requestIdRef.current) return;
-      console.error("Error fetching products:", error);
+      toast.error(`Failed to load subscriptions: ${getErrorMessage(error)}`, {
+        toastId: "billing_subscriptions_fetch_failed",
+      });
       setDataList([]);
       setTotalRecords(0);
       setPagination((prev) => ({ ...prev, totalRows: 0 }));
@@ -141,6 +202,51 @@ const ProductDetails = () => {
       }
     }
   }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey, selectedCompanyId]);
+
+  const handleCreateSubscription = useCallback(() => {
+    setShowCreateSubscriptionModal(false);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleCreateSubscriptionAndAddAnother = useCallback(() => {
+    setCreateSubscriptionModalKey((k) => k + 1);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleDeletePricing = useCallback(
+    async (productId: string | number) => {
+      if (!selectedCompanyId) return;
+      setDeletingProductId(productId);
+      try {
+        await deleteCustomerProductPricing(selectedCompanyId, productId);
+        setRefreshKey((k) => k + 1);
+      } catch (e) {
+        toast.error(`Failed to delete subscription: ${getErrorMessage(e)}`, {
+          toastId: "billing_subscriptions_delete_failed",
+        });
+      } finally {
+        setDeletingProductId(null);
+      }
+    },
+    [selectedCompanyId],
+  );
+
+  const openDeleteConfirmation = useCallback((row: any) => {
+    const productId = row?.product_id ?? row?.product?.id ?? row?.id;
+    if (!productId) return;
+    setDeleteTarget({
+      productId,
+      name: row?.product?.name,
+    });
+    setShowDeleteModal(true);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    await handleDeletePricing(deleteTarget.productId);
+    setShowDeleteModal(false);
+    setDeleteTarget(null);
+  }, [deleteTarget, handleDeletePricing]);
 
   useEffect(() => {
     fetchProducts();
@@ -160,6 +266,69 @@ const ProductDetails = () => {
           </div>
         ),
       },
+      {
+        key: "description",
+        label: "Description",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.product?.description ?? "",
+        render: (row) => (
+          <div>
+            <span>{row?.product?.description ?? "-"}</span>
+          </div>
+        ),
+      },
+
+      {
+        key: "base_price",
+        label: "Base Price",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.product?.base_price ?? "",
+        render: (row) => (
+          <div>
+            <span>{`${row?.product?.currency ?? "AED"} ${formatNumber(row?.product?.base_price ?? 0)}`}</span>
+          </div>
+        ),
+      },
+      {
+        key: "selling_price",
+        label: "Selling Price",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.selling_price ?? "",
+        render: (row) => (
+          <div>
+            <span>{`${row?.product?.currency ?? "AED"} ${formatNumber(row?.selling_price ?? 0)}`}</span>
+          </div>
+        ),
+      },
+
+    
+      {
+        key: "renewal_start_date",
+        label: "Renewal Start",
+        sortable: true,
+        type: "text",
+        accessor: (row) =>
+          row?.renewal_start_date
+            ? moment(row.renewal_start_date).format(GlobalDateFormat)
+            : "",
+        emptyValue: "-",
+      },
+      {
+        key: "renewal_end_date",
+        label: "Renewal End",
+        sortable: true,
+        type: "text",
+        accessor: (row) =>
+          row?.renewal_end_date
+            ? moment(row.renewal_end_date).format(GlobalDateFormat)
+            : "",
+        emptyValue: "-",
+      },
+      
+
       {
         key: "status",
         label: "Status",
@@ -184,28 +353,7 @@ const ProductDetails = () => {
           </span>
         ),
       },
-      {
-        key: "renewal_start_date",
-        label: "Current Period Start",
-        sortable: true,
-        type: "text",
-        accessor: (row) =>
-          row?.renewal_start_date
-            ? moment(row.renewal_start_date).format(GlobalDateFormat)
-            : "",
-        emptyValue: "-",
-      },
-      {
-        key: "renewal_end_date",
-        label: "Current Period End",
-        sortable: true,
-        type: "text",
-        accessor: (row) =>
-          row?.renewal_end_date
-            ? moment(row.renewal_end_date).format(GlobalDateFormat)
-            : "",
-        emptyValue: "-",
-      },
+      
       {
         key: "subscriptions",
         label: "Quantity",
@@ -214,27 +362,37 @@ const ProductDetails = () => {
         accessor: (row) => row?.subscriptions ?? "0",
         emptyValue: "0",
       },
+     
       {
-        key: "selling_price",
-        label: "Price",
-        sortable: true,
+        key: "actions",
+        label: "Actions",
+        sortable: false,
         type: "custom",
-        render: (row) => (
-          <span>
-            {row?.company?.profile?.currency ||
-              row?.product?.currency ||
-              "USD"}{" "}
-            {formatNumber(row?.selling_price)}
-          </span>
-        ),
+        render: (row) => {
+          const productId = row?.product_id ?? row?.product?.id ?? row?.id;
+          const isDeleting = deletingProductId != null && deletingProductId === productId;
+          return (
+            <Button
+              size="sm"
+              variant="outline-danger"
+              disabled={!productId || isDeleting}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!productId) return;
+                openDeleteConfirmation(row);
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          );
+        },
       },
     ],
-    []
+    [deletingProductId, handleDeletePricing]
   );
 
-  const [selectedProductView, setSelectedProductView] = useState<any | null>(
-    null
-  );
+  const [selectedProductView, setSelectedProductView] = useState<any>(null);
   const [showProductSidebar, setShowProductSidebar] = useState(false);
 
   const getInitials = (name: string) => {
@@ -254,7 +412,7 @@ const ProductDetails = () => {
       "#10b981", "#06b6d4", "#3b82f6",
     ];
     let n = 0;
-    for (let i = 0; i < (seed || "").length; i++) n += seed.charCodeAt(i);
+    for (let i = 0; i < (seed || "").length; i++) n += seed.codePointAt(i) ?? 0;
     return colors[n % colors.length];
   };
 
@@ -273,6 +431,12 @@ const ProductDetails = () => {
     handleViewProduct(row);
   }, [handleViewProduct]);
 
+  const applyStatusFilter = useCallback((status: string) => {
+    setCurrentFilters((prev) => ({ ...prev, status }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((k) => k + 1);
+  }, []);
+
   // Filter pills: Status + Next Billing Date
   const subscriptionFilterPills = useMemo<FilterPill[]>(() => [
     {
@@ -289,22 +453,22 @@ const ProductDetails = () => {
       dropdownContent: (
         <div style={{ minWidth: 200 }}>
           {["Active", "Trial", "Inactive", "Suspended"].map((s) => (
-            <div
+            <button
               key={s}
+              type="button"
               style={{
                 padding: "8px 12px",
                 cursor: "pointer",
                 background: currentFilters.status === s ? "#f0f0f0" : "transparent",
                 borderRadius: "4px",
+                border: "none",
+                width: "100%",
+                textAlign: "left",
               }}
-              onClick={() => {
-                setCurrentFilters((prev) => ({ ...prev, status: s }));
-                setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                setRefreshKey((k) => k + 1);
-              }}
+              onClick={() => applyStatusFilter(s)}
             >
               {s}
-            </div>
+            </button>
           ))}
         </div>
       ),
@@ -352,7 +516,7 @@ const ProductDetails = () => {
         </div>
       ),
     },
-  ], [currentFilters]);
+  ], [currentFilters, applyStatusFilter]);
 
   // Add Subscription button
   const renderAddSubscriptionButton = () => (
@@ -383,11 +547,7 @@ const ProductDetails = () => {
         }}
         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#1a1a1a"; }}
         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#000000"; }}
-        onClick={() => {
-          // Navigate to add subscription page or open a modal
-          // window.location.href = "/billing/create-invoice";
-          router.push('/billing/create-invoice');
-        }}
+        onClick={() => setShowCreateSubscriptionModal(true)}
       >
         <Plus size={16} />
         Add Subscription
@@ -491,22 +651,28 @@ const ProductDetails = () => {
         <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
 
           {/* Company selector above the table */}
-          <div className="mb-3 d-flex align-items-center gap-2">
-            <Form.Select
-              size="sm"
-              style={{ width: "220px" }}
-              value={String(selectedCompanyId)}
-              onChange={(e) =>
-                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-              }
-            >
-              <option value="">All companies</option>
-              {companyOptions.map((c: { id: string | number; name?: string }) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </option>
-              ))}
-            </Form.Select>
+          <div className="mb-3">
+            <div className="d-flex align-items-center gap-2">
+              <Form.Select
+                size="sm"
+                style={{ width: "220px" }}
+                value={String(selectedCompanyId)}
+                onChange={(e) =>
+                  setSelectedCompanyId(
+                    e.target.value === "" ? "" : e.target.value,
+                  )
+                }
+              >
+                <option value="">Select company</option>
+                {companyOptions.map(
+                  (c: { id: string | number; name?: string }) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name ?? c.id}
+                    </option>
+                  ),
+                )}
+              </Form.Select>
+            </div>
           </div>
 
       <GenericTable
@@ -527,7 +693,11 @@ const ProductDetails = () => {
         }}
         sortable={true}
         loading={loading}
-        emptyMessage="No subscriptions found"
+        emptyMessage={
+          selectedCompanyId === ""
+            ? "Select company to view subscriptions  "
+            : "No subscriptions found"
+        }
         loadingMessage="Loading subscriptions..."
         hover={true}
         uniqueKey="id"
@@ -672,6 +842,32 @@ const ProductDetails = () => {
         </div>
         )}
       </div>
+
+      {showCreateSubscriptionModal && (
+        <CreateSubscriptionModal
+          key={createSubscriptionModalKey}
+          customerId={selectedCompanyId}
+          onClose={() => setShowCreateSubscriptionModal(false)}
+          onCreate={handleCreateSubscription}
+          onCreateAndAddAnother={handleCreateSubscriptionAndAddAnother}
+        />
+      )}
+
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          if (!deletingProductId) {
+            setShowDeleteModal(false);
+            setDeleteTarget(null);
+          }
+        }}
+        onConfirm={() => {
+          void confirmDelete();
+        }}
+        itemType="subscription"
+        itemName={deleteTarget?.name}
+        loading={deletingProductId != null}
+      />
     </React.Fragment>
   );
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
 import {
   downloadInvoicePdf,
@@ -12,6 +12,7 @@ import { useSession } from "next-auth/react";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
 import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
 import { LinkButton } from "@components/shared/LinkButton";
+import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
 
 const font = BILLING_FONT;
 
@@ -35,16 +36,23 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
 function CardActions({
   onView,
   onDownload,
-}: Readonly<{ onView?: () => void; onDownload?: () => void }>) {
+  onPayNow,
+}: Readonly<{ onView?: () => void; onDownload?: () => void; onPayNow?: () => void }>) {
+  const actions: Array<{ key: string; label: string; onClick: () => void }> = [];
+  if (onPayNow) actions.push({ key: "pay-now", label: "Pay Now", onClick: onPayNow });
+  if (onView) actions.push({ key: "view", label: "View", onClick: onView });
+  if (onDownload) actions.push({ key: "download", label: "Download", onClick: onDownload });
+
   return (
     <div style={s.cardActions}>
-      <LinkButton onClick={onView} style={s.actionLink}>
-        View
-      </LinkButton>
-      <span style={s.divider}>|</span>
-      <LinkButton onClick={onDownload} style={s.actionLink}>
-        Download
-      </LinkButton>
+      {actions.map((a, idx) => (
+        <span key={a.key} style={{ display: "inline-flex", alignItems: "center" }}>
+          <LinkButton onClick={a.onClick} style={s.actionLink}>
+            {a.label}
+          </LinkButton>
+          {idx < actions.length - 1 && <span style={s.divider}>|</span>}
+        </span>
+      ))}
     </div>
   );
 }
@@ -318,6 +326,7 @@ function FilterDropdown({
                   border: "none",
                   padding: "8px 16px",
                   cursor: "pointer",
+                  textTransform: "capitalize",
                   fontSize: 14,
                   fontFamily: font,
                   display: "flex", alignItems: "center", gap: 10,
@@ -345,21 +354,372 @@ function FilterDropdown({
   );
 }
 
+function computeDateRange(option: string): { dateFrom: string; dateTo: string } | null {
+  const today = moment();
+  const dateTo = today.format("YYYY-MM-DD");
+
+  if (option === "Last 30 days") {
+    return { dateFrom: today.clone().subtract(30, "days").format("YYYY-MM-DD"), dateTo };
+  }
+  if (option === "Last 3 months") {
+    return { dateFrom: today.clone().subtract(3, "months").format("YYYY-MM-DD"), dateTo };
+  }
+  if (option === "Last 6 months") {
+    return { dateFrom: today.clone().subtract(6, "months").format("YYYY-MM-DD"), dateTo };
+  }
+  if (option === "Last 12 months") {
+    return { dateFrom: today.clone().subtract(12, "months").format("YYYY-MM-DD"), dateTo };
+  }
+
+  return null;
+}
+
+function DateRangeDropdown({
+  label,
+  options,
+  selectedOption,
+  dateFrom,
+  dateTo,
+  onChangeOption,
+  onChangeDateFrom,
+  onChangeDateTo,
+  onClear,
+}: Readonly<{
+  label: string;
+  options: readonly string[];
+  selectedOption: string;
+  dateFrom: string;
+  dateTo: string;
+  onChangeOption: (value: string) => void;
+  onChangeDateFrom: (value: string) => void;
+  onChangeDateTo: (value: string) => void;
+  onClear: () => void;
+}>) {
+  const [open, setOpen] = useState(false);
+
+  const isCustom = selectedOption === "Custom range";
+  const hasValue = selectedOption !== "" || (dateFrom !== "" && dateTo !== "");
+
+  return (
+    <div style={{ position: "relative" as const }}>
+      <button
+        type="button"
+        style={{
+          ...s.filterBtn,
+          backgroundColor: hasValue ? "#f0fafa" : "#fff",
+          borderColor: hasValue ? "rgb(0,97,98)" : "#ccc",
+          color: hasValue ? "rgb(0,97,98)" : "#141414",
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        {label}
+        {hasValue && (
+          <span
+            style={{
+              ...s.badge,
+              background: "rgb(0,97,98)",
+              color: "#fff",
+            }}
+          >
+            1
+          </span>
+        )}
+        <ChevronDown size={13} />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close filter dropdown"
+            onClick={() => setOpen(false)}
+            style={{
+              position: "fixed" as const,
+              inset: 0,
+              zIndex: 9,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "default",
+            }}
+          />
+
+          <div
+            style={{
+              position: "absolute" as const,
+              top: "calc(100% + 4px)",
+              left: 0,
+              zIndex: 10,
+              backgroundColor: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: 6,
+              boxShadow: "rgba(20,20,20,0.12) 0px 4px 16px",
+              minWidth: 240,
+              padding: 8,
+            }}
+          >
+            {hasValue && (
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClear();
+                    setOpen(false);
+                  }}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "rgb(0,97,98)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: font,
+                    fontSize: 12,
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
+            <div style={{ padding: "6px 0" }}>
+              {options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChangeOption(opt);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontFamily: font,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    borderRadius: 6,
+                    backgroundColor: selectedOption === opt ? "#f0fafa" : "transparent",
+                    color: selectedOption === opt ? "rgb(0,97,98)" : "#141414",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      border: `2px solid ${selectedOption === opt ? "rgb(0,97,98)" : "#ccc"}`,
+                      borderRadius: 50,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: selectedOption === opt ? "rgb(0,97,98)" : "transparent",
+                      flexShrink: 0,
+                    }}
+                  />
+                  {opt}
+                </button>
+              ))}
+            </div>
+
+            {isCustom && (
+              <div style={{ paddingTop: 8, borderTop: "1px solid #eee" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "#666", fontFamily: font, fontWeight: 700, marginBottom: 4 }}>
+                      From
+                    </div>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(e) => onChangeDateFrom(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #ccc",
+                        fontFamily: font,
+                        fontSize: 13,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: "#666", fontFamily: font, fontWeight: 700, marginBottom: 4 }}>
+                      To
+                    </div>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(e) => onChangeDateTo(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #ccc",
+                        fontFamily: font,
+                        fontSize: 13,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatusDropdown({
+  label,
+  options,
+  value,
+  onChange,
+  inactiveValues = ["", "All Statuses"],
+}: Readonly<{
+  label: string;
+  options: readonly string[];
+  value: string;
+  onChange: (next: string) => void;
+  inactiveValues?: readonly string[];
+}>) {
+  const [open, setOpen] = useState(false);
+  const hasValue = value !== "" && !inactiveValues.includes(value);
+
+  return (
+    <div style={{ position: "relative" as const }}>
+      <button
+        type="button"
+        style={{
+          ...s.filterBtn,
+          backgroundColor: hasValue ? "#f0fafa" : "#fff",
+          borderColor: hasValue ? "rgb(0,97,98)" : "#ccc",
+          color: hasValue ? "rgb(0,97,98)" : "#141414",
+          textTransform: "capitalize",
+        }}
+        onClick={() => setOpen(!open)}
+      >
+        {label}
+        {hasValue && (
+          <span
+            style={{
+              ...s.badge,
+              background: "rgb(0,97,98)",
+              color: "#fff",
+            }}
+          >
+            1
+          </span>
+        )}
+        <ChevronDown size={13} />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close filter dropdown"
+            onClick={() => setOpen(false)}
+            style={{
+              position: "fixed" as const,
+              inset: 0,
+              zIndex: 9,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "default",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute" as const,
+              top: "calc(100% + 4px)",
+              left: 0,
+              zIndex: 10,
+              backgroundColor: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: 6,
+              boxShadow: "rgba(20,20,20,0.12) 0px 4px 16px",
+              minWidth: 200,
+              padding: 8,
+            }}
+          >
+            {options.map((opt) => {
+              const isSelected = value === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontFamily: font,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    borderRadius: 6,
+                    textTransform: "capitalize",
+                    backgroundColor: isSelected ? "#f0fafa" : "transparent",
+                    color: isSelected ? "rgb(0,97,98)" : "#141414",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      border: `2px solid ${isSelected ? "rgb(0,97,98)" : "#ccc"}`,
+                      borderRadius: 50,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: isSelected ? "rgb(0,97,98)" : "transparent",
+                      flexShrink: 0,
+                    }}
+                  />
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Card: Invoice issued ───────────────────────────────────────────────────────
 function InvoiceCard({
   invoiceNumber,
   product,
   amount,
   balance,
+  status,
   onView,
   onDownload,
+  onPayNow,
 }: Readonly<{
   invoiceNumber: string;
   product: string;
   amount: string;
   balance: string;
+  status?: string;
   onView: () => void;
   onDownload: () => void;
+  onPayNow?: () => void;
 }>) {
   return (
     <div style={s.card}>
@@ -368,7 +728,13 @@ function InvoiceCard({
           <FileText size={22} color="#141414" />
           <h3 style={s.cardTitle}>Invoice issued #{invoiceNumber}</h3>
         </div>
-        <CardActions onView={onView} onDownload={onDownload} />
+        <CardActions
+          onPayNow={
+            typeof status === "string" && status.toLowerCase() === "pending" ? onPayNow : undefined
+          }
+          onView={onView}
+          onDownload={onDownload}
+        />
       </div>
       <div style={s.cardBody}>
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
@@ -504,8 +870,15 @@ function OrderCard({
 export default function BillingHistoryPage() {
   const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateRangeOption, setDateRangeOption] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("All Statuses");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("All Payments");
 
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const requestIdRef = useRef(0);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
@@ -538,24 +911,67 @@ export default function BillingHistoryPage() {
       console.error("BillingHistoryPage download invoice error:", err);
     }
   }, []);
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      try {
-        const res = await getInvoices({ page: 1, per_page: 50, limit: 50 }) as any;
-        setInvoices(res?.data || []);
-        console.log("getInvoices response:", res);
-      } catch (err) {
-        console.error("BillingHistoryPage getInvoices error:", err);
+
+  const fetchInvoices = useCallback(async (search: string) => {
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+
+    setLoadingInvoices(true);
+    try {
+      const res = (await getInvoices({
+        page: 1,
+        per_page: 50,
+        limit: 50,
+        search: search || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        crm_company_id: "null",
+        status: statusFilter === "All Statuses" ? "" : statusFilter,
+        payment_status: paymentStatusFilter === "All Payments" ? "" : paymentStatusFilter,
+      })) as any;
+
+      if (requestId !== requestIdRef.current) return;
+
+      setInvoices(res?.data || []);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      console.error("BillingHistoryPage getInvoices error:", err);
+      setInvoices([]);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoadingInvoices(false);
       }
-    };
-    fetchInvoices();
-  }, []);
+    }
+  }, [dateFrom, dateTo, statusFilter, paymentStatusFilter]);
+
+  const { openInvoicePayment: openInvoicePaymentModal, invoicePaymentModal } = useInvoicePaymentModal({
+    onPaymentSuccess: () => {
+      void fetchInvoices(searchQuery);
+    },
+  });
+
+  const handlePayNow = useCallback(
+    async (invoiceId: number) => {
+      try {
+        const invoiceDetails = await getInvoice(invoiceId);
+        openInvoicePaymentModal(invoiceDetails);
+      } catch (err) {
+        console.error("BillingHistoryPage pay now error:", err);
+      }
+    },
+    [openInvoicePaymentModal]
+  );
+
+  useEffect(() => {
+    void fetchInvoices(searchQuery);
+  }, [fetchInvoices, searchQuery, dateFrom, dateTo, statusFilter, paymentStatusFilter]);
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
+    { label: "Status", options: ["All Statuses", "draft", "sent", "paid", "pending", "overdue", "cancelled"] },
     { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
     { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
-    { label: "Payments", options: ["Payment processed", "Payment failed", "Payment refunded"] },
+    { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
     { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
     { label: "Refunds", options: ["Refund issued", "Refund pending"] },
     { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
@@ -578,46 +994,142 @@ export default function BillingHistoryPage() {
         </div>
 
         {/* Filter dropdowns */}
-        {filters.map(f => (
-          <FilterDropdown key={f.label} label={f.label} options={f.options} />
-        ))}
+        {filters.map((f) => {
+          if (f.label === "Date range") {
+            return (
+              <DateRangeDropdown
+                key={f.label}
+                label={f.label}
+                options={f.options}
+                selectedOption={dateRangeOption}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onChangeOption={(opt) => {
+                  setDateRangeOption(opt);
+                  if (opt === "Custom range") {
+                    if (dateFrom === "" && dateTo === "") {
+                      const today = moment().format("YYYY-MM-DD");
+                      setDateFrom(today);
+                      setDateTo(today);
+                    }
+                    return;
+                  }
+
+                  const computed = computeDateRange(opt);
+                  if (computed == null) {
+                    setDateFrom("");
+                    setDateTo("");
+                    return;
+                  }
+                  setDateFrom(computed.dateFrom);
+                  setDateTo(computed.dateTo);
+                }}
+                onChangeDateFrom={(value) => {
+                  setDateRangeOption("Custom range");
+                  setDateFrom(value);
+                  if (dateTo !== "" && value !== "" && value > dateTo) {
+                    setDateTo(value);
+                  }
+                }}
+                onChangeDateTo={(value) => {
+                  setDateRangeOption("Custom range");
+                  setDateTo(value);
+                  if (dateFrom !== "" && value !== "" && value < dateFrom) {
+                    setDateFrom(value);
+                  }
+                }}
+                onClear={() => {
+                  setDateRangeOption("");
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+              />
+            );
+          }
+
+          if (f.label === "Status") {
+            return (
+              <StatusDropdown
+                key={f.label}
+                label={f.label}
+                options={f.options}
+                value={statusFilter}
+                onChange={setStatusFilter}
+                inactiveValues={["", "All Statuses"]}
+              />
+            );
+          }
+
+          if (f.label === "Payments") {
+            return (
+              <StatusDropdown
+                key={f.label}
+                label={f.label}
+                options={f.options}
+                value={paymentStatusFilter}
+                onChange={setPaymentStatusFilter}
+                inactiveValues={["", "All Payments"]}
+              />
+            );
+          }
+
+          return <FilterDropdown key={f.label} label={f.label} options={f.options} />;
+        })}
       </div>
 
       {/* Content */}
       <div style={s.content}>
 
-        {invoices.map((invoice: any) => (
-          <div key={invoice.id}>
-            <div style={s.dateLabel}>{moment(invoice.created_at).format(GlobalDateTimeFormat)}</div>
-            <InvoiceCard
-              invoiceNumber={String(invoice.invoice_number ?? "")}
-              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
-              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
-              balance={`${invoice.currency_code || "AED"} ${invoice.amount_due ?? 0}`}
-              onView={() => handleViewInvoice(Number(invoice.id))}
-              onDownload={() => handleDownloadInvoice(Number(invoice.id))}
-            />
-            
-            {Array.isArray(invoice.payments) && invoice.payments.map((payment: any) => (
-              <PaymentCard
-                key={payment.id}
-                id={String(payment.id)}
-                product={payment.notes}
-                invoiceRef={String(invoice.invoice_number ?? "")}
-                cardLast4={payment?.card_last4 ?? ""}
-                cardHolder={payment?.card_holder ?? ""}
-                amount={`${payment?.currency_code || "AED"} ${payment?.amount ?? 0}`}
+        {loadingInvoices ? (
+          <div style={{ padding: "24px 0", color: "#666" }}>Loading...</div>
+        ) : (
+          invoices.map((invoice: any) => (
+            <div key={invoice.id}>
+              <div style={s.dateLabel}>
+                {moment(invoice.created_at).format(GlobalDateTimeFormat)}
+              </div>
+              <InvoiceCard
+                invoiceNumber={String(invoice.invoice_number ?? "")}
+                product={
+                  invoice.items
+                    ?.map((item: any) => item?.product?.name)
+                    .filter(Boolean)
+                    .join(", ") || ""
+                }
+                amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+                balance={`${invoice.currency_code || "AED"} ${invoice.amount_due ?? 0}`}
+                status={String(invoice.status ?? "")}
+                onView={() => handleViewInvoice(Number(invoice.id))}
+                onDownload={() => handleDownloadInvoice(Number(invoice.id))}
+                onPayNow={() => handlePayNow(Number(invoice.id))}
               />
-            ))}
 
-            <OrderCard
-              id="22970930"
-              product={invoice.items?.map((item: any) => item?.product?.name).filter(Boolean).join(", ") || ""}
-              amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
-            />
+              {Array.isArray(invoice.payments) &&
+                invoice.payments.map((payment: any) => (
+                  <PaymentCard
+                    key={payment.id}
+                    id={String(payment.id)}
+                    product={payment.notes}
+                    invoiceRef={String(invoice.invoice_number ?? "")}
+                    cardLast4={payment?.card_last4 ?? ""}
+                    cardHolder={payment?.card_holder ?? ""}
+                    amount={`${payment?.currency_code || "AED"} ${payment?.amount ?? 0}`}
+                  />
+                ))}
 
-          </div>
-        ))}
+              <OrderCard
+                id="22970930"
+                product={
+                  invoice.items
+                    ?.map((item: any) => item?.product?.name)
+                    .filter(Boolean)
+                    .join(", ") || ""
+                }
+                amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
+              />
+            </div>
+          ))
+        )}
         <InvoiceViewModal
           show={showViewInvoiceModal}
           onHide={closeViewInvoiceModal}
@@ -625,6 +1137,7 @@ export default function BillingHistoryPage() {
           loading={isInvoiceLoading}
           companyName={session?.user?.company_name || ""}
         />
+        {invoicePaymentModal}
       </div>
     </div>
   );

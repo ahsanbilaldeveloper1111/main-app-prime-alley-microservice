@@ -7,14 +7,12 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import parsePhoneNumber from "libphonenumber-js";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Card,
   Row,
   Col,
   Form,
@@ -22,11 +20,7 @@ import {
   Spinner,
   Modal,
   Badge,
-  InputGroup,
   Dropdown,
-  Table,
-  Popover,
-  OverlayTrigger,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -48,15 +42,11 @@ import {
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
-  FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-  FiCopy,
 } from "react-icons/fi";
 import {
   Users,
@@ -133,7 +123,9 @@ import {
   CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
+import { deleteProduct, getProducts } from "@utils/accounts";
 import { GetHierarchyData } from "@utils/users";
+import { getErrorMessage } from "@utils/errors";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -164,373 +156,33 @@ import CrmActivitiesPanel, {
 import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
-// KPI Card Component (from crm-new.tsx design)
-interface KPICardData {
-  title: string;
-  value: string | number;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const PhoneContainer = ({
-  phone,
-  onClick,
-}: {
-  phone: string;
-  onClick?: () => void;
-}) => {
-  const [showPopover, setShowPopover] = useState(false);
-
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-
-  const phoneBadge = (
-    <Badge
-      bg="info"
-      className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? "pointer" : "default" }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-
-  if (!onClick) {
-    return phoneBadge;
-  }
-
-  const popover = (
-    <Popover
-      id={`phone-popover-${phone}`}
-      style={{
-        maxWidth: "160px",
-        pointerEvents: "auto",
-        border: "none",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-      }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <Popover.Body
-        className="p-0"
-        style={{
-          padding: "8px",
-          borderRadius: "8px",
-        }}
-      >
-        <Button
-          variant="default"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-            setShowPopover(false);
-          }}
-          className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{
-            fontSize: "13px",
-            fontWeight: "600",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "1px solid #dee2e6",
-            backgroundColor: "transparent",
-            color: "#212529",
-            boxShadow: "none",
-            transition: "all 0.2s ease",
-            minHeight: "36px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.backgroundColor = "#f8f9fa";
-            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        >
-          <Phone size={18} style={{ strokeWidth: 2.5 }} />
-          <span>Call</span>
-        </Button>
-      </Popover.Body>
-    </Popover>
-  );
-
-  return (
-    <OverlayTrigger
-      show={showPopover}
-      placement="top"
-      overlay={popover}
-      trigger={[]}
-    >
-      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
-    </OverlayTrigger>
-  );
-};
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component (from crm-new.tsx design)
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          {/* Left Side: Quick Filter Buttons */}
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-
-              // Determine button styles
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2 "
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  <span className="d-flex align-items-center gap-2">
-                    {filter.icon && (
-                      <span className="d-flex align-items-center">
-                        {filter.icon}
-                      </span>
-                    )}
-                    {filter.label}
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Right Side: Search and Filters */}
-          {(onSearchChange || onToggleAdvancedFilters) && (
-            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-              {onSearchChange && onSearch && (
-                <InputGroup
-                  style={{ width: "300px", minWidth: "200px" }}
-                  className="flex-shrink-0"
-                >
-                  <Form.Control
-                    style={{ height: "41px" }}
-                    type="text"
-                    placeholder={searchPlaceholder}
-                    value={searchValue || ""}
-                    onChange={(e) => onSearchChange?.(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && onSearch) {
-                        onSearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => onSearch?.()}
-                  >
-                    <FiSearch size={16} />
-                  </Button>
-                </InputGroup>
-              )}
-              {onToggleAdvancedFilters && (
-                <Button
-                  variant={
-                    showAdvancedFilters ? "primary" : "outline-secondary"
-                  }
-                  onClick={onToggleAdvancedFilters}
-                  className="d-flex align-items-center flex-shrink-0"
-                >
-                  <FiFilter size={16} className="me-2" />
-                  Filters
-                  {(advancedFilterCount ?? 0) > 0 && (
-                    <Badge bg="light" text="dark" className="ms-2">
-                      {advancedFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
 // Helper function to get initials from name (first two words, first two letters, only a-z)
 const getInitials = (name: string): string => {
-  if (!name) return "NA";
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) return "NA";
 
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
+  const words = trimmed.split(/\s+/).slice(0, 2);
+  const alphaSingle = /[a-z]/i;
+  const firstAlphaUpper = (value: string): string | undefined => {
+    const m = alphaSingle.exec(value);
+    return m?.[0] ? m[0].toUpperCase() : undefined;
+  };
 
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
+  const w1 = words[0] ?? "";
+  const w2 = words[1];
+  const first = firstAlphaUpper(w1);
+  const second = w2 ? firstAlphaUpper(w2) : undefined;
+  if (first && second) return first + second;
 
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
+  // Fallback: first two letters (a-z only) from first word
+  const letters: string[] = [];
+  const alphaGlobal = /[a-z]/gi;
+  let match: RegExpExecArray | null;
+  while ((match = alphaGlobal.exec(w1)) !== null && letters.length < 2) {
+    letters.push(match[0].toUpperCase());
   }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
+  if (letters.length >= 2) return letters[0] + letters[1];
+  if (letters.length === 1) return letters[0];
   return "NA";
 };
 
@@ -571,6 +223,13 @@ const BillingManagement = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteModalMode, setDeleteModalMode] = useState<"single" | "bulk" | null>(null);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
+
+  const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
@@ -709,6 +368,8 @@ const BillingManagement = () => {
   const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [createProductModalKey, setCreateProductModalKey] = useState(0);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
 
   // Valid filter IDs
   const validFilters = ["all"];
@@ -912,10 +573,11 @@ const BillingManagement = () => {
   // Column customization and pagination states
   const defaultSelectedColumns = [
     "name",
-    "status",
     "sku",
     "tax_category",
-    "price_aed",
+    "base_price",
+    "is_active",
+    "actions",
   ];
   const [selectedColumns, setSelectedColumns] = useState<string[]>(
     () => defaultSelectedColumns,
@@ -1321,6 +983,32 @@ const BillingManagement = () => {
     ],
   );
 
+  const buildProductsParams = useCallback(
+    (overrides: { page?: number; per_page?: number } = {}) => {
+      const params: any = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+        ...overrides,
+      };
+
+      if (memoizedFilters.search) params.search = memoizedFilters.search;
+
+      if (pagination.sortColumn) {
+        params.sort_column = pagination.sortColumn;
+        params.sort_direction = pagination.sortDirection;
+      }
+
+      return params;
+    },
+    [
+      memoizedFilters.search,
+      pagination.currentPage,
+      pagination.rowsPerPage,
+      pagination.sortColumn,
+      pagination.sortDirection,
+    ],
+  );
+
   // Build API params from arbitrary filters (for export with custom filters)
   const buildExportParams = useCallback(
     (
@@ -1559,33 +1247,7 @@ const BillingManagement = () => {
     loadTags();
   }, [refreshKey]);
 
-  // Load available campaigns
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
-          value: campaign.id.toString(),
-          label: campaign.name,
-          id: campaign.id,
-        }));
-        setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
-      } catch (error) {
-        console.error("Failed to load campaigns:", error);
-        // Fallback to empty array
-        setAvailableCampaigns([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
-
+  
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -2193,127 +1855,60 @@ const BillingManagement = () => {
 
     setLoading(true);
     try {
-      // Use dummy data for products instead of API call
-      const dummyProducts = [
-        {
-          id: 1,
-          name: "Premium Wireless Headphones",
-          phone: "",
-          user_extension: "101",
-          campaign_id: 1,
-          is_viewed: true,
-          created_at: "2026-01-15T10:30:00Z",
-          updated_at: "2026-03-01T14:20:00Z",
-          title: "Premium Wireless Headphones",
-          status: "Active",
-          sku: "WH-PRO-001",
-          tax_category: "Electronics",
-          price_aed: 899,
-          description: "High-quality wireless headphones with noise cancellation",
-          data: {
-            sku: "WH-PRO-001",
-            tax_category: "Electronics",
-            price_aed: 899,
-            stock_quantity: 150,
-            category: "Audio Equipment",
-          },
-          campaign: {
-            id: 1,
-            name: "Electronics Collection",
-          },
-        },
-        {
-          id: 2,
-          name: "Smart Watch Series X",
-          phone: "",
-          user_extension: "102",
-          campaign_id: 2,
-          is_viewed: true,
-          created_at: "2026-02-01T09:15:00Z",
-          updated_at: "2026-02-28T16:45:00Z",
-          title: "Smart Watch Series X",
-          status: "Active",
-          sku: "SW-X-002",
-          tax_category: "Electronics",
-          price_aed: 1499,
-          description: "Latest generation smartwatch with health monitoring",
-          data: {
-            sku: "SW-X-002",
-            tax_category: "Electronics",
-            price_aed: 1499,
-            stock_quantity: 85,
-            category: "Wearables",
-          },
-          campaign: {
-            id: 2,
-            name: "Wearable Technology",
-          },
-        },
-        {
-          id: 3,
-          name: "Professional Camera Kit",
-          phone: "",
-          user_extension: "103",
-          campaign_id: 3,
-          is_viewed: false,
-          created_at: "2026-03-01T11:00:00Z",
-          updated_at: "2026-03-05T13:30:00Z",
-          title: "Professional Camera Kit",
-          status: "Out of Stock",
-          sku: "CAM-PRO-003",
-          tax_category: "Photography",
-          price_aed: 4299,
-          description: "Complete professional photography kit with accessories",
-          data: {
-            sku: "CAM-PRO-003",
-            tax_category: "Photography",
-            price_aed: 4299,
-            stock_quantity: 0,
-            category: "Photography Equipment",
-          },
-          campaign: {
-            id: 3,
-            name: "Professional Gear",
-          },
-        },
-      ];
-
-      const response = {
-        data: dummyProducts,
-        pagination: { total: 3 },
-        metrics: {
-          active_count: 2,
-          inactive_count: 0,
-          out_of_stock_count: 1,
-          total_value: 6697,
-        },
-      };
+      const response = await getProducts(buildProductsParams());
 
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
         return;
       }
 
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
+      const items = (response?.data || []) as any[];
+      const total = response?.pagination?.total ?? items.length;
+
+      setDataList(items as any);
+      setTotalRecords(total);
 
       // Keep total all products only when fetching without tab filter (all products)
       const isAllProducts =
         memoizedFilters.has_scheduled_calls !== true &&
         memoizedFilters.has_tickets !== true;
       if (isAllProducts) {
-        setTotalAllProducts(response.pagination.total || 0);
+        setTotalAllProducts(total);
       }
 
-      setMetrics(
-        response.metrics || {},
-      );
+      const summary = (response as any)?.summary;
+      if (summary && typeof summary === "object") {
+        setMetrics(summary);
+      } else {
+        const toNumber = (value: unknown) => {
+          const n = typeof value === "string" ? Number(value) : (value as number);
+          return Number.isFinite(n) ? n : 0;
+        };
+        const totalValue = items.reduce((acc, item) => {
+          const price =
+            item?.base_price ??
+            item?.data?.base_price ??
+            item?.effective_price ??
+            item?.base_price ??
+            0;
+          return acc + toNumber(price);
+        }, 0);
+        const activeCount = items.filter((i) => (i?.status ?? "Active") === "Active").length;
+        const inactiveCount = items.filter((i) => (i?.status ?? "") === "Inactive").length;
+        const outOfStockCount = items.filter((i) => (i?.status ?? "") === "Out of Stock").length;
+        setMetrics({
+          active_count: activeCount,
+          inactive_count: inactiveCount,
+          out_of_stock_count: outOfStockCount,
+          total_value: totalValue,
+        });
+      }
     } catch (error: any) {
       // Only handle error if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
         return;
       }
-      console.error("Failed to fetch CRM data:", error);
+      console.error("Failed to fetch products:", error);
       setDataList([]);
       setTotalRecords(0);
     } finally {
@@ -2322,7 +1917,31 @@ const BillingManagement = () => {
         setLoading(false);
       }
     }
-  }, [buildCrmDataParams]);
+  }, [buildProductsParams, memoizedFilters.has_scheduled_calls, memoizedFilters.has_tickets]);
+
+  const openProductDeleteModal = useCallback((row: any) => {
+    const id = Number(row?.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const name = String(row?.name ?? row?.title ?? `Product #${id}`);
+    setProductToDelete({ id, name });
+    setShowProductDeleteModal(true);
+  }, []);
+
+  const confirmProductDelete = useCallback(async () => {
+    if (!productToDelete) return;
+    setDeletingProduct(true);
+    try {
+      await deleteProduct(productToDelete.id);
+      toast.success("Product deleted successfully");
+      setShowProductDeleteModal(false);
+      setProductToDelete(null);
+      fetchCrmData();
+    } catch (e) {
+      toast.error(getErrorMessage(e, "Failed to delete product"));
+    } finally {
+      setDeletingProduct(false);
+    }
+  }, [fetchCrmData, productToDelete]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -3173,9 +2792,7 @@ const BillingManagement = () => {
   // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
-      router.push(
-        `/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`,
-      );
+      
     },
     [router],
   );
@@ -3198,21 +2815,7 @@ const BillingManagement = () => {
         iconBgColor: "#D1FAE5",
         metric: { text: "In stock", dotColor: "#10B981" },
       },
-      {
-        title: "Out of Stock",
-        value: metrics.out_of_stock_count ?? 0,
-        icon: AlertCircleIcon,
-        iconColor: "#EF4444",
-        iconBgColor: "#FEE2E2",
-        metric: { text: "Needs restock", dotColor: "#EF4444" },
-      },
-      {
-        title: "Total Value",
-        value: `AED ${Number(metrics.total_value ?? 0).toLocaleString()}`,
-        icon: Users,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-      },
+     
       {
         title: "Inactive Products",
         value: metrics.inactive_count ?? 0,
@@ -3241,28 +2844,7 @@ const BillingManagement = () => {
           </span>
         ),
       },
-      {
-        key: "status",
-        label: "Status",
-        sortable: true,
-        type: "custom",
-        render: (row) => {
-          const status = row.status || "Inactive";
-          const isActive = status === "Active";
-          const isOutOfStock = status === "Out of Stock";
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {isActive && (
-                <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e", display: "inline-block" }} />
-              )}
-              {isOutOfStock && (
-                <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#ef4444", display: "inline-block" }} />
-              )}
-              <span style={{ color: "#374151", fontSize: 13 }}>{status}</span>
-            </div>
-          );
-        },
-      },
+     
       {
         key: "sku",
         label: "SKU",
@@ -3286,17 +2868,58 @@ const BillingManagement = () => {
         ),
       },
       {
-        key: "price_aed",
+        key: "base_price",
         label: "Price AED",
         sortable: true,
         type: "custom",
         render: (row) => (
           <span style={{ color: "#374151", fontSize: 13, fontWeight: 500 }}>
-            {row.price_aed != null || row.data?.price_aed != null
-              ? `AED ${Number(row.price_aed ?? row.data?.price_aed).toLocaleString()}`
+            {row.base_price != null || row.data?.base_price != null
+              ? `AED ${Number(row.base_price ?? row.data?.base_price).toLocaleString()}`
               : "--"}
           </span>
         ),
+      },
+      {
+        key: "is_active",
+        label: "Status",
+        sortable: true,
+        type: "custom",
+        render: (row) => {
+          const status = row.is_active ? "Active" : "Inactive";
+          return (
+            <span style={{ color: "#374151", fontSize: 13 }}>{status}</span>
+          );
+        },
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        type: "custom",
+        render: (row: any) => {
+          return <div className="d-flex gap-1">
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() => {
+                const id = Number(row?.id);
+                if (!Number.isFinite(id) || id <= 0) return;
+                setEditingProductId(id);
+                setShowCreateProductModal(true);
+              }}
+            >
+              <FiEdit size={16} />
+            </Button>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={() => openProductDeleteModal(row)}
+            >
+              <FiTrash2 size={16} />
+            </Button>
+          </div>;
+        },
       },
     ],
     [handleViewData],
@@ -3305,30 +2928,24 @@ const BillingManagement = () => {
   // Define table actions
   const productsActions: TableAction<any>[] = useMemo(
     () => [
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
+      
             {
               label: "View",
               icon: <Eye size={16} />,
               onClick: (row: any) => handleViewData(row),
               variant: "link" as const,
             },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes("edit-crm-data-management")
-        ? [
             {
               label: "Edit",
               icon: <FiEdit size={16} />,
-              onClick: (row: any) => router.push(`/crm/products/${row.id}/edit`),
+              onClick: (row: any) => {
+                const id = Number(row?.id);
+                if (!Number.isFinite(id) || id <= 0) return;
+                setEditingProductId(id);
+                setShowCreateProductModal(true);
+              },
               variant: "link" as const,
             },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes(
-        "delete-crm-data-management",
-      )
-        ? [
             {
               label: "Delete",
               icon: <Trash2 size={14} />,
@@ -3339,8 +2956,6 @@ const BillingManagement = () => {
               },
               variant: "link" as const,
             },
-          ]
-        : []),
     ],
     [session, router, handleViewData],
   );
@@ -3747,7 +3362,37 @@ const BillingManagement = () => {
             Delete ({selectedItems.length})
           </button>
         )}
-      {session?.user?.permissions?.includes("add-crm-data-management") && (
+
+
+<button
+          onClick={() => {
+            router.push('/billing/products/manage-categories')
+          }}
+          style={{
+            padding: "9px 13px",
+            backgroundColor: "#000000",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "4px",
+            fontSize: "12px",
+            fontWeight: "500",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <Plus size={16} />
+          Manage Categories
+      </button>
+      
+     
         <button
           onClick={() => {
             setShowCreateProductModal(true)
@@ -3775,7 +3420,7 @@ const BillingManagement = () => {
           <Plus size={16} />
           Add Product
         </button>
-      )}
+    
     </div>
   );
 
@@ -4040,8 +3685,10 @@ const BillingManagement = () => {
       const handleCreateProductAndAddAnother = useCallback(() => {
         // TODO: Implement product creation logic
         toast.success("Product created successfully!");
-        // Don't close modal, just reset form or refresh
-      }, []);
+        setCreateProductModalKey((k) => k + 1);
+        fetchCrmData();
+        // Don't close modal, just reset form
+      }, [fetchCrmData]);
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
@@ -4282,183 +3929,6 @@ const BillingManagement = () => {
       /> */}
 
           <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showProspectsAnalytics && (
-              <>
-                {/* Summary Stats Grid - Using KPICard design */}
-                <Row className="mb-2">
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Prospects"
-                      value={totalRecords}
-                      icon={<Users size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllProspectStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Prospects Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Prospects Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
-                </Row>
-
-                <div className="text-center mb-4">
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setShowAllProspectStats(!showAllProspectStats)
-                    }
-                    className="text-decoration-none"
-                  >
-                    {showAllProspectStats ? (
-                      <>
-                        <ArrowUp size={16} className="me-1" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDown size={16} className="me-1" />
-                        Show More Stats
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {/* Filter Bar */}
-            {showFilterBar &&
-              session?.user?.permissions?.includes(
-                "list-crm-data-management",
-              ) && (
-                <FilterBar
-                  quickFilters={[
-                    {
-                      id: "all",
-                      label: "All Prospects",
-                      color: "#0d6efd",
-                      icon: <Users size={16} />,
-                    },
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      color: "#20c997",
-                      icon: <FiCalendar size={16} />,
-                    },
-                    {
-                      id: "has_leads",
-                      label: "Converted to Leads",
-                      color: "#0dcaf0",
-                      icon: <FiTarget size={16} />,
-                    },
-                  ]}
-                  activeFilter={activeFilter}
-                  onFilterChange={handleFilterChange}
-                  // searchValue={prospectsSearch}
-                  // onSearchChange={(value) => {
-                  //   setProspectsSearch(value);
-                  // }}
-                  // onSearch={() =>
-                  //   handleFiltersChange({
-                  //     ...currentFilters,
-                  //     search: prospectsSearch,
-                  //   })
-                  // }
-                  // searchPlaceholder="Search by name or phone..."
-                  // showAdvancedFilters={showAdvancedFilters}
-                  // onToggleAdvancedFilters={() =>
-                  //   setShowAdvancedFilters(!showAdvancedFilters)
-                  // }
-                  // advancedFilterCount={
-                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (prospectsFilters.campaigns !== null &&
-                  //   prospectsFilters.campaigns.length > 0
-                  //     ? 1
-                  //     : 0) +
-                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (prospectsFilters.tags !== null &&
-                  //   prospectsFilters.tags.length > 0
-                  //     ? 1
-                  //     : 0)
-                  // }
-                />
-              )}
-
-            {/* Bulk Actions */}
-            {/* {selectedItems.length > 0 &&
-          session?.user?.permissions?.includes(
-            "delete-crm-data-management"
-          ) && (
-            <div className="d-flex justify-content-end gap-2 mb-3">
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-primary" size="sm">
-                  <CheckSquare size={16} className="me-2" />
-                  Bulk Actions ({selectedItems.length})
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  <Dropdown.Item
-                    onClick={() => {
-                      setDeleteModalMode("bulk");
-                      setShowDeleteModal(true);
-                    }}
-                    className="d-flex align-items-center text-danger"
-                  >
-                    <Trash2 size={14} className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          )} */}
-
             {/* Prospects Table */}
             <div
               className="prospects-table-wrapper"
@@ -4591,1595 +4061,6 @@ const BillingManagement = () => {
             </div>
           </div>
 
-          {/* Upload Modal */}
-          {session?.user?.permissions?.includes("add-crm-data-management") && (
-            <Modal
-              show={showUploadModal}
-              onHide={() => setShowUploadModal(false)}
-              size="lg"
-              centered
-            >
-              <Modal.Header closeButton className="border-bottom bg-light">
-                <Modal.Title>Import Contacts - Prospects</Modal.Title>
-              </Modal.Header>
-              <Modal.Body className="p-4">
-                <div className="alert alert-info mb-4">
-                  <AlertCircleIcon size={18} className="me-2" />
-                  <strong>📋 Import Guidelines:</strong>
-                  <ul className="mb-0 mt-2">
-                    <li>
-                      <strong>Headers:</strong> First row must contain column
-                      headers
-                    </li>
-                    <li>
-                      <strong>Name Column:</strong> Include a "name" column
-                      (case insensitive) for first name and last name, or use
-                      separate "first name" and "last name" columns
-                    </li>
-                    <li>
-                      <strong>Phone Column:</strong> Include a "phone" column
-                      (case insensitive) for contact information. Phone must
-                      follow the E.164 format. (e.g., +14155552671)
-                    </li>
-                    <li>
-                      <strong>Email Column:</strong> Include a "email" column
-                      for contact information. Email must be a valid email
-                      address.
-                    </li>
-                    <li>
-                      <strong>File Size:</strong> Maximum 2MB per file
-                    </li>
-                    <li>
-                      <strong>Formats:</strong> CSV files supported
-                    </li>
-                    <li>
-                      <strong>Data Quality:</strong> Clean, valid data imports
-                      faster and works better
-                    </li>
-                  </ul>
-                </div>
-                <Form>
-                  <Form.Group className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <Form.Label className="fw-semibold mb-0">
-                        Select CSV File <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={downloadExampleCsv}
-                        className="d-flex align-items-center gap-1"
-                      >
-                        <Download size={14} />
-                        Download Example CSV
-                      </Button>
-                    </div>
-                    <Form.Control
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFileInputChange}
-                    />
-                    <Form.Text className="text-muted">
-                      Supported formats: CSV
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      Tags (Optional)
-                    </Form.Label>
-                    <CreatableSelect
-                      isMulti
-                      value={fieldTags}
-                      onChange={(selected) => setFieldTags(selected || [])}
-                      options={availableTags}
-                      placeholder="Add tags to organize and filter this data..."
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#ced4da",
-                          boxShadow: "none",
-                          fontSize: "14px",
-                        }),
-                      }}
-                    />
-                    <Form.Text className="text-muted">
-                      Add descriptive tags to help categorize and filter your
-                      data later. You can create new tags by typing them.
-                    </Form.Text>
-                  </Form.Group>
-                  <div className="alert alert-warning">
-                    <small>
-                      <strong>Note:</strong> The data will be uploaded even if
-                      some fields remain empty.
-                    </small>
-                  </div>
-                </Form>
-              </Modal.Body>
-              <Modal.Footer className="border-top">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowUploadModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={() => handleUpload()}>
-                  <Download size={16} className="me-2" />
-                  Upload & Import
-                </Button>
-              </Modal.Footer>
-            </Modal>
-          )}
-
-          {/* View Data Modal - Redesigned */}
-          {selectedDataItem && (
-            <Modal
-              show={showViewModal}
-              onHide={() => setShowViewModal(false)}
-              size="xl"
-              centered
-              className="prospect-view-modal"
-            >
-              {/* Modern Header with Gradient */}
-              <div
-                style={{
-                  background: "#fff",
-                  color: "black",
-                  padding: "24px 32px",
-                  position: "relative",
-                  borderTopLeftRadius: "12px",
-                  borderTopRightRadius: "12px",
-                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                  borderBottom: "1px solid #ccc",
-                }}
-              >
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    background: "rgba(255,255,255,0.15)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    color: "black",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <X size={18} />
-                </button>
-
-                {/* Header Content */}
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "16px",
-                      background: "#2563eb",
-                      backdropFilter: "blur(10px)",
-                      border: "2px solid rgba(255,255,255,0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "28px",
-                      fontWeight: "700",
-                      flexShrink: 0,
-                      color: "#fff",
-                    }}
-                  >
-                    {selectedDataItem.name
-                      ? selectedDataItem.name.charAt(0).toUpperCase()
-                      : "P"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontWeight: 700,
-                        fontSize: "26px",
-                        textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {selectedDataItem.name ||
-                        `Prospect #${selectedDataItem.id}`}
-                    </h2>
-                    <div
-                      style={{
-                        marginTop: "6px",
-                        opacity: 0.95,
-                        fontSize: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        flexWrap: "wrap",
-                        color: "#000",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <PhoneIcon size={14} />
-                        {selectedDataItem.phone || "No phone"}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Added{" "}
-                        {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
-                          : "N/A"}
-                      </span>
-                      {selectedDataItem.is_viewed && (
-                        <>
-                          <span>•</span>
-                          <Badge
-                            bg="light"
-                            text="dark"
-                            style={{
-                              background: "rgba(255,255,255,0.25)",
-                              border: "1px solid rgba(255,255,255,0.3)",
-                              color: "white",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Viewed
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Modal.Body
-                style={{
-                  padding: 0,
-                  maxHeight: "calc(90vh - 200px)",
-                  overflowY: "auto",
-                }}
-              >
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 360px",
-                    minHeight: "500px",
-                  }}
-                >
-                  {/* Left Panel - Main Information */}
-                  <div
-                    style={{
-                      padding: "32px",
-                      borderRight: "1px solid #e5e7eb",
-                    }}
-                  >
-                    {/* Quick Info Cards */}
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(2, 1fr)",
-                        gap: "16px",
-                        marginBottom: "28px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(102, 126, 234, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <User size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#2563eb",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Assigned Agent
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {selectedDataItem.user_extension
-                                ? extensions.find(
-                                    (extension: any) =>
-                                      extension.id.toString() ===
-                                      selectedDataItem.user_extension?.toString(),
-                                  )?.display_name ||
-                                  selectedDataItem.user_extension
-                                : "Unassigned"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #f093fb30",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(240, 147, 251, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#0284c7",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Target size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#f5576c",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Campaign
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {availableCampaigns.find(
-                                (c) =>
-                                  c.value ===
-                                  selectedDataItem.campaign_id?.toString(),
-                              )?.label || "No Campaign"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact Information Section */}
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Contact Details
-                      </h5>
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "140px 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "#2563eb" }} />
-                            Phone
-                          </div>
-                          <div
-                            style={{
-                              color: "#1f2937",
-                              fontSize: "15px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.phone || "N/A"}
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <Calendar size={16} style={{ color: "#2563eb" }} />
-                            Created
-                          </div>
-                          <div
-                            style={{
-                              color: "#1f2937",
-                              fontSize: "15px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
-                              : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Call Note Section */}
-                    {selectedDataItem?.note && (
-                      <div style={{ marginBottom: "28px" }}>
-                        <h5
-                          style={{
-                            fontSize: "15px",
-                            fontWeight: 700,
-                            color: "#1f2937",
-                            marginBottom: "16px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "4px",
-                              height: "18px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              borderRadius: "2px",
-                            }}
-                          />
-                          Call Notes
-                        </h5>
-                        <div
-                          style={{
-                            background: "#fffbeb",
-                            border: "1px solid #fcd34d",
-                            borderRadius: "12px",
-                            padding: "16px 20px",
-                            fontSize: "14px",
-                            color: "#78350f",
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {selectedDataItem.note}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Custom Data Fields Section */}
-                    {selectedDataItem.data &&
-                      Object.keys(selectedDataItem.data).length > 0 && (
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Additional Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              {Object.entries(selectedDataItem.data).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      {key
-                                        .replace(/_/g, " ")
-                                        .replace(/\b\w/g, (l) =>
-                                          l.toUpperCase(),
-                                        )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {value !== null && value !== undefined
-                                        ? typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : String(value)
-                                        : "N/A"}
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Call Recordings Section */}
-                    <div style={{ marginBottom: "20px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Call Recordings
-                        <Badge
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {callRecordingsTotal > 0
-                            ? callRecordingsTotal
-                            : callRecordings.length}
-                        </Badge>
-                      </h5>
-
-                      {callRecordingsLoading ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Spinner
-                            animation="border"
-                            variant="primary"
-                            size="sm"
-                            style={{ marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{ color: "#6b7280", fontSize: "14px" }}
-                          >
-                            Loading recordings...
-                          </p>
-                        </div>
-                      ) : callRecordings.length === 0 ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            border: "2px dashed #d1d5db",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <History
-                            size={40}
-                            style={{ color: "#9ca3af", marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            No call recordings found
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div style={{ overflowX: "auto" }}>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                              }}
-                            >
-                              <thead>
-                                <tr
-                                  style={{
-                                    background: "#f9fafb",
-                                    borderBottom: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Date & Time
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Extension
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Direction
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Duration
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "center",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      width: "100px",
-                                    }}
-                                  >
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {callRecordings.map(
-                                  (recording: any, index: number) => {
-                                    const duration =
-                                      parseInt(
-                                        recording.Duration?.toString() || "0",
-                                      ) / 10000000 || 0;
-                                    const isDownloading =
-                                      downloadingRecordings.has(recording.Id);
-                                    const progress =
-                                      downloadProgress[recording.Id] || 0;
-                                    const isOutgoing =
-                                      recording.Direction === "CALL_OUTGOING";
-
-                                    return (
-                                      <tr
-                                        key={recording.Id || index}
-                                        style={{
-                                          borderBottom: "1px solid #f3f4f6",
-                                          transition: "background 0.2s ease",
-                                        }}
-                                        onMouseOver={(e) => {
-                                          e.currentTarget.style.background =
-                                            "#f9fafb";
-                                        }}
-                                        onMouseOut={(e) => {
-                                          e.currentTarget.style.background =
-                                            "white";
-                                        }}
-                                      >
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              fontSize: "13px",
-                                              color: "#1f2937",
-                                              fontWeight: 500,
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalDateFormat,
-                                            )}
-                                          </div>
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "#6b7280",
-                                              marginTop: "2px",
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalTimeFormat,
-                                              "YYYY-MM-DD HH:mm:ss.SSSSSSS",
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {recording.AgentExtension || "N/A"}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "6px",
-                                              padding: "4px 10px",
-                                              borderRadius: "6px",
-                                              fontSize: "12px",
-                                              fontWeight: 600,
-                                              background: isOutgoing
-                                                ? "#dbeafe"
-                                                : "#d1fae5",
-                                              color: isOutgoing
-                                                ? "#1e40af"
-                                                : "#065f46",
-                                            }}
-                                          >
-                                            {isOutgoing
-                                              ? "Outgoing"
-                                              : "Incoming"}
-                                          </span>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {formatDuration(duration)}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "8px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          >
-                                            <button
-                                              style={{
-                                                background: "transparent",
-                                                border: "none",
-                                                color: "#2563eb",
-                                                cursor: "pointer",
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                transition: "all 0.2s ease",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}
-                                              title="Play Recording"
-                                              onClick={() =>
-                                                handlePlayCallRecording(
-                                                  recording,
-                                                )
-                                              }
-                                              onMouseOver={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "#ede9fe";
-                                              }}
-                                              onMouseOut={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "transparent";
-                                              }}
-                                            >
-                                              <FiPlay size={16} />
-                                            </button>
-                                            {isDownloading ? (
-                                              <CircularProgressCircle
-                                                progress={progress}
-                                                size="small"
-                                                color="#28a745"
-                                                backgroundColor="#e9ecef"
-                                                textColor="#495057"
-                                                showPercentage={false}
-                                                className="circular-progress-inline"
-                                              />
-                                            ) : (
-                                              <button
-                                                style={{
-                                                  background: "transparent",
-                                                  border: "none",
-                                                  color: "#2563eb",
-                                                  cursor: "pointer",
-                                                  padding: "6px",
-                                                  borderRadius: "6px",
-                                                  transition: "all 0.2s ease",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                                title="Download Recording"
-                                                onClick={() =>
-                                                  handleDownloadCallRecording(
-                                                    recording,
-                                                  )
-                                                }
-                                                onMouseOver={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "#ede9fe";
-                                                }}
-                                                onMouseOut={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "transparent";
-                                                }}
-                                              >
-                                                <Download size={16} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Panel - Quick Actions & Timeline */}
-                  <div
-                    style={{
-                      padding: "32px 24px",
-                      background: "#fafbfc",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                    }}
-                  >
-                    {/* Quick Actions */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Quick Actions
-                      </h6>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle call action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "white" }} />
-                          </div>
-                          Call Prospect
-                        </button>
-
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle message action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Mail size={16} style={{ color: "white" }} />
-                          </div>
-                          Send Message
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Status Overview */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Status Overview
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Status
-                            </span>
-                            <Badge
-                              bg={
-                                selectedDataItem.is_viewed
-                                  ? "success"
-                                  : "primary"
-                              }
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Total Calls
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {callRecordings.length}
-                            </span>
-                          </div>
-
-                          {selectedDataItem.scheduled_call_at && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                paddingTop: "14px",
-                                borderTop: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                <Calendar
-                                  size={14}
-                                  style={{ color: "#2563eb" }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Scheduled Call
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  marginLeft: "22px",
-                                }}
-                              >
-                                {moment(
-                                  selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Activity Timeline */}
-                    <div style={{ flex: 1 }}>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Recent Activity
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                          maxHeight: "300px",
-                          overflowY: "auto",
-                        }}
-                      >
-                        {callRecordings.length > 0 ? (
-                          <div style={{ position: "relative" }}>
-                            {/* Timeline line */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: "7px",
-                                top: "8px",
-                                bottom: "8px",
-                                width: "2px",
-                                background: "#e5e7eb",
-                              }}
-                            />
-
-                            {callRecordings
-                              .slice(0, 5)
-                              .map((recording: any, index: number) => {
-                                const isOutgoing =
-                                  recording.Direction === "CALL_OUTGOING";
-                                return (
-                                  <div
-                                    key={recording.Id || index}
-                                    style={{
-                                      position: "relative",
-                                      paddingLeft: "28px",
-                                      paddingBottom:
-                                        index <
-                                        Math.min(callRecordings.length, 5) - 1
-                                          ? "16px"
-                                          : "0",
-                                    }}
-                                  >
-                                    {/* Timeline dot */}
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        left: "0",
-                                        top: "4px",
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "50%",
-                                        background: isOutgoing
-                                          ? "#2563eb"
-                                          : "#10b981",
-                                        border: "3px solid white",
-                                        boxShadow: "0 0 0 1px #e5e7eb",
-                                      }}
-                                    />
-
-                                    <div>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          color: "#1f2937",
-                                          fontWeight: 600,
-                                          marginBottom: "4px",
-                                        }}
-                                      >
-                                        {isOutgoing
-                                          ? "Outgoing Call"
-                                          : "Incoming Call"}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "11px",
-                                          color: "#6b7280",
-                                        }}
-                                      >
-                                        {moment(recording.DateTime).format(
-                                          "MMM DD, hh:mm A",
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                            {callRecordings.length > 5 && (
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  marginTop: "12px",
-                                  paddingTop: "12px",
-                                  borderTop: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#2563eb",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  +{callRecordings.length - 5} more activities
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "20px",
-                              color: "#9ca3af",
-                            }}
-                          >
-                            <ClockIcon
-                              size={32}
-                              style={{ marginBottom: "8px", opacity: 0.5 }}
-                            />
-                            <div style={{ fontSize: "13px" }}>
-                              No activity yet
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Modal.Body>
-
-              {/* Footer */}
-              <div
-                style={{
-                  padding: "20px 32px",
-                  borderTop: "1px solid #e5e7eb",
-                  background: "white",
-                  borderBottomLeftRadius: "12px",
-                  borderBottomRightRadius: "12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Prospect ID: <strong>#{selectedDataItem.id}</strong>
-                </div>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: "8px",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    border: "2px solid #e5e7eb",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#2563eb";
-                    e.currentTarget.style.color = "#2563eb";
-                    e.currentTarget.style.background = "#eff6ff";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.color = "#6c757d";
-                    e.currentTarget.style.background = "white";
-                  }}
-                >
-                  Close
-                </Button>
-              </div>
-            </Modal>
-          )}
-
-          {/* Audio Player Modal */}
-          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCallHistory(selectedDataItem.id).length})
-                </div>
-                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                  <div style={{
-                    content: '',
-                    position: 'absolute',
-                    left: '8px',
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: '#e5e7eb'
-                  }} />
-                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = callEndReasons.find(
-                      (r) => r.value === call.endReason
-                    );
-                    const dispositionColors: Record<string, string> = {
-                      interested: 'success',
-                      not_interested: 'danger',
-                      callback_requested: 'warning',
-                      no_answer: 'secondary',
-                      busy: 'info',
-                      do_not_call: 'dark',
-                      wrong_number: 'light',
-                      follow_up: 'primary',
-                    };
-                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
-                    const endReasonColor = endReason?.color || 'secondary';
-                    
-                    return (
-                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                        <div style={{
-                          content: '',
-                          position: 'absolute',
-                          left: '-26px',
-                          top: '4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
-                          border: '3px solid white',
-                          boxShadow: '0 0 0 2px #e5e7eb'
-                        }} />
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
-                              <Badge bg={endReasonColor as any} className="me-2">
-                                {endReason?.label || call.endReason}
-                              </Badge>
-                              <Badge bg={dispositionColor as any}>
-                                {call.disposition
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </Badge>
-                            </div>
-                            {call.comment && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
-                                {call.comment}
-                              </div>
-                            )}
-                          </div>
-                          {call.recordingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1"
-                              title="Play Recording"
-                              onClick={() => handlePlayRecording(call.recordingUrl)}
-                            >
-                              <FiPlay size={16} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )} */}
-
           {/* Delete Confirmation Modal (single + bulk) */}
           <DeleteConfirmationModal
             show={showDeleteModal}
@@ -6228,6 +4109,20 @@ const BillingManagement = () => {
                 </div>
               ) : undefined
             }
+          />
+
+          <DeleteConfirmationModal
+            show={showProductDeleteModal}
+            onHide={() => {
+              setShowProductDeleteModal(false);
+              setProductToDelete(null);
+            }}
+            onConfirm={() => {
+              void confirmProductDelete();
+            }}
+            itemName={productToDelete?.name}
+            itemType="product"
+            loading={deletingProduct}
           />
 
           {/* Data Assignment Success Modal */}
@@ -7306,7 +5201,8 @@ const BillingManagement = () => {
                     const id = selectedProspect?.id;
                     if (!id) return;
                     setShowProspectSidebar(false);
-                    router.push(`/crm/products/${id}/edit`);
+                    setEditingProductId(Number(id));
+                    setShowCreateProductModal(true);
                   },
                 },
                 {
@@ -7329,7 +5225,8 @@ const BillingManagement = () => {
                       const id = selectedProspect?.id;
                       if (!id) return;
                       setShowProspectSidebar(false);
-                      router.push(`/crm/products/${id}/edit`);
+                      setEditingProductId(Number(id));
+                      setShowCreateProductModal(true);
                     },
                   },
                 ],
@@ -7350,8 +5247,8 @@ const BillingManagement = () => {
                   },
                   {
                     label: "Price AED",
-                    value: (selectedProspect?.price_aed != null || selectedProspect?.data?.price_aed != null)
-                      ? `AED ${Number(selectedProspect?.price_aed ?? selectedProspect?.data?.price_aed).toLocaleString()}` 
+                    value: (selectedProspect?.base_price != null || selectedProspect?.data?.base_price != null)
+                      ? `AED ${Number(selectedProspect?.base_price ?? selectedProspect?.data?.base_price).toLocaleString()}` 
                       : "N/A",
                     copyable: true,
                   },
@@ -7960,7 +5857,17 @@ const BillingManagement = () => {
        {/* Create Product Modal */}
        {showCreateProductModal && (
         <CreateProductModal
-          onClose={() => setShowCreateProductModal(false)}
+          key={createProductModalKey}
+          productId={editingProductId ?? undefined}
+          onUpdated={() => {
+            setShowCreateProductModal(false);
+            setEditingProductId(null);
+            fetchCrmData();
+          }}
+          onClose={() => {
+            setShowCreateProductModal(false);
+            setEditingProductId(null);
+          }}
           onCreate={handleCreateProduct}
           onCreateAndAddAnother={handleCreateProductAndAddAnother}
         />

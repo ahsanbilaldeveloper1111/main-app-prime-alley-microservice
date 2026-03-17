@@ -27,6 +27,8 @@ interface PaginationWrapper<T> {
   };
 }
 
+type IdLike = number | string;
+
 // Base interfaces for accounting entities
 export interface ResellerData {
   id: number;
@@ -51,7 +53,7 @@ export interface CompanyData {
   reseller_id?: string | null;
   country?: string;
   stripe_customer_id?: string | null;
-  crm_company_id?: number | string | null;
+  crm_company_id?: IdLike | null;
   profile?: {
     id: number;
     company_id: string;
@@ -228,9 +230,9 @@ export interface ExpenseData {
     type: string;
     uploaded_at: string;
   }[];
-  vendor: any | null;
+  vendor: unknown;
   category: ExpenseCategoryData;
-  service: any | null;
+  service: unknown;
   currency: string;
 }
 
@@ -243,7 +245,7 @@ export interface ExpenseCategoryData {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  company?: any | null;
+  company?: unknown;
   expenses?: ExpenseData[];
 }
 
@@ -284,7 +286,7 @@ export interface ProductData {
   deleted_at?: string | null;
   invoice_items?: any[];
   category?: ProductCategoryData;
-  company_pricing?: any | null;
+  company_pricing?: unknown;
 }
 
 export interface ProductCategoryData {
@@ -302,13 +304,16 @@ export interface ProductCategoryData {
 export interface ProductCategoryCreateUpdatePayload {
   name: string;
   description: string;
+  is_active?: boolean;
 }
 
 export interface ProductCreateUpdatePayload {
   name: string;
+  sku?: string;
   description?: string;
   category_id: string;
-  base_price: string;
+  base_price: string | number;
+  is_active?: boolean;
   is_service: boolean;
   currency: string;
 }
@@ -528,7 +533,7 @@ export interface ProductPricingData {
       updated_at: string;
     };
   };
-  discount_applicability: any | null;
+  discount_applicability: unknown;
 }
 
 export interface ProductPricingCreateUpdatePayload {
@@ -537,10 +542,65 @@ export interface ProductPricingCreateUpdatePayload {
   company_id?: number;
 }
 
+export interface CustomerProductPricingCreatePayload {
+  product_id: string;
+  selling_price: string;
+}
+
+export interface CustomerProductPricingListParams extends PaginationParams {
+  search?: string;
+}
+
+export const getCustomerProductPricingList = async (
+  customer: IdLike,
+  params: CustomerProductPricingListParams = {},
+): Promise<ProductPricingData[]> => {
+  try {
+    const response = await axiosInstance.get(
+      `/accounting/customers/${customer}/product-pricing-list`,
+      { params },
+    );
+    return extractData<ProductPricingData[]>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch customer product pricing list");
+    throw error;
+  }
+};
+
+export const createCustomerProductPricing = async (
+  customer: IdLike,
+  data: CustomerProductPricingCreatePayload,
+): Promise<ProductPricingData> => {
+  try {
+    const response = await axiosInstance.post(
+      `/accounting/customers/${customer}/product-pricing-list`,
+      data,
+    );
+    return extractData<ProductPricingData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create customer product pricing");
+    throw error;
+  }
+};
+
+export const deleteCustomerProductPricing = async (
+  customer: IdLike,
+  productId: IdLike,
+): Promise<void> => {
+  try {
+    await axiosInstance.delete(
+      `/accounting/customers/${customer}/product-pricing/${productId}`,
+    );
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete customer product pricing");
+    throw error;
+  }
+};
+
 export interface PaginationParams extends Record<string, any> {
   page?: number;
   per_page?: number;
-  search?: string;
+  limit?: number;
 }
 
 // Helper function to extract data from controlhub response
@@ -883,8 +943,9 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
     const contentDisposition = response.headers['content-disposition'];
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+      const extracted = filenameMatch?.[1];
+      if (extracted) {
+        filename = extracted.replaceAll(/['"]/g, "");
       }
     }
     
@@ -896,15 +957,15 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
       console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
     }
     
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
     
     toast.success('PDF downloaded successfully');
   } catch (error: any) {
@@ -934,8 +995,9 @@ export const downloadExpensePdf = async (id: number): Promise<void> => {
     const contentDisposition = response.headers['content-disposition'];
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+      const extracted = filenameMatch?.[1];
+      if (extracted) {
+        filename = extracted.replaceAll(/['"]/g, "");
       }
     }
     
@@ -947,15 +1009,15 @@ export const downloadExpensePdf = async (id: number): Promise<void> => {
       console.warn('Unexpected blob type:', blob.type, 'Expected: application/pdf');
     }
     
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
     
     toast.success('PDF downloaded successfully');
   } catch (error: any) {
@@ -984,8 +1046,9 @@ export const downloadTemplate = async (): Promise<void> => {
     const contentDisposition = response.headers['content-disposition'];
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '');
+      const extracted = filenameMatch?.[1];
+      if (extracted) {
+        filename = extracted.replaceAll(/['"]/g, "");
       }
     }
     
@@ -994,17 +1057,16 @@ export const downloadTemplate = async (): Promise<void> => {
     
     // Verify blob type
     
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
     
-    // toast.success('PDF downloaded successfully');
   } catch (error: any) {
     console.error('PDF download error:', error);
     toast.error(error?.message || "Failed to download File");
@@ -1207,12 +1269,33 @@ export const downloadFile = async (
 };
 
 
+
+
+export const getProductsWithCompanyPricing = async (
+  companyId?: number,
+  params: PaginationParams = {}
+): Promise<ProductData[]> => {
+  try {
+    const response = await axiosInstance.get(
+      "/accounting/products/with-company-pricing",
+      { params: { ...params, company_id: companyId } }
+    );
+    return extractData<PaginationWrapper<ProductData>>(response.data) as any;
+  } catch (error: any) {
+    toast.error(
+      error?.message || "Failed to fetch products with company pricing"
+    );
+    throw error;
+  }
+};
+
+
 // Product Management
 export const getProducts = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<ProductData>> => {
   try {
-    const response = await axiosInstance.get("/accounting/products", {
+    const response = await axiosInstance.get("/accounting/list-products", {
       params: { ...params },
     });
 
@@ -1253,25 +1336,6 @@ export const getProducts = async (
     };
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch products");
-    throw error;
-  }
-};
-
-
-export const getProductsWithCompanyPricing = async (
-  companyId?: number,
-  params: PaginationParams = {}
-): Promise<ProductData[]> => {
-  try {
-    const response = await axiosInstance.get(
-      "/accounting/products/with-company-pricing",
-      { params: { ...params, company_id: companyId } }
-    );
-    return extractData<PaginationWrapper<ProductData>>(response.data) as any;
-  } catch (error: any) {
-    toast.error(
-      error?.message || "Failed to fetch products with company pricing"
-    );
     throw error;
   }
 };
@@ -1713,6 +1777,92 @@ export interface ApiResponse<T> {
   success: boolean;
 }
 
+export interface CustomerData {
+  id: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  company_id?: number | string | null;
+  crm_company_id?: number | string | null;
+  stripe_customer_id?: string | null;
+  profile?: Record<string, any>;
+}
+
+export interface CustomerCreatePayload {
+  [key: string]: any;
+}
+
+export interface CustomerUpdatePayload {
+  name?: string;
+  [key: string]: any;
+}
+
+export const getCustomers = async (
+  params: PaginationParams = {},
+): Promise<PaginationWrapper<CustomerData>> => {
+  try {
+    const response = await axiosInstance.get("/accounting/customers", { params });
+    return extractData<PaginationWrapper<CustomerData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch customers");
+    throw error;
+  }
+};
+
+export const createCustomer = async (
+  data: CustomerCreatePayload,
+): Promise<CustomerData> => {
+  try {
+    const response = await axiosInstance.post("/accounting/customers", data);
+    return extractData<CustomerData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create customer");
+    throw error;
+  }
+};
+
+export const updateCustomer = async (
+  customer: number | string,
+  data: CustomerUpdatePayload,
+): Promise<CustomerData> => {
+  try {
+    const response = await axiosInstance.post(
+      `/accounting/customers/${customer}`,
+      data,
+    );
+    return extractData<CustomerData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to update customer");
+    throw error;
+  }
+};
+
+export const deleteCustomer = async (
+  customer: number | string,
+): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/accounting/customers/${customer}`);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete customer");
+    throw error;
+  }
+};
+
+export const getCustomer = async (
+  customer: number | string,
+): Promise<CustomerData> => {
+  try {
+    const response = await axiosInstance.get(`/accounting/customers/${customer}`);
+    return extractData<CustomerData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch customer");
+    throw error;
+  }
+};
+
 // Create direct payment function
 export const createDirectPayment = async (data: CreateDirectPaymentData): Promise<PaymentIntentResponse> => {
   try {
@@ -1727,12 +1877,7 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
       // The actual payment intent data should be in response.data.data.data
       // If it's an empty array, we might need to handle this case
       const paymentData = response.data.data;
-      
-      // if (Array.isArray(paymentData) && paymentData.length === 0) {
-      //   // Handle case where data is empty array
-      //   throw new Error("No payment intent data returned from server");
-      // }
-      
+
       return paymentData as PaymentIntentResponse;
     }
     
@@ -1744,3 +1889,5 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
     throw error;
   }
 };
+
+

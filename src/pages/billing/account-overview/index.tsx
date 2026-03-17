@@ -4,114 +4,81 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useState,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-
-import { useState } from 'react';
 import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
-import { ChevronRight, Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp, X, Eye, Send } from 'lucide-react';
-import { formatNumber, GlobalDateFormat, getCompanyByCrmId } from "@utils/Helper";
+import { Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp, X, Eye, Send } from 'lucide-react';
+import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 import countries from "world-countries";
 
-import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments } from "@utils/accounting";
-import { getInvoices } from "@utils/accounts";
+import { GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments, GetCurrencies } from "@utils/accounting";
+import { createCustomer, getCustomer, getInvoices, updateCustomer } from "@utils/accounts";
 import { getMinifiedCompanies } from "@utils/crm";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 import router from "next/router";
 import moment from "moment";
 
-const AccountOverview = () => {
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message || "Unknown error";
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
 
-  const [subscriptions, setSubscriptions] = useState([
-    { 
-      id: 1, 
-      name: 'Veeam Data Platform Essentials', 
-      description: "Vere's leer adicat, on time prcheucing",
-      status: 'Active', 
-      billingCycle: 'Yearly', 
-      renewalStart: '15-Dec-2025',
-      renewalEnd: '15-Dec-2026',
-      price: 'AED 230.73'
-    },
-    { 
-      id: 2, 
-      name: 'Microsoft Defender', 
-      description: "Heres leer adieting on time penesom",
-      status: 'Active', 
-      billingCycle: 'Yearly', 
-      renewalStart: '15-Dec-2025',
-      renewalEnd: '15-Dec-2026',
-      price: 'AED 88.35'
-    },
-    { 
-      id: 3, 
-      name: 'Exchange Online (Plan 2)', 
-      description: "Vere's leer eid Data Microsoft",
-      status: 'Active', 
-      billingCycle: 'Yearly', 
-      renewalStart: '24-Nov-2025',
-      renewalEnd: '24-Nov-2026',
-      price: 'AED 353.92'
-    },
-    { 
-      id: 4, 
-      name: 'Worry Free Services', 
-      description: "Vere's leer anticiency, on time archucing",
-      status: 'Trial', 
-      billingCycle: 'One Time', 
-      renewalStart: '15-Dec-2025',
-      renewalEnd: '15-Dec-2026',
-      price: 'AED 99.04'
-    },
-    { 
-      id: 5, 
-      name: 'Windows Server 2022', 
-      description: "Vere y leer eid Data rignoris",
-      status: 'In Progress', 
-      billingCycle: 'Yearly', 
-      renewalStart: '15-Dov-2025',
-      renewalEnd: '15-Dev-2026',
-      price: 'AED 1,913.60'
-    },
-    { 
-      id: 6, 
-      name: 'Exchange Online Archiving', 
-      description: "Jile a leer ari Data rgroris",
-      status: 'Suspended', 
-      billingCycle: 'Yearly', 
-      renewalStart: '15-Dec-2025',
-      renewalEnd: '15-Dec-2026',
-      price: 'AED 134.85'
-    },
-    { 
-      id: 7, 
-      name: 'UCaaS-Firewall 90G1', 
-      description: "Here's loer tsile ornari",
-      status: 'Active', 
-      billingCycle: 'Yearly', 
-      renewalStart: '24-Nov-2025',
-      renewalEnd: '24-Nov-2025',
-      price: 'AED 600.36'
-    },
-    { 
-      id: 8, 
-      name: 'UCaaS-Firewall', 
-      description: '',
-      status: 'Certiive', 
-      billingCycle: 'One Time', 
-      renewalStart: '15-Dec-2025',
-      renewalEnd: '15-Dov-2026',
-      price: 'AED 504.32'
-    }
-  ]);
+const BILLING_ROUTES = {
+  invoices: "/billing/invoices",
+  subscriptions: "/billing/subscriptions",
+  paymentHistory: "/billing/payment-history",
+  billingSettings: "/settings?tab=billing",
+} as const;
+
+type PaymentMethodCard = {
+  last4?: string;
+  brand?: string;
+  exp_month?: string | number;
+  exp_year?: string | number;
+};
+
+type PaymentMethod = {
+  id?: string | number;
+  is_default?: boolean;
+  card?: PaymentMethodCard;
+};
+
+function PaymentMethodEmptyState({
+  message,
+  buttonText,
+  onAction,
+}: Readonly<{
+  message: string;
+  buttonText: string;
+  onAction: () => void;
+}>) {
+  return (
+    <div className="text-center py-3">
+      <p className="text-muted mb-2" style={{ fontSize: "0.75rem" }}>
+        {message}
+      </p>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={onAction}
+        style={{ fontSize: "0.75rem", padding: "0.35rem 0.7rem" }}
+      >
+        {buttonText}
+      </Button>
+    </div>
+  );
+}
+
+const AccountOverview = () => {
 
   const [billingInfo, setBillingInfo] = useState<any>({
     name: '',
@@ -126,34 +93,163 @@ const AccountOverview = () => {
 
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('');
+  const [customerData, setCustomerData] = useState<any>(null);
+  const [customerCurrency, setCustomerCurrency] = useState<string>("");
+  const [currencyOptions, setCurrencyOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [isLoadingCurrencies, setIsLoadingCurrencies] = useState(false);
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
 
+  const normalizeCurrencyOptions = useCallback((data: any): Array<{ value: string; label: string }> => {
+    let list: any[] = [];
+    if (Array.isArray(data)) list = data;
+    else if (Array.isArray(data?.data)) list = data.data;
 
-  const getCompanyDetails = useCallback(async () => {
+    const out: Array<{ value: string; label: string }> = [];
+    for (const item of list) {
+      if (typeof item === "string" && item.trim()) {
+        out.push({ value: item.trim(), label: item.trim() });
+        continue;
+      }
+      if (item && typeof item === "object") {
+        const code =
+          String(item.code ?? item.currency_code ?? item.currency ?? item.value ?? "").trim();
+        if (!code) continue;
+        const name = String(item.name ?? item.label ?? "").trim();
+        out.push({ value: code, label: name ? `${code} - ${name}` : code });
+      }
+    }
+    const seen = new Set<string>();
+    return out.filter((o) => {
+      const key = o.value;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, []);
+
+  const loadCustomerAndCurrencies = useCallback(async () => {
     if (!selectedCompanyId) return;
-    const response = await GetCompanyDetails({ crm_company_id: selectedCompanyId }) as any;
-    setCompanyDetails(response);
-  }, [selectedCompanyId]);
+    setIsLoadingCustomer(true);
+    try {
+      let existingCustomer: any = await getCustomer(selectedCompanyId);
 
-    useEffect(() => {
-      getCompanyDetails();
-    }, [getCompanyDetails]);
+      if (existingCustomer?.success === false && existingCustomer?.message === "Not Found") {
+        await createCustomer({
+          crm_company_id: selectedCompanyId,
+          profile: { vat_exemption: false },
+        });
+        existingCustomer = await getCustomer(selectedCompanyId);
+      }
+
+      setCustomerData(existingCustomer);
+      const existingCurrency = String(
+        existingCustomer?.profile?.currency ??
+          existingCustomer?.profile?.currency_code ??
+          ""
+      );
+      setCustomerCurrency(existingCurrency);
+      setCompanyDetails(existingCustomer);
+    } catch (err) {
+      toast.error(`Failed to load customer: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_customer_failed",
+      });
+      setCustomerData(null);
+      setCustomerCurrency("");
+    } finally {
+      setIsLoadingCustomer(false);
+    }
+
+    if (currencyOptions.length > 0) return;
+    setIsLoadingCurrencies(true);
+    try {
+      const currencies = await GetCurrencies();
+      const normalized = normalizeCurrencyOptions(currencies);
+      setCurrencyOptions(normalized);
+    } catch (err) {
+      toast.error(`Failed to load currencies: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_load_currencies_failed",
+      });
+      setCurrencyOptions([]);
+    } finally {
+      setIsLoadingCurrencies(false);
+    }
+  }, [selectedCompanyId, currencyOptions.length, normalizeCurrencyOptions]);
+
+  useEffect(() => {
+    void loadCustomerAndCurrencies();
+  }, [loadCustomerAndCurrencies]);
+
+  const isCurrencyLocked = useMemo(() => {
+    const profileCurrency = customerData?.profile?.currency ?? customerData?.profile?.currency_code;
+    if (typeof profileCurrency === "string") return profileCurrency.trim() !== "";
+    return profileCurrency != null;
+  }, [customerData]);
+
+  const handleCurrencyChange = useCallback(
+    async (nextCurrency: string) => {
+      if (isCurrencyLocked) {
+        toast.info("Currency is already set and cannot be changed.", {
+          toastId: "billing_overview_currency_locked",
+        });
+        return;
+      }
+      if (nextCurrency === customerCurrency) return;
+
+      setCustomerCurrency(nextCurrency);
+      if (!selectedCompanyId) return;
+
+      setIsSavingCurrency(true);
+      try {
+        const nextProfile = {  currency: nextCurrency };
+        await updateCustomer(selectedCompanyId, { crm_company_id: selectedCompanyId,profile: nextProfile });
+        toast.success("Customer currency updated");
+
+        try {
+          const refreshedCustomer = await getCustomer(selectedCompanyId);
+          setCustomerData(refreshedCustomer);
+          setCompanyDetails(refreshedCustomer);
+          const refreshedCurrency = String(
+            refreshedCustomer?.profile?.currency ??
+              refreshedCustomer?.profile?.currency_code ??
+              ""
+          );
+          setCustomerCurrency(refreshedCurrency);
+        } catch (refreshErr) {
+          toast.error(`Updated currency, but failed to refresh customer: ${getErrorMessage(refreshErr)}`, {
+            toastId: "billing_overview_refresh_customer_failed",
+          });
+        }
+      } catch (err) {
+        toast.error(`Failed to update currency: ${getErrorMessage(err)}`);
+      } finally {
+        setIsSavingCurrency(false);
+      }
+    },
+    [selectedCompanyId, isCurrencyLocked, customerCurrency]
+  );
 
   useEffect(() => {
     const fetchCompanies = async () => {
-      const result = await getMinifiedCompanies({ send_all: "true" });
-      const list = result ?? [];
-      setCompanies(list);
-      if (list.length > 0 && list[0]?.id != null) {
-        setSelectedCompanyId(list[0].id);
-        setSelectedCompanyName(list[0].name);
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        const list = result ?? [];
+        setCompanies(list);
+        if (list.length > 0 && list[0]?.id != null) {
+          setSelectedCompanyId(list[0].id);
+          setSelectedCompanyName(list[0].name);
+        }
+      } catch (error) {
+        toast.error(`Failed to load companies: ${getErrorMessage(error)}`, {
+          toastId: "billing_overview_load_companies_failed",
+        });
+        setCompanies([]);
       }
     };
     fetchCompanies();
   }, []);
-
-  const apiPayload = selectedCompanyId ? { crm_company_id: selectedCompanyId } : {};
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const getPaymentMethods = useCallback(async () => {
@@ -164,13 +260,16 @@ const AccountOverview = () => {
     try {
       const response = await GetPaymentMethods({ crm_company_id: selectedCompanyId }) as any;
       setPaymentMethods(response?.payment_methods || []);
-    } catch {
+    } catch (error) {
+      toast.error(`Failed to load payment methods: ${getErrorMessage(error)}`, {
+        toastId: "billing_overview_load_payment_methods_failed",
+      });
       setPaymentMethods([]);
     }
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    getPaymentMethods();
+    void getPaymentMethods();
   }, [getPaymentMethods]);
 
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
@@ -183,13 +282,15 @@ const AccountOverview = () => {
       const response = await GetPayments({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setPaymentHistory(response?.dataList || []);
     } catch (error) {
-      console.error('Error fetching payment history:', error);
+      toast.error(`Failed to load payment history: ${getErrorMessage(error)}`, {
+        toastId: "billing_overview_load_payment_history_failed",
+      });
       setPaymentHistory([]);
     }
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    getPaymentHistory();
+    void getPaymentHistory();
   }, [getPaymentHistory]);
 
   const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
@@ -202,13 +303,15 @@ const AccountOverview = () => {
       const response = await getInvoices({ page: 1, per_page: 3, limit: 3, crm_company_id: selectedCompanyId }) as any;
       setRecentInvoices(response?.data || []);
     } catch (error) {
-      console.error('Error fetching recent invoices:', error);
+      toast.error(`Failed to load recent invoices: ${getErrorMessage(error)}`, {
+        toastId: "billing_overview_load_recent_invoices_failed",
+      });
       setRecentInvoices([]);
     }
   }, [selectedCompanyId]);
 
   useEffect(() => {
-    getRecentInvoices();
+    void getRecentInvoices();
   }, [getRecentInvoices]);
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
@@ -239,31 +342,115 @@ const AccountOverview = () => {
     [],
 );
 
+  const [isSavingBillingInfo, setIsSavingBillingInfo] = useState(false);
   const handleSaveBillingInfo = async () => {
-    setShowBillingEditModal(false);
-    //toast.error('Todo: Need api for update billing details');
-    return false;
-    const response = await UpdateCompanyDetails(billingInfo) as any;
-    if(response){
-      toast.success('Billing information updated successfully');
-      setShowBillingEditModal(false);
-    }else{
-      toast.error('Failed to update billing information');
-      setShowBillingEditModal(false);
+    setIsSavingBillingInfo(true);
+    try {
+      const response = await UpdateCompanyDetails(billingInfo);
+      if (response) {
+        toast.success("Billing information updated successfully");
+        setShowBillingEditModal(false);
+        return;
+      }
+      toast.error("Failed to update billing information");
+    } catch (error) {
+      toast.error(`Failed to update billing information: ${getErrorMessage(error)}`);
+    } finally {
+      setIsSavingBillingInfo(false);
     }
   };
 
 
   const [dashboardCounters, setDashboardCounters] = useState<any>(null);
-  useEffect(() => {
-    if(selectedCompanyId){
-      getDashboardCounters(apiPayload);
+  const getDashboardCounters = useCallback(async (crmCompanyId: string | number) => {
+    try {
+      const response = await GetDashboardCounters({ crm_company_id: crmCompanyId }) as any;
+      setDashboardCounters(response);
+    } catch (error) {
+      toast.error(`Failed to load dashboard counters: ${getErrorMessage(error)}`, {
+        toastId: "billing_overview_load_counters_failed",
+      });
+      setDashboardCounters(null);
     }
-  }, [selectedCompanyId]);
-  const getDashboardCounters = async (params: { crm_company_id?: string | number } = {}) => {
-    const response = await GetDashboardCounters(params) as any;
-    setDashboardCounters(response);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      void getDashboardCounters(selectedCompanyId);
+    }
+  }, [selectedCompanyId, getDashboardCounters]);
+
+  const goToInvoices = useCallback(() => {
+    void router.push(BILLING_ROUTES.invoices);
+  }, []);
+
+  const goToBillingSettings = useCallback(() => {
+    void router.push(BILLING_ROUTES.billingSettings);
+  }, []);
+
+  const goToPaymentHistory = useCallback(() => {
+    void router.push(BILLING_ROUTES.paymentHistory);
+  }, []);
+
+  const goToSubscriptions = useCallback(() => {
+    void router.push(BILLING_ROUTES.subscriptions);
+  }, []);
+
+  const paymentMethodContent = useMemo(() => {
+    const methods = (paymentMethods ?? []) as PaymentMethod[];
+    const defaultMethod = methods.find((m) => m?.is_default === true);
+
+    if (defaultMethod?.card) {
+      return (
+        <>
+          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+            <small className="text-muted" style={{ fontSize: "0.75rem" }}>
+              Card
+            </small>
+            <span className="fw-semibold" style={{ fontSize: "0.8rem" }}>
+              •••• {defaultMethod.card.last4}
+            </span>
+          </div>
+
+          <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+            <small className="text-muted" style={{ fontSize: "0.75rem" }}>
+              Card Type
+            </small>
+            <span className="fw-semibold" style={{ fontSize: "0.8rem" }}>
+              {defaultMethod.card.brand}
+            </span>
+          </div>
+
+          <div className="d-flex justify-content-between align-items-center py-1">
+            <small className="text-muted" style={{ fontSize: "0.75rem" }}>
+              Expiry
+            </small>
+            <span className="fw-semibold" style={{ fontSize: "0.8rem" }}>
+              {defaultMethod.card.exp_month}/{defaultMethod.card.exp_year}
+            </span>
+          </div>
+        </>
+      );
+    }
+
+    if (methods.length > 0) {
+      return (
+        <PaymentMethodEmptyState
+          message="No default payment method set"
+          buttonText="Manage Payment Methods"
+          onAction={goToBillingSettings}
+        />
+      );
+    }
+
+    return (
+      <PaymentMethodEmptyState
+        message="No payment method added"
+        buttonText="Add Card"
+        onAction={goToBillingSettings}
+      />
+    );
+  }, [paymentMethods, goToBillingSettings]);
 
 
   
@@ -293,7 +480,9 @@ const AccountOverview = () => {
             </ol>
           </nav>
         </div>
-        <div className="mb-3 mb-md-0">
+        <div className="mb-3 mb-md-0 d-flex align-items-center gap-2">
+
+          
           <Form.Select
             size="sm"
             style={{ width: '220px' }}
@@ -309,6 +498,26 @@ const AccountOverview = () => {
               </option>
             ))}
           </Form.Select>
+
+          {selectedCompanyId ? (
+            <Form.Select
+              size="sm"
+              style={{ width: '220px' }}
+              value={customerCurrency}
+              disabled={isLoadingCustomer || isLoadingCurrencies || isSavingCurrency || isCurrencyLocked}
+              title={isCurrencyLocked ? "Currency is already set and cannot be changed." : undefined}
+              onChange={(e) => void handleCurrencyChange(e.target.value)}
+            >
+              <option value="">
+                {isLoadingCustomer || isLoadingCurrencies ? "Loading currencies..." : "Select currency"}
+              </option>
+              {currencyOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Form.Select>
+          ) : null}
         </div>
       </div>
 
@@ -355,7 +564,7 @@ const AccountOverview = () => {
                 </div>
                 <div className="d-flex gap-2">
                   <Button 
-                    onClick={() => router.push('/billing/invoices')}
+                    onClick={goToInvoices}
                     variant="primary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', fontWeight: '600' }}
@@ -403,7 +612,7 @@ const AccountOverview = () => {
               </div>
               <div className="d-flex justify-content-end">
               <Button 
-                onClick={() => router.push('/billing/invoices')}
+                onClick={goToInvoices}
                     variant="outline-secondary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
@@ -569,62 +778,7 @@ const AccountOverview = () => {
                 <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment Method</h6>
               </div>
 
-              {paymentMethods && paymentMethods.some((method: any) => method.is_default === true) ? (
-                paymentMethods.map((method: any) => (
-                  <div key={method.id}>
-                    {method.is_default === true && (
-                      <>
-                        <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
-                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
-                        </div>
-
-                        <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
-                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                            {method.card?.brand}
-                          </span>
-                        </div>
-
-                        <div className="d-flex justify-content-between align-items-center py-1">
-                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
-                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                            {method.card?.exp_month}/{method.card?.exp_year}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))
-              ) : paymentMethods && paymentMethods.length > 0 ? (
-                <div className="text-center py-3">
-                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>
-                    No default payment method set
-                  </p>
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    onClick={() => router.push('/settings?tab=billing')}
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
-                  >
-                    Manage Payment Methods
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-3">
-                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>
-                    No payment method added
-                  </p>
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    onClick={() => router.push('/settings?tab=billing')}
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
-                  >
-                    Add Card
-                  </Button>
-                </div>
-              )}
+              {paymentMethodContent}
               
               
 
@@ -660,7 +814,7 @@ const AccountOverview = () => {
                   variant="outline-primary" 
                   size="sm" 
                   className="d-flex align-items-center"
-                  onClick={() => router.push('/billing/invoices')}
+                  onClick={goToInvoices}
                   style={{ textDecoration: 'none', fontSize: '0.75rem' }}
                 >
                   <Eye size={12} className="me-1" /> View All
@@ -787,7 +941,7 @@ const AccountOverview = () => {
                   variant="outline-primary" 
                   size="sm" 
                   className="d-flex align-items-center"
-                  onClick={() => router.push('/billing/payment-history')}
+                  onClick={goToPaymentHistory}
                   style={{ textDecoration: 'none', fontSize: '0.75rem' }}
                 >
                   <Eye size={12} className="me-1" /> View All
@@ -807,14 +961,17 @@ const AccountOverview = () => {
                   };
 
                   const getStatusText = () => {
+                    const invoiceNumber = payment.invoice?.invoice_number;
+                    const invoiceSuffix = invoiceNumber ? ` - ${invoiceNumber}` : '';
+
                     if (payment.status === 'completed') {
-                      return `Payment completed${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                      return `Payment completed${invoiceSuffix}`;
                     } else if (payment.status === 'failed') {
-                      return `Payment failed${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                      return `Payment failed${invoiceSuffix}`;
                     } else if (payment.status === 'cancelled') {
-                      return `Payment cancelled${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                      return `Payment cancelled${invoiceSuffix}`;
                     } else {
-                      return `Payment ${payment.status}${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                      return `Payment ${payment.status}${invoiceSuffix}`;
                     }
                   };
 
@@ -858,15 +1015,19 @@ const AccountOverview = () => {
               </div>
               
               <div className="d-flex flex-column gap-2">
-                <div 
-                  className="d-flex align-items-center gap-2 py-2 px-2" 
-                  style={{ 
-                    border: '1px solid #dee2e6', 
+                <button
+                  type="button"
+                  className="d-flex align-items-center gap-2 py-2 px-2"
+                  style={{
+                    border: '1px solid #dee2e6',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    background: 'transparent',
+                    textAlign: 'left',
                   }}
-                  onClick={() => router.push('/billing/invoices')}
+                  onClick={goToInvoices}
+                  aria-label="Invoices status"
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" style={{ 
                     width: '24px', 
@@ -877,41 +1038,49 @@ const AccountOverview = () => {
                     <FileText size={12} style={{ color: '#3b82f6' }} />
                   </div>
                   <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Invoices status</small>
-                </div>
+                </button>
 
-                <div 
-                  className="d-flex align-items-center gap-2 py-2 px-2" 
-                  style={{ 
-                    border: '1px solid #dee2e6', 
+                <button
+                  type="button"
+                  className="d-flex align-items-center gap-2 py-2 px-2"
+                  onClick={goToBillingSettings}
+                  style={{
+                    border: '1px solid #dee2e6',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    background: 'transparent',
+                    textAlign: 'left',
                   }}
-                 
+                  aria-label="Update Payment Method"
                 >
-                  <div className="rounded d-flex align-items-center justify-content-center" 
-                  onClick={() => router.push('/settings?tab=billing')}
-                  style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    flexShrink: 0 
-                  }}>
-                    
+                  <div
+                    className="rounded d-flex align-items-center justify-content-center"
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                      flexShrink: 0,
+                    }}
+                  >
                     <Wallet size={12} style={{ color: '#22c55e' }} />
                   </div>
                   <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Update Payment Method</small>
-                </div>
+                </button>
 
-                <div 
-                  className="d-flex align-items-center gap-2 py-2 px-2" 
-                  onClick={() => router.push('/billing/subscriptions')}
-                  style={{ 
-                    border: '1px solid #dee2e6', 
+                <button
+                  type="button"
+                  className="d-flex align-items-center gap-2 py-2 px-2"
+                  onClick={goToSubscriptions}
+                  style={{
+                    border: '1px solid #dee2e6',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    background: 'transparent',
+                    textAlign: 'left',
                   }}
+                  aria-label="View Subscriptions"
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" style={{ 
                     width: '24px', 
@@ -922,7 +1091,7 @@ const AccountOverview = () => {
                     <Package size={12} style={{ color: '#a855f7' }} />
                   </div>
                   <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>View Subscriptions</small>
-                </div>
+                </button>
               </div>
             </Card.Body>
           </Card>
@@ -1015,7 +1184,11 @@ const AccountOverview = () => {
             <Button variant="outline-secondary" onClick={() => setShowBillingEditModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={() => handleSaveBillingInfo()}>
+            <Button
+              variant="primary"
+              onClick={() => void handleSaveBillingInfo()}
+              disabled={isSavingBillingInfo}
+            >
               Save Changes
             </Button>
           </Modal.Footer>

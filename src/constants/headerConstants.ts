@@ -281,7 +281,8 @@ MENU_COLORS: {
     VIEW_AI_CHAT: 'view-ai-chat-general',
     VIEW_AI_CHAT_MENTIONS: 'view-ai-chat-mentions-general',
     VIEW_AI_CHAT_RESPONSES: 'view-ai-chat-responses-general',
-    VIEW_VIRTUAL_AGENTS:'view-virtual-agents-general',
+    VIEW_VIRTUAL_AGENTS: 'view-virtual-agents-general',
+    VIEW_PRICING_FEATURES: 'view-pricing-general',
     
     //AI chat permissions end
 
