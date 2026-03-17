@@ -7,11 +7,19 @@ export interface CsvExportOptions {
   excludeKeys?: string[];
 }
 
+const isCsvScalar = (value: unknown): value is string | number | boolean => {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+};
+
 export const exportRecordAsCsv = (options: CsvExportOptions): void => {
   const { row, fileName, excludeKeys = [] } = options;
 
   const headers = Object.keys(row).filter(
-    (key) => !excludeKeys.includes(key) && typeof row[key] !== "object",
+    (key) => !excludeKeys.includes(key) && isCsvScalar(row[key]),
   );
 
   const csvRows = [
@@ -20,7 +28,7 @@ export const exportRecordAsCsv = (options: CsvExportOptions): void => {
       .map((header) => {
         const value = row[header];
         if (value == null) return "";
-        if (typeof value === "object") return "";
+        if (!isCsvScalar(value)) return "";
         const stringValue = String(value).replaceAll('"', '""');
         return stringValue.includes(",") || stringValue.includes('"')
           ? `"${stringValue}"`
