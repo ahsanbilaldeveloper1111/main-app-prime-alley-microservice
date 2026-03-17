@@ -34,87 +34,16 @@ import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCti } from "@hooks/useCti";
 import { toast } from "react-toastify";
-
-// ============================================================================
-// SHARED STYLES (LOCAL ONLY, TO REDUCE DUPLICATION)
-// ============================================================================
-
-const sidebarContainerStyle: React.CSSProperties = {
-  backgroundColor: "#f0f0f0",
-  display: "flex",
-  flexDirection: "column",
-  height: "100%",
-  flexShrink: 0,
-  overflowY: "auto",
-};
-
-const sidebarCardStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #cccccc",
-  borderRadius: "10px",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-};
-
-const sectionHeaderRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const chevronTitleRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-};
-
-const ghostActionButtonStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "none",
-  padding: "6px",
-  cursor: "pointer",
-  color: "#141414",
-  display: "flex",
-  alignItems: "center",
-  borderRadius: "3px",
-};
-
-const dropdownItemButtonStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 16px",
-  backgroundColor: "transparent",
-  border: "none",
-  textAlign: "left",
-  fontSize: "14px",
-  color: "#141414",
-  cursor: "pointer",
-};
-
-const quickActionCircleButtonStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "9px 7px",
-  background: "#ffffff",
-  border: "1px solid #8a8a8a",
-  borderRadius: "50%",
-  width: "30px",
-  height: "30px",
-  color: "#141414",
-};
-
-const borderedPillButtonStyle: React.CSSProperties = {
-  padding: "8px 16px",
-  backgroundColor: "transparent",
-  border: "1px solid #cbd5e0",
-  borderRadius: "4px",
-  fontSize: "14px",
-  fontWeight: "500",
-  color: "#141414",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-};
+import {
+  sidebarContainerStyle,
+  sidebarCardStyle,
+  sectionHeaderRowStyle,
+  chevronTitleRowStyle,
+  ghostActionButtonStyle,
+  dropdownItemButtonStyle,
+  quickActionCircleButtonStyle,
+  borderedPillButtonStyle,
+} from "@components/CrmDetailSharedStyles";
 
 // ============================================================================
 // TYPE DEFINITIONS

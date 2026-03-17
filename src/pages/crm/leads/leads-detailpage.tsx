@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  FileText,
   AlertCircle,
 } from "lucide-react";
 import Layout from "@layout/index";
@@ -42,98 +41,16 @@ import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
-
-// ============================================================================
-// SHARED STYLES & SMALL PRESENTATIONAL HELPERS (LOCAL ONLY)
-// ============================================================================
-
-const sidebarContainerStyle: React.CSSProperties = {
-  backgroundColor: "#f0f0f0",
-  display: "flex",
-  flexDirection: "column",
-  height: "100%",
-  flexShrink: 0,
-  overflowY: "auto",
-};
-
-const sidebarCardStyle: React.CSSProperties = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #cccccc",
-  borderRadius: "10px",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-};
-
-const sectionHeaderRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const chevronTitleRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-};
-
-const ghostActionButtonStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "none",
-  padding: "6px",
-  cursor: "pointer",
-  color: "#141414",
-  fontSize: "14px",
-  fontWeight: 500,
-  borderRadius: "3px",
-  transition: "background-color 0.2s",
-};
-
-const dropdownMenuItemStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 16px",
-  backgroundColor: "transparent",
-  border: "none",
-  textAlign: "left",
-  fontSize: "14px",
-  color: "#141414",
-  cursor: "pointer",
-};
-
-const quickActionCircleButtonBaseStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "9px 7px",
-  background: "#ffffff",
-  border: "1px solid #8a8a8a",
-  borderRadius: "50%",
-  width: "30px",
-  height: "30px",
-  color: "#141414",
-};
-
-const borderedPillButtonStyle: React.CSSProperties = {
-  padding: "8px 16px",
-  backgroundColor: "transparent",
-  border: "1px solid #cbd5e0",
-  borderRadius: "4px",
-  fontSize: "14px",
-  fontWeight: "500",
-  color: "#141414",
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-};
-
-const viewAllLinkStyle: React.CSSProperties = {
-  fontSize: "13px",
-  color: "#006162",
-  textDecoration: "none",
-  fontWeight: "500",
-  display: "flex",
-  alignItems: "center",
-  gap: "4px",
-};
+import {
+  sidebarContainerStyle,
+  sidebarCardStyle,
+  sectionHeaderRowStyle,
+  chevronTitleRowStyle,
+  ghostActionButtonStyle,
+  dropdownMenuItemStyle,
+  quickActionCircleButtonBaseStyle,
+  viewAllLinkStyle,
+} from "@components/CrmDetailSharedStyles";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -148,29 +65,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface SubscriptionItem {
-  id: string;
-  name: string;
-  status: "active" | "inactive" | "cancelled";
-  nextBillingDate: string;
-  nextPaymentAmount: string;
-  contactEmail: string;
-  link: string;
-}
-
-interface RevenueSection {
-  id: string;
-  title: string;
-  count: number;
-  description: string;
-  buttonText: string;
-  buttonIcon?: React.ComponentType<{ size?: number }>;
-  items?: SubscriptionItem[];
-  onButtonClick: () => void;
-  addButtonText?: string;
-  onAddClick?: () => void;
-}
 
 // Add this function to toggle activity expansion
 
@@ -615,217 +509,6 @@ const ContactRecordPage: NextPageWithLayout = () => {
   ];
 
   // Intelligence tab is now a shared component (CrmIntelligenceTab)
-
-  const renderRevenueSection = (section: RevenueSection) => {
-    return (
-      <div
-        key={section.id}
-        style={{
-          ...sidebarCardStyle,
-          borderColor: "#eaf0f6",
-          padding: "20px",
-          marginBottom: "16px",
-        }}
-      >
-        {/* Section Header */}
-        <div
-          style={{
-            ...sectionHeaderRowStyle,
-            marginBottom: section.items ? "16px" : "12px",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "16px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
-            {section.title} ({section.count})
-          </h3>
-          {section.addButtonText && (
-            <button
-              onClick={section.onAddClick}
-              style={{
-                padding: "6px 12px",
-                border: "none",
-                fontSize: "14px",
-                color: "#006162",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                cursor: "pointer",
-                backgroundColor: "transparent",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = "none";
-              }}
-            >
-              +{section.addButtonText}
-              <ChevronDown size={14} />
-            </button>
-          )}
-        </div>
-
-        {/* Section Content */}
-        {section.items && section.items.length > 0 ? (
-          <>
-            {/* Subscription Items */}
-            {section.items.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "16px",
-                  backgroundColor: "#f7fafc",
-                  border: "1px solid #eaf0f6",
-                  borderRadius: "5px",
-                  marginBottom: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "10px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <FileText size={18} color="#7c98b6" />
-                  <a
-                    href={item.link}
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: "600",
-                      color: "#006162",
-                      textDecoration: "none",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.textDecoration = "none";
-                    }}
-                  >
-                    {item.name}
-                  </a>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                    fontSize: "14px",
-                  }}
-                >
-                  <div>
-                    <span style={{ color: "#141414" }}>Status: </span>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        color: "#141414",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor:
-                            item.status === "active" ? "#10b981" : "#ef4444",
-                          display: "inline-block",
-                        }}
-                      />
-                      {item.status.charAt(0).toUpperCase() +
-                        item.status.slice(1)}
-                    </span>
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next billing date: {item.nextBillingDate}
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next payment amount: {item.nextPaymentAmount}
-                  </div>
-                  <div>
-                    <span style={{ color: "#141414" }}>Contact email: </span>
-                    <a
-                      href={`mailto:${item.contactEmail}`}
-                      style={{
-                        color: "#006162",
-                        textDecoration: "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = "underline";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = "none";
-                      }}
-                    >
-                      {item.contactEmail}
-                    </a>
-                    <ExternalLink
-                      size={12}
-                      style={{ marginLeft: "4px", display: "inline" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* View All Link */}
-            <button
-              style={borderedPillButtonStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              View all associated {section.title}
-              <ExternalLink size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Empty State */}
-            <p
-              style={{
-                fontSize: "14px",
-                color: "#141414",
-                lineHeight: "1.6",
-                marginBottom: "16px",
-              }}
-            >
-              {section.description}
-            </p>
-
-            {section.buttonText && (
-              <button
-                onClick={section.onButtonClick}
-                style={borderedPillButtonStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {section.buttonIcon && <section.buttonIcon size={16} />}
-                {section.buttonText}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
   // ============================================================================
   // LEFT SIDEBAR (Contact Info)
   // ============================================================================
