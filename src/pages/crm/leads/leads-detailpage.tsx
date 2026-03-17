@@ -44,6 +44,98 @@ import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
 
 // ============================================================================
+// SHARED STYLES & SMALL PRESENTATIONAL HELPERS (LOCAL ONLY)
+// ============================================================================
+
+const sidebarContainerStyle: React.CSSProperties = {
+  backgroundColor: "#f0f0f0",
+  display: "flex",
+  flexDirection: "column",
+  height: "100%",
+  flexShrink: 0,
+  overflowY: "auto",
+};
+
+const sidebarCardStyle: React.CSSProperties = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #cccccc",
+  borderRadius: "10px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+};
+
+const sectionHeaderRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const chevronTitleRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+};
+
+const ghostActionButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "6px",
+  cursor: "pointer",
+  color: "#141414",
+  fontSize: "14px",
+  fontWeight: 500,
+  borderRadius: "3px",
+  transition: "background-color 0.2s",
+};
+
+const dropdownMenuItemStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 16px",
+  backgroundColor: "transparent",
+  border: "none",
+  textAlign: "left",
+  fontSize: "14px",
+  color: "#141414",
+  cursor: "pointer",
+};
+
+const quickActionCircleButtonBaseStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "9px 7px",
+  background: "#ffffff",
+  border: "1px solid #8a8a8a",
+  borderRadius: "50%",
+  width: "30px",
+  height: "30px",
+  color: "#141414",
+};
+
+const viewAllLinkStyle: React.CSSProperties = {
+  fontSize: "13px",
+  color: "#006162",
+  textDecoration: "none",
+  fontWeight: "500",
+  display: "flex",
+  alignItems: "center",
+  gap: "4px",
+};
+
+const borderedPillButtonStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  backgroundColor: "transparent",
+  border: "1px solid #cbd5e0",
+  borderRadius: "4px",
+  fontSize: "14px",
+  fontWeight: "500",
+  color: "#141414",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+};
+
+// ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
@@ -771,31 +863,22 @@ const ContactRecordPage: NextPageWithLayout = () => {
       className="sidebar-scrollbar"
       style={{
         width: "385px",
-        backgroundColor: "#f0f0f0",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        flexShrink: 0,
-        overflowY: "auto",
         marginRight: "10px",
+        ...sidebarContainerStyle,
       }}
     >
       {/* Header Card */}
       <div
         style={{
           padding: "10px 0px",
-          borderRadius: "10px",
-          backgroundColor: "#ffffff",
           marginBottom: "12px",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         {/* Top Bar - Breadcrumb and Actions */}
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             paddingBottom: "10px",
             borderBottom: "1px solid #cccccc",
             paddingLeft: "24px",
@@ -826,17 +909,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
               onClick={() => setShowActionsDropdown(!showActionsDropdown)}
               style={{
                 padding: "6px 14px",
-                backgroundColor: "transparent",
-                border: "none",
                 fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                borderRadius: "3px",
-                transition: "all 0.2s",
+                ...ghostActionButtonStyle,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = "#f5f8fa";
@@ -869,26 +946,17 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   <button
                     key={action}
                     disabled={action === "Export" && exporting}
-            onClick={() => {
-              setShowActionsDropdown(false);
-              if (action === "Edit") {
-                handleOpenEditLead();
-              } else if (action === "Delete") {
-                handleOpenDeleteLead();
-              } else if (action === "Export") {
-                handleOpenExport();
-              }
-            }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
+                    onClick={() => {
+                      setShowActionsDropdown(false);
+                      if (action === "Edit") {
+                        handleOpenEditLead();
+                      } else if (action === "Delete") {
+                        handleOpenDeleteLead();
+                      } else if (action === "Export") {
+                        handleOpenExport();
+                      }
                     }}
+                    style={dropdownMenuItemStyle}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = "#f7fafc";
                     }}
@@ -1085,17 +1153,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   disabled={action.disabled}
                   onClick={action.onClick}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "9px 7px",
-                    background: "#ffffff",
-                    border: "1px solid #8a8a8a",
-                    borderRadius: "50%",
+                    ...quickActionCircleButtonBaseStyle,
                     cursor: action.disabled ? "not-allowed" : "pointer",
-                    width: "30px",
-                    height: "30px",
-                    color: "#141414",
                   }}
                 >
                   <Icon size={20} />
@@ -1125,17 +1184,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
             <button
               onClick={() => setShowMoreActivities(!showMoreActivities)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "9px 7px",
-                background: "#ffffff",
-                border: "1px solid #8a8a8a",
-                borderRadius: "50%",
+                ...quickActionCircleButtonBaseStyle,
                 cursor: "pointer",
-                width: "30px",
-                height: "30px",
-                color: "#141414",
               }}
             >
               <MoreHorizontal size={20} />
@@ -1176,16 +1226,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       setShowMoreActivities(false);
                       onClick();
                     }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
-                    }}
+                    style={dropdownMenuItemStyle}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = "#f7fafc";
                     }}
@@ -1271,19 +1312,15 @@ const ContactRecordPage: NextPageWithLayout = () => {
       {/* Key Information Card */}
       <div
         style={{
-          backgroundColor: "#ffffff",
           borderRadius: "5px",
           marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             padding: "14px 20px",
             cursor: "pointer",
             backgroundColor: "#ffffff",
@@ -1293,7 +1330,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
           onClick={() => toggleSection("key-info")}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={chevronTitleRowStyle}>
             <ChevronDown
               size={18}
               style={{

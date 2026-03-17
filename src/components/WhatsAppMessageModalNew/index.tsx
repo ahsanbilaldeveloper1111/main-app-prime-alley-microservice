@@ -19,6 +19,26 @@ import { ChevronDown, Maximize2, X } from 'lucide-react';
 import { getWhatsAppTemplates } from '@utils/communication';
 import type { WhatsAppTemplateItem } from '@utils/communication';
 
+const sectionBoxStyle: React.CSSProperties = {
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+};
+
+const sectionLabelStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#718096',
+  marginBottom: '8px',
+  fontWeight: '500',
+};
+
+const footerContainerStyle: React.CSSProperties = {
+  padding: '16px 20px',
+  borderTop: '1px solid #e2e8f0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+};
+
 interface WhatsAppMessageModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -136,11 +156,10 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       {/* ── Header ── */}
       <div
         style={{
+          ...sectionBoxStyle,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px 20px',
-          borderBottom: '1px solid #e2e8f0',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -181,7 +200,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
 
       {/* ── Template dropdown ── */}
       <div style={{ padding: '20px', borderBottom: '1px solid #e2e8f0' }}>
-        <div style={{ fontSize: '12px', color: '#718096', marginBottom: '8px', fontWeight: '500' }}>
+        <div style={sectionLabelStyle}>
           Template
         </div>
         <select
@@ -214,7 +233,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       {/* ── Template variables (required) ── */}
       {selectedTemplate && Array.isArray(selectedTemplate.params) && selectedTemplate.params.length > 0 && (
         <div style={{ padding: '0 20px 20px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '8px', fontWeight: '500' }}>
+          <div style={sectionLabelStyle}>
             Template variables (all required)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -260,8 +279,8 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
 
       {/* ── Template content ── */}
       {previewContent && (
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '8px', fontWeight: '500' }}>
+        <div style={sectionBoxStyle}>
+          <div style={sectionLabelStyle}>
             Template content
           </div>
           <div style={{ fontSize: '14px', color: '#141414', whiteSpace: 'pre-wrap' }}>
@@ -272,7 +291,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
 
       {/* ── Associated Records ── */}
       {associatedRecords.length > 0 && (
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={sectionBoxStyle}>
           <div style={{ fontSize: '13px', color: '#718096', fontWeight: '500' }}>
             Associated with {associatedRecords.length} record{associatedRecords.length !== 1 ? 's' : ''}
           </div>
@@ -280,15 +299,7 @@ const WhatsAppMessageModal: React.FC<WhatsAppMessageModalProps> = ({
       )}
 
       {/* ── Footer ── */}
-      <div
-        style={{
-          padding: '16px 20px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-        }}
-      >
+      <div style={footerContainerStyle}>
         <button
           onClick={handleSave}
           disabled={!canSend}
