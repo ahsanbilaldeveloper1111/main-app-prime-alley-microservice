@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import { GetCompanyDetails, GetPaymentMethods } from "@utils/accounting";
 import TopSection from "../Overview/TopSection";
 import { BILLING_PAGE, billingSharedStyles } from "@components/billings/shared/styles";
@@ -68,6 +69,7 @@ function IncludesList({ items }: Readonly<{ items: readonly string[] }>) {
 
 export default function SubscriptionsPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [companyDetails, setCompanyDetails] = useState<any>(null);
   const [paymentMethods, setPaymentMethods] = useState<any>(null);
 
@@ -102,7 +104,17 @@ export default function SubscriptionsPage() {
               <h2 style={styles.sectionHeading}>Subscription Summary</h2>
               <div style={{ display: "flex", gap: 8 }}>
                 <button style={styles.btnDark}>Add seats</button>
-                <button style={styles.btnLight}>View invoices</button>
+                <button
+                  type="button"
+                  style={styles.btnLight}
+                  onClick={() => {
+                    router
+                      .push("/billing/account-billing/billing-history")
+                      .then(() => undefined);
+                  }}
+                >
+                  View invoices
+                </button>
               </div>
             </div>
 
