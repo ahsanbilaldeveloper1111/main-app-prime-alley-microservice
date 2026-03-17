@@ -8,107 +8,15 @@ import {
 } from "@utils/accounts";
 import { getErrorMessage } from "@utils/errors";
 import { toast } from "react-toastify";
-
-const BASE_BUTTON = {
-  cursor: "pointer",
-  transition: "150ms ease-out",
-  display: "inline-block",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  backgroundColor: "rgb(255, 255, 255)",
-  borderColor: "rgb(138, 138, 138)",
-  color: "rgb(20, 20, 20)",
-  textDecoration: "none",
-  borderRadius: "4px",
-  borderWidth: "1px",
-  borderStyle: "solid",
-  verticalAlign: "middle",
-  paddingBlock: "8px",
-  paddingInline: "16px",
-  maxWidth: "100%",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontSize: "12px",
-  fontWeight: 300,
-  letterSpacing: "0px",
-  lineHeight: "14px",
-  textUnderlineOffset: "24%",
-};
-
-const FIELD_LABEL = {
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontSize: "12px",
-  fontWeight: 400,
-  color: "#141414",
-  marginBottom: "6px",
-  display: "block",
-};
-
-const FIELD_INPUT = {
-  height: "42px",
-  width: "100%",
-  border: "1px solid rgb(138, 138, 138)",
-  borderRadius: "4px",
-  padding: "0 12px",
-  fontSize: "14px",
-  fontWeight: 100,
-  color: "#141414",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  outline: "none",
-  boxSizing: "border-box" as const,
-  backgroundColor: "#fff",
-};
-
-const FIELD_TEXTAREA = {
-  width: "100%",
-  border: "1px solid rgb(138, 138, 138)",
-  borderRadius: "4px",
-  padding: "10px 12px",
-  fontSize: "14px",
-  fontWeight: 100,
-  color: "#141414",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  outline: "none",
-  boxSizing: "border-box" as const,
-  resize: "vertical" as const,
-  minHeight: "72px",
-  backgroundColor: "#fff",
-};
-
-const FIELD_SELECT = {
-  height: "42px",
-  width: "100%",
-  border: "1px solid rgb(138, 138, 138)",
-  borderRadius: "4px",
-  padding: "0 36px 0 12px",
-  fontSize: "14px",
-  fontWeight: 100,
-  color: "#141414",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  outline: "none",
-  boxSizing: "border-box" as const,
-  backgroundColor: "#fff",
-  appearance: "none" as const,
-  WebkitAppearance: "none" as const,
-  cursor: "pointer",
-};
-
-const SECTION_CARD = {
-  backgroundColor: "#fff",
-  border: "1px solid #e0e0e0",
-  borderRadius: "8px",
-  padding: "28px 32px",
-  marginBottom: "16px",
-};
-
-const SECTION_TITLE = {
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontSize: "14px",
-  fontWeight: 500,
-  color: "#141414",
-  marginBottom: "24px",
-  marginTop: 0,
-};
+import {
+  BASE_BUTTON,
+  FIELD_INPUT,
+  FIELD_LABEL,
+  FIELD_SELECT,
+  FIELD_TEXTAREA,
+  SECTION_CARD,
+  SECTION_TITLE,
+} from "@components/shared/productModalStyles";
 
 interface CreateProductModalProps {
   onClose: () => void;
