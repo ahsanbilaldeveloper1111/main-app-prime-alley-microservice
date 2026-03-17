@@ -341,7 +341,9 @@ export default function CreateProductModal({
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {isEditMode ? (
             <button
-              onClick={() => void submitProduct("create")}
+              onClick={() => {
+                submitProduct("create").then(() => undefined);
+              }}
               style={{
                 ...BASE_BUTTON,
                 backgroundColor: "#fff",
@@ -358,7 +360,9 @@ export default function CreateProductModal({
           ) : (
             <>
               <button
-                onClick={() => void submitProduct("create_and_add_another")}
+                onClick={() => {
+                  submitProduct("create_and_add_another").then(() => undefined);
+                }}
                 style={{
                   ...BASE_BUTTON,
                   backgroundColor: "transparent",
@@ -377,7 +381,9 @@ export default function CreateProductModal({
               </button>
               <div style={{ position: "relative" }}>
                 <button
-                  onClick={() => void submitProduct("create")}
+                  onClick={() => {
+                    submitProduct("create").then(() => undefined);
+                  }}
                   style={{
                     ...BASE_BUTTON,
                     backgroundColor: "#fff",

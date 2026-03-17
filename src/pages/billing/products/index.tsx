@@ -47,11 +47,7 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { type StatsCardData } from "@components/GenericStatsCards";
 import {
-  getCrmDataById,
-  getAllCrmDataById,
-  createCrmData,
-  updateCrmData,
-  getCrmDataTags,
+
   CrmDataItem,
 } from "@utils/crm";
 import { deleteProduct, getProducts } from "@utils/accounts";
@@ -59,6 +55,26 @@ import { deleteProduct, getProducts } from "@utils/accounts";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+
+let customFieldIdSeq = 0;
+function createCustomFieldId(fieldName: string): string {
+  const w = (globalThis as unknown as { window?: Window }).window;
+  const cryptoObj = w?.crypto;
+
+  if (cryptoObj?.randomUUID) {
+    return `${cryptoObj.randomUUID()}-${fieldName}`;
+  }
+
+  if (cryptoObj?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex}-${fieldName}`;
+  }
+
+  customFieldIdSeq += 1;
+  return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
+}
 import {
   RECORD_TYPES,
 } from "@utils/Helper";
@@ -139,14 +155,6 @@ const BillingManagement = () => {
   const [deletingProduct, setDeletingProduct] = useState(false);
   const [extensions] = useState<any[]>([]);
 
- 
-  const [availableTags, setAvailableTags] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
   const [availableCampaigns] = useState<
     Array<{
       value: string;
@@ -190,7 +198,7 @@ const BillingManagement = () => {
       field_value: string;
     }>,
   });
-  const [createContactLoading, setCreateContactLoading] = useState(false);
+  const [createContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactFormLoadError, setContactFormLoadError] = useState<
     string | null
@@ -259,97 +267,9 @@ const BillingManagement = () => {
     let cancelled = false;
     setContactFormLoadError(null);
     setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
-        if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                  value: t.name ?? t.value ?? String(t.id ?? ""),
-                  label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
-                  id: Number(t.id ?? t.tag_id ?? t.pivot?.tag_id ?? 0),
-                },
-            )
-          : [];
-        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
-        let phoneCountryCode = "";
-        let phoneNumber = item.phone ?? "";
-        if (typeof item.phone === "string" && item.phone.trim()) {
-          try {
-            const normalized = item.phone.replaceAll(/\s/g, "");
-            const parsed = parsePhoneNumberInput(normalized);
-            if (parsed) {
-              phoneCountryCode = `+${parsed.countryCallingCode}`;
-              phoneNumber = parsed.nationalNumber;
-            }
-          } catch {
-            // keep phoneNumber as-is, phoneCountryCode ""
-          }
-        }
-        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
-        const reservedDataKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "disposition",
-          "tags",
-          "note",
-          "contact_owner",
-          "lifecycle_stage",
-          "legal_basis",
-        ]);
-        const customFieldsArray = Object.entries(d)
-          .filter(([k]) => !reservedDataKeys.has(k))
-          .map(([field_name, field_value]) => ({
-            id: `${Date.now()}-${Math.random()}-${field_name}`,
-            field_name,
-            field_value: Array.isArray(field_value)
-              ? (field_value as string[]).join(", ")
-              : String(field_value ?? "").trim(),
-          }))
-          .filter((f) => f.field_name || f.field_value);
-        setContactForm({
-          firstName,
-          lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phone_country_code: phoneCountryCode,
-          phoneNumber,
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
-          note: item.note ?? d.note ?? "",
-          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
-          custom_fields: customFieldsArray,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError("Failed to load prospect");
-          setContactFormLoading(false);
-        }
-      });
+    
     return () => {
-      cancelled = true;
+      
     };
   }, [showCreateContactSidebar, editingContactId]);
 
@@ -426,18 +346,6 @@ const BillingManagement = () => {
     out_of_stock_count: 0,
     total_value: 0,
   });
-
-  // Static tags data
-  const staticTags = [
-    { value: "hot-lead", label: "Hot Lead" },
-    { value: "cold-lead", label: "Cold Lead" },
-    { value: "follow-up", label: "Follow Up" },
-    { value: "interested", label: "Interested" },
-    { value: "not-interested", label: "Not Interested" },
-    { value: "callback", label: "Callback" },
-    { value: "qualified", label: "Qualified" },
-    { value: "unqualified", label: "Unqualified" },
-  ];
 
   // Custom select styles
   const customSelectStyles = {
@@ -540,38 +448,6 @@ const BillingManagement = () => {
     const extensionData = extensions.find((ext) => ext.id === extension);
     return extensionData?.display_name || extensionData?.name || extension;
   }
-
-  
-
-  // Load available tags
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        const tagOptions = tags
-        .filter((tag: any) => tag.id != null)
-        .map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
-        setAvailableTags(tagOptions);
-      } catch (error) {
-        console.error("Failed to load tags:", error);
-        // Fallback to static tags
-        setAvailableTags(
-          staticTags.map((tag) => ({
-            value: tag.value,
-            label: tag.label,
-            id: Number.parseInt(tag.value.replace("tag-", ""), 10) || 0,
-          })),
-        );
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
@@ -761,31 +637,8 @@ const BillingManagement = () => {
         : Number.NaN;
     if (!Number.isFinite(id) || id <= 0) return;
 
-    const token = ++sidebarProspectFetchTokenRef.current;
-    getAllCrmDataById(id)
-      .then((full: any) => {
-        if (sidebarProspectFetchTokenRef.current !== token) return;
-        const record = full?.data ?? null;
-        if (!record) return;
-
-        // Attach audit trail (top-level on the full response) onto the record so
-        // CrmActivitiesPanel can pick it up consistently.
-        const hydrated = {
-          ...record,
-          audit_trail: full?.audit_trail ?? full?.audit_trails ?? undefined,
-          leads: full?.leads ?? undefined,
-          deals: full?.deals ?? undefined,
-        };
-
-        setSelectedProspect((prev: any) => {
-          const prevId = Number(prev?.id);
-          if (!Number.isFinite(prevId) || prevId !== id) return prev;
-          return { ...prev, ...hydrated };
-        });
-      })
-      .catch(() => {
-        // getAllCrmDataById already toasts on error; keep sidebar usable with base row data
-      });
+  
+   
   }, []);
 
   // Backwards-compatible alias used throughout the file
@@ -1066,162 +919,6 @@ const BillingManagement = () => {
     </div>
   );
 
-  // Create prospect (contact) API submit - POST crm/crm-data { name, phone, data }
-  const handleCreateContactSubmit = useCallback(
-    async (addAnother: boolean) => {
-      const name = [contactForm.firstName, contactForm.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-      if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
-        toast.error("Name, email and phone are required");
-        return;
-      }
-      if (contactForm.campaign_id == null) {
-        toast.error("Campaign is required");
-        return;
-      }
-      const sessionUser = session?.user as any;
-      const userExtension = String(sessionUser?.phone ?? "");
-      const assignedTo = userExtension;
-      const uploadedBy = userExtension;
-
-      const phoneForPayload =
-        contactForm.phone_country_code && contactForm.phoneNumber?.trim()
-          ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-          : contactForm.phoneNumber?.trim() ?? "";
-      const customFieldsForPayload = (contactForm.custom_fields ?? [])
-        .map((f) => ({
-          field_name: String(f.field_name ?? "").trim(),
-          field_value: String(f.field_value ?? "").trim(),
-        }))
-        .filter((f) => f.field_name || f.field_value);
-      const dataPayload: Record<string, any> = {
-        email: contactForm.email.trim(),
-        assigned_to: assignedTo,
-        uploaded_by: uploadedBy,
-        disposition: contactForm.disposition || undefined,
-        note: contactForm.note || undefined,
-        contact_owner: contactForm.contact_owner ?? undefined,
-        // lifecycle_stage: contactForm.lifecycle_stage || undefined,
-        legal_basis: contactForm.legal_basis?.length
-          ? contactForm.legal_basis
-          : undefined,
-      };
-      customFieldsForPayload.forEach((f) => {
-        dataPayload[f.field_name] = f.field_value;
-      });
-      setCreateContactLoading(true);
-      try {
-        await createCrmData({
-          name,
-          phone: phoneForPayload,
-          user_extension: userExtension,
-          campaign_id: contactForm.campaign_id ?? null,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source?.trim() || undefined,
-          tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
-          data: dataPayload,
-        });
-        fetchCrmData();
-        setContactForm({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone_country_code: "",
-          phoneNumber: "",
-          campaign_id: null,
-          contact_owner: null,
-          lifecycle_stage: "",
-          disposition: "",
-          legal_basis: [],
-          company_domain: "",
-          scheduled_call_at: "",
-          tags: [],
-          note: "",
-          source: "",
-          custom_fields: [],
-        });
-        if (!addAnother) {
-          setShowCreateContactSidebar(false);
-        }
-      } catch {
-        // Error already shown by createCrmData
-      } finally {
-        setCreateContactLoading(false);
-      }
-    },
-    [contactForm, fetchCrmData, session?.user],
-  );
-
-  const handleUpdateContactSubmit = useCallback(async () => {
-    if (editingContactId == null) return;
-    const name = [contactForm.firstName, contactForm.lastName]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    if (
-      !name ||
-      !contactForm.email?.trim() ||
-      !contactForm.phoneNumber?.trim()
-    ) {
-      toast.error("Name, email and phone are required");
-      return;
-    }
-    if (contactForm.campaign_id == null) {
-      toast.error("Campaign is required");
-      return;
-    }
-    const phoneForPayload =
-      contactForm.phone_country_code && contactForm.phoneNumber?.trim()
-        ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-        : contactForm.phoneNumber?.trim() ?? "";
-    const customFieldsForPayload = (contactForm.custom_fields ?? [])
-      .map((f) => ({
-        field_name: String(f.field_name ?? "").trim(),
-        field_value: String(f.field_value ?? "").trim(),
-      }))
-      .filter((f) => f.field_name || f.field_value);
-    const dataPayload: Record<string, any> = {
-      email: contactForm.email.trim(),
-      disposition: contactForm.disposition || undefined,
-      note: contactForm.note || undefined,
-      contact_owner: contactForm.contact_owner ?? undefined,
-      // lifecycle_stage: contactForm.lifecycle_stage || undefined,
-      legal_basis: contactForm.legal_basis?.length
-        ? contactForm.legal_basis
-        : undefined,
-    };
-    customFieldsForPayload.forEach((f) => {
-      dataPayload[f.field_name] = f.field_value;
-    });
-    setCreateContactLoading(true);
-    try {
-      await updateCrmData(editingContactId, {
-        name,
-        phone: phoneForPayload,
-        campaign_id: contactForm.campaign_id ?? null,
-        company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source?.trim() || undefined,
-        scheduled_call_at: contactForm.scheduled_call_at || undefined,
-        data: dataPayload,
-        tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
-      });
-      fetchCrmData();
-      setShowCreateContactSidebar(false);
-      setEditingContactId(null);
-    } catch {
-      // Error already shown by updateCrmData
-    } finally {
-      setCreateContactLoading(false);
-    }
-  }, [editingContactId, contactForm, fetchCrmData]);
-
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {
     if (!showCreateContactSidebar) return null;
@@ -1245,26 +942,22 @@ const BillingManagement = () => {
         contactFormLoadError={contactFormLoadError}
         availableCampaigns={availableCampaigns}
         extensions={extensions}
-        availableTags={availableTags}
-        parsePhoneNumberInput={parsePhoneNumberInput}
+        availableTags={[]}
+        parsePhoneNumberInput={() => undefined}
+        onSubmitPrimary={() => {
+         
+        }}
         onClose={() => {
           setShowCreateContactSidebar(false);
           setEditingContactId(null);
           setContactFormLoadError(null);
           setContactFormLoading(false);
         }}
-        onSubmitPrimary={() => {
-          if (editingContactId) {
-            handleUpdateContactSubmit();
-          } else {
-            handleCreateContactSubmit(false);
-          }
-        }}
         onCreateAndAddAnother={
           editingContactId
             ? undefined
             : () => {
-                handleCreateContactSubmit(true);
+               
               }
         }
       />
@@ -1552,20 +1245,7 @@ const BillingManagement = () => {
       )}
       onCardClick={(card) => handleViewData(card.raw)}
       onCardMove={(cardId, fromCol, toCol) => {
-        // Optionally call updateCrmData here to persist the lifecycle_stage change
-        const prospect = dataList.find(p => p.id === cardId);
-        if (prospect) {
-          updateCrmData(Number(cardId), {
-            name: prospect.name || "",
-            phone: prospect.phone || "",
-            campaign_id: prospect.campaign_id,
-            data: { ...prospect.data, lifecycle_stage: toCol },
-            scheduled_call_at: prospect.scheduled_call_at || undefined,
-            company_domain: prospect.data?.company_domain || undefined,
-            company_name: prospect.data?.company_name || undefined,
-            source: prospect.data?.source || undefined,
-          });
-        }
+        
       }}
       searchValue={prospectsSearch}
     />
@@ -1582,7 +1262,7 @@ const BillingManagement = () => {
               setProductToDelete(null);
             }}
             onConfirm={() => {
-              void confirmProductDelete();
+              confirmProductDelete().then(() => undefined);
             }}
             itemName={productToDelete?.name}
             itemType="product"

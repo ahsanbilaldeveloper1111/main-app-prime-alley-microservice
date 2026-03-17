@@ -862,7 +862,7 @@ const ProductDetails = () => {
           }
         }}
         onConfirm={() => {
-          void confirmDelete();
+          confirmDelete().then(() => undefined);
         }}
         itemType="subscription"
         itemName={deleteTarget?.name}

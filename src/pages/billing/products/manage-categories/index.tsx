@@ -459,7 +459,7 @@ const ManageCategories = () => {
           if (!deletingCategory) setShowDeleteModal(false);
         }}
         onConfirm={() => {
-          void confirmDeleteCategory();
+          confirmDeleteCategory().then(() => undefined);
         }}
         itemType="category"
         itemName={categoryToDelete?.name}
