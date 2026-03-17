@@ -1473,40 +1473,7 @@ const BillingManagement = () => {
               onChange: (value) => setProspectsSearch(value),
               placeholder: "Search by quote title...",
             },
-            {
-              id: "assignedTo",
-              label: "Owner",
-              type: "select",
-              value: prospectsFilters.assignedTo
-                ? (() => {
-                    const assignedToId = prospectsFilters.assignedTo;
-                    const ext = extensions.find(
-                      (e: any) => (e.id || e.extension) === assignedToId,
-                    );
-                    return ext
-                      ? {
-                          value: assignedToId,
-                          label: ext.display_name || ext.name || assignedToId,
-                        }
-                      : { value: assignedToId, label: assignedToId };
-                  })()
-                : null,
-              onChange: (selected) => {
-                const assignedToValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  assignedTo: assignedToValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: extensions.map((ext: any) => ({
-                value: ext.id || ext.extension,
-                label: ext.display_name || ext.name || ext.id || ext.extension,
-              })),
-              placeholder: "Search and select owner...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
+            
             
           ]}
           onApply={() => {
@@ -1523,9 +1490,6 @@ const BillingManagement = () => {
             }
             if (prospectsFilters.nextCallDateFrom) {
               filtersToApply.last_activity_date = prospectsFilters.nextCallDateFrom;
-            }
-            if (prospectsFilters.sourceFile) {
-              filtersToApply.quote_owner = prospectsFilters.sourceFile;
             }
             if (prospectsFilters.tags) {
               filtersToApply.signing_status = prospectsFilters.tags;
