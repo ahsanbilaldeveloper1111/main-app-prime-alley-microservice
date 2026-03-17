@@ -67,6 +67,20 @@ export default function CreateSubscriptionModal({
   }, []);
 
   const [pricingTab, setPricingTab] = useState("flat");
+
+  const handlePricingTabEnter = useCallback(
+    (tabId: string, e: MouseEvent<HTMLButtonElement>) => {
+      if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#f9f9f9";
+    },
+    [pricingTab],
+  );
+  const handlePricingTabLeave = useCallback(
+    (tabId: string, e: MouseEvent<HTMLButtonElement>) => {
+      if (pricingTab !== tabId) e.currentTarget.style.backgroundColor = "#fff";
+    },
+    [pricingTab],
+  );
+
   const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");
   const [additionalOpen, setAdditionalOpen] = useState(false);
@@ -187,8 +201,8 @@ export default function CreateSubscriptionModal({
           onCreate();
         }
       } catch (e: any) {
-        console.error("Failed to create product:", e);
-        setSubmitError(e?.message || "Failed to create product");
+        console.error("Failed to create subscription:", e);
+        setSubmitError(e?.message || "Failed to create subscription");
       } finally {
         setSubmitting(false);
       }
@@ -207,6 +221,13 @@ export default function CreateSubscriptionModal({
       productType,
       validatePayload,
     ],
+  );
+
+  const handleSubmitMode = useCallback(
+    (mode: "create" | "create_and_add_another") => {
+      submitCreateProduct(mode).then(() => undefined);
+    },
+    [submitCreateProduct],
   );
 
   return (
@@ -241,15 +262,13 @@ export default function CreateSubscriptionModal({
 
         {/* Title */}
         <span style={{ color: "#fff", fontSize: "14px", fontWeight: 400, fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif" }}>
-          Create product
+          Create Subscription
         </span>
 
         {/* Right actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
-            onClick={() => {
-              submitCreateProduct("create_and_add_another").then(() => undefined);
-            }}
+            onClick={() => handleSubmitMode("create_and_add_another")}
             style={{ ...BASE_BUTTON, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
             onMouseEnter={handleDarkBorderEnter}
             onMouseLeave={handleDarkBorderLeave}
@@ -259,9 +278,7 @@ export default function CreateSubscriptionModal({
           </button>
           <div style={{ position: "relative" }}>
             <button
-              onClick={() => {
-                submitCreateProduct("create").then(() => undefined);
-              }}
+              onClick={() => handleSubmitMode("create")}
               style={{ ...BASE_BUTTON, backgroundColor: "#fff", color: "#141414", fontWeight: 400, paddingInline: "20px" }}
               onMouseEnter={handleLightBgEnter}
               onMouseLeave={handleLightBgLeave}
@@ -666,8 +683,8 @@ export default function CreateSubscriptionModal({
                     fontWeight: pricingTab === tab.id ? 400 : 300,
                     color: "#141414",
                   }}
-                  onMouseEnter={e => { if (pricingTab !== tab.id) e.currentTarget.style.backgroundColor = "#f9f9f9"; }}
-                  onMouseLeave={e => { if (pricingTab !== tab.id) e.currentTarget.style.backgroundColor = "#fff"; }}
+                  onMouseEnter={(e) => handlePricingTabEnter(tab.id, e)}
+                  onMouseLeave={(e) => handlePricingTabLeave(tab.id, e)}
                 >
                   {tab.label}
                 </button>
@@ -768,8 +785,8 @@ export default function CreateSubscriptionModal({
                       value={priceAED}
                       onChange={e => setPriceAED(e.target.value)}
                       style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={e => e.target.style.borderColor = "#2d6ae0"}
-                      onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"}
+                      onFocus={handleBorderFocus}
+                      onBlur={handleBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
@@ -779,8 +796,8 @@ export default function CreateSubscriptionModal({
                       value={priceUSD}
                       onChange={e => setPriceUSD(e.target.value)}
                       style={{ ...FIELD_INPUT, border: "1px solid rgb(138,138,138)" }}
-                      onFocus={e => e.target.style.borderColor = "#2d6ae0"}
-                      onBlur={e => e.target.style.borderColor = "rgb(138,138,138)"}
+                      onFocus={handleBorderFocus}
+                      onBlur={handleBorderBlur}
                       placeholder="0.00"
                     />
                   </div>
