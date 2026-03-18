@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement } from "react";
+import React, { useState, useRef, useEffect, ReactElement, useCallback } from "react";
 import { useRouter } from "next/router";
 import {
   ChevronDown,
@@ -17,14 +17,34 @@ import {
   ExternalLink,
 } from "lucide-react";
 import Layout from "@layout/index";
-import { getCompany, type CompanyData, type EnrichmentData } from "@utils/crm";
+import {
+  getCompany,
+  deleteCompany,
+  updateCompany,
+  type CompanyData,
+  type EnrichmentData,
+} from "@utils/crm";
+import {
+  CreateCompanySidebar,
+  type CompanyFormPayload,
+} from "@components/renderCreateCompany";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import moment from "moment-timezone";
-import { usePermissions } from "@utils/permissionUtils";
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCti } from "@hooks/useCti";
 import { toast } from "react-toastify";
+import { exportRecordAsCsv } from "@utils/csvExport";
+import {
+  sidebarContainerStyle,
+  sidebarCardStyle,
+  sectionHeaderRowStyle,
+  chevronTitleRowStyle,
+  ghostActionButtonStyle,
+  dropdownItemButtonStyle,
+  quickActionCircleButtonStyle,
+  borderedPillButtonStyle,
+} from "@components/CrmDetailSharedStyles";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -70,10 +90,6 @@ interface RevenueSection {
 const CompanyDetailPage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id: companyId } = router.query;
-  const { hasPermission } = usePermissions();
-  const canSendWhatsApp = hasPermission(
-    HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM,
-  );
 
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
@@ -108,7 +124,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     const add = (n: string | null | undefined) => {
       const v = (n ?? "").trim();
       if (!v) return;
-      const key = v.replace(/\s/g, "");
+      const key = v.replaceAll(" ", "");
       if (seen.has(key)) return;
       seen.add(key);
       out.push(v);
@@ -151,6 +167,16 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     recordEmail: enrichmentEmail,
     recordPhone: enrichmentPhone,
   });
+
+  const [exporting, setExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<{
+    id: number;
+    name?: string | null;
+  } | null>(null);
+  const [showEditCompanySidebar, setShowEditCompanySidebar] = useState(false);
+  const [editingCompanyForm, setEditingCompanyForm] =
+    useState<CompanyFormPayload | null>(null);
 
   // Load company by ID from URL
   useEffect(() => {
@@ -271,7 +297,6 @@ const CompanyDetailPage: NextPageWithLayout = () => {
   ];
 
   const enrichment = company?.enrichment_data;
-  const struct = enrichment?.structured_data;
   const websiteUrl =
     enrichment?.discovered_website ||
     (company?.domain
@@ -491,9 +516,18 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 {allPhones.length === 0 ? (
                   "--"
                 ) : (
-                  allPhones.map((num, i) => (
-                    <a key={i} href={`tel:${num.replace(/\s/g, "")}`} style={{ color: "#006162", textDecoration: "none" }}>{num}</a>
-                  ))
+                  allPhones.map((num) => {
+                    const normalized = num.replaceAll(" ", "");
+                    return (
+                      <a
+                        key={normalized}
+                        href={`tel:${normalized}`}
+                        style={{ color: "#006162", textDecoration: "none" }}
+                      >
+                        {num}
+                      </a>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -510,10 +544,17 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             <div>
               <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>LinkedIn</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400" }}>
-                {firstLinkedIn !== "--" ? (
-                  <a href={firstLinkedIn} target="_blank" rel="noopener noreferrer" style={{ color: "#006162", textDecoration: "none" }}>{firstLinkedIn}</a>
-                ) : (
+                {firstLinkedIn === "--" ? (
                   "--"
+                ) : (
+                  <a
+                    href={firstLinkedIn}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#006162", textDecoration: "none" }}
+                  >
+                    {firstLinkedIn}
+                  </a>
                 )}
               </div>
             </div>
@@ -608,22 +649,92 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     );
   };
 
+  const handleCompanyExport = useCallback(() => {
+    if (!company) return;
+    const id = company.id ?? companyRecordId;
+    setExporting(true);
+    try {
+      exportRecordAsCsv({
+        row: company as unknown as Record<string, unknown>,
+        fileName: `company_${id}.csv`,
+      });
+      toast.success("Exported company successfully!");
+    } catch (err) {
+      toast.error("Failed to export company");
+      // eslint-disable-next-line no-console
+      console.error("Failed to export company:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, [company, companyRecordId]);
+
+  const handleOpenDeleteCompany = useCallback(() => {
+    if (!companyRecordId || !company) return;
+    setCompanyToDelete({ id: companyRecordId, name: company.name });
+    setShowDeleteModal(true);
+  }, [companyRecordId, company]);
+
+  const confirmDeleteCompany = useCallback(async () => {
+    if (!companyToDelete) return;
+    try {
+      await deleteCompany(companyToDelete.id);
+      setShowDeleteModal(false);
+      setCompanyToDelete(null);
+      router.push("/crm/companies");
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.error("Delete company error:", error);
+    }
+  }, [companyToDelete, router]);
+
+  const handleOpenEditCompany = useCallback(() => {
+    if (!company) return;
+    setEditingCompanyForm({
+      name: company.name ?? "",
+      domain: company.domain ?? "",
+      industry: company.industry ?? "",
+      country: company.country ?? "",
+      city: company.city ?? "",
+      email: company.email ?? "",
+      phone: company.phone ?? "",
+    });
+    setShowEditCompanySidebar(true);
+  }, [company]);
+
+  const handleCompanySave = useCallback(
+    async (data: CompanyFormPayload, id?: number) => {
+      const targetId = id ?? companyRecordId;
+      if (!targetId) return;
+      try {
+        const updated = await updateCompany(targetId, {
+          name: data.name,
+          phone: data.phone,
+          city: data.city,
+          country: data.country,
+          industry: data.industry,
+          domain: data.domain,
+          email: data.email,
+        });
+        setCompany(updated);
+      } catch {
+        // errors/toasts handled in updateCompany
+      }
+    },
+    [companyRecordId],
+  );
+
   const renderRevenueSection = (section: RevenueSection) => (
     <div
       key={section.id}
       style={{
-        backgroundColor: "#ffffff",
-        border: "1px solid #eaf0f6",
-        borderRadius: "5px",
+        ...cardStyle,
         padding: "20px",
         marginBottom: "16px",
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          ...sectionHeaderRowStyle,
           marginBottom: section.items ? "16px" : "12px",
         }}
       >
@@ -750,19 +861,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             </div>
           ))}
           <button
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "transparent",
-              border: "1px solid #cbd5e0",
-              borderRadius: "4px",
-              fontSize: "14px",
-              fontWeight: "500",
-              color: "#141414",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
+            style={borderedPillButtonStyle}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#f7fafc";
             }}
@@ -789,19 +888,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           {section.buttonText && (
             <button
               onClick={section.onButtonClick}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                border: "1px solid #cbd5e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
+              style={borderedPillButtonStyle}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = "#f7fafc";
               }}
@@ -824,29 +911,20 @@ const CompanyDetailPage: NextPageWithLayout = () => {
       className="sidebar-scrollbar"
       style={{
         width: "385px",
-        backgroundColor: "#f0f0f0",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        flexShrink: 0,
-        overflowY: "auto",
         marginRight: "10px",
+        ...sidebarContainerStyle,
       }}
     >
       <div
         style={{
           padding: "10px 0px",
-          borderRadius: "10px",
-          backgroundColor: "#ffffff",
           marginBottom: "12px",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             paddingBottom: "10px",
             borderBottom: "1px solid #cccccc",
             paddingLeft: "24px",
@@ -873,20 +951,16 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           </button>
           <div style={{ position: "relative" }} ref={dropdownRef}>
             <button
-              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
               style={{
                 padding: "6px 14px",
-                backgroundColor: "transparent",
-                border: "none",
                 fontSize: "14px",
                 fontWeight: "500",
-                color: "#141414",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                borderRadius: "3px",
+                ...ghostActionButtonStyle,
               }}
+              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
             >
               Actions
               <ChevronDown size={14} />
@@ -910,19 +984,20 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                 {["Edit", "Delete", "Export"].map((action) => (
                   <button
                     key={action}
-                    onClick={() => setShowActionsDropdown(false)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
+                    disabled={action === "Export" && exporting}
+                    onClick={() => {
+                      if (action === "Edit") {
+                        handleOpenEditCompany();
+                      } else if (action === "Delete") {
+                        handleOpenDeleteCompany();
+                      } else if (action === "Export") {
+                        handleCompanyExport();
+                      }
+                      setShowActionsDropdown(false);
                     }}
+                    style={dropdownItemButtonStyle}
                   >
-                    {action}
+                    {action === "Export" && exporting ? "Exporting..." : action}
                   </button>
                 ))}
               </div>
@@ -1028,17 +1103,8 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                   disabled={action.disabled}
                   onClick={action.onClick}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "9px 7px",
-                    background: "#ffffff",
-                    border: "1px solid #8a8a8a",
-                    borderRadius: "50%",
+                    ...quickActionCircleButtonStyle,
                     cursor: action.disabled ? "not-allowed" : "pointer",
-                    width: "30px",
-                    height: "30px",
-                    color: "#141414",
                   }}
                 >
                   <Icon size={20} />
@@ -1060,17 +1126,8 @@ const CompanyDetailPage: NextPageWithLayout = () => {
             <button
               onClick={() => setShowMoreActivities(!showMoreActivities)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "9px 7px",
-                background: "#ffffff",
-                border: "1px solid #8a8a8a",
-                borderRadius: "50%",
+                ...quickActionCircleButtonStyle,
                 cursor: "pointer",
-                width: "30px",
-                height: "30px",
-                color: "#141414",
               }}
             >
               <MoreHorizontal size={20} />
@@ -1102,16 +1159,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
                       setShowMoreActivities(false);
                       onClick();
                     }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 16px",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      textAlign: "left",
-                      fontSize: "14px",
-                      color: "#141414",
-                      cursor: "pointer",
-                    }}
+                    style={dropdownItemButtonStyle}
                   >
                     {label}
                   </button>
@@ -1125,19 +1173,14 @@ const CompanyDetailPage: NextPageWithLayout = () => {
       {/* Key Information Card */}
       <div
         style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "5px",
           marginBottom: "12px",
           overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
+          ...sidebarCardStyle,
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
+            ...sectionHeaderRowStyle,
             padding: "14px 20px",
             cursor: "pointer",
             backgroundColor: "#ffffff",
@@ -1145,7 +1188,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
           }}
           onClick={() => toggleSection("key-info")}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={chevronTitleRowStyle}>
             <ChevronDown
               size={18}
               style={{
@@ -1540,7 +1583,25 @@ const CompanyDetailPage: NextPageWithLayout = () => {
         {renderMainContent()}
         {renderRightSidebar()}
       </div>
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setCompanyToDelete(null);
+        }}
+        onConfirm={confirmDeleteCompany}
+        itemName={companyToDelete?.name ?? company?.name}
+        itemType="company"
+      />
       {activityModals.modals}
+      {showEditCompanySidebar && (
+        <CreateCompanySidebar
+          onClose={() => setShowEditCompanySidebar(false)}
+          initialData={editingCompanyForm}
+          editingId={companyRecordId || undefined}
+          onSave={handleCompanySave}
+        />
+      )}
     </>
   );
 };

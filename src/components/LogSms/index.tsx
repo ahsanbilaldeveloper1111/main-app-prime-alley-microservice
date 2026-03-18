@@ -37,6 +37,85 @@ import {
 } from 'lucide-react';
 import { generateSms } from '@utils/communication';
 
+// ── Shared styles (local only, to reduce duplication) ─────────────────────────
+
+const modalContainerStyle: React.CSSProperties = {
+  position: 'fixed',
+  height: 'auto',
+  backgroundColor: '#ffffff',
+  zIndex: 1000,
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e0',
+  overflow: 'hidden',
+  animation: 'slideInUp 0.3s ease-out',
+};
+
+const headerContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+};
+
+const iconButtonStyle: React.CSSProperties = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '6px',
+  color: '#141414',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const closeChevronButtonStyle: React.CSSProperties = {
+  ...iconButtonStyle,
+  padding: '4px',
+};
+
+const headerTitleStyle: React.CSSProperties = {
+  fontSize: '16px',
+  fontWeight: 600,
+  color: '#141414',
+  margin: 0,
+};
+
+const smallLabelStyle: React.CSSProperties = {
+  fontSize: '12px',
+  color: '#718096',
+  marginBottom: '6px',
+  fontWeight: '500',
+};
+
+const sectionRowBorderedStyle: React.CSSProperties = {
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  padding: '8px 20px',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: '4px',
+  fontSize: '14px',
+  fontWeight: '500',
+  transition: 'background-color 0.2s',
+};
+
+const dropdownItemButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 16px',
+  backgroundColor: 'transparent',
+  border: 'none',
+  textAlign: 'left',
+  fontSize: '14px',
+  cursor: 'pointer',
+};
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Contact {
@@ -92,6 +171,11 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activityDate, setActivityDate] = useState(formatDateTimeLocal(new Date()));
   const [createTask, setCreateTask] = useState(false);
+  const [taskActivityDate, setTaskActivityDate] = useState('In 3 business days (Wednesday)');
+  const [taskActivityTime, setTaskActivityTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [taskCustomDate, setTaskCustomDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [taskCustomTime, setTaskCustomTime] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [showTaskDatePicker, setShowTaskDatePicker] = useState(false);
   const [isDraftSaved, setIsDraftSaved] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [showContactInput, setShowContactInput] = useState(false);
@@ -103,6 +187,16 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const contactInputRef = useRef<HTMLInputElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const taskDateOptions = [
+    'Today',
+    'Tomorrow',
+    'In 3 business days (Wednesday)',
+    'In 1 week',
+    'In 2 weeks',
+    'In 1 month',
+    'Custom...',
+  ];
 
   // Focus textarea on open
   useEffect(() => {
@@ -133,12 +227,15 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSave = () => {
+    const taskDateToSend = taskActivityDate === 'Custom...' ? taskCustomDate : taskActivityDate;
+    const taskTimeToSend = taskActivityDate === 'Custom...' ? taskCustomTime : taskActivityTime;
+
     onSave({
       message: messageText,
       contacts,
       activityDate,
       createTask,
-      taskDueDate: createTask ? 'In 3 business days (Wednesday)' : undefined,
+      taskDueDate: createTask ? `${taskDateToSend} ${taskTimeToSend}` : undefined,
       attachments: [],
     });
     // Reset state
@@ -146,6 +243,14 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
     setContacts([]);
     setActivityDate(formatDateTimeLocal(new Date()));
     setCreateTask(false);
+    setTaskActivityDate('In 3 business days (Wednesday)');
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const timeStr = now.toTimeString().slice(0, 5);
+    setTaskActivityTime(timeStr);
+    setTaskCustomDate(today);
+    setTaskCustomTime(timeStr);
+    setShowTaskDatePicker(false);
     setIsDraftSaved(false);
     setIsMaximized(false);
     setShowContactInput(false);
@@ -245,24 +350,9 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
     }
   };
 
-  const insertText = (text: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const newText = messageText.substring(0, start) + text + messageText.substring(end);
-    setMessageText(newText);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + text.length, start + text.length);
-    }, 0);
-  };
-
   const handleBold = () => toggleFormatting('**');
   const handleItalic = () => toggleFormatting('*');
   const handleUnderline = () => toggleFormatting('__');
-  const handleStrikethrough = () => toggleFormatting('~~');
-  const handleCode = () => toggleFormatting('`');
 
   const handleLink = () => {
     const textarea = textareaRef.current;
@@ -280,37 +370,6 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
       const urlStart = start + linkText.length + 3;
       textarea.setSelectionRange(urlStart, urlStart + linkUrl.length);
     }, 0);
-  };
-
-  const handleImage = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = messageText.substring(start, end);
-    const altText = selectedText || 'image description';
-    const imageUrl = 'https://';
-    const markdown = `![${altText}](${imageUrl})`;
-    const newText = messageText.substring(0, start) + markdown + messageText.substring(end);
-    setMessageText(newText);
-    setTimeout(() => {
-      textarea.focus();
-      const urlStart = start + altText.length + 4;
-      textarea.setSelectionRange(urlStart, urlStart + imageUrl.length);
-    }, 0);
-  };
-
-  const handleList = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const lines = messageText.substring(0, start).split('\n');
-    const isAtLineStart = lines[lines.length - 1].trim() === '';
-    if (isAtLineStart) {
-      insertText('- ');
-    } else {
-      insertText('\n- ');
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -341,61 +400,35 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   return (
     <div
       style={{
-        position: 'fixed',
+        ...modalContainerStyle,
         inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 0.5vh auto',
-        height: isMaximized ? 'auto' : 'auto',
         width: isMaximized ? 'auto' : '650px',
-        backgroundColor: '#ffffff',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-        borderRadius: '8px',
-        border: '1px solid #cbd5e0',
-        overflow: 'hidden',
-        animation: 'slideInUp 0.3s ease-out',
       }}
     >
       {/* ── Header ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 20px',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
+      <div style={headerContainerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#141414',
-              padding: '4px',
-            }}
+            style={closeChevronButtonStyle}
           >
             <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
           </button>
-          <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+          <h2 style={headerTitleStyle}>
             Send SMS
           </h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
             <Maximize2 size={18} />
           </button>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px', color: '#141414' }}
+            style={iconButtonStyle}
           >
             <X size={20} />
           </button>
@@ -417,7 +450,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             borderRight: '1px solid #e2e8f0',
           }}
         >
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '6px', fontWeight: '500' }}>
+          <div style={smallLabelStyle}>
             Contacted
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', minHeight: '28px' }}>
@@ -495,7 +528,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
 
         {/* Activity date */}
         <div style={{ padding: '12px 20px' }}>
-          <div style={{ fontSize: '12px', color: '#718096', marginBottom: '6px', fontWeight: '500' }}>
+          <div style={smallLabelStyle}>
             Activity date
           </div>
           <div style={{ position: 'relative' }}>
@@ -542,16 +575,16 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
       </div>
 
       {/* ── Generate SMS (AI) ── */}
-      <div
-        style={{
-          padding: '12px 20px',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}
-      >
-        <div style={{ fontSize: '12px', color: '#718096', fontWeight: '500' }}>
+        <div
+          style={{
+            padding: '12px 20px',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+        <div style={{ ...smallLabelStyle, marginBottom: 0 }}>
           Query for AI (optional)
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -632,7 +665,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
         </div>
 
         {/* ── Associated Records ── */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={sectionRowBorderedStyle}>
           <button
             style={{
               background: 'transparent',
@@ -648,7 +681,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             }}
           >
             Associated with {associatedRecords.length > 0 ? associatedRecords.length : 2} record
-            {(associatedRecords.length !== 1) ? 's' : ''}
+            {associatedRecords.length === 1 ? '' : 's'}
             <ChevronDown size={14} />
           </button>
         </div>
@@ -671,42 +704,141 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
               onChange={(e) => setCreateTask(e.target.checked)}
               style={{ width: '16px', height: '16px', cursor: 'pointer' }}
             />
-            <span>
-              Create a{' '}
-              <button
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span>
+                Create a <strong>To-do</strong> task to follow up
+              </span>
+              <div
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#141414',
-                  cursor: 'pointer',
-                  padding: '0 2px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  textDecoration: 'underline',
-                  display: 'inline-flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '2px',
+                  gap: '8px',
+                  position: 'relative',
                 }}
               >
-                To-do
-                <ChevronDown size={12} />
-              </button>{' '}
-              task to follow up{' '}
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#141414',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '13px',
-                  fontWeight: '600',
-                }}
-              >
-                In 3 business days (Wednesday)
-              </button>
-              <ChevronDown size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskDatePicker(!showTaskDatePicker)}
+                    style={{
+                      padding: '4px 0',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#141414',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {taskActivityDate === 'Custom...' ? taskCustomDate : taskActivityDate}
+                    <ChevronDown size={14} />
+                  </button>
+                  {showTaskDatePicker && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        bottom: '100%',
+                        marginBottom: '4px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '5px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        minWidth: '200px',
+                        zIndex: 1001,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {taskDateOptions.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => {
+                            if (option === 'Custom...') {
+                              setTaskActivityDate('Custom...');
+                              setTaskActivityTime(taskCustomTime);
+                              setShowTaskDatePicker(false);
+                            } else {
+                              setTaskActivityDate(option);
+                              setShowTaskDatePicker(false);
+                            }
+                          }}
+                          style={{
+                            ...dropdownItemButtonStyle,
+                            color: '#33475b',
+                            transition: 'background-color 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f7fafc';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="time"
+                    value={taskActivityDate === 'Custom...' ? taskCustomTime : taskActivityTime}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTaskActivityTime(v);
+                      if (taskActivityDate === 'Custom...') {
+                        setTaskCustomTime(v);
+                      }
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '5px',
+                      fontSize: '13px',
+                      color: '#141414',
+                      backgroundColor: '#ffffff',
+                    }}
+                  />
+                </div>
+              </div>
+              {taskActivityDate === 'Custom...' && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginTop: '6px',
+                  }}
+                >
+                  <input
+                    type="date"
+                    value={taskCustomDate}
+                    onChange={(e) => setTaskCustomDate(e.target.value)}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '5px',
+                      fontSize: '13px',
+                      color: '#141414',
+                      backgroundColor: '#ffffff',
+                    }}
+                  />
+                </div>
+              )}
             </span>
           </label>
         </div>
@@ -745,15 +877,9 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
           onClick={handleSave}
           disabled={!messageText.trim()}
           style={{
-            padding: '8px 20px',
+            ...primaryButtonStyle,
             backgroundColor: messageText.trim() ? '#141414' : '#cbd5e0',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '14px',
-            fontWeight: '500',
             cursor: messageText.trim() ? 'pointer' : 'not-allowed',
-            transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
             if (messageText.trim()) e.currentTarget.style.backgroundColor = '#ff6347';
@@ -762,7 +888,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
             if (messageText.trim()) e.currentTarget.style.backgroundColor = '#141414';
           }}
         >
-          Log sms message
+          Send SMS
         </button>
       </div>
     </div>

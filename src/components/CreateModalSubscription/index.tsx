@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import {
   createProduct,
-  getProduct,
+  createCustomerProductPricing,
   getProductCategoriesList,
   type ProductCategoryData,
-  updateProduct,
 } from "@utils/accounts";
-import { getErrorMessage } from "@utils/errors";
-import { toast } from "react-toastify";
 import {
-  BASE_BUTTON
+  BASE_BUTTON,
 } from "@components/shared/productModalStyles";
 import {
   onDarkBorderEnter,
@@ -23,24 +24,21 @@ import { BillingDetailsCard } from "@components/shared/BillingDetailsCard";
 import { PricingConfigurationCard } from "@components/shared/PricingConfigurationCard";
 import { formatAedMargin } from "@components/shared/pricingUtils";
 
-interface CreateProductModalProps {
+interface CreateSubscriptionModalProps {
+  customerId: string | number;
   onClose: () => void;
   onCreate: () => void;
   onCreateAndAddAnother: () => void;
-  /** When provided, modal will load product data and update instead of creating. */
-  productId?: number;
-  /** Optional callback for edit mode. */
-  onUpdated?: () => void;
 }
 
-export default function CreateProductModal({
+export default function CreateSubscriptionModal({
+  customerId,
   onClose,
   onCreate,
   onCreateAndAddAnother,
-  productId,
-  onUpdated,
-}: Readonly<CreateProductModalProps>) {
+}: Readonly<CreateSubscriptionModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
+
   const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");
   const [additionalOpen, setAdditionalOpen] = useState(false);
@@ -59,8 +57,6 @@ export default function CreateProductModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const isEditMode = typeof productId === "number" && Number.isFinite(productId);
-
   const margin = formatAedMargin({ unitCost, priceAed: priceAED });
 
   useEffect(() => {
@@ -73,7 +69,7 @@ export default function CreateProductModal({
       })
       .catch((e) => {
         if (cancelled) return;
-        toast.error(getErrorMessage(e, "Failed to load product categories"));
+        console.error("Failed to load product categories:", e);
         setCategories([]);
       })
       .finally(() => {
@@ -86,41 +82,6 @@ export default function CreateProductModal({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isEditMode) return;
-    let cancelled = false;
-    setSubmitting(true);
-    setSubmitError(null);
-    getProduct(productId)
-      .then((p) => {
-        if (cancelled) return;
-        setProductName(p?.name ?? "");
-        setProductSku((p as { sku?: string }).sku ?? "");
-        setProductDescription(p?.description ?? "");
-        setCategoryId(String(p?.category_id ?? ""));
-        setPriceAED(p?.base_price == null ? "" : String(p.base_price));
-        const currencyCode =
-          (p as { currency_code?: string }).currency_code ?? p?.currency ?? "AED";
-        setCurrency(currencyCode === "USD" ? "USD" : "AED");
-        setProductType(p?.is_service ? "service" : "");
-        const maybeRecord = p as unknown as Record<string, unknown>;
-        const maybeIsActive = maybeRecord["is_active"];
-        if (typeof maybeIsActive === "boolean") setIsActive(maybeIsActive);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        toast.error(getErrorMessage(e, "Failed to load product"));
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setSubmitting(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isEditMode, productId]);
-
   const validatePayload = useCallback((): string | null => {
     if (!productName.trim()) return "Name is mandatory";
     if (!categoryId) {
@@ -131,7 +92,7 @@ export default function CreateProductModal({
     return null;
   }, [categoryId, priceAED, productName, setAdditionalOpen]);
 
-  const submitProduct = useCallback(
+  const submitCreateProduct = useCallback(
     async (mode: "create" | "create_and_add_another") => {
       const validationError = validatePayload();
       if (validationError) {
@@ -142,6 +103,11 @@ export default function CreateProductModal({
       setSubmitting(true);
       setSubmitError(null);
       try {
+        if (customerId === "") {
+          setSubmitError("Please select a company first");
+          return;
+        }
+
         const payload = {
           name: productName.trim(),
           sku: productSku.trim() ? productSku.trim() : undefined,
@@ -152,54 +118,73 @@ export default function CreateProductModal({
           is_service: productType === "service",
           currency,
         };
+        const created = await createProduct(payload);
+        console.log("Created product:", created);
 
-        if (isEditMode) {
-          await updateProduct(productId, payload);
-          toast.success("Product updated successfully!");
-          onUpdated?.();
-          if (!onUpdated) onCreate();
-          return;
+        const createdProductId = created?.id;
+        if (createdProductId == null) {
+          throw new Error("Product created but id is missing");
         }
 
-        await createProduct(payload);
-        toast.success("Product created successfully!");
-        if (mode === "create_and_add_another") onCreateAndAddAnother();
-        else onCreate();
-      } catch (e) {
-        const msg = getErrorMessage(
-          e,
-          isEditMode ? "Failed to update product" : "Failed to create product",
-        );
-        setSubmitError(msg);
+        await createCustomerProductPricing(customerId, {
+          product_id: String(createdProductId),
+          selling_price: String(payload.base_price ?? 0),
+        });
+
+        if (mode === "create_and_add_another") {
+          onCreateAndAddAnother();
+        } else {
+          onCreate();
+        }
+      } catch (e: any) {
+        console.error("Failed to create subscription:", e);
+        setSubmitError(e?.message || "Failed to create subscription");
       } finally {
         setSubmitting(false);
       }
     },
     [
       categoryId,
+      customerId,
       currency,
       isActive,
-      isEditMode,
       onCreate,
       onCreateAndAddAnother,
-      onUpdated,
       priceAED,
       productDescription,
       productName,
       productSku,
-      productId,
       productType,
       validatePayload,
     ],
   );
 
+  const handleSubmitMode = useCallback(
+    (mode: "create" | "create_and_add_another") => {
+      submitCreateProduct(mode).then(() => undefined);
+    },
+    [submitCreateProduct],
+  );
+
   const topBarActions = (
     <>
-      {isEditMode ? (
+      <button
+        onClick={() => handleSubmitMode("create_and_add_another")}
+        style={{
+          ...BASE_BUTTON,
+          backgroundColor: "transparent",
+          borderColor: "rgba(255,255,255,0.35)",
+          color: "#fff",
+        }}
+        onMouseEnter={onDarkBorderEnter}
+        onMouseLeave={onDarkBorderLeave}
+        disabled={submitting}
+      >
+        Create and add another
+      </button>
+      <div style={{ position: "relative" }}>
         <button
-          onClick={() => {
-            submitProduct("create").then(() => undefined);
-          }}
+          onClick={() => handleSubmitMode("create")}
           style={{
             ...BASE_BUTTON,
             backgroundColor: "#fff",
@@ -211,62 +196,18 @@ export default function CreateProductModal({
           onMouseLeave={onLightBgLeave}
           disabled={submitting}
         >
-          Update
+          Create
         </button>
-      ) : (
-        <>
-          <button
-            onClick={() => {
-              submitProduct("create_and_add_another").then(() => undefined);
-            }}
-            style={{
-              ...BASE_BUTTON,
-              backgroundColor: "transparent",
-              borderColor: "rgba(255,255,255,0.35)",
-              color: "#fff",
-            }}
-            onMouseEnter={onDarkBorderEnter}
-            onMouseLeave={onDarkBorderLeave}
-            disabled={submitting}
-          >
-            Create and add another
-          </button>
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => {
-                submitProduct("create").then(() => undefined);
-              }}
-              style={{
-                ...BASE_BUTTON,
-                backgroundColor: "#fff",
-                color: "#141414",
-                fontWeight: 400,
-                paddingInline: "20px",
-              }}
-              onMouseEnter={onLightBgEnter}
-              onMouseLeave={onLightBgLeave}
-              disabled={submitting}
-            >
-              Create
-            </button>
-          </div>
-        </>
-      )}
+      </div>
     </>
-  );
-
-  const subBarLeft = isEditMode ? (
-    <SubBarButton>Edit product</SubBarButton>
-  ) : (
-    <SubBarButton>Create new product</SubBarButton>
   );
 
   return (
     <FullScreenModalShell
-      title="Create product"
+      title="Create Subscription"
       onClose={onClose}
       topBarActions={topBarActions}
-      subBarLeft={subBarLeft}
+      subBarLeft={<SubBarButton>Edit this form</SubBarButton>}
       isActive={isActive}
       onToggleActive={() => setIsActive((v) => !v)}
     >
@@ -287,13 +228,13 @@ export default function CreateProductModal({
         onProductTypeChange={setProductType}
         additionalOpen={additionalOpen}
         onAdditionalOpenChange={setAdditionalOpen}
-        idPrefix="cmp"
+        idPrefix="cms"
       />
 
       <BillingDetailsCard
         billingFrequency={billingFrequency}
         onBillingFrequencyChange={setBillingFrequency}
-        idPrefix="cmp"
+        idPrefix="cms"
       />
 
       <PricingConfigurationCard
@@ -309,7 +250,7 @@ export default function CreateProductModal({
         onUnitCostChange={setUnitCost}
         marginText={margin}
         submitting={submitting}
-        idPrefix="cmp"
+        idPrefix="cms"
       />
 
         {/* Bottom spacing */}
@@ -317,3 +258,4 @@ export default function CreateProductModal({
     </FullScreenModalShell>
   );
 }
+

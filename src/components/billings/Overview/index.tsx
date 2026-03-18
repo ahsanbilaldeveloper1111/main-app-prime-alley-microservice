@@ -222,7 +222,7 @@ const OverviewPage = () => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
               <div>
                 <div style={{ ...styles.label, marginBottom: 4 }}>Billing period</div>
-                <div style={{ fontSize: 14, color: "#141414" }}>1st April 2026 – 30th April 2026 <span className=" text-small text-danger">(Static)</span></div>
+                <div style={{ fontSize: 14, color: "#141414" }}>1st April 2026 – 30th April 2026</div>
               </div>
               <div>
                 <div style={{ ...styles.label, marginBottom: 4 }}>Payment method</div>

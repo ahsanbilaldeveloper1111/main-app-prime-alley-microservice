@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import moment from "moment";
 import type { ToolbarConfig, FilterPill, TabConfig } from "@components/GenericTable";
 
-export type CrmEntityType = "prospects" | "leads" | "deals" | "orders";
+export type CrmEntityType = "prospects" | "leads" | "deals" | "orders" | "approvals";
 
 export interface UseCrmToolbarConfigOptions {
   entity: CrmEntityType;
@@ -22,7 +22,7 @@ export interface UseCrmToolbarConfigOptions {
   activeTab: string;
   onTabChange: (tabId: string) => void;
   tabs: TabConfig[];
-  onTabAdd: () => void;
+  onTabAdd?: () => void;
   onTabRemove: (tabId: string) => void;
   tabsDropdownLabel: string;
 
@@ -158,7 +158,14 @@ export function useCrmToolbarConfig(
     const pills: FilterPill[] = [];
 
     // Owner / Associate pill (all entities)
-    const ownerLabel = entity === "prospects" || entity === "leads" || entity === "deals" || entity === "orders" ? "Owner" : "Associate with";
+    const ownerLabel =
+      entity === "prospects" ||
+      entity === "leads" ||
+      entity === "deals" ||
+      entity === "orders" ||
+      entity === "approvals"
+        ? "Owner"
+        : "Associate with";
     const ownerFilterKey = entity === "prospects" ? "user_extension" : "assigned_to";
 
     const isOwnerArray = entity === "prospects";
@@ -197,7 +204,12 @@ export function useCrmToolbarConfig(
       id: "contact_owner",
       label: ownerLabel,
       showDropdown: true,
-      searchable: entity === "prospects" || entity === "leads" || entity === "deals" || entity === "orders",
+      searchable:
+        entity === "prospects" ||
+        entity === "leads" ||
+        entity === "deals" ||
+        entity === "orders" ||
+        entity === "approvals",
       active: !!hasOwnerFilter,
       activeLabel: ownerActiveLabel,
       onClear: clearOwner,

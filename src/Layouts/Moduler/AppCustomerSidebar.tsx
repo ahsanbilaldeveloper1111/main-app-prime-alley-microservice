@@ -22,7 +22,6 @@ import {
   X,
   UserSearch,
   Handshake,
-  Scroll,
   ReceiptText,
   Activity,
   Contact,
@@ -664,15 +663,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       
         //outbound start
         {
-          id: 'voicebot-outbound-trunks',
-          title: 'Outbound - Trunks',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/outbound/trunks'
-        },
-        {
           id: 'voicebot-outbound-voicebots',
-          title: 'Outbound - Bots',
+          title: 'Outbound Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
           url: '/voicebot/outbound/voicebots'
@@ -680,21 +672,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         
         {
           id: 'voicebot-outbound-campaigns',
-          title: 'Outbound - Campaigns',
+          title: 'Campaigns',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_AGENT_CAMPAIGNS_AIML,
           url: '/voicebot/outbound/campaigns'
         },
         {
           id: 'voicebot-outbound-reports',
-          title: 'Outbound - Reports',
+          title: 'Reports',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/reports'
         },
         {
           id: 'voicebot-outbound-analytics',
-          title: 'Outbound - Analytics',
+          title: 'Analytics',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/outbound/analytics'
@@ -711,21 +703,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         //inbound start
         {
           id: 'voicebot-inbound-dashboard',
-          title: 'Inbound - Dashboard',
+          title: 'Inbound Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/dashboard'
         },
         {
           id: 'voicebot-inbound-companies',
-          title: 'Inbound - Companies',
+          title: 'Companies',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/companies'
         },
         {
           id: 'voicebot-inbound-bots',
-          title: 'Inbound - Bots',
+          title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/voicebot/inbound/bots'
@@ -733,14 +725,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         
         {
           id: 'voicebot-inbound-calls',
-          title: 'Inbound - Conversations',
+          title: 'Conversations',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/conversations'
         },
         {
           id: 'voicebot-inbound-analytics',
-          title: 'Inbound - Analytics',
+          title: 'Analytics',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.AI_ML_SERVICES,
           url: '/voicebot/inbound/analytics'
@@ -769,13 +761,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
           url: '/agents/analytics'
-        },
-        {
-          id: 'virtual-agents-usage-reports',
-          title: 'Usage Reports',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_USAGE_REPORTS_AIML,
-          url: '/agents/usage-reports'
         }
       ]
     },
@@ -982,69 +967,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: 'Billing',
       url: '',
       subItems: [
-        // { 
-        //   id: 'finance-dashboard', 
-        //   title: 'Dashboard', 
-        //   icon: <LayoutDashboard size={16} />, 
-        //   url: '/billing/dashboard', 
-        //   permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
-        // },
-        // { 
-        //   id: 'finance-account-overview', 
-        //   title: 'Account Overview', 
-        //   icon: <Eye size={16} />, 
-        //   url: '/billing/account-overview', 
-        //   permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
-        // },
-        // { 
-        //   id: 'finance-subscriptions', 
-        //   title: 'Subscriptions', 
-        //   icon: <ShoppingBag size={16} />, 
-        //   url: '/billing/subscriptions', 
-        //   permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
-        // },
-        // { 
-        //   id: 'finance-order-invoicing', 
-        //   title: 'Order Invoicing', 
-        //   icon: <ShoppingBag size={16} />, 
-        //   url: '/billing/order-invoicing', 
-        //   permission: PERMISSIONS.VIEW_ORDER_INVOICES_BILLING 
-        // },
-        
-        // { 
-        //   id: 'finance-payment-history', 
-        //   title: 'Payment History', 
-        //   icon: <FileText size={16} />, 
-        //   url: '/billing/payment-history', 
-        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
-        // },
-        // {
-        //   id: 'finance-separator-1',
-        //   title: '---',
-        //   icon: null,
-        //   url: ''
-        // },
-        // { 
-        //   id: 'finance-quotes', 
-        //   title: 'Quotes', 
-        //   icon: <Scroll size={16} />, 
-        //   url: '/billing/quotes', 
-        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
-        // },
-        // { 
-        //   id: 'finance-invoices', 
-        //   title: 'Invoices', 
-        //   icon: <DollarSign size={16} />, 
-        //   url: '/billing/invoices', 
-        //   permission: PERMISSIONS.VIEW_INVOICES_BILLING 
-        // },
-        // { 
-        //   id: 'finance-products', 
-        //   title: 'Products', 
-        //   icon: <ShoppingBag size={16} />, 
-        //   url: '/billing/products', 
-        //   permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
-        // },
         { 
           id: 'finance-account-overview', 
           title: 'Overview', 
@@ -1053,13 +975,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
         
-        { 
-          id: 'finance-quotes', 
-          title: 'Quotes', 
-          icon: <Scroll size={16} />, 
-          url: '/billing/quotes', 
-          permission: PERMISSIONS.VIEW_CRM_QUOTES 
-        },
+       
         
         { 
           id: 'finance-products', 
@@ -1067,6 +983,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <ShoppingBag size={16} />, 
           url: '/billing/products', 
           permission: PERMISSIONS.VIEW_PRODUCTS_BILLING 
+        },
+
+        { 
+          id: 'finance-quotation', 
+          title: 'Quotation', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/quotes', 
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
+        },
+        { 
+          id: 'finance-orders', 
+          title: 'Sales Orders', 
+          icon: <ShoppingBag size={16} />, 
+          url: '/billing/order-invoicing', 
+          permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
         },
         
         { 
@@ -1097,7 +1028,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-transactions', 
           title: 'Transactions', 
           icon: <FileText size={16} />, 
-          url: '', 
+          url: '/billing/transactions', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))

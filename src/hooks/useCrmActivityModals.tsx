@@ -5,6 +5,7 @@
  */
 import React, { useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import { createCrmNote, createMeeting, createTask } from "@utils/crm";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import NotesModal from "@components/NotesModal";
@@ -64,6 +65,7 @@ export function useCrmActivityModals({
   onMeetingScheduled,
 }: UseCrmActivityModalsParams): UseCrmActivityModalsReturn {
   const { data: session } = useSession();
+  const router = useRouter();
   const userEmail =
     (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
   const userName =
@@ -336,11 +338,12 @@ export function useCrmActivityModals({
               : undefined,
         });
         setShowWhatsAppModal(false);
+        router.push(`/crm/inbox?phone=${encodeURIComponent(number)}`);
       } catch {
         // sendWhatsApp shows toast on error
       }
     },
-    [recordPhone],
+    [recordPhone, router],
   );
 
   const modals = (

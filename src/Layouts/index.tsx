@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationCustomerSidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Moduler/AppCustomerSidebar';
 import { useSession } from "next-auth/react";
-import { useNotifications, NotificationItem } from '../contexts/NotificationContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { useDialerModal } from '../contexts/DialerModalContext';
 import NotificationsSidebar from '@components/Notificationssidebar';
@@ -36,6 +36,8 @@ import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
 import CreateLeadModal from '@components/CreateLeadModal';
 import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
 import { createCompany } from '@utils/crm';
+import { toast } from "react-toastify";
+import { getErrorMessage } from "@utils/errors";
 
 interface LayoutProps {
 	children: ReactNode;
@@ -71,7 +73,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const router = useRouter();
 	const { data: session, status } = useSession();
   const { logout } = useAuth();
-	const { notifications, unreadCount } = useNotifications();
+	const { unreadCount } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
   const { 
 		isInitialized, 
@@ -193,113 +195,22 @@ const Layout = ({ children }: LayoutProps) => {
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, []);
 
-	const formatTimeAgo = (date: Date) => {
-		try {
-			const now = new Date();
-			const diffMs = now.getTime() - date.getTime();
-			const diffMins = Math.floor(diffMs / 60000);
-			const diffHours = Math.floor(diffMs / 3600000);
-			const diffDays = Math.floor(diffMs / 86400000);
-
-			if (diffMins < 1) return 'Just now';
-			if (diffMins < 60) return `${diffMins} min ago`;
-			if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-			if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-			return date.toLocaleDateString();
-		} catch {
-			return 'Just now';
-		}
-	};
-
-	const getDummyNotifications = (): NotificationItem[] => {
-		const now = new Date();
-		const twoMinutesAgo = new Date(now.getTime() - 2 * 60000);
-		const oneHourAgo = new Date(now.getTime() - 60 * 60000);
-		const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60000);
-
-		return [
-			{
-				id: 'dummy-1',
-				title: 'New deal created',
-				body: "A new deal has been added to your pipeline.",
-				description: "A new deal has been added to your pipeline.",
-				module: 'CRM',
-				timestamp: twoMinutesAgo,
-				read: false,
-				icon: undefined,
-			},
-			{
-				id: 'dummy-2',
-				title: 'Meeting reminder',
-				body: "You have a meeting in 30 minutes.",
-				description: "You have a meeting in 30 minutes.",
-				timestamp: oneHourAgo,
-				read: false,
-			},
-			{
-				id: 'dummy-3',
-				title: 'Task completed',
-				body: 'Your task has been marked as complete.',
-				description: 'Your task has been marked as complete.',
-				timestamp: twelveHoursAgo,
-				read: true,
-			},
-		];
-	};
-
-	const groupNotificationsByDate = () => {
-		const now = new Date();
-		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-		const yesterday = new Date(today);
-		yesterday.setDate(yesterday.getDate() - 1);
-
-		const allNotifications = [...notifications, ...getDummyNotifications()];
-
-		const groups: { [key: string]: NotificationItem[] } = {
-			today: [],
-			yesterday: [],
-			older: []
-		};
-
-		allNotifications.forEach(notification => {
-			const notifDate = new Date(notification.timestamp);
-			if (notifDate >= today) {
-				groups.today.push(notification);
-			} else if (notifDate >= yesterday) {
-				groups.yesterday.push(notification);
-			} else {
-				groups.older.push(notification);
-			}
-		});
-
-		return groups;
-	};
-
 	const totalUnreadCount = unreadCount;
 
   const [loggedInName, setLoggedInName] = useState('');
   const [loggedInCompanyName, setLoggedInCompanyName] = useState('');
-  
-	const [loggedInUserRole, setLoggedInUserRole] = useState('');
-	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
 	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
 
 	useEffect(() => {
 		if (status !== "loading" && session?.user) {
-		  if (typeof window !== "undefined") {
-		    setLoggedInName(session.user.name ?? '');
-		    setLoggedInCompanyName(session.user.company_name ?? '');
-		    setLoggedInUserUsername(session.user.username ?? '');
-		    setLoggedInUserRole(session.user.role ?? '');
-		    setLoggedInUserProfilePicture(session.user.profile_picture ?? '');
-		  }
+		  setLoggedInName(session.user.name ?? '');
+		  setLoggedInCompanyName(session.user.company_name ?? '');
+		  setLoggedInUserProfilePicture(session.user.profile_picture ?? '');
 		}
 	}, [
 	  status,
 	  session?.user?.name,
 	  session?.user?.company_name,
-	  session?.user?.username,
-	  session?.user?.role,
 	  session?.user?.profile_picture,
 	]);
 
@@ -345,59 +256,12 @@ const Layout = ({ children }: LayoutProps) => {
 		return number;
 	};
 
-	const activeCall = useMemo(() => {
-		const call = Array.from(activeCalls.values())
-			.filter((call) => {
-				const involvesUser = userAddress && (
-					call.callingAddress === userAddress || 
-					call.calledAddress === userAddress
-				);
-				
-				const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(call.status);
-				
-				return involvesUser && hasValidStatus;
-			})
-			.sort((a, b) => {
-				const priority = { connected: 3, ringing: 2, dialing: 1, onHold: 0 };
-				return (priority[b.status as keyof typeof priority] || 0) - (priority[a.status as keyof typeof priority] || 0);
-			})[0];
-		
-		return call || null;
-	}, [activeCalls, userAddress]);
-
-	const activeCallUserData = useMemo(() => {
-		if (!activeCall || !activeCall.number || !getUserDataExtensions) {
-			return null;
-		}
-		
-		try {
-			const userDataExtensions = getUserDataExtensions() || {};
-			const callNumber = activeCall.number;
-			const dnString = String(callNumber);
-			const dnNumber = Number(callNumber);
-			
-			const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
-			
-			return data;
-		} catch (error) {
-			console.error(`[Layout] Error getting extension data for ${activeCall.number}:`, error);
-			return null;
-		}
-	}, [activeCall, getUserDataExtensions]);
-
-	const activeCallUserName = useMemo(() => {
-		if (!activeCallUserData) {
-			return activeCall?.number || "Unknown";
-		}
-		return activeCallUserData.name || activeCallUserData.user_name || activeCall?.number || "Unknown";
-	}, [activeCallUserData, activeCall]);
-
 	const isDeviceRegistered = useMemo(() => {
-		if (!userAddress || !dnsMap || !dnsMap[userAddress]) {
+		if (!userAddress || !dnsMap?.[userAddress]) {
 			return false;
 		}
 		
-		const userDevices = Object.values(dnsMap[userAddress].devices || {});
+		const userDevices = Object.values(dnsMap[userAddress]?.devices || {});
 		if (userDevices.length === 0) {
 			return false;
 		}
@@ -406,7 +270,7 @@ const Layout = ({ children }: LayoutProps) => {
 	}, [userAddress, dnsMap]);
 
 	const incomingCallUserData = useMemo(() => {
-		if (!incomingCall || !incomingCall.callingAddress || !getUserDataExtensions) {
+		if (!incomingCall?.callingAddress || !getUserDataExtensions) {
 			return null;
 		}
 		
@@ -419,7 +283,9 @@ const Layout = ({ children }: LayoutProps) => {
 			const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
 			return data;
 		} catch (error) {
-			console.error(`[Layout] Error getting extension data for incoming call ${incomingCall.callingAddress}:`, error);
+			toast.error(`Failed to load incoming call data: ${getErrorMessage(error)}`, {
+				toastId: "layout_incoming_call_data_failed",
+			});
 			return null;
 		}
 	}, [incomingCall, getUserDataExtensions]);
@@ -493,7 +359,9 @@ const Layout = ({ children }: LayoutProps) => {
 				closeIncomingCallModal();
 			}
 		} catch (error) {
-			// Silent
+			toast.error(`Failed to attend call: ${getErrorMessage(error)}`, {
+				toastId: "layout_attend_call_failed",
+			});
 		} finally {
 			setIsDialing(false);
 		}
@@ -521,9 +389,11 @@ const Layout = ({ children }: LayoutProps) => {
 				controllerAddress: userAddress || '',
 				controllerDeviceName: controllerDevice.deviceName || '',
 				controllerDeviceType: controllerDevice.deviceType || ''
-			} as any).catch(() => {});
+			} as any);
 		} catch (error) {
-			console.error("Unable to reject call");
+			toast.error(`Unable to reject call: ${getErrorMessage(error)}`, {
+				toastId: "layout_reject_call_failed",
+			});
 		} finally {
 			closeIncomingCallModal();
 		}
@@ -559,7 +429,9 @@ const Layout = ({ children }: LayoutProps) => {
 				closeDialer();
 			}
 		} catch (error) {
-			// Silent
+			toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+				toastId: "layout_dial_failed",
+			});
 		} finally {
 			setIsDialing(false);
 		}
@@ -601,11 +473,19 @@ const Layout = ({ children }: LayoutProps) => {
 				closeDialer();
 			}
 		} catch (error) {
-			// Silent
+			toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+				toastId: "layout_make_call_failed",
+			});
 		} finally {
 			setIsDialing(false);
 		}
 	};
+
+	const mainContentWidth = useMemo(() => {
+		if (!showBreezeAssistant) return '100%';
+		if (breezeMaximized) return '0%';
+		return 'calc(100% - 400px)';
+	}, [showBreezeAssistant, breezeMaximized]);
 
 	const dialpadButtons = [
 		{ num: '1' },
@@ -1210,7 +1090,9 @@ font-weight:600;
                 {/* Create Dropdown */}
                 {showCreateDropdown && (
                   <>
-                    <div
+                    <button
+                      type="button"
+                      aria-label="Close create menu"
                       style={{
                         position: 'fixed',
                         top: 0,
@@ -1218,6 +1100,10 @@ font-weight:600;
                         right: 0,
                         bottom: 0,
                         zIndex: 1040,
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'default',
                       }}
                       onClick={() => setShowCreateDropdown(false)}
                     />
@@ -1397,7 +1283,9 @@ font-weight:600;
                 {showUserDropdown && (
                   <>
                     {/* Backdrop to close dropdown */}
-                    <div
+                    <button
+                      type="button"
+                      aria-label="Close user menu"
                       style={{
                         position: 'fixed',
                         top: 0,
@@ -1405,6 +1293,10 @@ font-weight:600;
                         right: 0,
                         bottom: 0,
                         zIndex: 1040,
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'default',
                       }}
                       onClick={() => setShowUserDropdown(false)}
                     />
@@ -1488,12 +1380,13 @@ font-weight:600;
                             </button>
                           )}
                           
-                          
-                        <button className="user-dropdown-item">
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRICING_FEATURES) && (
+                        <button className="user-dropdown-item" onClick={() => router.push('/pricing')}>
                           {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
                           <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
-                          </button>
+                            </button>
+                          )}
                           
                           {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
                         <button className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
@@ -1632,7 +1525,9 @@ font-weight:600;
 			{/* Dialer Popup */}
 			{isDialerOpen && (
 				<>
-					<div
+					<button
+						type="button"
+						aria-label="Close dialer"
 						style={{
 							position: 'fixed',
 							top: 0,
@@ -1640,7 +1535,10 @@ font-weight:600;
 							right: 0,
 							bottom: 0,
 							zIndex: 1040,
-							backgroundColor: 'transparent'
+							backgroundColor: 'transparent',
+							border: 'none',
+							padding: 0,
+							cursor: 'default',
 						}}
 						onClick={() => {
 							closeDialer();
@@ -1658,7 +1556,6 @@ font-weight:600;
 							maxWidth: '320px',
 							padding: '1rem',
 						}}
-						onClick={(e) => e.stopPropagation()}
 					>
 						<div className="d-flex align-items-center justify-content-between mb-3">
 							<h6 className="mb-0" style={{ fontSize: '14px', fontWeight: 600 }}>Dialer</h6>
@@ -1771,11 +1668,7 @@ font-weight:600;
   className="flex-grow-1 p-3 main-content-wrapper"
   style={{
     overflowY: 'auto',
-    width: showBreezeAssistant
-      ? breezeMaximized
-        ? '0%'          // ← collapse to 0 when maximized
-        : 'calc(100% - 400px)'
-      : '100%',
+    width: mainContentWidth,
     overflow: breezeMaximized ? 'hidden' : 'auto',
     transition: 'width 0.3s ease-in-out'
   }}
@@ -1788,18 +1681,6 @@ font-weight:600;
 
 			{/* Breeze AI Assistant Sidebar */}
 			{showBreezeAssistant && (
-				// <BreezeAssistantSidebar
-				// 	isOpen={showBreezeAssistant}
-				// 	onClose={() => setShowBreezeAssistant(false)}
-				// 	onMaximize={() => {
-				// 		console.log('Maximize Breeze Assistant');
-				// 	}}
-				// 	width="400px"
-				// 	onSendMessage={async (message: string) => {
-				// 		await new Promise(resolve => setTimeout(resolve, 1000));
-				// 		return "I'm here to help! This is a demo response. You can customize the message handling by implementing the onSendMessage callback.";
-				// 	}}
-				// />
 <BreezeAssistantSidebar
        isOpen={showBreezeAssistant}
        onClose={() => { setShowBreezeAssistant(false); setBreezeMaximized(false); }}

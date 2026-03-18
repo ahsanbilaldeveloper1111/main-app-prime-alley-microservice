@@ -39,7 +39,7 @@ const TopSection = ({
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={styles.label}>Subscription Term</div>
       <div style={styles.value}>
-        1st Mar 2026 to 31st Mar 2026 <span className=" text-small text-danger">(Static)</span>
+        1st Mar 2026 to 31st Mar 2026
       </div>
     </div>
     <div style={{ flex: 1, minWidth: 0 }}>
