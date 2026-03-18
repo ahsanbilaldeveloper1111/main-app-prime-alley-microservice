@@ -89,6 +89,15 @@ const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
     margin: 0,
   };
 
+  let borderBottomStyle: React.CSSProperties['borderBottom'] = undefined;
+  if (showBorderBottom) {
+    if (isCollapsed) {
+      borderBottomStyle = 'none';
+    } else {
+      borderBottomStyle = '1px solid #cccccc';
+    }
+  }
+
   const renderTitle = () => {
     if (titleTag === 'h2') {
       return <h2 style={titleStyle}>{title}</h2>;
@@ -105,11 +114,7 @@ const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
         padding: '14px 20px',
         cursor: 'pointer',
         backgroundColor: '#ffffff',
-        borderBottom: showBorderBottom
-          ? isCollapsed
-            ? 'none'
-            : '1px solid #cccccc'
-          : undefined,
+        borderBottom: borderBottomStyle,
       }}
       onClick={onToggle}
     >
