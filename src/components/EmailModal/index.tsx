@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Maximize2,
@@ -62,7 +62,10 @@ const EmailModal: React.FC<EmailModalProps> = ({
   contextPayload,
   onSend,
 }) => {
-  const initialTo = normalizeRecipientEmails(recipientEmail);
+  const initialTo = useMemo(
+    () => normalizeRecipientEmails(recipientEmail),
+    [recipientEmail],
+  );
   const [toEmails, setToEmails] = useState<string[]>(initialTo);
   const [ccEmails, setCcEmails] = useState<string[]>([]);
   const [bccEmails, setBccEmails] = useState<string[]>([]);
@@ -91,6 +94,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialToRef = useRef(initialTo);
+  const wasOpenRef = useRef(isOpen);
 
   // Generate email (AI) state – same options as EmailSection
   const [generatePrompt, setGeneratePrompt] = useState("");
@@ -137,6 +142,10 @@ const EmailModal: React.FC<EmailModalProps> = ({
       );
     }
   }, [recipientEmail]);
+
+  useEffect(() => {
+    initialToRef.current = initialTo;
+  }, [initialTo]);
 
   // When we set body from Generate, update the contenteditable div
   useEffect(() => {
@@ -187,8 +196,10 @@ const EmailModal: React.FC<EmailModalProps> = ({
 
   // Reset state when modal is closed (mirrors NotesModal behavior, including attachments)
   useEffect(() => {
-    if (!isOpen) {
-      setToEmails(initialTo);
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = isOpen;
+    if (wasOpen && !isOpen) {
+      setToEmails(initialToRef.current);
       setCcEmails([]);
       setBccEmails([]);
       setShowCc(false);
@@ -210,7 +221,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setCustomTime(timeStr);
       setShowDatePicker(false);
     }
-  }, [isOpen, initialTo]);
+  }, [isOpen]);
 
   const handleGenerateEmail = async () => {
     const query = generatePrompt.trim();
