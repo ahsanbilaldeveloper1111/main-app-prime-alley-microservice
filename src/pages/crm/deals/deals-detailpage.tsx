@@ -53,6 +53,114 @@ interface KeyInfoField {
   copyable?: boolean;
 }
 
+type CollapsibleSectionHeaderProps = {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  title: string;
+  titleTag: 'h2' | 'h3';
+  titleFontSize: string;
+  chevronSize: number;
+  rightButtonLabel?: string;
+  onRightButtonClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  showBorderBottom?: boolean;
+};
+
+const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
+  isCollapsed,
+  onToggle,
+  title,
+  titleTag,
+  titleFontSize,
+  chevronSize,
+  rightButtonLabel,
+  onRightButtonClick,
+  showBorderBottom = false,
+}) => {
+  const chevronStyle: React.CSSProperties = {
+    color: '#141414',
+    transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+    transition: 'transform 0.2s ease',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: titleFontSize,
+    fontWeight: '600',
+    color: '#141414',
+    margin: 0,
+  };
+
+  const renderTitle = () => {
+    if (titleTag === 'h2') {
+      return <h2 style={titleStyle}>{title}</h2>;
+    }
+    return <h3 style={titleStyle}>{title}</h3>;
+  };
+
+  return rightButtonLabel ? (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 20px',
+        cursor: 'pointer',
+        backgroundColor: '#ffffff',
+        borderBottom: showBorderBottom
+          ? isCollapsed
+            ? 'none'
+            : '1px solid #cccccc'
+          : undefined,
+      }}
+      onClick={onToggle}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <ChevronDown size={chevronSize} style={chevronStyle} />
+        {renderTitle()}
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRightButtonClick?.(e);
+        }}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: '6px',
+          cursor: 'pointer',
+          color: '#141414',
+          fontSize: '14px',
+          fontWeight: '500',
+          borderRadius: '3px',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f5f8fa';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        type="button"
+      >
+        {rightButtonLabel}
+      </button>
+    </div>
+  ) : (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '16px',
+        cursor: 'pointer',
+      }}
+      onClick={onToggle}
+    >
+      <ChevronDown size={chevronSize} style={chevronStyle} />
+      {renderTitle()}
+    </div>
+  );
+};
+
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
@@ -816,61 +924,16 @@ const DealRecordPage: NextPageWithLayout = () => {
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
         border: '1px solid #cccccc',
       }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('key-info') ? 'none' : '1px solid #cccccc',
-          }}
-          onClick={() => toggleSection('key-info')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: '#141414',
-                transform: collapsedSections.has('key-info') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-            }}>
-              Key information
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '14px',
-              fontWeight: '500',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            Actions
-          </button>
-        </div>
+        <CollapsibleSectionHeader
+          isCollapsed={collapsedSections.has('key-info')}
+          onToggle={() => toggleSection('key-info')}
+          title="Key information"
+          titleTag="h3"
+          titleFontSize="16px"
+          chevronSize={18}
+          rightButtonLabel="Actions"
+          showBorderBottom
+        />
 
         {!collapsedSections.has('key-info') && (
           <div style={{ padding: '20px' }}>
@@ -1107,33 +1170,14 @@ const DealRecordPage: NextPageWithLayout = () => {
             <div style={{
               marginBottom: '24px',
             }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px',
-                  cursor: 'pointer',
-                }}
-                onClick={() => toggleSection('e-commerce')}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: '#141414',
-                    transform: collapsedSections.has('e-commerce') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-                <h2 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  e-Commerce
-                </h2>
-              </div>
+              <CollapsibleSectionHeader
+                isCollapsed={collapsedSections.has('e-commerce')}
+                onToggle={() => toggleSection('e-commerce')}
+                title="e-Commerce"
+                titleTag="h2"
+                titleFontSize="18px"
+                chevronSize={20}
+              />
 
               {!collapsedSections.has('e-commerce') && (
                 <div style={{

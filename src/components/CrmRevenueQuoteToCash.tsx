@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown, ExternalLink, FileText } from "lucide-react";
+import CrmQuoteToCashItemMeta from "./CrmQuoteToCashItemMeta";
 
 export interface SubscriptionItem {
   id: string;
@@ -249,58 +250,12 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                   </UnderlineAnchor>
                 </div>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
-                    fontSize: "14px",
-                  }}
-                >
-                  <div>
-                    <span style={{ color: "#141414" }}>Status: </span>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        color: "#141414",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "8px",
-                          height: "8px",
-                          borderRadius: "50%",
-                          backgroundColor:
-                            item.status === "active" ? "#10b981" : "#ef4444",
-                          display: "inline-block",
-                        }}
-                      />
-                      {item.status.charAt(0).toUpperCase() +
-                        item.status.slice(1)}
-                    </span>
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next billing date: {item.nextBillingDate}
-                  </div>
-                  <div style={{ color: "#141414" }}>
-                    Next payment amount: {item.nextPaymentAmount}
-                  </div>
-                  <div>
-                    <span style={{ color: "#141414" }}>Contact email: </span>
-                    <UnderlineAnchor
-                      href={`mailto:${item.contactEmail}`}
-                      style={{ color: "#006162", textDecoration: "none" }}
-                    >
-                      {item.contactEmail}
-                    </UnderlineAnchor>
-                    <ExternalLink
-                      size={12}
-                      style={{ marginLeft: "4px", display: "inline" }}
-                    />
-                  </div>
-                </div>
+                <CrmQuoteToCashItemMeta
+                  status={item.status}
+                  nextBillingDate={item.nextBillingDate}
+                  nextPaymentAmount={item.nextPaymentAmount}
+                  contactEmail={item.contactEmail}
+                />
               </div>
             ))}
             <BorderHoverButton gapPx={6}>
