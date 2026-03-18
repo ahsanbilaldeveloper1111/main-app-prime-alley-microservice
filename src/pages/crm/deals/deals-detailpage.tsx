@@ -551,46 +551,12 @@ const DealRecordPage: NextPageWithLayout = () => {
   // ============================================================================
 
   const renderLeftSidebar = () => (
-    <div className="sidebar-scrollbar" style={{
-      width: '385px',
-      backgroundColor: '#f0f0f0',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      flexShrink: 0,
-      overflowY: 'auto',
-      marginRight: '10px',
-    }}>
-      <div style={{
-        padding: '10px 0px',
-        borderRadius: '10px',
-        backgroundColor: '#ffffff',
-        marginBottom: '12px',
-        border: '1px solid #cccccc',
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingBottom: '10px',
-          borderBottom: '1px solid #cccccc',
-          paddingLeft: '24px',
-          paddingRight: '24px',
-        }}>
+    <div className="sidebar-scrollbar crmLeftSidebarContainer">
+      <div className="crmLeftSidebarHeaderCard">
+        <div className="crmLeftSidebarHeaderRow">
           <button
-            onClick={() => window.history.back()}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              color: '#141414',
-              fontWeight: '500',
-            }}
+            onClick={() => globalThis.history.back()}
+            className="crmLeftSidebarBackButton"
           >
             <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
             Deals
@@ -599,45 +565,14 @@ const DealRecordPage: NextPageWithLayout = () => {
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
               onClick={() => setShowActionsDropdown(!showActionsDropdown)}
-              style={{
-                padding: '6px 14px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#141414',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderRadius: '3px',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f8fa';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+              className="crmLeftSidebarActionsButton"
             >
               Actions
               <ChevronDown size={14} />
             </button>
 
             {showActionsDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '4px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '5px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                minWidth: '180px',
-                zIndex: 1000,
-                overflow: 'hidden',
-              }}>
+              <div className="crmLeftSidebarActionsDropdownMenu">
                 {['Edit', 'Delete', 'Export'].map((action) => (
                   <button
                     key={action}
@@ -651,22 +586,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                         handleDealExport();
                       }
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 16px',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      fontSize: '14px',
-                      color: '#141414',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f7fafc';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    className="crmLeftSidebarActionsDropdownItem"
                   >
                     {action}
                   </button>
@@ -688,19 +608,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             gap: '12px',
             marginBottom: '12px',
           }}>
-            <div style={{
-              width: '40px',
-              height: '37px',
-              borderRadius: '26px',
-              background: '#e3f2fd',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: '400',
-              color: '#141414',
-              flexShrink: 0,
-            }}>
+            <div className="crmLeftSidebarAvatarCircle">
               <Handshake size={20} />
             </div>
             <div style={{ flex: 1 }}>
@@ -1718,6 +1626,112 @@ const DealRecordPage: NextPageWithLayout = () => {
           .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #a0aec0;
           }
+
+          /* Deals left sidebar header (avoid Sonar duplication against other CRM pages) */
+          .crmLeftSidebarContainer {
+            width: 385px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+            overflow-y: auto;
+            margin-right: 10px;
+          }
+
+          .crmLeftSidebarHeaderCard {
+            padding: 10px 0px;
+            border-radius: 10px;
+            background-color: #ffffff;
+            margin-bottom: 12px;
+            border: 1px solid #cccccc;
+          }
+
+          .crmLeftSidebarHeaderRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #cccccc;
+            padding-left: 24px;
+            padding-right: 24px;
+          }
+
+          .crmLeftSidebarBackButton {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #141414;
+            font-weight: 500;
+          }
+
+          .crmLeftSidebarActionsButton {
+            padding: 6px 14px;
+            background-color: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #141414;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+          }
+
+          .crmLeftSidebarActionsButton:hover {
+            background-color: #f5f8fa;
+          }
+
+          .crmLeftSidebarActionsDropdownMenu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 180px;
+            z-index: 1000;
+            overflow: hidden;
+          }
+
+          .crmLeftSidebarActionsDropdownItem {
+            width: 100%;
+            padding: 10px 16px;
+            background-color: transparent;
+            border: none;
+            text-align: left;
+            font-size: 14px;
+            color: #141414;
+            cursor: pointer;
+          }
+
+          .crmLeftSidebarActionsDropdownItem:hover {
+            background-color: #f7fafc;
+          }
+
+          .crmLeftSidebarAvatarCircle {
+            width: 40px;
+            height: 37px;
+            border-radius: 26px;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 400;
+            color: #141414;
+            flex-shrink: 0;
+          }
+
         `}
       </style>
 

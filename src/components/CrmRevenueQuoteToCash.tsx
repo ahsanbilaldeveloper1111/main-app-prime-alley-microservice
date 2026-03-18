@@ -24,6 +24,71 @@ export interface RevenueSection {
   onAddClick?: () => void;
 }
 
+const underlineOnHoverEnter = (e: React.MouseEvent<HTMLElement>) => {
+  e.currentTarget.style.textDecoration = "underline";
+};
+
+const underlineOnHoverLeave = (e: React.MouseEvent<HTMLElement>) => {
+  e.currentTarget.style.textDecoration = "none";
+};
+
+const hoverBgEnter = (e: React.MouseEvent<HTMLElement>) => {
+  e.currentTarget.style.backgroundColor = "#f7fafc";
+};
+
+const hoverBgLeave = (e: React.MouseEvent<HTMLElement>) => {
+  e.currentTarget.style.backgroundColor = "transparent";
+};
+
+const borderHoverButtonBaseStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  backgroundColor: "transparent",
+  border: "1px solid #cbd5e0",
+  borderRadius: "4px",
+  fontSize: "14px",
+  fontWeight: 500,
+  color: "#141414",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+};
+
+const getBorderHoverButtonStyle = (gapPx: number): React.CSSProperties => ({
+  ...borderHoverButtonBaseStyle,
+  gap: `${gapPx}px`,
+});
+
+const UnderlineAnchor: React.FC<{
+  href: string;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+}> = ({ href, style, children }) => (
+  <a
+    href={href}
+    style={style}
+    onMouseEnter={underlineOnHoverEnter}
+    onMouseLeave={underlineOnHoverLeave}
+  >
+    {children}
+  </a>
+);
+
+const BorderHoverButton: React.FC<{
+  onClick?: () => void;
+  gapPx: number;
+  children: React.ReactNode;
+}> = ({ onClick, gapPx, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={getBorderHoverButtonStyle(gapPx)}
+    onMouseEnter={hoverBgEnter}
+    onMouseLeave={hoverBgLeave}
+  >
+    {children}
+  </button>
+);
+
 export const createDefaultRevenueSections = (
   subscriptionCount: number,
   subscriptionItems: SubscriptionItem[],
@@ -140,12 +205,8 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                 alignItems: "center",
                 gap: "4px",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = "underline";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = "none";
-              }}
+              onMouseEnter={underlineOnHoverEnter}
+              onMouseLeave={underlineOnHoverLeave}
             >
               +{section.addButtonText}
               <ChevronDown size={14} />
@@ -175,7 +236,7 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                   }}
                 >
                   <FileText size={18} color="#7c98b6" />
-                  <a
+                  <UnderlineAnchor
                     href={item.link}
                     style={{
                       fontSize: "15px",
@@ -183,15 +244,9 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                       color: "#006162",
                       textDecoration: "none",
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.textDecoration = "none";
-                    }}
                   >
                     {item.name}
-                  </a>
+                  </UnderlineAnchor>
                 </div>
 
                 <div
@@ -234,18 +289,12 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                   </div>
                   <div>
                     <span style={{ color: "#141414" }}>Contact email: </span>
-                    <a
+                    <UnderlineAnchor
                       href={`mailto:${item.contactEmail}`}
                       style={{ color: "#006162", textDecoration: "none" }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = "underline";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = "none";
-                      }}
                     >
                       {item.contactEmail}
-                    </a>
+                    </UnderlineAnchor>
                     <ExternalLink
                       size={12}
                       style={{ marginLeft: "4px", display: "inline" }}
@@ -254,31 +303,10 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
                 </div>
               </div>
             ))}
-            <button
-              type="button"
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                border: "1px solid #cbd5e0",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                color: "#141414",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
+            <BorderHoverButton gapPx={6}>
               View all associated {section.title}
               <ExternalLink size={14} />
-            </button>
+            </BorderHoverButton>
           </>
         ) : (
           <>
@@ -293,32 +321,10 @@ export const CrmRevenueQuoteToCash: React.FC<CrmRevenueQuoteToCashProps> = ({
               {section.description}
             </p>
             {section.buttonText && (
-              <button
-                type="button"
-                onClick={section.onButtonClick}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "transparent",
-                  border: "1px solid #cbd5e0",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  color: "#141414",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
+              <BorderHoverButton gapPx={8} onClick={section.onButtonClick}>
                 {section.buttonIcon && <section.buttonIcon size={16} />}
                 {section.buttonText}
-              </button>
+              </BorderHoverButton>
             )}
           </>
         )}
