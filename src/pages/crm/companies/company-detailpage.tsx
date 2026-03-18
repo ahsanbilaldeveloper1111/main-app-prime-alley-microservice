@@ -14,7 +14,6 @@ import {
   Building2,
   AlertCircle,
   FileText,
-  ExternalLink,
 } from "lucide-react";
 import Layout from "@layout/index";
 import {
@@ -43,8 +42,12 @@ import {
   ghostActionButtonStyle,
   dropdownItemButtonStyle,
   quickActionCircleButtonStyle,
-  borderedPillButtonStyle,
 } from "@components/CrmDetailSharedStyles";
+import {
+  CrmRevenueQuoteToCash,
+  type SubscriptionItem,
+  type RevenueSection,
+} from "@components/CrmRevenueQuoteToCash";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -59,29 +62,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface SubscriptionItem {
-  id: string;
-  name: string;
-  status: "active" | "inactive" | "cancelled";
-  nextBillingDate: string;
-  nextPaymentAmount: string;
-  contactEmail: string;
-  link: string;
-}
-
-interface RevenueSection {
-  id: string;
-  title: string;
-  count: number;
-  description: string;
-  buttonText: string;
-  buttonIcon?: React.ComponentType<{ size?: number }>;
-  items?: SubscriptionItem[];
-  onButtonClick: () => void;
-  addButtonText?: string;
-  onAddClick?: () => void;
-}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -723,188 +703,6 @@ const CompanyDetailPage: NextPageWithLayout = () => {
     [companyRecordId],
   );
 
-  const renderRevenueSection = (section: RevenueSection) => (
-    <div
-      key={section.id}
-      style={{
-        ...cardStyle,
-        padding: "20px",
-        marginBottom: "16px",
-      }}
-    >
-      <div
-        style={{
-          ...sectionHeaderRowStyle,
-          marginBottom: section.items ? "16px" : "12px",
-        }}
-      >
-        <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>
-          {section.title} ({section.count})
-        </h3>
-        {section.addButtonText && (
-          <button
-            onClick={section.onAddClick}
-            style={{
-              padding: "6px 12px",
-              backgroundColor: "transparent",
-              border: "none",
-              fontSize: "14px",
-              fontWeight: "500",
-              color: "#006162",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = "underline";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = "none";
-            }}
-          >
-            +{section.addButtonText}
-            <ChevronDown size={14} />
-          </button>
-        )}
-      </div>
-
-      {section.items && section.items.length > 0 ? (
-        <>
-          {section.items.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                padding: "16px",
-                backgroundColor: "#f7fafc",
-                border: "1px solid #eaf0f6",
-                borderRadius: "5px",
-                marginBottom: "12px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "10px",
-                  marginBottom: "12px",
-                }}
-              >
-                <FileText size={18} color="#7c98b6" />
-                <a
-                  href={item.link}
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: "600",
-                    color: "#006162",
-                    textDecoration: "none",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.textDecoration = "underline";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.textDecoration = "none";
-                  }}
-                >
-                  {item.name}
-                </a>
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "12px",
-                  fontSize: "14px",
-                }}
-              >
-                <div>
-                  <span style={{ color: "#141414" }}>Status: </span>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      color: "#141414",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: "8px",
-                        height: "8px",
-                        borderRadius: "50%",
-                        backgroundColor: item.status === "active" ? "#10b981" : "#ef4444",
-                        display: "inline-block",
-                      }}
-                    />
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                  </span>
-                </div>
-                <div style={{ color: "#141414" }}>Next billing date: {item.nextBillingDate}</div>
-                <div style={{ color: "#141414" }}>Next payment amount: {item.nextPaymentAmount}</div>
-                <div>
-                  <span style={{ color: "#141414" }}>Contact email: </span>
-                  <a
-                    href={`mailto:${item.contactEmail}`}
-                    style={{ color: "#006162", textDecoration: "none" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.textDecoration = "underline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.textDecoration = "none";
-                    }}
-                  >
-                    {item.contactEmail}
-                  </a>
-                  <ExternalLink size={12} style={{ marginLeft: "4px", display: "inline" }} />
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            style={borderedPillButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            View all associated {section.title}
-            <ExternalLink size={14} />
-          </button>
-        </>
-      ) : (
-        <>
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#141414",
-              lineHeight: "1.6",
-              marginBottom: "16px",
-            }}
-          >
-            {section.description}
-          </p>
-          {section.buttonText && (
-            <button
-              onClick={section.onButtonClick}
-              style={borderedPillButtonStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              {section.buttonIcon && <section.buttonIcon size={16} />}
-              {section.buttonText}
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-
   // Left sidebar (company info + quick actions)
   const renderLeftSidebar = () => (
     <div
@@ -1378,42 +1176,11 @@ const CompanyDetailPage: NextPageWithLayout = () => {
 
         {activeTab === "revenue" && (
           <div>
-            <div style={{ marginBottom: "24px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "16px",
-                  cursor: "pointer",
-                }}
-                onClick={() => toggleSection("quote-to-cash")}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: "#141414",
-                    transform: collapsedSections.has("quote-to-cash") ? "rotate(-90deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease",
-                  }}
-                />
-                <h2 style={{ fontSize: "18px", fontWeight: "600", color: "#141414", margin: 0 }}>
-                  Quote-to-cash
-                </h2>
-              </div>
-
-              {!collapsedSections.has("quote-to-cash") && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))",
-                    gap: "16px",
-                  }}
-                >
-                  {revenueSections.slice(0, 5).map((section) => renderRevenueSection(section))}
-                </div>
-              )}
-            </div>
+            <CrmRevenueQuoteToCash
+              sections={revenueSections.slice(0, 5)}
+              isCollapsed={collapsedSections.has("quote-to-cash")}
+              onToggle={() => toggleSection("quote-to-cash")}
+            />
           </div>
         )}
 
