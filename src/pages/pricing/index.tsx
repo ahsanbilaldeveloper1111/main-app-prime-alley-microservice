@@ -560,101 +560,7 @@ const AgentMiniTable: React.FC<{ slide: AgentSlide }> = ({ slide }) => (
 
 // ─── Prime Credits Section ──────────────────────────────────────────────────
 
-const PrimeCreditsSection: React.FC = () => {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const slide = AGENT_SLIDES[activeSlide];
 
-  const goNext = () => setActiveSlide((s) => (s + 1) % AGENT_SLIDES.length);
-  const goPrev = () => setActiveSlide((s) => (s - 1 + AGENT_SLIDES.length) % AGENT_SLIDES.length);
-
-  return (
-    <div style={{ borderRadius: "8px", overflow: "hidden", marginTop: "28px", border: "1px solid #e5e7eb", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", minHeight: "320px" }}>
-        <div style={{ flex: "0 0 50%", backgroundColor: "#ffffff", padding: "32px 0px 0 0px", display: "flex", flexDirection: "column", position: "relative", minHeight: 0 }}>
-          <div style={{ padding: "10px 218px 56px 40px" }}>
-            <h2 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: PRIMARY, margin: "0 0 0 0" }}>Prime Credits:</h2>
-            <p style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 600, color: PRIMARY, lineHeight: "20px", margin: "8px 0 0 0", paddingInlineEnd: "80px" }}>
-              Fuel powerful features that scale work at your own pace
-            </p>
-            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "24px", marginBlockStart: "24px", marginTop: "24px", paddingInlineEnd: "32px", marginBottom: "0" }}>
-              Prime has powerful tools that scale work alongside your teams. You can take advantage of these tools with Prime Credits—a simple, flexible way to pay for what you use.
-            </p>
-          </div>
-          <div className="simple-flexible-section" style={{ backgroundColor: "#042729", display: "flex", gap: "0", flex: 1, alignItems: "stretch" }}>
-            <div style={{ flex: 1, padding: "32px 36px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <SparkleIcon color="#ff4800" />
-                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Simple</h3>
-              </div>
-              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  <strong>Get started fast</strong> and test the latest AI tools with included credits.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  See credit balance, track usage, and more—<strong>all in a single workspace</strong>.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  Report on exactly which tools are <strong>delivering the most value</strong>.
-                </li>
-              </ul>
-            </div>
-            <div style={{ width: "1px", backgroundColor: "#0f4345", margin: "24px 0" }} />
-            <div style={{ flex: 1, padding: "32px 36px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <SparkleIcon color="#ff4800" />
-                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Flexible</h3>
-              </div>
-              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  <strong>Easily plan</strong> your spend with credit packs, or enable pay as you go.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  Add more packs, adjust your spend cap, or pause features—<strong>staying in control</strong> without disruption.
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ flex: "0 0 50%", backgroundColor: "#fcece6", padding: "55px 60px 55px 60px", position: "relative", display: "flex", flexDirection: "column" }}>
-          <button onClick={goPrev} type="button" style={{ position: "absolute", left: "49px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.5 2L3.5 5L6.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <button onClick={goNext} type="button" style={{ position: "absolute", right: "52px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5L3.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", padding: "40px 50px", flex: 1, display: "flex", flexDirection: "column", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", position: "relative", overflow: "visible" }}>
-            <div style={{ position: "absolute", top: "-14px", left: "24px" }}>
-              <span style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 500, color: "#8b3a0f", backgroundColor: "#fcc6b1", padding: "3px 10px", borderRadius: "20px", display: "inline-block" }}>{slide.tag}</span>
-            </div>
-            <h3 style={{ fontFamily: FONT, fontSize: "1.125rem", fontWeight: 500, lineHeight: 1.55555556, color: PRIMARY, margin: "0 0 8px 0" }}>{slide.title}</h3>
-            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "22px", margin: "0 0 6px 0" }}>
-              {slide.description}{" "}
-              {slide.learnMoreHref && (
-                <button type="button" style={{ ...LINK_BUTTON_STYLE, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                  Learn more <ExternalLinkIcon />
-                </button>
-              )}
-            </p>
-            <AgentMiniTable slide={slide} />
-            <div style={{ height: "1px", backgroundColor: "#e5e7eb", margin: "4px 0 14px" }} />
-            <div style={{ display: "flex", gap: "0", flex: 1, alignItems: "flex-start" }}>
-              {slide.stats.map((stat, i) => (
-                <React.Fragment key={`${stat.value}-${stat.label}`}>
-                  <div style={{ flex: 1, textAlign: "center", padding: "0 8px" }}>
-                    <p style={{ fontFamily: FONT, fontSize: "2.5rem", fontWeight: 500, lineHeight: 1.04545455, color: "rgb(255, 72, 0)", margin: "0 0 4px 0" }}>{stat.value}</p>
-                    <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#374151", lineHeight: "20px", margin: 0, whiteSpace: "pre-line", textAlign: "center" }}>{stat.label}</p>
-                  </div>
-                  {i < slide.stats.length - 1 && <div style={{ width: "1px", backgroundColor: "#e5e7eb", alignSelf: "stretch", margin: "0 4px" }} />}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ─── Build Pipeline Section ───────────────────────────────────────────────────
 
@@ -909,8 +815,7 @@ const SalesHubPage = () => {
           ))}
         </div>
 
-        {/* Prime Credits Section */}
-        {/* <PrimeCreditsSection /> */}
+    
 
         {/* Build Pipeline Section */}
         <BuildPipelineSection />
