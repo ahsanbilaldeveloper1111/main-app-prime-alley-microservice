@@ -105,7 +105,7 @@ interface PipelineRow {
   isBold?: boolean;
   hasIcon?: boolean;
   iconColor?: string;
-  starter: CellContent;
+  standard: CellContent;
   professional: CellContent;
   enterprise: CellContent;
 }
@@ -114,85 +114,77 @@ interface PipelineRow {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    heading: "Platform Solutions",
-    items: ["Customer Platform", "Prime for Marketers"],
+    heading: "RingEdge Connect",
+    items: ["Plans", "Features", "Pricing"],
   },
   {
-    heading: "Products",
-    items: ["Smart CRM", "Marketing", "Sales", "Service", "Content", "Data", "Commerce"],
-  },
-  {
-    heading: "Enhancements",
-    items: ["Prime Credits", "Add-ons"],
+    heading: "Resources",
+    items: ["Documentation", "API Reference", "Support"],
   },
 ];
 
 const PLANS: Plan[] = [
   {
-    id: "starter",
-    name: "Starter",
-    description: "Essential sales tools to shorten sales cycles and improve close rates",
-    startsAt: "£9/mo/seat",
-    originalPrice: "£18/mo/seat",
-    credits: "500 Prime Credits",
-    featureIntro: "Free tools with increased limits, plus:",
+    id: "standard",
+    name: "Standard",
+    description: "For small teams getting started with cloud calling",
+    startsAt: "180 AED/mo/seat",
+    credits: "Max 2 seats",
+    featureIntro: "Includes:",
     features: [
-      "Breeze Assistant",
-      "Calling",
-      "Prime-provided phone numbers",
-      "Repeating tasks and task queues",
-      "Object Tags",
-      "Goals",
+      "Web dialer for agents",
+      "Inbound & outbound calls",
+      "Basic IVR and call routing",
+      "Call logs & dispositions",
+      "Call recordings (basic controls)",
+      "Email notifications",
     ],
-    buttons: [{ label: "See current plan", variant: "outline" }],
-    badge: "YOU OWN STARTER CUSTOMER PLATFORM",
-    badgeDark: false,
+    buttons: [
+      { label: "Start Free Trial", variant: "outline" },
+      { label: "Buy now", variant: "solid" },
+    ],
   },
   {
     id: "professional",
     name: "Professional",
-    description: "Comprehensive sales software to automate and scale your sales processes",
-    startsAt: "£77/mo/seat",
-    originalPrice: "£85/mo/seat",
-    credits: "3,000 Prime Credits",
-    featureIntro: "Sales Hub Starter, plus:",
+    description: "For growing contact centers that need more control",
+    startsAt: "290 AED/mo/seat",
+    credits: "Scalable seats",
+    featureIntro: "Includes all Standard features, plus:",
     features: [
-      "AI Meeting Assistant",
-      "Breeze Prospecting Agent",
-      "Call transcription and coaching",
-      "Sales analytics",
-      "Sales workspace",
-      "Forecasting",
-      "Sequences",
+      "Advanced IVR and routing policies",
+      "DNCR compliance checker",
+      "Supervisor live view & monitoring",
+      "Advanced wallboards and KPIs",
+      "Better recording controls & retention options",
+      "Channels: SMS & WhatsApp",
     ],
     buttons: [
+      { label: "Start Free Trial", variant: "outline" },
       { label: "Buy now", variant: "solid" },
-      { label: "Start 14-day trial", variant: "outline" },
-      { label: "Talk to Sales", variant: "outline" },
     ],
-    footnote: "*Cost shown does not include the required, one-time onboarding fee.",
+    badge: "POPULAR",
+    badgeDark: false,
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    description: "Our most powerful sales software for advanced control and flexibility",
-    startsAt: "£135/mo/seat",
-    credits: "5,000 Prime Credits",
-    featureIntro: "Sales Hub Professional, plus:",
+    description: "For large operations with complex needs",
+    startsAt: "437 AED/mo/seat",
+    credits: "Unlimited seats",
+    featureIntro: "Includes all Professional features, plus:",
     features: [
-      "AI call transcript enrichment (Beta)",
-      "Conversation intelligence",
-      "Deal splits",
-      "Deal journey analytics",
-      "Lead Form Routing",
-      "Pipeline approvals for Deals",
-      "Interactive Voice Response",
+      "Multi-site wallboards and reporting",
+      "Full DNCR & compliance suite",
+      "BYOC model for own carriers (add-on)",
+      "Advanced calling features (queues, whisper, barge, etc.)",
+      "High-touch support and onboarding",
+      "Custom routing design and policy consulting",
     ],
-    buttons: [{ label: "Talk to Sales", variant: "solid" }],
+    buttons: [{ label: "Contact Sales", variant: "solid" }],
     badge: "RECOMMENDED",
     badgeDark: true,
-    footnote:
-      "*Cost shown does not include the required, one-time Enterprise Onboarding for a fee of £3,050.",
+    footnote: "*Contact sales for pricing. Response guaranteed within 24 hours.",
   },
 ];
 
@@ -200,119 +192,133 @@ const PLANS: Plan[] = [
 
 const PIPELINE_ROWS: PipelineRow[] = [
   {
-    feature: "1-to-1 email",
+    feature: "Users",
     isBold: true,
-    starter: { type: "text", value: "Prime branding removed" },
-    professional: { type: "text", value: "Prime branding removed" },
-    enterprise: { type: "text", value: "Prime branding removed" },
+    standard: { type: "text", value: "Max 2 seats" },
+    professional: { type: "text", value: "Scalable" },
+    enterprise: { type: "text", value: "Unlimited" },
   },
   {
-    feature: "Canned snippets",
-    starter: { type: "text", value: "Up to 5,000 snippets" },
-    professional: { type: "text", value: "Up to 5,000 snippets" },
-    enterprise: { type: "text", value: "Up to 5,000 snippets" },
-  },
-  {
-    feature: "Email templates",
-    starter: { type: "text", value: "5,000 templates" },
-    professional: { type: "text", value: "5,000 templates" },
-    enterprise: { type: "text", value: "5,000 templates" },
-  },
-  {
-    feature: "1:1 video messaging",
-    starter: { type: "empty" },
+    feature: "Live Calls (real-time view + monitoring)",
+    standard: { type: "check" },
     professional: { type: "check" },
     enterprise: { type: "check" },
   },
   {
-    feature: "Sales email frequency controls",
-    hasIcon: true,
-    iconColor: "#666666",
-    starter: { type: "empty" },
+    feature: "Calls History (logs + recordings search/playback)",
+    standard: { type: "check" },
     professional: { type: "check" },
     enterprise: { type: "check" },
   },
   {
-    feature: "Calling",
+    feature: "IVR",
+    standard: { type: "text", value: "Basic" },
+    professional: { type: "text", value: "Advanced" },
+    enterprise: { type: "text", value: "Advanced" },
+  },
+  {
+    feature: "Telco Gateway (GSM gateway management)",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Web Dialer (agent calling UI)",
+    standard: { type: "check" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Call Logs + Dispositions",
+    standard: { type: "check" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Call Recordings",
+    standard: { type: "text", value: "Basic" },
+    professional: { type: "text", value: "Full controls" },
+    enterprise: { type: "text", value: "Full controls" },
+  },
+  {
+    feature: "Supervisor View (live status)",
+    standard: { type: "text", value: "Limited" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Live Wallboard",
+    standard: { type: "text", value: "Basic" },
+    professional: { type: "text", value: "Advanced" },
+    enterprise: { type: "text", value: "Multi-site" },
+  },
+  {
+    feature: "Channels: Email notifications",
+    standard: { type: "check" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Channels: SMS",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "Channels: WhatsApp",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
+  },
+  {
+    feature: "DNCR Compliance Checker",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "text", value: "Full suite" },
+  },
+  {
+    feature: "BYOC Model (Bring Your Own Carrier)",
     isBold: true,
-    starter: { type: "text", value: "500 minutes" },
-    professional: { type: "text", value: "3,000 minutes" },
-    enterprise: { type: "text", value: "12,000 minutes" },
+    standard: { type: "empty" },
+    professional: { type: "empty" },
+    enterprise: { type: "text", value: "Add-on available" },
   },
   {
-    feature: "Prime-provided phone numbers",
-    starter: { type: "text", value: "1 phone number. Not supported in all countries." },
-    professional: { type: "text", value: "Up to 3 phone numbers. Not supported in all countries." },
-    enterprise: { type: "text", value: "Up to 5 phone numbers. Not supported in all countries." },
-  },
-  {
-    feature: "Call transcription and coaching",
-    starter: { type: "empty" },
-    professional: { type: "text", value: "Search, review, and comment on calls. 750 hours of transcription per account, per month." },
-    enterprise: { type: "text", value: "Search, review, and comment on calls. 1,500 hours of transcription per account, per month." },
-  },
-  {
-    feature: "Coaching Playlists",
-    starter: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
-  },
-  {
-    feature: "Conversation intelligence",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
-    professional: { type: "text", value: "Includes stats, insights, and call transcriptions.", isLink: true },
-    enterprise: { type: "text", value: "Includes stats, insights, call transcriptions, and tracked terms.", isLink: true },
-  },
-  {
-    feature: "AI call transcript enrichment (Beta)",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
+    feature: "Advanced Calling Features (queues, whisper, barge)",
+    standard: { type: "empty" },
     professional: { type: "empty" },
     enterprise: { type: "check" },
   },
   {
-    feature: "Interactive Voice Response",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
+    feature: "Calling Routes / Routing Policies",
+    standard: { type: "empty" },
     professional: { type: "empty" },
     enterprise: { type: "check" },
   },
   {
-    feature: "Prime mobile app",
+    feature: "Dashboards (basic KPIs)",
     isBold: true,
-    starter: { type: "check" },
+    standard: { type: "check" },
     professional: { type: "check" },
     enterprise: { type: "check" },
   },
   {
-    feature: "Live chat",
-    isBold: true,
-    starter: { type: "text", value: "Remove Prime branding", isLink: true },
-    professional: { type: "text", value: "Remove Prime branding", isLink: true },
-    enterprise: { type: "text", value: "Remove Prime branding", isLink: true },
+    feature: "Unified Reporting (CRM + Connect)",
+    standard: { type: "text", value: "Basic" },
+    professional: { type: "text", value: "Advanced filters" },
+    enterprise: { type: "text", value: "Custom dashboards" },
   },
   {
-    feature: "Conversational bots",
-    starter: { type: "text", value: "Limited features", isLink: true },
-    professional: { type: "text", value: "Additional features" },
-    enterprise: { type: "text", value: "Additional features" },
+    feature: "Scheduled Reports",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
   },
   {
-    feature: "Facebook Messenger integration",
-    starter: { type: "text", value: "Remove Prime branding", isLink: true },
-    professional: { type: "text", value: "Includes advanced Messenger bot branching and advanced reporting", isLink: true },
-    enterprise: { type: "text", value: "Includes the ability to use code snippets for custom Messenger bot actions", isLink: true },
-  },
-  {
-    feature: "Sales automation",
-    isBold: true,
-    starter: { type: "text", value: "Trigger tasks and email notifications when deals change stages.", isLink: true },
-    professional: { type: "text", value: "Up to 300 fully customizable workflows." },
-    enterprise: { type: "text", value: "Up to 1,000 fully customizable workflows, with the ability to trigger sequences. Also includes quote-based workflows" },
+    feature: "AI Analytics (transcription, sentiment, QA scoring)",
+    standard: { type: "empty" },
+    professional: { type: "check" },
+    enterprise: { type: "check" },
   },
 ];
 
@@ -723,11 +729,11 @@ const BuildPipelineSection: React.FC = () => {
             padding: "0",
             marginBlockStart: "40px",
           }}>
-            Build Pipeline
+            Feature Comparison
           </h2>
         </div>
 
-        {/* Col 2: Starter */}
+        {/* Col 2: Standard */}
         <div style={{
           flex: dataColFlex,
           padding: "20px 16px 24px",
@@ -738,16 +744,16 @@ const BuildPipelineSection: React.FC = () => {
           alignItems: "center",
           gap: "4px",
         }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Starter</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£9/mo/seat</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Standard</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>180 AED/mo</span>
           <div style={{ width: "100%", marginTop: "8px" }}>
             <button
               type="button"
-              style={getButtonStyles("outline", hoveredPlan === "starter")}
-              onMouseEnter={() => setHoveredPlan("starter")}
+              style={getButtonStyles("outline", hoveredPlan === "standard")}
+              onMouseEnter={() => setHoveredPlan("standard")}
               onMouseLeave={() => setHoveredPlan(null)}
             >
-              Your current plan
+              Get Started
             </button>
           </div>
         </div>
@@ -764,7 +770,7 @@ const BuildPipelineSection: React.FC = () => {
           gap: "4px",
         }}>
           <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Professional</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£77/mo/seat</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>290 AED/mo</span>
           <div style={{ width: "100%", marginTop: "8px" }}>
             <button
               type="button"
@@ -788,7 +794,7 @@ const BuildPipelineSection: React.FC = () => {
           gap: "4px",
         }}>
           <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Enterprise</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£135/mo</span>
+          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>437 AED/mo</span>
           <div style={{ width: "100%", marginTop: "8px" }}>
             <button
               type="button"
@@ -796,7 +802,7 @@ const BuildPipelineSection: React.FC = () => {
               onMouseEnter={() => setHoveredPlan("enterprise")}
               onMouseLeave={() => setHoveredPlan(null)}
             >
-              Talk to Sales
+              Contact Sales
             </button>
           </div>
         </div>
@@ -830,9 +836,9 @@ const BuildPipelineSection: React.FC = () => {
               </span>
             </div>
 
-            {/* Starter */}
+            {/* Standard */}
             <div style={dataCellStyle}>
-              {renderCellContent(row.starter)}
+              {renderCellContent(row.standard)}
             </div>
 
             {/* Professional */}
@@ -911,10 +917,10 @@ const SalesHubPage = () => {
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "6px" }}>
             <HubIcon />
-            <h1 style={{ fontFamily: FONT, fontSize: "32px", fontWeight: 700, color: PRIMARY, lineHeight: "39px", margin: 0 }}>Sales Hub</h1>
+            <h1 style={{ fontFamily: FONT, fontSize: "32px", fontWeight: 700, color: PRIMARY, lineHeight: "39px", margin: 0 }}>RingEdge Connect</h1>
           </div>
           <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px", margin: 0 }}>
-            Close more deals and accelerate growth with powerful sales software
+            Cloud calling solution with scalable pricing for teams of any size
           </p>
         </div>
 
@@ -928,7 +934,7 @@ const SalesHubPage = () => {
         </div>
 
         {/* Prime Credits Section */}
-        <PrimeCreditsSection />
+        {/* <PrimeCreditsSection /> */}
 
         {/* Build Pipeline Section */}
         <BuildPipelineSection />
