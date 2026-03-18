@@ -76,7 +76,9 @@ export const routePermissions: RoutePermission[] = [
    
     {path:'/crm/quotes',permissions: [PERMISSIONS.VIEW_CRM_QUOTES]},
     {path:'/billing/quotes',permissions: [PERMISSIONS.VIEW_QUOTES_BILLING]},
-    {path:'/billing/products',permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING]},
+    { path: '/billing/products', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
+    { path: '/billing/products/manage-categories', permissions: [PERMISSIONS.VIEW_PRODUCTS_BILLING] },
+    { path: '/billing/transactions', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
 
 
 
@@ -834,7 +836,71 @@ function pathToLabel(path: string): string {
 
 /** True if path contains a dynamic segment ([id], :id, {id}, etc.) */
 function isDynamicPath(path: string): boolean {
-    return /\[[\w-]*\]|:\w+|\{[^}]+\}/.test(path);
+    // Avoid regex backtracking risks (Sonar S5852): use simple linear checks instead.
+    return hasBracketParam(path) || hasColonParam(path) || hasBraceParam(path);
+}
+
+function isAsciiWordChar(ch: string): boolean {
+    return (
+        (ch >= "a" && ch <= "z") ||
+        (ch >= "A" && ch <= "Z") ||
+        (ch >= "0" && ch <= "9") ||
+        ch === "_"
+    );
+}
+
+function isIdentStartChar(ch: string): boolean {
+    return (
+        (ch >= "a" && ch <= "z") ||
+        (ch >= "A" && ch <= "Z") ||
+        ch === "_"
+    );
+}
+
+function hasBracketParam(path: string): boolean {
+    let open = path.indexOf("[");
+    while (open !== -1) {
+        const close = path.indexOf("]", open + 1);
+        if (close === -1) {
+            open = path.indexOf("[", open + 1);
+            continue;
+        }
+        if (close > open + 1 && isValidBracketParamName(path, open + 1, close)) return true;
+        open = path.indexOf("[", open + 1);
+    }
+    return false;
+}
+
+function isValidBracketParamName(path: string, start: number, end: number): boolean {
+    for (let i = start; i < end; i++) {
+        const ch = path[i];
+        if (!isAsciiWordChar(ch) && ch !== "-") return false;
+    }
+    return true;
+}
+
+function hasColonParam(path: string): boolean {
+    let idx = path.indexOf(":");
+    while (idx !== -1) {
+        const next = path[idx + 1];
+        if (next != null && isIdentStartChar(next)) return true;
+        idx = path.indexOf(":", idx + 1);
+    }
+    return false;
+}
+
+function hasBraceParam(path: string): boolean {
+    let open = path.indexOf("{");
+    while (open !== -1) {
+        const close = path.indexOf("}", open + 1);
+        if (close === -1) {
+            open = path.indexOf("{", open + 1);
+            continue;
+        }
+        if (close > open + 1) return true;
+        open = path.indexOf("{", open + 1);
+    }
+    return false;
 }
 
 /**

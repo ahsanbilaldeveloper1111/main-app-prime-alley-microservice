@@ -1,4 +1,4 @@
-import { toast } from "react-toastify";
+  import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
 
@@ -310,3 +310,15 @@ export const GetAccountAuditLogs = async (params: any = {}) => {
     throw error;
   }
 };
+
+export const GetCurrencies = async (): Promise<any> => {
+  try {
+    const response = await axiosInstance.get("accounting/currencies");
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch currencies");
+    throw error;
+  }
+};
+
+
