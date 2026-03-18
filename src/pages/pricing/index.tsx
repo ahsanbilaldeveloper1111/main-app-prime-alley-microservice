@@ -100,6 +100,11 @@ type CellContent =
   | { type: "check" }
   | { type: "empty" };
 
+const CHECK_CELL: CellContent = { type: "check" };
+const EMPTY_CELL: CellContent = { type: "empty" };
+const textCell = (value: string, isLink?: boolean): CellContent =>
+  isLink ? { type: "text", value, isLink } : { type: "text", value };
+
 interface PipelineRow {
   feature: string;
   isBold?: boolean;
@@ -194,132 +199,142 @@ const PIPELINE_ROWS: PipelineRow[] = [
   {
     feature: "Users",
     isBold: true,
-    standard: { type: "text", value: "Max 2 seats" },
-    professional: { type: "text", value: "Scalable" },
-    enterprise: { type: "text", value: "Unlimited" },
+    standard: textCell("Max 2 seats"),
+    professional: textCell("Scalable"),
+    enterprise: textCell("Unlimited"),
   },
   {
     feature: "Live Calls (real-time view + monitoring)",
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Calls History (logs + recordings search/playback)",
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "IVR",
-    standard: { type: "text", value: "Basic" },
-    professional: { type: "text", value: "Advanced" },
-    enterprise: { type: "text", value: "Advanced" },
+    standard: textCell("Basic"),
+    professional: textCell("Advanced"),
+    enterprise: textCell("Advanced"),
   },
   {
     feature: "Telco Gateway (GSM gateway management)",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Web Dialer (agent calling UI)",
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Call Logs + Dispositions",
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Call Recordings",
-    standard: { type: "text", value: "Basic" },
-    professional: { type: "text", value: "Full controls" },
-    enterprise: { type: "text", value: "Full controls" },
+    standard: textCell("Basic"),
+    professional: textCell("Full controls"),
+    enterprise: textCell("Full controls"),
   },
   {
     feature: "Supervisor View (live status)",
-    standard: { type: "text", value: "Limited" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: textCell("Limited"),
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Live Wallboard",
-    standard: { type: "text", value: "Basic" },
-    professional: { type: "text", value: "Advanced" },
-    enterprise: { type: "text", value: "Multi-site" },
+    standard: textCell("Basic"),
+    professional: textCell("Advanced"),
+    enterprise: textCell("Multi-site"),
   },
   {
     feature: "Channels: Email notifications",
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Channels: SMS",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Channels: WhatsApp",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "DNCR Compliance Checker",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "text", value: "Full suite" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: textCell("Full suite"),
   },
   {
     feature: "BYOC Model (Bring Your Own Carrier)",
     isBold: true,
-    standard: { type: "empty" },
-    professional: { type: "empty" },
-    enterprise: { type: "text", value: "Add-on available" },
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: textCell("Add-on available"),
   },
   {
     feature: "Advanced Calling Features (queues, whisper, barge)",
-    standard: { type: "empty" },
-    professional: { type: "empty" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Calling Routes / Routing Policies",
-    standard: { type: "empty" },
-    professional: { type: "empty" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Dashboards (basic KPIs)",
     isBold: true,
-    standard: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "Unified Reporting (CRM + Connect)",
-    standard: { type: "text", value: "Basic" },
-    professional: { type: "text", value: "Advanced filters" },
-    enterprise: { type: "text", value: "Custom dashboards" },
+    standard: textCell("Basic"),
+    professional: textCell("Advanced filters"),
+    enterprise: textCell("Custom dashboards"),
   },
   {
     feature: "Scheduled Reports",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
     feature: "AI Analytics (transcription, sentiment, QA scoring)",
-    standard: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
+];
+
+const PLAN_COMPARISON_META: Array<{
+  id: Plan["id"];
+  ctaLabel: string;
+  ctaVariant: PlanButton["variant"];
+}> = [
+  { id: "standard", ctaLabel: "Get Started", ctaVariant: "outline" },
+  { id: "professional", ctaLabel: "Buy now", ctaVariant: "solid" },
+  { id: "enterprise", ctaLabel: "Contact Sales", ctaVariant: "solid" },
 ];
 
 // ─── Agent carousel data ──────────────────────────────────────────────────────
@@ -645,6 +660,10 @@ const PrimeCreditsSection: React.FC = () => {
 
 const BuildPipelineSection: React.FC = () => {
   const [hoveredPlan, setHoveredPlan] = useState<Plan["id"] | null>(null);
+  const comparisonPlans = PLAN_COMPARISON_META.map((meta) => {
+    const plan = PLANS.find((p) => p.id === meta.id);
+    return { ...meta, plan };
+  }).filter((entry): entry is { id: Plan["id"]; ctaLabel: string; ctaVariant: PlanButton["variant"]; plan: Plan } => Boolean(entry.plan));
 
   // Column widths: first col = 35%, remaining 3 cols each = ~21.67%
   const firstColFlex = "0 0 35%";
@@ -733,79 +752,36 @@ const BuildPipelineSection: React.FC = () => {
           </h2>
         </div>
 
-        {/* Col 2: Standard */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          border: "none",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Standard</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>180 AED/mo</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("outline", hoveredPlan === "standard")}
-              onMouseEnter={() => setHoveredPlan("standard")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Get Started
-            </button>
+        {comparisonPlans.map(({ id, ctaLabel, ctaVariant, plan }) => (
+          <div
+            key={id}
+            style={{
+              flex: dataColFlex,
+              padding: "20px 16px 24px",
+              boxSizing: "border-box",
+              border: "none",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>{plan.name}</span>
+            <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>
+              {plan.startsAt.replace("/seat", "")}
+            </span>
+            <div style={{ width: "100%", marginTop: "8px" }}>
+              <button
+                type="button"
+                style={getButtonStyles(ctaVariant, hoveredPlan === id)}
+                onMouseEnter={() => setHoveredPlan(id)}
+                onMouseLeave={() => setHoveredPlan(null)}
+              >
+                {ctaLabel}
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Col 3: Professional */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          border: "none",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Professional</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>290 AED/mo</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("solid", hoveredPlan === "professional")}
-              onMouseEnter={() => setHoveredPlan("professional")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Buy now
-            </button>
-          </div>
-        </div>
-
-        {/* Col 4: Enterprise */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Enterprise</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>437 AED/mo</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("solid", hoveredPlan === "enterprise")}
-              onMouseEnter={() => setHoveredPlan("enterprise")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Contact Sales
-            </button>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* ── Feature comparison rows ── */}
