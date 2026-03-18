@@ -47,6 +47,7 @@ import {
   CrmRevenueQuoteToCash,
   type SubscriptionItem,
   type RevenueSection,
+  createDefaultRevenueSections,
 } from "@components/CrmRevenueQuoteToCash";
 
 // ============================================================================
@@ -210,61 +211,10 @@ const CompanyDetailPage: NextPageWithLayout = () => {
 
   const subscriptionsData: SubscriptionItem[] = [];
 
-  const revenueSections: RevenueSection[] = [
-    {
-      id: "quotes",
-      title: "Quotes",
-      count: 0,
-      description: "Track the sales documents associated with this record.",
-      buttonText: "Create quote",
-      buttonIcon: FileText,
-      onButtonClick: () => {},
-      addButtonText: "Add",
-      onAddClick: () => {},
-    },
-    {
-      id: "invoices",
-      title: "Invoices",
-      count: 0,
-      description:
-        "Send your customer a request for payment and associate it with this record.",
-      buttonText: "Set up payments",
-      onButtonClick: () => {},
-      addButtonText: "Add",
-      onAddClick: () => {},
-    },
-    {
-      id: "payment-links",
-      title: "Payment Links",
-      count: 0,
-      description:
-        "Add a payment link to accept a payment and associate it with this record.",
-      buttonText: "Set up payments",
-      onButtonClick: () => {},
-      addButtonText: "Add",
-      onAddClick: () => {},
-    },
-    {
-      id: "subscriptions",
-      title: "Subscriptions",
-      count: subscriptionsData.length,
-      description: "",
-      buttonText: "",
-      items: subscriptionsData,
-      onButtonClick: () => {},
-      addButtonText: "Add",
-      onAddClick: () => {},
-    },
-    {
-      id: "payments",
-      title: "Payments",
-      count: 0,
-      description:
-        "Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.",
-      buttonText: "Set up payments",
-      onButtonClick: () => {},
-    },
-  ];
+  const revenueSections: RevenueSection[] = createDefaultRevenueSections(
+    subscriptionsData.length,
+    subscriptionsData,
+  );
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);

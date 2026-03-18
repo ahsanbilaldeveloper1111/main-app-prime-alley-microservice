@@ -38,7 +38,9 @@ import {
   CrmRevenueQuoteToCash,
   type SubscriptionItem,
   type RevenueSection,
+  createDefaultRevenueSections,
 } from "@components/CrmRevenueQuoteToCash";
+import { useCrmSectionTab } from "@hooks/useCrmSectionTab";
 import { toast } from "react-toastify";
 
 // ============================================================================
@@ -69,7 +71,11 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [dealLoading, setDealLoading] = useState(true);
   const [dealError, setDealError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState('about');
+  const { activeTab, setActiveTab } = useCrmSectionTab(
+    router,
+    ["about", "activities", "revenue", "intelligence"],
+    "about",
+  );
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
@@ -103,18 +109,6 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-
-  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = new Set(["about", "activities", "revenue", "intelligence"]);
-  useEffect(() => {
-    if (!router.isReady) return;
-    const section = router.query.section;
-    const tabId =
-      typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.has(tabId)) {
-      setActiveTab(tabId);
-    }
-  }, [router.isReady, router.query.section]);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -202,58 +196,10 @@ const DealRecordPage: NextPageWithLayout = () => {
     },
   ];
 
-  const revenueSections: RevenueSection[] = [
-    {
-      id: 'quotes',
-      title: 'Quotes',
-      count: 0,
-      description: 'Track the sales documents associated with this record.',
-      buttonText: 'Create quote',
-      buttonIcon: FileText,
-      onButtonClick: () => console.log('Create quote'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add quote'),
-    },
-    {
-      id: 'invoices',
-      title: 'Invoices',
-      count: 0,
-      description: 'Send your customer a request for payment and associate it with this record.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add invoice'),
-    },
-    {
-      id: 'payment-links',
-      title: 'Payment Links',
-      count: 0,
-      description: 'Add a payment link to accept a payment and associate it with this record.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add payment link'),
-    },
-    {
-      id: 'subscriptions',
-      title: 'Subscriptions',
-      count: 1,
-      description: '',
-      buttonText: '',
-      items: subscriptionsData,
-      onButtonClick: () => console.log('Subscriptions'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add subscription'),
-    },
-    {
-      id: 'payments',
-      title: 'Payments',
-      count: 0,
-      description: 'Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-    },
-  ];
+  const revenueSections: RevenueSection[] = createDefaultRevenueSections(
+    subscriptionsData.length,
+    subscriptionsData,
+  );
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -399,7 +345,9 @@ const DealRecordPage: NextPageWithLayout = () => {
         if (result?.error) {
           toast.error(result.error);
         }
-      } catch {
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to make call:", error);
         toast.error("Failed to make call");
       } finally {
         setIsDialing(false);
@@ -409,29 +357,32 @@ const DealRecordPage: NextPageWithLayout = () => {
   );
 
   const handleCallClick = useCallback(() => {
-    if (hasPhone) {
-      handleCall(numberToCall);
-    } else {
+    if (!hasPhone) {
       toast.error("No phone number available");
+      return;
     }
+    handleCall(numberToCall);
   }, [hasPhone, numberToCall, handleCall]);
 
   const handleOpenEditDeal = useCallback(() => {
     if (!dealRecordId) return;
-    setEditDealIdForSidebar(dealRecordId);
+    const id = dealRecordId;
+    setEditDealIdForSidebar(id);
     setShowCreateDealSidebar(true);
   }, [dealRecordId]);
 
   const handleOpenDeleteDeal = useCallback(() => {
     if (!dealRecordId) return;
-    setDealToDelete({ id: dealRecordId, name: dealRecordName });
+    const payload = { id: dealRecordId, name: dealRecordName };
+    setDealToDelete(payload);
     setShowDeleteModal(true);
   }, [dealRecordId, dealRecordName]);
 
   const confirmDeleteDeal = useCallback(async () => {
     if (!dealToDelete) return;
     try {
-      await deleteDeal(dealToDelete.id);
+      const id = dealToDelete.id;
+      await deleteDeal(id);
       setShowDeleteModal(false);
       setDealToDelete(null);
       setShowSuccessfulModal(true);
@@ -448,7 +399,8 @@ const DealRecordPage: NextPageWithLayout = () => {
   const handleDealExport = useCallback(async () => {
     if (!dealRecordId) return;
     try {
-      await PDFDownloadDeal(dealRecordId);
+      const id = dealRecordId;
+      await PDFDownloadDeal(id);
       toast.success("Exported deal successfully!");
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -462,7 +414,8 @@ const DealRecordPage: NextPageWithLayout = () => {
       if (!dealRecordId) return;
       setDownloadingAttachmentId(attachmentId);
       try {
-        await downloadDealAttachment(dealRecordId, attachmentId);
+        const id = dealRecordId;
+        await downloadDealAttachment(id, attachmentId);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to download attachment:", error);
