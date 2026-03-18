@@ -1,14 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
 import type { NextRouter } from "next/router";
 
-export type CrmTabId = string;
-
 export const useCrmSectionTab = (
   router: NextRouter,
-  validTabIds: CrmTabId[],
-  defaultTab: CrmTabId,
+  validTabIds: string[],
+  defaultTab: string,
 ) => {
-  const [activeTab, setActiveTab] = useState<CrmTabId>(defaultTab);
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   const validTabSet = useMemo(
     () => new Set(validTabIds.map((t) => t.toLowerCase().trim())),
