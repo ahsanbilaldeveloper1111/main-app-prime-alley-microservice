@@ -1,147 +1,261 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useState, useCallback } from "react";
+import React, { ReactElement, useEffect, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
+import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import { ListGsmManagement, updateGsm, deleteGsm } from "@utils/GsmManagement";
 
-import { Column } from "@components/CustomDataTable";
-import { Button, Card, Modal, Row } from "react-bootstrap";
-import { Col } from "react-bootstrap";
+import { FiEdit, FiTrash2, FiEye } from "react-icons/fi";
+import { Button, Modal, Row, Col } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useTokenService } from "src/hooks/useTokenService";
 import { useSession } from "next-auth/react";
-import GsmListFilter from "@components/filters/GsmListFilter";
 
 import "@assets/scss/common.scss";
-
-import { motion } from "framer-motion";
-import imgStatus1 from "@assets/images/widget/img-status-1.svg";
-import imgStatus2 from "@assets/images/widget/img-status-2.svg";
-import imgStatus3 from "@assets/images/widget/img-status-3.svg";
-import imgStatus4 from "@assets/images/widget/img-status-4.svg";
 
 import AddGsmModal from "@pages/gsm/partial/AddGsmModal";
 
 import GsmDetailModel from "@pages/gsm/partial/GsmDetailModel";
 
-import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye, FiPlus } from "react-icons/fi";
-import { getDashboardData, ViewGsm } from "@utils/GsmAssign";
+
+// Mapped GSM table row interface
+interface GsmTableRow {
+  id: string;
+  ipAddress: string;
+  name: string;
+  username: string;
+  deviceStatus: string;
+  companyName: string;
+}
+
+interface GsmApiCompany {
+  name?: string;
+}
+
+interface GsmApiRecord {
+  id?: string | number;
+  ID?: string | number;
+  ip_address?: string;
+  ipAddress?: string;
+  IP?: string;
+  name?: string;
+  Name?: string;
+  username?: string;
+  Username?: string;
+  device_status?: string;
+  deviceStatus?: string;
+  status?: string;
+  company_name?: string;
+  companyName?: string;
+  company?: string;
+  companies?: GsmApiCompany[];
+}
+
+function mapGsmRow(item: GsmApiRecord, idx: number): GsmTableRow {
+  const companyName =
+    item.company_name ||
+    item.companyName ||
+    item.company ||
+    (item.companies && item.companies.length > 0 ? item.companies[0].name : "") ||
+    "";
+
+  return {
+    id: String(item.id ?? item.ID ?? idx),
+    ipAddress: item.ip_address || item.ipAddress || item.IP || "",
+    name: item.name || item.Name || "",
+    username: item.username || item.Username || "",
+    deviceStatus: item.device_status || item.deviceStatus || item.status || "",
+    companyName,
+  };
+}
 
 const GsmList = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
-  const columns: Column[] = [
-    {
-      key: "ip_address",
-      name: "IP Address",
-      selector: (row: any) => row.ip_address,
-      sortable: true,
-    },
-    {
-      key: "name",
-      name: "Name",
-      selector: (row: any) => row.name,
-      sortable: true,
-    },
-    {
-      key: "username",
-      name: "Username",
-      selector: (row: any) => row.username,
-      sortable: true,
-    },
-    {
-      key: "device_status",
-      name: "Device Status",
-      selector: (row: any) => row.device_status,
-      sortable: true,
-      cell: (row: any) => (
-        <div className="flex items-center gap-2">
-          {row?.device_status ? (
-            <>
+  // Table state
+  const [tableData, setTableData] = useState<GsmTableRow[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage, setRecordsPerPage] = useState(15);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Modal and filter state
+  const [showAddGsmModal, setShowAddGsmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const currentFilters: Record<string, unknown> = {};
+
+
+  // Table columns definition
+  const gsmColumns = useMemo<TableColumn<GsmTableRow>[]>(() => {
+    const columns: TableColumn<GsmTableRow>[] = [
+      {
+        key: "ipAddress",
+        label: "IP ADDRESS",
+        type: "text",
+        sortable: true,
+        render: (row: GsmTableRow) => row.ipAddress || "---",
+      },
+      {
+        key: "name",
+        label: "NAME",
+        type: "text",
+        sortable: true,
+        render: (row: GsmTableRow) => row.name || "---",
+      },
+      {
+        key: "username",
+        label: "USERNAME",
+        type: "text",
+        sortable: true,
+        render: (row: GsmTableRow) => row.username || "---",
+      },
+      {
+        key: "deviceStatus",
+        label: "DEVICE STATUS",
+        type: "custom",
+        sortable: true,
+        render: (row: GsmTableRow) => (
+          <div className="flex items-center gap-2">
+            {row.deviceStatus ? (
               <div className="text-gray-700 text-sm font-medium uppercase device-status-container">
                 <div
                   className={`device-status-dot ${
-                    row.device_status === "power_on"
-                      ? "active animate-ping"
-                      : ""
+                    row.deviceStatus === "power_on" ? "active animate-ping" : ""
                   }`}
                 ></div>
-
-                {row?.device_status?.toUpperCase() || "OFFLINE"}
+                {row.deviceStatus.toUpperCase() || "OFFLINE"}
               </div>
-            </>
-          ) : (
-            <div className="text-gray-400 text-lg">---</div>
+            ) : (
+              <div className="text-gray-400 text-lg">---</div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "companyName",
+        label: "COMPANIES",
+        type: "text",
+        sortable: true,
+        render: (row: GsmTableRow) => row.companyName || "---",
+      },
+    ];
+
+    return columns;
+  }, []);
+
+  // Toolbar configuration
+  const toolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: searchQuery,
+      searchPlaceholder: "Search GSM, Company...",
+      onSearchChange: setSearchQuery,
+      onSearch: () => {},
+      showFilterPills: false,
+      showExportButton: false,
+      showFiltersButton: false,
+      showSortButton: false,
+      showEditColumns: false,
+      customActions: (
+        <div className="d-flex gap-2">
+          {session?.user?.permissions?.includes('add-gsm-management') && (
+            <button
+              className="btn btn-primary"
+              id="new-assign-btn"
+              onClick={() => setShowAddGsmModal(true)}
+            >
+              <i className="fas fa-plus"></i> New Assign
+            </button>
+          )}
+
+          {session?.user?.permissions?.includes('export-gsm-managements') && (
+            <button
+              className="btn btn-export"
+              id="export-btn"
+              onClick={handleExportSuccessful}
+            >
+              <i className="fas fa-download"></i> Export
+            </button>
           )}
         </div>
       ),
+    }),
+    [searchQuery, session?.user?.permissions],
+  );
+
+  // Fetch GSM data - follows GenericListPage pattern
+  const fetchGsmData = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      setLoading(true);
+      try {
+        const response = await ListGsmManagement({
+          page,
+          perPage,
+          search,
+          filters: currentFilters,
+        });
+
+        if (response?.data) {
+          // Primary response structure: response.data contains the array
+          const dataArray = Array.isArray(response.data) ? (response.data as GsmApiRecord[]) : [];
+          const mappedData: GsmTableRow[] = dataArray.map((item, idx) => mapGsmRow(item, idx));
+          setTableData(mappedData);
+          
+          // Extract pagination metadata following API response structure
+          // Expected: response.total, response.last_page, response.current_page, response.per_page
+          const totalRecordsCount = response.total || response.metadata?.total_records || mappedData.length;
+          setTotalRecords(totalRecordsCount);
+
+          // Calculate summary data when data is fetched
+          if (response?.summary) {
+            setGsmSummary(response.summary);
+          }
+        } else {
+          // Fallback: API might return array directly or in dataList/records properties
+          const dataArray = Array.isArray(response)
+            ? (response as GsmApiRecord[])
+            : ((response?.dataList || response?.records || []) as GsmApiRecord[]);
+          
+          // Map fallback data to GsmTableRow format
+          if (dataArray.length > 0 && dataArray[0]?.id !== undefined) {
+            const mappedFallbackData: GsmTableRow[] = dataArray.map((item, idx) => mapGsmRow(item, idx));
+            setTableData(mappedFallbackData);
+            setTotalRecords(mappedFallbackData?.length || 0);
+          } else {
+            const mappedFallbackData: GsmTableRow[] = dataArray.map((item, idx) => mapGsmRow(item, idx));
+            setTableData(mappedFallbackData);
+            setTotalRecords(mappedFallbackData.length);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching GSM data:", err);
+        toast.error("Failed to load GSM data");
+        setTableData([]);
+        setTotalRecords(0);
+      } finally {
+        setLoading(false);
+      }
     },
-    {
-      key: "companies",
-      name: "Companies",
-      selector: (row: any) => row.company_name,
-      sortable: true,
-    },
-    // { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
-    //   cell: (row: any) => (
-    //     <span className={`badge ${row.status == "active" ? 'bg-success' : 'bg-danger'}`}>{row.status.charAt(0).toUpperCase() + row.status.slice(1)}</span>
-    //   )
-    //  },
-    {
-      key: "Action",
-      name: "ACTION",
-      selector: (row: any) => row.id,
-      sortable: false,
-      cell: (props: any) => (
-        <DatatableActionButton
-          actions={[
+    [],
+  );
 
-            ...(session?.user?.permissions?.includes('edit-gsm-management') ? [
-            {
-              label: "Edit",
-              icon: <FiEdit className="me-2" />,
-              onClick: () => handleEditGsm(props),
-              className: "action-edit",
-            },
-            ] : []),
+  // Handle pagination change callback
+  const handlePaginationChange = (page: number, rowsPerPage: number) => {
+    setCurrentPage(page);
+    if (rowsPerPage !== recordsPerPage) {
+      setRecordsPerPage(rowsPerPage);
+    }
+    // fetchGsmData will be called by useEffect when state updates
+  };
 
-            ...(session?.user?.permissions?.includes('view-gsm-management') ? [
-            {
-              label: "View",
-              icon: <FiEye className="me-2" />,
-              onClick: () => setShowGsmDetailsModel(true),
-              className: "action-view",
-            },
-            ] : []),
-
-            ...(session?.user?.permissions?.includes('delete-gsm-management') ? [
-            {
-              label: "Delete",
-              icon: <FiTrash2 className="me-2" />,
-              onClick: () => handleDeleteGsm(props),
-              className: "action-delete",
-            },
-            ] : []),
-          ]}
-        />
-      ),
-    },
-  ];
-
-  const [showAddGsmModal, setShowAddGsmModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
+  // Fetch data on mount and when pagination/search/filters change
+  useEffect(() => {
+    fetchGsmData(currentPage, recordsPerPage, searchQuery);
+  }, [currentPage, recordsPerPage, searchQuery, fetchGsmData]);
 
   // GSM Summary Data
   const [gsmSummary, setGsmSummary] = useState({
@@ -195,42 +309,6 @@ const GsmList = () => {
     },
   ];
 
-  const fetchGsm = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      const response = await ListGsmManagement({
-        page,
-        perPage,
-        search,
-        filters: currentFilters,
-      });
-
-      // Calculate summary data when data is fetched
-      if (response && response?.summary) {
-        setGsmSummary(response.summary);
-      }
-
-      return response;
-    },
-    [currentFilters]
-  );
-
-  const handleFiltersChange = (filters: any) => {
-    setCurrentFilters(filters);
-  };
-
-  const handleExport = async (
-    exportType: string,
-    filters: Record<string, any>
-  ) => {
-    // try {
-    //     const response = await ExportCallLogs({ page: 1, perPage: 15, search: "", filters, isExport: true, exportType });
-    //     console.log(response);
-    // } catch (error) {
-    //     console.error('Export error:', error);
-    //     toast.error('Export failed. Please try again.');
-    // }
-  };
-
   const [showEditGsmModal, setShowEditGsmModal] = useState(false);
   const [editGsmId, setEditGsmId] = useState("");
   const [editGsmName, setEditGsmName] = useState("");
@@ -239,15 +317,14 @@ const GsmList = () => {
   const [editGsmPassword, setEditGsmPassword] = useState("");
   const [editGsmStatus, setEditGsmStatus] = useState("");
 
-  const handleEditGsm = (props: any) => {
+  const handleEditGsm = (row: GsmTableRow) => {
     setShowEditGsmModal(true);
-    setEditGsmId(props.id);
-    setEditGsmName(props.name);
-    setEditGsmIpAddress(props.ip_address);
-    setEditGsmUsername(props.username);
-    setEditGsmPassword(props.password);
-    setEditGsmStatus(props.status);
-    setShowEditGsmModal(true);
+    setEditGsmId(row.id);
+    setEditGsmName(row.name);
+    setEditGsmIpAddress(row.ipAddress);
+    setEditGsmUsername(row.username);
+    setEditGsmPassword("");
+    setEditGsmStatus("");
   };
 
   const handleSubmitEditGsm = async () => {
@@ -277,7 +354,6 @@ const GsmList = () => {
         setEditGsmUsername("");
         setEditGsmPassword("");
         setEditGsmStatus("");
-        setRefreshKey(refreshKey + 1);
 
         // Show success message
         setSuccessModalTitle("Successfully Updated");
@@ -285,6 +361,10 @@ const GsmList = () => {
           "The GSM device has been successfully updated."
         );
         setShowSuccessModal(true);
+
+        // Refresh table data
+        setCurrentPage(1);
+        fetchGsmData(1, recordsPerPage, searchQuery);
       } else {
         toast.error("Failed to update GSM device");
       }
@@ -298,9 +378,9 @@ const GsmList = () => {
   const [selectedGsm, setSelectedGsm] = useState<string>("");
   const [selectedGsmName, setSelectedGsmName] = useState<string>("");
 
-  const handleDeleteGsm = (props: any) => {
-    setSelectedGsm(props.id);
-    setSelectedGsmName(props.name);
+  const handleDeleteGsm = (row: GsmTableRow) => {
+    setSelectedGsm(row.id);
+    setSelectedGsmName(row.name);
     setShowDeleteGsmModal(true);
   };
 
@@ -311,7 +391,6 @@ const GsmList = () => {
         setShowDeleteGsmModal(false);
         setSelectedGsm("");
         setSelectedGsmName("");
-        setRefreshKey(refreshKey + 1);
 
         // Show success message
         setSuccessModalTitle("Successfully Deleted");
@@ -319,6 +398,10 @@ const GsmList = () => {
           "The GSM device has been successfully deleted."
         );
         setShowSuccessModal(true);
+
+        // Refresh table data
+        setCurrentPage(1);
+        fetchGsmData(1, recordsPerPage, searchQuery);
       } else {
         toast.error("Failed to delete GSM");
       }
@@ -366,58 +449,10 @@ const GsmList = () => {
               <Col md={5}>
                 <h2 className="mb-0">Telco Gateway Management</h2>
 
-                {/* {session?.user?.permissions?.includes('add-gsm-management') && (
-                          <Button variant="outline-primary" size="sm" className="ms-3" onClick={() => setShowCreateGsmModal(true)}>New Gsm</Button>
-                      )}
-
-                      </h2>
-                    </Col>
-                    <Col md={7} className="d-flex justify-content-end">
-                      <GsmListFilter onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
               </Col>
 
               <Col md={7} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  
-                  {session?.user?.permissions?.includes('list-gsm-management') && (
-                  <div className="search-container">
-                    <i className="fas fa-search search-icon"></i>
-                    <input
-                      type="text"
-                      className="search-bar"
-                      placeholder="Search GSM, Company..."
-                      onChange={(e) =>
-                        handleFiltersChange({
-                          ...currentFilters,
-                          search: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  )}
-
-{session?.user?.permissions?.includes('add-gsm-management') && (
-                  <button
-                    className="btn btn-primary"
-                    id="new-assign-btn"
-                    onClick={() => setShowAddGsmModal(true)}
-                  >
-                    <i className="fas fa-plus"></i> New Assign
-                  </button>
-                  )}
-
-
-{session?.user?.permissions?.includes('export-gsm-managements') && (
-                  <button
-                    className="btn btn-export"
-                    id="export-btn"
-                    onClick={handleExportSuccessful}
-                  >
-                    <i className="fas fa-download"></i> Export
-                  </button>
-                  )}
-                </div>
-                
+                {/* Search and action buttons are now in GenericTable toolbar */}
               </Col>
             </Row>
           </div>
@@ -428,22 +463,57 @@ const GsmList = () => {
       <PageSummaryGrid cards={summaryCards} />
 
       {session?.user?.permissions?.includes("list-gsm-management") && (
-        <GenericListPage
-          columns={columns}
-          fetchData={fetchGsm}
-          title="GSM List"
-          searchPlaceholder="Search gsm list..."
-          defaultPageSize={15}
-          filters={currentFilters}
-          refreshKey={refreshKey}
-          search={false}
-          tableStyle="table-style-2"
-          onFiltersClick={() => console.log("Filters clicked")}
-          onExportClick={handleExportSuccessful}
-          onNewClick={() => setShowAddGsmModal(true)}
-          filtersText="Filters"
-          exportText="Export"
-          newText="New GSM"
+        <GenericTable<GsmTableRow>
+          data={tableData}
+          columns={gsmColumns}
+          uniqueKey="id"
+          loading={loading}
+          loadingMessage="Loading GSM devices..."
+          emptyMessage="No GSM devices found. Click 'New Assign' to add one."
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          showActions={true}
+          actionsLabel="Actions"
+          customizableColumns={false}
+          showToolbarActions={false}
+          pagination={{
+            currentPage,
+            rowsPerPage: recordsPerPage,
+            totalRows: totalRecords,
+            pageSizeOptions: [10, 15, 25, 50],
+          }}
+          onPaginationChange={handlePaginationChange}
+          actions={[
+            ...(session?.user?.permissions?.includes('edit-gsm-management') ? [
+              {
+                label: "Edit",
+                icon: <FiEdit className="me-2" />,
+                onClick: (row: GsmTableRow) => handleEditGsm(row),
+                className: "action-edit",
+              },
+            ] : []),
+            ...(session?.user?.permissions?.includes('view-gsm-management') ? [
+              {
+                label: "View",
+                icon: <FiEye className="me-2" />,
+                onClick: (row: GsmTableRow) => {
+                  setShowGsmDetailsModel(true);
+                },
+                className: "action-view",
+              },
+            ] : []),
+            ...(session?.user?.permissions?.includes('delete-gsm-management') ? [
+              {
+                label: "Delete",
+                icon: <FiTrash2 className="me-2" />,
+                onClick: (row: GsmTableRow) => handleDeleteGsm(row),
+                className: "action-delete",
+              },
+            ] : []),
+          ]}
+          hover={true}
+          striped={false}
+          size="md"
         />
       )}
 
@@ -523,28 +593,24 @@ const GsmList = () => {
       )}
 
       {showDeleteGsmModal && (
-        <>
-          <ConfirmModal
-            show={showDeleteGsmModal}
-            onHide={() => setShowDeleteGsmModal(false)}
-            title="Delete GSM?"
-            description={`Are you sure you want to delete "${selectedGsmName}"? This action cannot be undone.`}
-            targetName="this GSM device"
-            onConfirm={handleSubmitDeleteGsm}
-          />
-        </>
+        <ConfirmModal
+          show={showDeleteGsmModal}
+          onHide={() => setShowDeleteGsmModal(false)}
+          title="Delete GSM?"
+          description={`Are you sure you want to delete "${selectedGsmName}"? This action cannot be undone.`}
+          targetName="this GSM device"
+          onConfirm={handleSubmitDeleteGsm}
+        />
       )}
 
       {showExportSuccessfulModal && (
-        <>
-          <SuccessfulModal
-            show={showExportSuccessfulModal}
-            onHide={() => setShowExportSuccessfulModal(false)}
-            title="Export Successful!"
-            description="The GSM data has been successfully exported as a JSON file."
-            confirmButtonText="OK"
-          />
-        </>
+        <SuccessfulModal
+          show={showExportSuccessfulModal}
+          onHide={() => setShowExportSuccessfulModal(false)}
+          title="Export Successful!"
+          description="The GSM data has been successfully exported as a JSON file."
+          confirmButtonText="OK"
+        />
       )}
 
       {showAddGsmModal && (
@@ -558,7 +624,9 @@ const GsmList = () => {
               "The GSM device has been successfully created."
             );
             setShowSuccessModal(true);
-            setRefreshKey(refreshKey + 1);
+            // Refresh table data
+            setCurrentPage(1);
+            fetchGsmData(1, recordsPerPage, searchQuery);
           }}
         />
       )}
@@ -574,25 +642,23 @@ const GsmList = () => {
       )}
 
       {showGsmDetailsModel && (
-        <>
-          <GsmDetailModel
-            show={showGsmDetailsModel}
-            onHide={() => setShowGsmDetailsModel(false)}
-            gsmData={{
-              id: "GSM001",
-              name: "Main GSM",
-              status: "Active",
-              location: "Building A",
-              ports: [1, 2, 3, 5],
-              lastSync: "2024-01-15 10:30:00",
-              description: "Primary GSM unit for building A",
-            }}
-            onEdit={(data: any) => console.log("Edit:", data)}
-            onDelete={(id: any) => console.log("Delete:", id)}
-            showEditButton={true}
-            showDeleteButton={true}
-          />
-        </>
+        <GsmDetailModel
+          show={showGsmDetailsModel}
+          onHide={() => setShowGsmDetailsModel(false)}
+          gsmData={{
+            id: "GSM001",
+            name: "Main GSM",
+            status: "Active",
+            location: "Building A",
+            ports: [1, 2, 3, 5],
+            lastSync: "2024-01-15 10:30:00",
+            description: "Primary GSM unit for building A",
+          }}
+          onEdit={() => {}}
+          onDelete={() => {}}
+          showEditButton={true}
+          showDeleteButton={true}
+        />
       )}
     </React.Fragment>
   );

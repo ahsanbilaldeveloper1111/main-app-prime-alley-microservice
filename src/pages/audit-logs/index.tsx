@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import PageHeader from "@components/PageHeader";
-import { Card, Dropdown, Modal, Table, Form, Button } from "react-bootstrap";
+import { Modal, Table, Form, Button } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import { FileText } from "lucide-react";
-import GenericTable, { TableColumn, PaginationConfig, ToolbarConfig } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
+import GenericTable, { TableColumn, PaginationConfig, ToolbarConfig, FilterPill } from "@components/GenericTable";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import AuditLogSidebar, { AuditSidebarField } from "@components/AuditLogSidebar";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
@@ -26,8 +23,8 @@ function normalizeAuditResponse(result: unknown): unknown[] {
 function formatLabel(value: unknown): string {
   if (value == null || value === "") return "—";
   return String(value)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .replaceAll("_", " ")
+    .replaceAll(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /** Build shared Changes column (reused across modules). */
@@ -38,11 +35,12 @@ function changesSummaryColumn(): TableColumn<Record<string, unknown>> {
     sortable: false,
     type: "custom",
     render: (row: Record<string, unknown>) => {
-      const summary = row.changes_summary as any[] | undefined;
-      if (!summary?.length) return "—";
+      const summary = row.changes_summary as ChangeItem[] | undefined;
+      if (summary == null || summary.length === 0) return "—";
+      const suffix = summary.length === 1 ? "" : "s";
       return (
-        <span title={summary.map((c: any) => `${c.field}: ${c.type} ${c.new || c.old || ""}`).join("\n")}>
-          {summary.length} change{summary.length !== 1 ? "s" : ""}
+        <span title={summary.map((c) => `${c.field}: ${c.type} ${c.new || c.old || ""}`).join("\n")}>
+          {summary.length} change{suffix}
         </span>
       );
     },
@@ -69,8 +67,7 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "User",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) =>
-        (row.user as any)?.display_name || (row.user as any)?.email || row.user_id || "—",
+      accessor: (row: Record<string, unknown>) => userDisplayFromRow(row),
       emptyValue: "—",
     },
     // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
@@ -93,7 +90,7 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "Company",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) => (row.company as any)?.name || "—",
+      accessor: (row: Record<string, unknown>) => companyNameFromRow(row),
       emptyValue: "—",
     },
     // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
@@ -132,7 +129,7 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "Company",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) => (row.company as any)?.name || "—",
+      accessor: (row: Record<string, unknown>) => companyNameFromRow(row),
       emptyValue: "—",
     },
     // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
@@ -181,7 +178,8 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       accessor: (row: Record<string, unknown>) => {
         const u = row.user_extension;
         if (row.user_display != null && row.user_display !== "") return String(row.user_display);
-        if (u && typeof u === "object" && !Array.isArray(u)) return (u as any).display_name || (u as any).name || "—";
+        const userObj = toUserLike(u);
+        if (userObj) return userObj.display_name || userObj.name || "—";
         if (u != null && u !== "") return String(u);
         return "—";
       },
@@ -225,10 +223,11 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       accessor: (row: Record<string, unknown>) => {
         if (row.user_display != null && row.user_display !== "") return String(row.user_display);
         const uExt = row.user_extension;
-        if (uExt && typeof uExt === "object" && !Array.isArray(uExt))
-          return (uExt as any).display_name || (uExt as any).name || (uExt as any).email || "—";
+        const uExtObj = toUserLike(uExt);
+        if (uExtObj) return uExtObj.display_name || uExtObj.name || uExtObj.email || "—";
         const u = row.user_id;
-        if (u && typeof u === "object" && !Array.isArray(u)) return (u as any).display_name || (u as any).name || "—";
+        const uObj = toUserLike(u);
+        if (uObj) return uObj.display_name || uObj.name || "—";
         if (u != null && u !== "") return String(u);
         if (uExt != null && uExt !== "") return String(uExt);
         return "—";
@@ -256,8 +255,7 @@ const defaultAuditLogColumns: TableColumn<Record<string, unknown>>[] = [
     label: "User",
     sortable: true,
     type: "text",
-    accessor: (row: Record<string, unknown>) =>
-      (row.user as any)?.display_name || (row.user as any)?.email || row.user_id || "—",
+    accessor: (row: Record<string, unknown>) => userDisplayFromRow(row),
     emptyValue: "—",
   },
   // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
@@ -317,19 +315,47 @@ const AUDIT_SIDEBAR_FIELDS_BY_MODULE: Record<
 
 const DEFAULT_SIDEBAR_FIELDS = AUDIT_SIDEBAR_FIELDS_BY_MODULE["Staff management"];
 
-function getSidebarFieldValue(row: Record<string, unknown>, key: string): string {
-  if (key === "user" || key === "user_id") {
-    if (row.user_display != null && row.user_display !== "") return String(row.user_display);
-    const uExt = row.user_extension;
-    if (uExt && typeof uExt === "object" && !Array.isArray(uExt))
-      return (uExt as any).display_name || (uExt as any).name || (uExt as any).email || "—";
-    if (uExt != null && uExt !== "") return String(uExt);
-    const u = row.user as any;
-    return u?.display_name || u?.email || (row.user_id != null ? String(row.user_id) : "—") || "—";
+type UserLike = { display_name?: string; name?: string; email?: string };
+function asStringOrEmpty(value: unknown): string {
+  if (value == null || value === "") return "";
+  return String(value);
+}
+
+function valueOrDash(value: unknown): string {
+  if (value == null || value === "") return "—";
+  return String(value);
+}
+type HierarchyResponse = { extensions?: Array<Record<string, unknown>> };
+
+function toUserLike(value: unknown): UserLike | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as UserLike;
+  return null;
+}
+
+function userDisplayFromRow(row: Record<string, unknown>): string {
+  if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+  const uExt = row.user_extension;
+  const uExtObj = toUserLike(uExt);
+  if (uExtObj) return uExtObj.display_name || uExtObj.name || uExtObj.email || "—";
+  if (uExt != null && uExt !== "") return String(uExt);
+  const uObj = toUserLike(row.user);
+  if (uObj) return uObj.display_name || uObj.email || uObj.name || "—";
+  if (row.user_id != null && row.user_id !== "") return String(row.user_id);
+  return "—";
+}
+
+function companyNameFromRow(row: Record<string, unknown>): string {
+  const company = row.company;
+  if (company && typeof company === "object" && !Array.isArray(company)) {
+    const name = (company as { name?: unknown }).name;
+    if (name != null && name !== "") return String(name);
   }
-  if (key === "company") {
-    return (row.company as any)?.name || "—";
-  }
+  return "—";
+}
+
+function getSidebarFieldValue(row: Record<string, unknown>, key: string): string { // NOSONAR
+  if (key === "user" || key === "user_id") return userDisplayFromRow(row);
+  if (key === "company") return companyNameFromRow(row);
   if (key === "resource_type") return formatLabel(row.record_type ?? row.resource_type);
   if (key === "formatted_timestamp") {
     const v = row.formatted_timestamp;
@@ -340,7 +366,10 @@ function getSidebarFieldValue(row: Record<string, unknown>, key: string): string
   if (key === "formatted_action") {
     const v = row.formatted_action;
     if (v != null && v !== "") return String(v);
-    return formatLabel(row.action) || (row.action != null ? String(row.action) : "") || "—";
+    const formattedAction = formatLabel(row.action);
+    if (formattedAction !== "—") return formattedAction;
+    if (row.action != null && row.action !== "") return String(row.action);
+    return "—";
   }
   if (key === "created_at_formatted") {
     const v = row.created_at_formatted;
@@ -354,8 +383,9 @@ function getSidebarFieldValue(row: Record<string, unknown>, key: string): string
   if (key === "entity_type") return formatLabel(row.entity_type) || "—";
   if (key === "changes_summary") {
     const summary = row.changes_summary as ChangeItem[] | undefined;
-    if (!summary?.length) return "—";
-    return `${summary.length} change${summary.length !== 1 ? "s" : ""}: ${summary.map((c) => c.field).filter(Boolean).join(", ")}`;
+    if (summary == null || summary.length === 0) return "—";
+    const suffix = summary.length === 1 ? "" : "s";
+    return `${summary.length} change${suffix}: ${summary.map((c) => c.field).filter(Boolean).join(", ")}`;
   }
   const v = row[key];
   return v != null && v !== "" ? String(v) : "—";
@@ -415,26 +445,33 @@ function normalizeCrmChanges(changes: unknown): ChangeItem[] {
   if (!changes) return [];
   const format = (v: unknown): string => (v == null || v === "" ? "—" : String(v));
   if (Array.isArray(changes)) {
-    return changes.map((c: any) => ({
-      field: c.field ?? (c.fieldKey != null ? formatLabel(c.fieldKey) : "—"),
-      type: c.type ?? "updated",
-      old: c.old != null ? format(c.old) : "—",
-      new: c.new != null ? format(c.new) : "—",
-    }));
+    return changes.map((c) => {
+      const obj = c as Record<string, unknown>;
+      const fieldValue = valueOrDash(obj.field);
+      const fieldKeyValue = valueOrDash(obj.fieldKey) === "—" ? "—" : formatLabel(obj.fieldKey);
+      const field = fieldValue === "—" ? fieldKeyValue : fieldValue;
+      const type = valueOrDash(obj.type) === "—" ? "updated" : String(obj.type);
+      return {
+        field,
+        type,
+        old: valueOrDash(obj.old) === "—" ? "—" : format(obj.old),
+        new: valueOrDash(obj.new) === "—" ? "—" : format(obj.new),
+      };
+    });
   }
   if (typeof changes === "object" && changes !== null && !Array.isArray(changes)) {
     const obj = changes as Record<string, { old?: unknown; new?: unknown }>;
     return Object.entries(obj).map(([key, val]) => ({
       field: formatLabel(key),
       type: "updated",
-      old: val && typeof val === "object" && "old" in val ? format(val.old) : "—",
-      new: val && typeof val === "object" && "new" in val ? format(val.new) : "—",
+      old: val != null && typeof val === "object" && "old" in val ? format(val.old) : "—",
+      new: val != null && typeof val === "object" && "new" in val ? format(val.new) : "—",
     }));
   }
   return [];
 }
 
-function ChangesSummaryTable({ changes }: { changes: ChangeItem[] }) {
+function ChangesSummaryTable({ changes }: Readonly<{ changes: ChangeItem[] }>) {
   if (!changes?.length) {
     return <span className="text-muted">—</span>;
   }
@@ -449,8 +486,8 @@ function ChangesSummaryTable({ changes }: { changes: ChangeItem[] }) {
         </tr>
       </thead>
       <tbody>
-        {changes.map((c, i) => (
-          <tr key={i}>
+        {changes.map((c) => (
+          <tr key={`${c.field ?? "field"}-${c.type ?? "type"}-${c.new ?? ""}-${c.old ?? ""}`}>
             <td>{c.field ?? "—"}</td>
             <td>{c.type ?? "—"}</td>
             <td className="text-break">{c.new ?? "—"}</td>
@@ -462,7 +499,7 @@ function ChangesSummaryTable({ changes }: { changes: ChangeItem[] }) {
   );
 }
 
-const AuditLogsNewPage = () => {
+const AuditLogsNewPage = () => { // NOSONAR
   const { data: session } = useSession();
   const [selectedAuditModule, setSelectedAuditModule] = useState<AuditFilterNode | null>(null);
   const [selectedAuditService, setSelectedAuditService] = useState<AuditFilterService | null>(null);
@@ -483,9 +520,10 @@ const AuditLogsNewPage = () => {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
 
+  const selectedRowUser = toUserLike(selectedRow?.user);
   const sidebarFields: AuditSidebarField[] = selectedRow ? [
-  { label: "Category",       value: formatLabel(selectedRow.resource_type as string) },
-  { label: "Subcategory",    value: formatLabel(selectedRow.formatted_action as string) },
+  { label: "Category",       value: formatLabel(selectedRow.resource_type) },
+  { label: "Subcategory",    value: formatLabel(selectedRow.formatted_action) },
   { label: "Action",         value: "Perform" },
   {
     label: "Date of change",
@@ -495,15 +533,15 @@ const AuditLogsNewPage = () => {
     label: "Modified by",
     value: "",
     isUser: true,
-    userName: (selectedRow.user as any)?.display_name || "Unknown",
-    userEmail: (selectedRow.user as any)?.email || "",
+    userName: selectedRowUser?.display_name || "Unknown",
+    userEmail: selectedRowUser?.email || "",
     sectionBreakAfter: true,
   },
-  { label: "Country",        value: (selectedRow.country as string) || "—" },
-  { label: "Region",         value: (selectedRow.region as string) || "—" },
-  { label: "Login Type",     value: (selectedRow.login_type as string) || "—" },
-  { label: "User Agent",     value: (selectedRow.user_agent as string) || "—" },
-  { label: "IP Address",     value: (selectedRow.ip_address as string) || "—" },
+  { label: "Country",        value: selectedRow.country != null && selectedRow.country !== "" ? String(selectedRow.country) : "—" },
+  { label: "Region",         value: selectedRow.region != null && selectedRow.region !== "" ? String(selectedRow.region) : "—" },
+  { label: "Login Type",     value: selectedRow.login_type != null && selectedRow.login_type !== "" ? String(selectedRow.login_type) : "—" },
+  { label: "User Agent",     value: selectedRow.user_agent != null && selectedRow.user_agent !== "" ? String(selectedRow.user_agent) : "—" },
+  { label: "IP Address",     value: selectedRow.ip_address != null && selectedRow.ip_address !== "" ? String(selectedRow.ip_address) : "—" },
 ] : [];
 
   const visibleAuditModules = useMemo(() => {
@@ -573,12 +611,12 @@ const AuditLogsNewPage = () => {
     }
     let cancelled = false;
     GetHierarchyData(moduleSlug)
-      .then((data: any) => {
+      .then((data: HierarchyResponse) => {
         if (cancelled || !data?.extensions || !Array.isArray(data.extensions)) return;
         setAuditUserOptions(
-          data.extensions.map((ext: any) => ({
+          data.extensions.map((ext) => ({
             value: String(ext.id ?? ext.extension_number ?? ext.extension ?? ext.user_id ?? ""),
-            label: ext.display_name || ext.name || ext.extension_number || ext.extension || String(ext.id ?? "Unknown"),
+            label: String(ext.display_name ?? ext.name ?? ext.extension_number ?? ext.extension ?? ext.id ?? "Unknown"),
           }))
         );
       })
@@ -627,8 +665,8 @@ const AuditLogsNewPage = () => {
           summary?: Record<string, number>;
           data?: { summary?: Record<string, number> };
         };
-        if (res?.pagination?.total != null) setAuditTotal(res.pagination.total);
-        else setAuditTotal(Array.isArray(data) ? data.length : 0);
+        if (res?.pagination?.total == null) setAuditTotal(Array.isArray(data) ? data.length : 0);
+        else setAuditTotal(res.pagination.total);
         const summaryObj = res?.summary ?? res?.data?.summary;
         if (summaryObj && typeof summaryObj === "object" && !Array.isArray(summaryObj)) {
           const summary: Record<string, number> = {};
@@ -666,39 +704,48 @@ const AuditLogsNewPage = () => {
     const raw = auditLogsData ?? [];
     const moduleName = selectedAuditModule?.moduleName ?? "";
     if (moduleName === "Main App") {
-      return raw.map((row: any) => {
-        const derived = deriveChangesFromOldNew(row.old_values, row.new_values);
-        const ext = row.user_extension != null ? String(row.user_extension) : "";
+      return raw.map((row) => {
+        const rowObj = row as Record<string, unknown>;
+        const derived = deriveChangesFromOldNew(
+          rowObj.old_values as Record<string, unknown> | undefined,
+          rowObj.new_values as Record<string, unknown> | undefined
+        );
+        const ext = asStringOrEmpty(rowObj.user_extension);
+        const userExtObj = toUserLike(rowObj.user_extension);
         const userDisplay =
           auditUserOptions.find((o) => String(o.value) === ext)?.label ??
-          (row.user_extension && typeof row.user_extension === "object"
-            ? (row.user_extension as any).display_name || (row.user_extension as any).name
-            : null);
+          (userExtObj ? userExtObj.display_name || userExtObj.name : null);
         return {
-          ...row,
-          resource_type: row.record_type ?? row.resource_type,
-          formatted_timestamp: row.formatted_timestamp ?? (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null),
-          formatted_action: row.formatted_action ?? (row.action ? formatLabel(row.action) : null) ?? row.action,
-          changes_summary: row.changes_summary ?? derived,
+          ...rowObj,
+          resource_type: rowObj.record_type ?? rowObj.resource_type,
+          formatted_timestamp: rowObj.formatted_timestamp ?? (rowObj.created_at ? moment(String(rowObj.created_at)).format("MMM D, YYYY HH:mm:ss") : null),
+          formatted_action: rowObj.formatted_action ?? (rowObj.action ? formatLabel(rowObj.action) : null) ?? rowObj.action,
+          changes_summary: rowObj.changes_summary ?? derived,
           ...(userDisplay != null && userDisplay !== "" ? { user_display: userDisplay } : {}),
         };
       });
     }
     if (moduleName === "Accounts" || moduleName === "Automation") {
-      return raw.map((row: any) => {
-        const existing = row.changes_summary;
+      return raw.map((row) => {
+        const rowObj = row as Record<string, unknown>;
+        const existing = rowObj.changes_summary;
         if (existing && Array.isArray(existing) && existing.length > 0) return row;
-        const derived = deriveChangesFromOldNew(row.old_values, row.new_values);
-        return { ...row, changes_summary: derived };
+        const derived = deriveChangesFromOldNew(
+          rowObj.old_values as Record<string, unknown> | undefined,
+          rowObj.new_values as Record<string, unknown> | undefined
+        );
+        return { ...rowObj, changes_summary: derived };
       });
     }
     if (moduleName === "CRM") {
-      return raw.map((row: any) => {
-        const ext = row.user_extension != null ? String(row.user_extension) : "";
-        const userDisplay = auditUserOptions.find((o) => String(o.value) === ext)?.label ?? (row.user_extension && typeof row.user_extension === "object" ? (row.user_extension as any).display_name || (row.user_extension as any).name : null);
+      return raw.map((row) => {
+        const rowObj = row as Record<string, unknown>;
+        const ext = asStringOrEmpty(rowObj.user_extension);
+        const userExtObj = toUserLike(rowObj.user_extension);
+        const userDisplay = auditUserOptions.find((o) => String(o.value) === ext)?.label ?? (userExtObj ? userExtObj.display_name || userExtObj.name : null);
         return {
-          ...row,
-          changes_summary: row.changes_summary ?? normalizeCrmChanges(row.changes) ?? [],
+          ...rowObj,
+          changes_summary: rowObj.changes_summary ?? normalizeCrmChanges(rowObj.changes) ?? [],
           ...(userDisplay != null && userDisplay !== "" ? { user_display: userDisplay } : {}),
         };
       });
@@ -706,56 +753,60 @@ const AuditLogsNewPage = () => {
     return raw;
   }, [auditLogsData, selectedAuditModule?.moduleName, auditUserOptions]);
 
-  const isReady = !!selectedAuditModule;
+  const filterPills = useMemo<FilterPill[]>(() => {
+    if (visibleAuditModules.length === 0) return [];
 
-  const changesSummary = (selectedRow?.changes_summary as ChangeItem[] | undefined) ?? [];
-
-  const filterPills = useMemo(() => {
-    const pills: any[] = [];
-    if (visibleAuditModules.length === 0) return pills;
-    
-    // Add individual module pills instead of dropdown
-    visibleAuditModules.forEach((module) => {
-      pills.push({
-        id: `audit_module_${module.moduleName}`,
-        label: module.moduleName,
-        active: selectedAuditModule?.moduleName === module.moduleName,
-        onClick: () => handleAuditModuleChange(module.moduleName),
-        onClear: selectedAuditModule?.moduleName === module.moduleName 
+    const modulePills: FilterPill[] = visibleAuditModules.map((module) => ({
+      id: `audit_module_${module.moduleName}`,
+      label: String(module.moduleName),
+      active: selectedAuditModule?.moduleName === module.moduleName,
+      onClick: () => handleAuditModuleChange(module.moduleName),
+      onClear:
+        selectedAuditModule?.moduleName === module.moduleName
           ? () => handleAuditModuleChange("")
           : undefined,
-      });
-    });
-    
-    if (!selectedAuditModule) return pills;
-    pills.push({
-      id: "audit_service",
-      searchable: true,
-      label: selectedAuditService ? selectedAuditService.serviceName : "Select Resources",
-      showDropdown: true,
-      dropdownOptions: [
-        // { label: "All Resources", value: "", onClick: () => handleAuditServiceChange("") },
-        ...visibleAuditServices.map((s) => ({ label: s.serviceName, value: s.serviceName, onClick: () => handleAuditServiceChange(s.serviceName) })),
-      ],
-    });
+    }));
+    if (!selectedAuditModule) return modulePills;
+
     const actionOptions = selectedAuditService
       ? selectedAuditService.actions
       : Array.from(new Set(visibleAuditServices.flatMap((s) => s.actions)));
-    pills.push({
+
+    const dateLabel = (() => {
+      const hasRange = auditStartDate && auditEndDate;
+      if (!hasRange) return "Select Audit date";
+      if (auditStartDate === auditEndDate) return moment(auditStartDate).format("MMM D, YYYY");
+      const start = moment(auditStartDate).format("MMM D");
+      const end = moment(auditEndDate).format("MMM D, YYYY");
+      return `${start} - ${end}`;
+    })();
+
+    const servicePill: FilterPill = {
+      id: "audit_service",
+      searchable: true,
+      label: selectedAuditService ? String(selectedAuditService.serviceName) : "Select Resources",
+      showDropdown: true,
+      dropdownOptions: visibleAuditServices.map((s) => ({
+        label: String(s.serviceName),
+        value: String(s.serviceName),
+        onClick: () => handleAuditServiceChange(s.serviceName),
+      })),
+    };
+
+    const actionPill: FilterPill = {
       id: "audit_action",
       label: selectedAuditAction || "Select Action",
       showDropdown: true,
       searchable: true,
       dropdownOptions: [
         { label: "All", value: "", onClick: () => setSelectedAuditAction("") },
-        ...actionOptions?.map((a) => ({ label: a, value: a, onClick: () => setSelectedAuditAction(a ?? "") })) ?? [],
+        ...(actionOptions?.map((a) => ({ label: String(a), value: String(a), onClick: () => setSelectedAuditAction(a ?? "") })) ?? []),
       ],
-    });
-    pills.push({
+    };
+
+    const datePill: FilterPill = {
       id: "audit_date",
-      label: auditStartDate && auditEndDate
-        ? auditStartDate === auditEndDate ? moment(auditStartDate).format("MMM D, YYYY") : `${moment(auditStartDate).format("MMM D")} - ${moment(auditEndDate).format("MMM D, YYYY")}`
-        : "Select Audit date",
+      label: dateLabel,
       showDropdown: true,
       dropdownOptions: [
         { label: "All Time", value: "all", onClick: () => { setAuditStartDate(""); setAuditEndDate(""); } },
@@ -764,23 +815,30 @@ const AuditLogsNewPage = () => {
         { label: "Last 30 Days", value: "month", onClick: () => { setAuditStartDate(moment().subtract(30, "days").format("YYYY-MM-DD")); setAuditEndDate(moment().format("YYYY-MM-DD")); } },
         { label: "Custom range...", value: "custom", onClick: () => { setCustomStartDate(auditStartDate || ""); setCustomEndDate(auditEndDate || ""); setShowAuditDateCustomModal(true); } },
       ],
-    });
-    const showUserPill =
-      (selectedAuditModule && (selectedAuditModule.users === "hierarchy" || selectedAuditModule.users === "dropdown")) ||
-      (selectedAuditService && (selectedAuditService.users === "hierarchy" || selectedAuditService.users === "dropdown"));
-    if (showUserPill) {
-      pills.push({
-        id: "audit_user",
-        label: selectedAuditUser ? (auditUserOptions.find((o) => o.value === selectedAuditUser)?.label || selectedAuditUser) : "Select User",
-        showDropdown: true,
-        searchable: true,
-        dropdownOptions: [
-          { label: "All users", value: "", onClick: () => setSelectedAuditUser("") },
-          ...auditUserOptions.map((o) => ({ label: o.label, value: o.value, onClick: () => setSelectedAuditUser(o.value) })),
-        ],
-      });
-    }
-    return pills;
+    };
+
+    const moduleUsesUsers =
+      selectedAuditModule.users === "hierarchy" || selectedAuditModule.users === "dropdown";
+    const serviceUsesUsers =
+      selectedAuditService?.users === "hierarchy" || selectedAuditService?.users === "dropdown";
+    const showUserPill = moduleUsesUsers || serviceUsesUsers;
+    if (!showUserPill) return [...modulePills, servicePill, actionPill, datePill];
+
+    const selectedUserLabel =
+      selectedAuditUser
+        ? auditUserOptions.find((o) => o.value === selectedAuditUser)?.label || selectedAuditUser
+        : "Select User";
+    const userPill: FilterPill = {
+      id: "audit_user",
+      label: selectedUserLabel,
+      showDropdown: true,
+      searchable: true,
+      dropdownOptions: [
+        { label: "All users", value: "", onClick: () => setSelectedAuditUser("") },
+        ...auditUserOptions.map((o) => ({ label: o.label, value: o.value, onClick: () => setSelectedAuditUser(o.value) })),
+      ],
+    };
+    return [...modulePills, servicePill, actionPill, datePill, userPill];
   }, [visibleAuditModules, visibleAuditServices, selectedAuditModule, selectedAuditService, selectedAuditAction, auditStartDate, auditEndDate, selectedAuditUser, auditUserOptions, handleAuditModuleChange, handleAuditServiceChange]);
 
   const toolbarConfig: ToolbarConfig = useMemo(() => ({
@@ -862,9 +920,9 @@ const AuditLogsNewPage = () => {
     isOpen={showSidebar}
     onClose={handleCloseSidebar}
     title="Additional details"
-    subtitle={selectedRow.formatted_timestamp as string}
+    subtitle={asStringOrEmpty(selectedRow.formatted_timestamp)}
     fields={sidebarFields}
-    onSaveComment={(comment) => console.log("Comment:", comment)}
+    onSaveComment={() => {}}
   />
 )}
 

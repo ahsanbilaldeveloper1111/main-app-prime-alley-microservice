@@ -10,12 +10,16 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import axiosInstance from "@utils/axios";
-import { convertDateTimeWithOffsetToLocal, GlobalDateTimeFormat } from "@utils/Helper";
+import GenericTable, {
+  FilterPill,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { Row, Col, Card, Form, Button, Table, Dropdown, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
-import { TrendingUp, Shield, RefreshCw, XCircle, X, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
+import { Row, Col, Card, Form, Button, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
+import { TrendingUp, Shield, RefreshCw, XCircle, Clock, Phone } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 
@@ -69,7 +73,7 @@ interface CDRResponse {
         max_time_ms: number;
       };
     };
-    [key: string]: any;
+    [key: string]: unknown;
   };
   status: string;
   message: string;
@@ -86,6 +90,23 @@ interface CDRResponse {
   data: CDRRecord[];
 }
 
+type StatusChipTone = {
+  color: string;
+  backgroundColor: string;
+};
+
+function getTriStateTone(value: string, positive: string, neutral: string): StatusChipTone {
+  if (value === positive) return { color: "#0d8a5e", backgroundColor: "#d1f4e8" };
+  if (value === neutral) return { color: "#6c757d", backgroundColor: "#e9ecef" };
+  return { color: "#dc3545", backgroundColor: "#f8d7da" };
+}
+
+function getDncrTone(value: string): StatusChipTone {
+  if (value === "TRUE") return { color: "#dc3545", backgroundColor: "#f8d7da" };
+  if (value === "FALSE") return { color: "#0d8a5e", backgroundColor: "#d1f4e8" };
+  return { color: "#6c757d", backgroundColor: "#e9ecef" };
+}
+
 // Mapped record type for UI
 interface MappedCDRRecord {
   id: string;
@@ -100,6 +121,41 @@ interface MappedCDRRecord {
   allowLocalDNCL: string;
   allowApiDNCLCalls: string;
   allowRepetition: string;
+}
+
+interface AppliedFilters {
+  search: string;
+  calling_number: string;
+  called_number: string;
+  user_id: string;
+  call_repetition_status: string;
+  local_dnd_status: string;
+  dncr_api_status: string;
+  date_from: string;
+  date_to: string;
+}
+
+function buildCdrQueryParams(
+  currentPage: number,
+  recordsPerPage: number,
+  filters: AppliedFilters,
+): Record<string, string | number | boolean> {
+  const params: Record<string, string | number | boolean> = {
+    page: currentPage,
+    per_page: recordsPerPage,
+    include_statistics: true,
+  };
+
+  if (filters.search) params.search = filters.search;
+  if (filters.calling_number) params.calling_number = filters.calling_number;
+  if (filters.called_number) params.called_number = filters.called_number;
+  if (filters.user_id.trim()) params.user_id = filters.user_id.trim();
+  if (filters.call_repetition_status) params.call_repetition_status = filters.call_repetition_status;
+  if (filters.local_dnd_status) params.local_dnd_status = filters.local_dnd_status;
+  if (filters.dncr_api_status) params.dncr_api_status = filters.dncr_api_status;
+  if (filters.date_from) params.date_from = filters.date_from;
+  if (filters.date_to) params.date_to = filters.date_to;
+  return params;
 }
 
 // Phone Container Component
@@ -299,7 +355,7 @@ const CDRRecords = () => {
   };
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
     search: '',
     calling_number: '',
     called_number: '',
@@ -323,57 +379,28 @@ const CDRRecords = () => {
     setLoading(true);
     setError(null);
     try {
-      const params: any = {
-        page: currentPage,
-        per_page: recordsPerPage,
-        include_statistics: true,
-      };
-
-      console.log('appliedFilters', appliedFilters);
-
-      // Add filter parameters
-      if (appliedFilters.search) {
-        params.search = appliedFilters.search;
-      }
-      if (appliedFilters.calling_number) {
-        params.calling_number = appliedFilters.calling_number;
-      }
-      if (appliedFilters.called_number) {
-        params.called_number = appliedFilters.called_number;
-      }
-      if (appliedFilters.user_id && appliedFilters.user_id.trim() !== '') {
-        params.user_id = appliedFilters.user_id.trim();
-      }
-      if (appliedFilters.call_repetition_status) {
-        params.call_repetition_status = appliedFilters.call_repetition_status;
-      }
-      if (appliedFilters.local_dnd_status) {
-        params.local_dnd_status = appliedFilters.local_dnd_status;
-      }
-      if (appliedFilters.dncr_api_status) {
-        params.dncr_api_status = appliedFilters.dncr_api_status;
-      }
-      if (appliedFilters.date_from) {
-        params.date_from = appliedFilters.date_from;
-      }
-      if (appliedFilters.date_to) {
-        params.date_to = appliedFilters.date_to;
-      }
+      const params = buildCdrQueryParams(currentPage, recordsPerPage, appliedFilters);
 
       const response = await axiosInstance.get<CDRResponse>('/dncr/cdr/v1', { params });
       
       if (response.data?.status === 'success') {
         setApiData(response.data.data || []);
         setMetadata(response.data.metadata);
-        console.log('response.data.statistics', response?.data?.statistics);
-        setStatistics(response?.data?.statistics || undefined);
+        setStatistics(response?.data?.statistics || null);
       } else {
         setError('Failed to fetch CDR records');
         setApiData([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching CDR data:', err);
-      setError(err.response?.data?.message || 'Failed to fetch CDR records');
+      const msg =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : 'Failed to fetch CDR records';
+      setError(msg ?? 'Failed to fetch CDR records');
       setApiData([]);
     } finally {
       setLoading(false);
@@ -558,19 +585,10 @@ const CDRRecords = () => {
     { name: 'Not Checked', value: stats.repetitionNotChecked || 0, color: '#6c757d' }
   ];
 
-  const allowLocalDNCLData = [
-    { name: 'FALSE', value: stats.allowLocalDNCLFalse, color: '#ec4899' },
-    { name: 'TRUE', value: stats.allowLocalDNCLTrue, color: '#10b981' },
-    { name: 'Other', value: Math.max(0, stats.totalRecords - stats.allowLocalDNCLTrue - stats.allowLocalDNCLFalse), color: '#8b5cf6' }
-  ];
-
   // Map API data to UI format
   const mappedData: MappedCDRRecord[] = apiData.map(mapRecordToUI);
 
-  // Data is already filtered by API, so use mapped data directly
-  const currentRecords = mappedData;
   const totalRecords = metadata?.total_records || 0;
-  const totalPages = metadata?.total_pages || 1;
 
   // Apply filters handler
   const handleApplyFilters = () => {
@@ -614,16 +632,365 @@ const CDRRecords = () => {
     setCurrentPage(1);
   };
 
-  // Pagination handlers
-  const handleFirstPage = () => setCurrentPage(1);
-  const handleLastPage = () => setCurrentPage(totalPages);
-  const handleNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const handlePrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  // Pagination handler for GenericTable
   const handleRecordsPerPageChange = (value: number) => {
     setRecordsPerPage(value);
     setCurrentPage(1);
     // fetchCDRData will be called automatically via useEffect
   };
+
+  const repetitionFilterOptions = useMemo(
+    () => [
+      { label: 'All Status', value: '__all__', onClick: () => setRepetitionStatusFilter('') },
+      { label: 'Allowed', value: 'Allowed', onClick: () => setRepetitionStatusFilter('Allowed') },
+      { label: 'Blocked Daily', value: 'Blocked - Daily', onClick: () => setRepetitionStatusFilter('Blocked - Daily') },
+      { label: 'Blocked Weekly', value: 'Blocked - Weekly', onClick: () => setRepetitionStatusFilter('Blocked - Weekly') },
+      { label: 'Blocked Both', value: 'Blocked - Both', onClick: () => setRepetitionStatusFilter('Blocked - Both') },
+      { label: 'Not Checked', value: 'Not Checked', onClick: () => setRepetitionStatusFilter('Not Checked') },
+      {
+        label: 'Not Checked - Zero Limits',
+        value: 'Not Checked - Zero Limits',
+        onClick: () => setRepetitionStatusFilter('Not Checked - Zero Limits'),
+      },
+    ],
+    [],
+  );
+
+  const localDndFilterOptions = useMemo(
+    () => [
+      { label: 'All Status', value: '__all__', onClick: () => setLocalDndStatusFilter('') },
+      { label: 'Allowed', value: 'Allowed', onClick: () => setLocalDndStatusFilter('Allowed') },
+      { label: 'Blocked', value: 'Blocked', onClick: () => setLocalDndStatusFilter('Blocked') },
+      { label: 'Not Checked', value: 'Not Checked', onClick: () => setLocalDndStatusFilter('Not Checked') },
+    ],
+    [],
+  );
+
+  const dncrApiFilterOptions = useMemo(
+    () => [
+      { label: 'All Statuses', value: '__all__', onClick: () => setDncrApiStatusFilter('') },
+      ...Object.entries(dncrApiStatusLabels)
+        .filter(([key]) => key !== '')
+        .map(([key, label]) => ({
+          label,
+          value: key,
+          onClick: () => setDncrApiStatusFilter(key),
+        })),
+    ],
+    [dncrApiStatusLabels],
+  );
+
+  const callingDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: '220px' }}>
+        <Form.Control
+          type="text"
+          placeholder="Calling Number"
+          value={callingNumberFilter}
+          onChange={(e) => setCallingNumberFilter(e.target.value)}
+          size="sm"
+        />
+      </div>
+    ),
+    [callingNumberFilter],
+  );
+
+  const calledDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: '220px' }}>
+        <Form.Control
+          type="text"
+          placeholder="Called Number"
+          value={calledNumberFilter}
+          onChange={(e) => setCalledNumberFilter(e.target.value)}
+          size="sm"
+        />
+      </div>
+    ),
+    [calledNumberFilter],
+  );
+
+  const userDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: '180px' }}>
+        <Form.Control
+          type="text"
+          placeholder="User ID"
+          value={userIdFilter}
+          onChange={(e) => setUserIdFilter(e.target.value)}
+          size="sm"
+        />
+      </div>
+    ),
+    [userIdFilter],
+  );
+
+  const dateFromDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: '220px' }}>
+        <Form.Control
+          type="datetime-local"
+          value={dateFromFilter}
+          onChange={(e) => setDateFromFilter(e.target.value)}
+          size="sm"
+        />
+      </div>
+    ),
+    [dateFromFilter],
+  );
+
+  const dateToDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: '220px' }}>
+        <Form.Control
+          type="datetime-local"
+          value={dateToFilter}
+          onChange={(e) => setDateToFilter(e.target.value)}
+          size="sm"
+        />
+      </div>
+    ),
+    [dateToFilter],
+  );
+
+  const clearAppliedFilter = useCallback(
+    (key: keyof typeof appliedFilters) => {
+      setAppliedFilters((prev) => ({ ...prev, [key]: '' }));
+      setCurrentPage(1);
+    },
+    [setAppliedFilters, setCurrentPage],
+  );
+
+  const makeFilterPill = useCallback(
+    (
+      id: string,
+      label: string,
+      key: keyof typeof appliedFilters,
+      options?: {
+        dropdownContent?: React.ReactNode;
+        dropdownOptions?: FilterPill["dropdownOptions"];
+        searchable?: boolean;
+        activeLabel?: string;
+        onClearExtra?: () => void;
+      },
+    ): FilterPill => {
+      const appliedValue = appliedFilters[key];
+      const clearHandler = appliedValue
+        ? () => {
+            options?.onClearExtra?.();
+            clearAppliedFilter(key);
+          }
+        : undefined;
+      return {
+        id,
+        label,
+        showDropdown: true,
+        ...(options?.searchable ? { searchable: true } : {}),
+        active: Boolean(appliedValue),
+        activeLabel: options?.activeLabel ?? (appliedValue || undefined),
+        onClear: clearHandler,
+        ...(options?.dropdownContent ? { dropdownContent: options.dropdownContent } : {}),
+        ...(options?.dropdownOptions ? { dropdownOptions: options.dropdownOptions } : {}),
+      };
+    },
+    [appliedFilters, clearAppliedFilter],
+  );
+
+  const filterPills = useMemo<FilterPill[]>(
+    () => [
+      makeFilterPill('cdr-calling', 'Calling #', 'calling_number', {
+        dropdownContent: callingDropdownContent,
+        onClearExtra: () => setCallingNumberFilter(''),
+      }),
+      makeFilterPill('cdr-called', 'Called #', 'called_number', {
+        dropdownContent: calledDropdownContent,
+        onClearExtra: () => setCalledNumberFilter(''),
+      }),
+      makeFilterPill('cdr-user', 'User', 'user_id', {
+        dropdownContent: userDropdownContent,
+        onClearExtra: () => setUserIdFilter(''),
+      }),
+      makeFilterPill('cdr-repetition', 'Repetition', 'call_repetition_status', {
+        dropdownOptions: repetitionFilterOptions,
+        onClearExtra: () => setRepetitionStatusFilter(''),
+      }),
+      makeFilterPill('cdr-local-dnd', 'Local DND', 'local_dnd_status', {
+        dropdownOptions: localDndFilterOptions,
+        onClearExtra: () => setLocalDndStatusFilter(''),
+      }),
+      makeFilterPill(
+        'cdr-dncr',
+        'DNCR API',
+        'dncr_api_status',
+        {
+          dropdownOptions: dncrApiFilterOptions,
+          searchable: true,
+          activeLabel: appliedFilters.dncr_api_status
+            ? dncrApiStatusLabels[appliedFilters.dncr_api_status] || appliedFilters.dncr_api_status
+            : undefined,
+          onClearExtra: () => setDncrApiStatusFilter(''),
+        },
+      ),
+      makeFilterPill('cdr-date-from', 'Date From', 'date_from', {
+        dropdownContent: dateFromDropdownContent,
+        onClearExtra: () => setDateFromFilter(''),
+      }),
+      makeFilterPill('cdr-date-to', 'Date To', 'date_to', {
+        dropdownContent: dateToDropdownContent,
+        onClearExtra: () => setDateToFilter(''),
+      }),
+    ],
+    [
+      appliedFilters,
+      makeFilterPill,
+      callingDropdownContent,
+      calledDropdownContent,
+      userDropdownContent,
+      dateFromDropdownContent,
+      dateToDropdownContent,
+      repetitionFilterOptions,
+      localDndFilterOptions,
+      dncrApiFilterOptions,
+      dncrApiStatusLabels,
+    ],
+  );
+
+  const toolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: searchQuery,
+      searchPlaceholder: 'Search (across all fields)',
+      onSearchChange: setSearchQuery,
+      onSearch: handleApplyFilters,
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      customActions: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Button
+            variant="light"
+            onClick={handleResetFilters}
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #dee2e6',
+              borderRadius: '8px',
+              color: '#212529',
+              height: '33px',
+              fontSize: '0.875rem',
+              padding: '0 12px',
+            }}
+          >
+            Reset
+          </Button>
+          <Button
+            onClick={handleApplyFilters}
+            style={{
+              backgroundColor: '#4f46e5',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              height: '33px',
+              fontSize: '0.875rem',
+              padding: '0 12px',
+            }}
+          >
+            Apply Filters
+          </Button>
+        </div>
+      ),
+    }),
+    [searchQuery, filterPills],
+  );
+
+  const cdrColumns = useMemo<TableColumn<MappedCDRRecord>[]>(
+    () => [
+      { key: 'id', label: 'ID', type: 'text', sortable: false },
+      { key: 'dateTime', label: 'DATE/TIME', type: 'text', sortable: false },
+      {
+        key: 'calling',
+        label: 'CALLING #',
+        type: 'custom',
+        sortable: false,
+        render: (row) => <PhoneContainer phone={row.calling} />,
+      },
+      {
+        key: 'called',
+        label: 'CALLED #',
+        type: 'custom',
+        sortable: false,
+        render: (row) => <PhoneContainer phone={row.called} />,
+      },
+      { key: 'userId', label: 'USER ID', type: 'text', sortable: false },
+      {
+        key: 'localDND',
+        label: 'LOCAL DND',
+        type: 'custom',
+        sortable: false,
+        render: (row) => {
+          const tone = getTriStateTone(row.localDND, 'Allowed', 'Not Checked');
+          return (
+            <span
+              style={{
+                color: tone.color,
+                backgroundColor: tone.backgroundColor,
+                padding: '4px 8px',
+                borderRadius: '6px',
+              }}
+            >
+              {row.localDND}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'repetition',
+        label: 'REPETITION',
+        type: 'custom',
+        sortable: false,
+        render: (row) => {
+          const tone = getTriStateTone(row.repetition, 'Allowed', 'Not Checked');
+          return (
+            <span
+              style={{
+                color: tone.color,
+                backgroundColor: tone.backgroundColor,
+                padding: '4px 8px',
+                borderRadius: '6px',
+              }}
+            >
+              {row.repetition}
+            </span>
+          );
+        },
+      },
+      {
+        key: 'dncrApi',
+        label: 'DNCR API',
+        type: 'custom',
+        sortable: false,
+        render: (row) => {
+          const tone = getDncrTone(row.dncrApi);
+          return (
+            <span
+              style={{
+                color: tone.color,
+                backgroundColor: tone.backgroundColor,
+                padding: '4px 8px',
+                borderRadius: '6px',
+              }}
+            >
+              {row.dncrApi}
+            </span>
+          );
+        },
+      },
+      { key: 'time', label: 'TIME (MS)', type: 'text', sortable: false },
+      { key: 'allowLocalDNCL', label: 'ALLOW LOCAL DNCL', type: 'text', sortable: false },
+      { key: 'allowApiDNCLCalls', label: 'ALLOW API DNCL', type: 'text', sortable: false },
+      { key: 'allowRepetition', label: 'ALLOW REPETITIVE', type: 'text', sortable: false },
+    ],
+    [],
+  );
 
 
   return (
@@ -815,260 +1182,7 @@ const CDRRecords = () => {
           </Col>
         </Row>
 
-        {/* Search and Filter Row */}
-        <Row className="mb-3">
-          <Col>
-            <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-              <div className="d-flex flex-wrap gap-2 align-items-center">
-                {/* Global Search */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  
-                  <Search size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
-                  <Form.Control
-                    type="text"
-                    placeholder="Search (across all fields)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      color: '#212529',
-                      width: '200px',
-                      padding: '0'
-                    }}
-                  />
-                </div>
-                
-                {/* Calling Number Filter */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  <Search size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
-                  <Form.Control
-                    type="text"
-                    placeholder="Calling Number"
-                    value={callingNumberFilter}
-                    onChange={(e) => setCallingNumberFilter(e.target.value)}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      width: '130px',
-                      padding: '0'
-                    }}
-                  />
-                </div>
-
-                {/* Called Number Filter */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  <Search size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
-                  <Form.Control
-                    type="text"
-                    placeholder="Called Number"
-                    value={calledNumberFilter}
-                    onChange={(e) => setCalledNumberFilter(e.target.value)}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      width: '130px',
-                      padding: '0'
-                    }}
-                  />
-                </div>
-
-                {/* User ID Filter */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  <span style={{ marginRight: '8px', fontSize: '14px' }}>👤</span>
-                  <input
-                    type="text"
-                    placeholder="User ID"
-                    value={userIdFilter}
-                    onChange={(e) => {
-                      console.log('User ID onChange:', e.target.value);
-                      setUserIdFilter(e.target.value);
-                    }}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      width: '110px',
-                      padding: '0',
-                      outline: 'none',
-                      backgroundColor: 'transparent',
-                      flex: 1
-                    }}
-                  />
-                </div>
-
-                {/* Repetition Status Dropdown */}
-                <Dropdown>
-                  <Dropdown.Toggle 
-                    variant="light" 
-                    style={{ 
-                      backgroundColor: '#ffffff', 
-                      border: '1px solid #dee2e6', 
-                      borderRadius: '8px', 
-                      color: '#212529',
-                      height: '38px',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span style={{ marginRight: '4px' }}>🔄</span> {repetitionStatusFilter || 'Repetition Status'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('')}>All Status</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Allowed')}>Allowed</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Daily')}>Blocked Daily</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Weekly')}>Blocked Weekly</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Both')}>Blocked Both</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Not Checked')}>Not Checked</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Not Checked - Zero Limits')}>Not Checked - Zero Limits</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-
-                {/* Local DND Status Dropdown */}
-                <Dropdown>
-                  <Dropdown.Toggle 
-                    variant="light" 
-                    style={{ 
-                      backgroundColor: '#ffffff', 
-                      border: '1px solid #dee2e6', 
-                      borderRadius: '8px', 
-                      color: '#212529',
-                      height: '38px',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <span style={{ marginRight: '4px' }}>🛡️</span> {localDndStatusFilter || 'Local DND'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => setLocalDndStatusFilter('')}>All Status</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setLocalDndStatusFilter('Allowed')}>Allowed</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setLocalDndStatusFilter('Blocked')}>Blocked</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setLocalDndStatusFilter('Not Checked')}>Not Checked</Dropdown.Item>
-
-                  </Dropdown.Menu>
-                </Dropdown>
-
-                {/* DNCR API Status Dropdown */}
-                <Dropdown>
-                  <Dropdown.Toggle 
-                    variant="light" 
-                    style={{ 
-                      backgroundColor: '#ffffff', 
-                      border: '1px solid #dee2e6', 
-                      borderRadius: '8px', 
-                      color: '#212529',
-                      height: '38px',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {dncrApiStatusLabels[dncrApiStatusFilter] || 'DNCR API'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {/* <Dropdown.Item onClick={() => setDncrApiStatusFilter('')}>All Statuses</Dropdown.Item>
-                    <Dropdown.Divider /> */}
-                    <Dropdown.Header>✅ Normal Response</Dropdown.Header>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('TRUE')}>🚫 TRUE (Blocked in DNCR)</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('FALSE')}>✅ FALSE (Allowed by DNCR)</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('Not Checked')}>⏭️ Not Checked</Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Header>⚠️ Special Cases</Dropdown.Header>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('INVALID')}>⚠️ INVALID (Not Found)</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('NONE')}>⚠️ NONE (Null Status)</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('NULL')}>⚠️ NULL (Null Status)</Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Header>❌ API Error - No Fallback</Dropdown.Header>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('UNKNOWN')}>❌ UNKNOWN (Timeout/Error)</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('ERROR')}>❌ ERROR (API Failed)</Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Header>🔄 API Error - Fallback Used</Dropdown.Header>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%CACHE-BLOCKED')}>🔄 Cache: Blocked</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%CACHE-ALLOWED')}>🔄 Cache: Allowed</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%NOT-IN-CACHE')}>🚫 Cache: Miss (Fail-closed)</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-
-                {/* Date From Filter */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  <Calendar size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
-                  <Form.Control
-                    type="datetime-local"
-                    placeholder="Date From"
-                    value={dateFromFilter}
-                    onChange={(e) => setDateFromFilter(e.target.value)}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      width: '180px',
-                      padding: '0'
-                    }}
-                  />
-                </div>
-
-                {/* Date To Filter */}
-                <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
-                  <Calendar size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
-                  <Form.Control
-                    type="datetime-local"
-                    placeholder="Date To"
-                    value={dateToFilter}
-                    onChange={(e) => setDateToFilter(e.target.value)}
-                    style={{ 
-                      border: 'none', 
-                      boxShadow: 'none',
-                      fontSize: '0.875rem',
-                      width: '180px',
-                      padding: '0'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons - Right Side */}
-              <div className="d-flex gap-2 align-items-center">
-                <Button 
-                  variant="light" 
-                  onClick={handleResetFilters}
-                  style={{ 
-                    backgroundColor: '#ffffff', 
-                    border: '1px solid #dee2e6', 
-                    borderRadius: '8px', 
-                    color: '#212529',
-                    height: '38px',
-                    fontSize: '0.875rem',
-                    padding: '0 16px'
-                  }}
-                >
-                  Reset
-                </Button>
-                
-                <Button 
-                  onClick={handleApplyFilters}
-                  style={{ 
-                    backgroundColor: '#4f46e5', 
-                    border: 'none', 
-                    borderRadius: '8px', 
-                    color: '#ffffff',
-                    height: '38px',
-                    fontSize: '0.875rem',
-                    padding: '0 16px'
-                  }}
-                >
-                  Apply Filters
-                </Button>
-              </div>
-            </div>
-          </Col>
-        </Row>
+        <div className="mb-3" />
 
         {/* Active Filters Display */}
         {(appliedFilters.search || appliedFilters.calling_number || appliedFilters.called_number || 
@@ -1127,223 +1241,31 @@ const CDRRecords = () => {
           </div>
         )}
 
-        {/* Table Section */}
-        <Card className="border" style={{ backgroundColor: '#ffffff', borderRadius: '12px', borderColor: '#dee2e6' }}>
-          <Card.Body className="p-0">
-            <div className="d-flex justify-content-between align-items-center p-3 border-bottom" style={{ borderColor: '#dee2e6 !important' }}>
-              <h6 className="mb-0" style={{ color: '#212529' }}>
-                CDR Records <span style={{ color: '#6c757d' }}>— Compliance Checks</span>
-              </h6>
-              <div className="d-flex align-items-center gap-2">
-                <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>
-                  {totalRecords} Records | Page {currentPage} of {totalPages || 1}
-                </span>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
-              <Table className="mb-0" style={{ minWidth: '1400px' }}>
-                <thead style={{ backgroundColor: '#f8f9fa' }}>
-                  <tr>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>ID</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>DATE/TIME</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>CALLING #</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>CALLED #</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>USER ID</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>LOCAL DND</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>REPETITION</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>DNCR API</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>TIME (MS)</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>ALLOW LOCAL DNCL</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>Allow API DNCL</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>ALLOW REPETITIVE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    if (loading) {
-                      return (
-                        <tr>
-                          <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                            Loading...
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (error) {
-                      return (
-                        <tr>
-                          <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#dc3545' }}>
-                            {error}
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (currentRecords.length > 0) {
-                      return currentRecords.map((row) => (
-                        <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.id}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          {row?.dateTime}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <PhoneContainer phone={row.calling} />
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <PhoneContainer phone={row.called} />
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.userId}</td>
-                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                        <span style={{ 
-                            color: row?.localDND === 'Allowed' ? '#0d8a5e' : row?.localDND === 'Not Checked' ? '#6c757d' : '#dc3545',
-                            backgroundColor: row?.localDND === 'Allowed' ? '#d1f4e8' : row?.localDND === 'Not Checked' ? '#e9ecef' : '#f8d7da',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.localDND}</span>
-                        </td>
-                        <td style={{ fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            color: row?.repetition === 'Allowed' ? '#0d8a5e' : row?.repetition === 'Not Checked' ? '#6c757d' : '#dc3545',
-                            backgroundColor: row?.repetition === 'Allowed' ? '#d1f4e8' : row?.repetition === 'Not Checked' ? '#e9ecef' : '#f8d7da',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row?.repetition}
-                          </span>
-                        </td>
-                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            color: row.dncrApi === 'TRUE' ? '#dc3545' : row.dncrApi === 'FALSE' ? '#0d8a5e' : '#6c757d',
-                            backgroundColor: row.dncrApi === 'TRUE' ? '#f8d7da' : row.dncrApi === 'FALSE' ? '#d1f4e8' : '#e9ecef',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.dncrApi}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.time}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                             
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.allowLocalDNCL}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row?.allowApiDNCLCalls}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.allowRepetition}
-                          </span>
-                        </td>
-                      </tr>
-                      ));
-                    }
-                    return (
-                      <tr>
-                        <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                          No records found matching your filters
-                        </td>
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </Table>
-            </div>
-
-            <div className="d-flex justify-content-between align-items-center p-3 border-top" style={{ borderColor: '#dee2e6 !important' }}>
-              <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>
-                {totalRecords} Records | Page {currentPage} of {totalPages || 1}
-              </span>
-              <div className="d-flex align-items-center gap-2">
-                <span style={{ color: '#6c757d', fontSize: '0.875rem', marginRight: '8px' }}>Records per page:</span>
-                <Dropdown>
-                  <Dropdown.Toggle variant="light" size="sm" style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}>
-                    {recordsPerPage} ▼
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    
-                    <Dropdown.Item onClick={() => handleRecordsPerPageChange(25)}>25</Dropdown.Item>
-                    <Dropdown.Item onClick={() => handleRecordsPerPageChange(50)}>50</Dropdown.Item>
-                    <Dropdown.Item onClick={() => handleRecordsPerPageChange(100)}>100</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handleFirstPage}
-                  disabled={currentPage === 1}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529', marginLeft: '12px' }}
-                >
-                  <ChevronsLeft size={16} />
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-                <Button 
-                  variant="primary" 
-                  size="sm" 
-                  style={{ backgroundColor: '#4f46e5', border: 'none', minWidth: '32px' }}
-                >
-                  {currentPage}
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handleNextPage}
-                  disabled={!metadata?.has_next_page || currentPage === totalPages || totalPages === 0}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
-                  <ChevronRight size={16} />
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  onClick={handleLastPage}
-                  disabled={!metadata?.has_next_page || currentPage === totalPages || totalPages === 0}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
-                  <ChevronsRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </Card.Body>
-        </Card>
+        <GenericTable<MappedCDRRecord>
+          data={mappedData}
+          columns={cdrColumns}
+          loading={loading}
+          loadingMessage="Loading CDR records..."
+          emptyMessage={error ? <span style={{ color: '#dc3545' }}>{error}</span> : 'No records found matching your filters'}
+          uniqueKey="id"
+          pagination={{
+            currentPage,
+            rowsPerPage: recordsPerPage,
+            totalRows: totalRecords,
+            pageSizeOptions: [25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPageValue) => {
+            if (rowsPerPageValue !== recordsPerPage) {
+              handleRecordsPerPageChange(rowsPerPageValue);
+              return;
+            }
+            setCurrentPage(page);
+          }}
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          showToolbarActions={false}
+          showActions={false}
+        />
 
     </React.Fragment>
   );
