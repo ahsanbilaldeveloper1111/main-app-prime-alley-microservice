@@ -177,28 +177,32 @@ export interface InvoiceItemCreateUpdatePayload {
 
 // API-specific interface for invoice items (uses vat_rate instead of tax_rate)
 export interface InvoiceItemAPIPayload {
-  product_id: string;
-  quantity: string;
-  unit_price: string;
+  product_id: number;
+  quantity: number;
+  unit_price: number;
   vat_rate: string;
   tax_amount?: string;
+  description?: string;
 }
 
 // API-specific interface for invoice creation/update (uses vat_rate for items)
 export interface InvoiceCreateUpdateAPIPayload {
-  company_id: string;
+  tenant_id: string;
+  crm_company_id?: string;
+  po_number?: string;
   invoice_date: string;
   due_date: string;
-  payment_mode: string;
-  currency_code: string;
+  end_date?: string;
+  payment_mode: "one_time" | "recurring" | "subscription";
+  currency_code?: string;
+  exchange_rate: number;
   tax_amount: number;
-  vat_rate?: number;
-  notes: string;
-  terms_conditions: string;
+  notes?: string;
+  terms_conditions?: string;
   items: InvoiceItemAPIPayload[];
   subtotal: number;
   total_amount: number;
-  status: string;
+  status?: string;
 }
 
 export interface ExpenseData {
@@ -547,6 +551,39 @@ export interface CustomerProductPricingCreatePayload {
   selling_price: string;
 }
 
+export interface CustomerProductPricingDataItem {
+  product_id: number;
+  selling_price: number;
+  discount_applicability_id: number | null;
+  custom_description: string;
+  is_active: boolean;
+  renewal_start_date: string;
+  renewal_end_date: string;
+  status: "Active" | "Trial" | "In Progress" | "Suspended" | "Inactive";
+  billing_cycle: "one time" | "monthly" | "quarterly" | "yearly";
+  subscriptions: number;
+  base_price?: number;
+  final_price?: number;
+  product?: ProductData;
+}
+
+export interface CustomerProductPricingBulkPayload {
+  pricing_data: CustomerProductPricingDataItem[];
+}
+
+export interface CustomerProductPricingUpsertPayload {
+  product_id: string;
+  selling_price: number;
+  custom_description: string | null;
+  is_active: boolean;
+  discount_applicability_id: number | null;
+  renewal_start_date: string | null;
+  renewal_end_date: string | null;
+  status: CustomerProductPricingDataItem["status"];
+  billing_cycle: CustomerProductPricingDataItem["billing_cycle"];
+  subscriptions: number;
+}
+
 export interface CustomerProductPricingListParams extends PaginationParams {
   search?: string;
 }
@@ -582,6 +619,39 @@ export const createCustomerProductPricing = async (
     throw error;
   }
 };
+
+export const createCustomerProductPricingBulk = async (
+  customer: IdLike,
+  data: CustomerProductPricingBulkPayload,
+): Promise<any> => {
+  try {
+    const response = await axiosInstance.post(
+      `/accounting/customers/${customer}/product-pricing/bulk-update`,
+      data,
+    );
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create customer product pricing");
+    throw error;
+  }
+};
+
+export const upsertCustomerProductPricing = async (
+  customer: IdLike,
+  data: CustomerProductPricingUpsertPayload,
+): Promise<any> => {
+  try {
+    const response = await axiosInstance.post(
+      `/accounting/customers/${customer}/product-pricing`,
+      data,
+    );
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to update customer product pricing");
+    throw error;
+  }
+};
+
 
 export const deleteCustomerProductPricing = async (
   customer: IdLike,

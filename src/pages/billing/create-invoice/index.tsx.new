@@ -4,10 +4,9 @@ import {
   MoreHorizontal, Star, Bold, Italic, Underline,
   Link, List, ChevronRight, ExternalLink,
 } from "lucide-react";
-import SelectBox, { type SelectBoxOption } from "@components/SelectBox";
-import type { ProductPricingData } from "@utils/accounts";
+import SelectBox from "@components/SelectBox";
 import { getCompanyByCrmId } from "@utils/Helper";
-import { useCreateInvoiceForm, type InvoiceLineItem } from "./useCreateInvoiceForm";
+import { useCreateInvoiceForm } from "./useCreateInvoiceForm";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -286,10 +285,10 @@ const lineItemBtnStyle1: React.CSSProperties = {
 
 function handleProductSelect(
   value: unknown,
-  toSingleSelectString: (v: unknown) => string | null,
-  customerProducts: ProductPricingData[],
+  toSingleSelectString: (v: unknown) => string,
+  customerProducts: Array<{ product?: { id?: number }; product_id?: number }>,
   selectedProductIds: Set<number>,
-  addProductToInvoice: (cp: ProductPricingData) => void,
+  addProductToInvoice: (cp: unknown) => void,
   setProductSelectOpen: (v: boolean | ((prev: boolean) => boolean)) => void,
 ) {
   const v = toSingleSelectString(value);
@@ -315,23 +314,23 @@ type LineItemsSectionProps = Readonly<{
   setProductSelectAnchor: (v: "top" | "empty") => void;
   setProductSelectOpen: (v: boolean | ((p: boolean) => boolean)) => void;
   productSelectDisabled: boolean;
-  availableProductOptions: SelectBoxOption[];
+  availableProductOptions: Array<{ value: string; label: string }>;
   productSelectPlaceholder: string;
-  toSingleSelectString: (v: unknown) => string | null;
-  customerProducts: ProductPricingData[];
+  toSingleSelectString: (v: unknown) => string;
+  customerProducts: Array<{ product?: { id?: number }; product_id?: number }>;
   selectedProductIds: Set<number>;
-  addProductToInvoice: (cp: ProductPricingData) => void;
-  items: InvoiceLineItem[];
-  round2: (n: number) => number;
-  lineTax: (it: InvoiceLineItem) => number;
-  lineTotal: (it: InvoiceLineItem) => number;
+  addProductToInvoice: (cp: unknown) => void;
+  items: Array<{ id: string; product_name: string; product_description?: string; description: string; quantity: number; unit_price: number; vat_rate: number };
+  round2: (n: number) => string;
+  lineTax: (it: { vat_rate: number; quantity: number; unit_price: number }) => number;
+  lineTotal: (it: { vat_rate: number; quantity: number; unit_price: number }) => number;
   cloneItem: (id: string) => void;
   removeItem: (id: string) => void;
   updateItem: (id: string, patch: object) => void;
-  formatVatRate2: (vat: unknown) => string;
-  subtotal: number;
-  taxAmount: number;
-  totalAmount: number;
+  formatVatRate2: (v: string) => number;
+  subtotal: string;
+  taxAmount: string;
+  totalAmount: string;
 }>;
 
 function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
@@ -383,7 +382,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
             <div style={{ maxWidth: 400 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: font, margin: "0 0 10px 0" }}>Add line items to your invoice</h3>
               <p style={{ fontSize: 14, color: "#555", fontFamily: font, margin: "0 0 14px 0", lineHeight: "21px" }}>Add line items for the products you're selling to your customer.</p>
-              <button type="button" style={{ ...t.link, display: "inline-flex", marginBottom: 20, border: "none", background: "transparent", padding: 0 }}>Learn more about the product library <ExternalLink size={12} /></button>
+              <a style={{ ...t.link, display: "inline-flex", marginBottom: 20 }}>Learn more about the product library <ExternalLink size={12} /></a>
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <div ref={productSelectWrapRef} style={{ position: "relative" as const }}>
                   <button type="button" onClick={() => { setProductSelectAnchor("empty"); setProductSelectOpen((v) => !v); }}
@@ -452,7 +451,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
         </div>
         <div style={{ padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button type="button" style={{ ...t.link, border: "none", background: "transparent", padding: 0 }}>+ Add discount, fee, or tax</button><ChevronDown size={13} color="rgb(0,97,98)" />
+            <a style={t.link}>+ Add discount, fee, or tax</a><ChevronDown size={13} color="rgb(0,97,98)" />
             <InfoTip text="Add a discount, fee, or additional tax to this invoice." />
           </div>
         </div>
@@ -765,11 +764,11 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
     <div style={{
       flex: 1,
       backgroundColor: "#fff",
-      margin: "0",
+      margin: "16px 56px 24px 24px",
       borderRadius: 8,
-      border: "none",
+      border: "1px solid rgb(204,204,204)",
       boxShadow: "rgba(20,20,20,0.06) 0px 1px 8px 0px",
-      padding: "0",
+      padding: "36px 48px",
       boxSizing: "border-box" as const,
     }}>
 
@@ -975,7 +974,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
               </div>
               <div>
                 <div style={t.label}>Payment terms *</div>
-                <select style={t.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as "one_time" | "recurring" | "subscription")}>
+                <select style={t.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as any)}>
                   <option value="one_time">One time</option>
                   <option value="recurring">Recurring</option>
                   <option value="subscription">Subscription</option>
@@ -1134,7 +1133,6 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
         />
       </div>
     </div>
-  </div>
   );
 }
 

@@ -26,6 +26,10 @@ export const BASE_BUTTON: CSSProperties = {
   textUnderlineOffset: "24%",
 };
 
+export const TABLE_CONTAINER: CSSProperties = {
+  marginBottom: "16px",
+  overflowX: "auto",
+};
 export const FIELD_LABEL: CSSProperties = {
   fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
   fontSize: "12px",
@@ -33,6 +37,22 @@ export const FIELD_LABEL: CSSProperties = {
   color: "#141414",
   marginBottom: "6px",
   display: "block",
+};
+
+export const TABLE: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  border: "1px solid #e8e8e8",
+  borderRadius: "4px",
+  overflow: "hidden",
+};
+
+export const TABLE_HEAD: CSSProperties = {
+  backgroundColor: "#f8f8f8",
+  fontSize: "12px",
+  fontWeight: 500,
+  color: "#141414",
+  padding: "12px 16px",
 };
 
 export const FIELD_INPUT: CSSProperties = {
@@ -48,6 +68,10 @@ export const FIELD_INPUT: CSSProperties = {
   outline: "none",
   boxSizing: "border-box",
   backgroundColor: "#fff",
+};
+export const FIELD_INPUT_DISABLED_STYLE: CSSProperties = {
+  backgroundColor: "#f8f8f8",
+  cursor: "not-allowed",
 };
 
 export const FIELD_TEXTAREA: CSSProperties = {
@@ -66,6 +90,21 @@ export const FIELD_TEXTAREA: CSSProperties = {
   backgroundColor: "#fff",
 };
 
+export const FIELD_TEXTAREA_SMALL: CSSProperties = {
+  width: "100%",
+  border: "1px solid rgb(138, 138, 138)",
+  borderRadius: "4px",
+  padding: "10px 12px",
+  fontSize: "14px",
+  fontWeight: 100,
+  color: "#141414",
+  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+  outline: "none",
+  boxSizing: "border-box",
+  resize: "vertical",
+  minHeight: "45px",
+  backgroundColor: "#fff",
+};
 export const FIELD_SELECT: CSSProperties = {
   height: "42px",
   width: "100%",
