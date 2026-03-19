@@ -626,7 +626,7 @@ export const createCustomerProductPricingBulk = async (
 ): Promise<any> => {
   try {
     const response = await axiosInstance.post(
-      `/accounting/customers/${customer}/product-pricing-list`,
+      `/accounting/customers/${customer}/product-pricing/bulk-update`,
       data,
     );
     return extractData<any>(response.data);
