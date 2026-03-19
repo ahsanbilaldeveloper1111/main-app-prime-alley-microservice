@@ -23,6 +23,28 @@ interface UpdateStatusData {
   is_completed?: boolean;
 }
 
+/** Calendar event from GET tasks/calendar */
+export interface CalendarEvent {
+  id: number;
+  task_id: string;
+  title: string;
+  start: string;
+  end: string;
+  priority: string;
+  allDay: boolean;
+  due_date: string;
+  start_date: string;
+  task?: Record<string, unknown>;
+  project?: Record<string, unknown> | null;
+  status?: { id: number; name: string };
+}
+
+/** Calendar API response data (events + timezone) */
+export interface TasksCalendarData {
+  events: CalendarEvent[];
+  timezone: string;
+}
+
 // ==================== Helper Functions ====================
 
 const reportWorkPlannerApiError = (response: any, errorMessage: string) => {
@@ -77,8 +99,8 @@ export const getCurrentUserRoleInMembers = (
 
   // Find the member matching current user's extension_number
   const currentUserMember = membersArray.find((member: any) => {
-    const memberExt = String(member?.extension_number || '').trim();
-    const currentExt = String(currentUserExtension || '').trim();
+    const memberExt = String(member?.extension_number ?? '').trim();
+    const currentExt = String(currentUserExtension).trim();
     return memberExt && currentExt && memberExt === currentExt;
   });
 
@@ -109,8 +131,8 @@ export const canManage = (
   // Check if user is the project owner
   const ownerExtension = selectedProject?.apiData?.owner_extension_number;
   if (ownerExtension) {
-    const ownerExt = String(ownerExtension || '').trim();
-    const userExt = String(currentUserExtension || '').trim();
+    const ownerExt = String(ownerExtension).trim();
+    const userExt = String(currentUserExtension).trim();
     if (ownerExt && userExt && ownerExt === userExt) {
       return true;
     }
@@ -244,3 +266,31 @@ export const AuditLogsWorkPlanner = async (params?: Record<string, unknown>) => 
     throw error;
   }
 };
+
+/**
+ * GET tasks/calendar
+ * Returns { events, timezone } when successful
+ */
+export const getTasksCalendar = async (
+  params?: Record<string, unknown>
+): Promise<TasksCalendarData | null> => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/calendar`, { params });
+    if (response?.data) {
+      const responseData = response.data;
+      if (responseData.success === false) {
+        reportWorkPlannerApiError(response, responseData.message ?? 'Failed to fetch tasks calendar');
+        toast.error(responseData.message ?? 'Failed to fetch tasks calendar');
+        return null;
+      }
+      return (responseData.data ?? responseData) as TasksCalendarData;
+    }
+    return null;
+  } catch (error: unknown) {
+    console.error('API Error:', error);
+    toast.error((error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to fetch tasks calendar');
+    throw error;
+  }
+};
+
+

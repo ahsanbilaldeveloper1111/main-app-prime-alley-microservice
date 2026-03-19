@@ -5,17 +5,12 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  
   Eye,
   ShoppingBag,
   Briefcase,
-  PieChart,
-  Link as LinkIcon,
   Target,
   Megaphone,
   Database,
-  TrendingUp,
-  XCircle,
   BarChart3,
   Phone,
   Languages,
@@ -26,10 +21,7 @@ import {
   List,
   Package,
   Layers,
-  Tags,
   CreditCard,
-  Building,
-  MapPin,
   Settings,
   History,
   ChartNoAxesCombined,
@@ -39,15 +31,12 @@ import {
   Workflow,
   NotebookText,
   DollarSign,
-  PhoneCallIcon,
   MonitorSpeaker,
   Monitor,
   Server,
   Group,
-  ShieldPlus,
   Shield,
   NotebookTabs,
-  HelpCircle,
   Info,
   CircleQuestionMark,
   Boxes
@@ -55,15 +44,11 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-import { authAPI } from "@utils/api";
-import { useAuth } from "../../hooks/useAuth";
-import { useTmsPermissions } from "../../hooks/useTmsPermissions";
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
-import Translate from '@pages/ai-ml/translate';
 
 // Destructure constants for easier use
-const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
+const { MENU_LABELS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
 
 interface SubMenuItem {
   id: string;
@@ -93,12 +78,208 @@ interface SidebarProps {
   setSidebarOpen: (open: boolean) => void;
 }
 
+const renderSubModuleHeader = (
+  subItem: SubMenuItem,
+  isExpanded: boolean,
+  onToggle: () => void,
+  asLink: boolean
+) => {
+  const headerContent = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+        <span className="sub-item-icon">{subItem.icon}</span>
+        <span>{subItem.title}</span>
+      </div>
+      {subItem.subItems && subItem.subItems.length > 0 && (
+        <span className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}>
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </span>
+      )}
+    </>
+  );
+  const className = `sub-module-header ${isExpanded ? 'expanded' : ''}`;
+  if (asLink && subItem.url) {
+    return (
+      <Link href={subItem.url}>
+        <button className={className} onClick={onToggle}>
+          {headerContent}
+        </button>
+      </Link>
+    );
+  }
+  return (
+    <button className={className} onClick={onToggle}>
+      {headerContent}
+    </button>
+  );
+};
+
+const renderSubItemLink = (
+  subItem: SubMenuItem,
+  pathname: string,
+  isExpanded: boolean,
+  onToggle: () => void
+) => {
+  const className = `sub-item ${pathname === subItem.url ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`;
+  return (
+    <Link href={subItem.url || '/'}>
+      <button className={className} onClick={onToggle}>
+        <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+          <span className="sub-item-icon">{subItem.icon}</span>
+          <span>{subItem.title}</span>
+        </div>
+      </button>
+    </Link>
+  );
+};
+
+const getSubItemHeader = (
+  subItem: SubMenuItem,
+  hasNested: boolean,
+  isExpanded: boolean,
+  toggleSub: () => void,
+  pathname: string
+) => {
+  const asLink = Boolean(subItem.url);
+  if (hasNested) {
+    return renderSubModuleHeader(subItem, isExpanded, toggleSub, asLink);
+  }
+  if (subItem.url === '') {
+    return renderSubModuleHeader(subItem, isExpanded, toggleSub, false);
+  }
+  return renderSubItemLink(subItem, pathname, isExpanded, toggleSub);
+};
+
+interface SubItemRowProps {
+  subItem: SubMenuItem;
+  isExpanded: boolean;
+  pathname: string;
+  onToggleSub: () => void;
+  onSubItemClick: () => void;
+}
+
+interface ModuleRowProps {
+  module: MainMenuItem;
+  index: number;
+  totalModules: number;
+  expandedModules: string[];
+  expandedSubModules: string[];
+  pathname: string;
+  onToggleModule: (id: string) => void;
+  onToggleSubModule: (id: string) => void;
+  onSubItemClick: () => void;
+}
+
+const ModuleRow: React.FC<ModuleRowProps> = ({
+  module,
+  index,
+  totalModules,
+  expandedModules,
+  expandedSubModules,
+  pathname,
+  onToggleModule,
+  onToggleSubModule,
+  onSubItemClick
+}) => {
+  const isExpanded = expandedModules.includes(module.id);
+
+  const moduleHeaderContent = (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+        <div
+          className="module-icon-wrapper"
+          style={{ backgroundColor: `${module.color}15` }}
+        >
+          {React.cloneElement(module.icon as React.ReactElement, {
+            style: { color: module.color }
+          } as React.HTMLAttributes<SVGElement>)}
+        </div>
+        <span>{module.title}</span>
+      </div>
+      {module.subItems && module.subItems.length > 0 && (
+        <span className={`chevron-icon ${isExpanded ? 'expanded' : ''}`}>
+          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+        </span>
+      )}
+    </>
+  );
+
+  const headerClassName = `module-header ${isExpanded ? 'expanded' : ''}`;
+  const headerStyle = { borderLeftColor: isExpanded ? module.color : 'transparent' };
+
+  return (
+    <div>
+      {module.url === '' ? (
+        <button
+          className={headerClassName}
+          style={headerStyle}
+          onClick={() => onToggleModule(module.id)}
+        >
+          {moduleHeaderContent}
+        </button>
+      ) : (
+        <Link href={(BASE_URL || '') + (module.url || '/')}>
+          <button className={headerClassName} style={headerStyle}>
+            {moduleHeaderContent}
+          </button>
+        </Link>
+      )}
+      {isExpanded && module.subItems && (
+        <div>
+          {module.subItems.map((subItem: SubMenuItem) => (
+            <SubItemRow
+              key={subItem.id}
+              subItem={subItem}
+              isExpanded={expandedSubModules.includes(subItem.id)}
+              pathname={pathname}
+              onToggleSub={() => onToggleSubModule(subItem.id)}
+              onSubItemClick={onSubItemClick}
+            />
+          ))}
+        </div>
+      )}
+      {index < totalModules - 1 && <div className="module-divider" />}
+    </div>
+  );
+};
+
+const SubItemRow: React.FC<SubItemRowProps> = ({
+  subItem,
+  isExpanded,
+  pathname,
+  onToggleSub,
+  onSubItemClick
+}) => {
+  const hasNested = Boolean(subItem.subItems && subItem.subItems.length > 0);
+  const header = getSubItemHeader(subItem, hasNested, isExpanded, onToggleSub, pathname);
+
+  return (
+    <div>
+      {header}
+      {hasNested && isExpanded && subItem.subItems && (
+        <div>
+          {subItem.subItems.map((nestedItem: SubMenuItem) => (
+            <Link key={nestedItem.id} href={nestedItem.url || '/'}>
+              <button
+                className="nested-sub-item"
+                onClick={onSubItemClick}
+              >
+                <span className="nested-sub-item-icon">{nestedItem.icon}</span>
+                <span>{nestedItem.title}</span>
+              </button>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ApplicationSidebar: React.FC<SidebarProps> = ({ 
   sidebarOpen, 
   setSidebarOpen
 }) => {
-  //const [expandedModules, setExpandedModules] = useState<string[]>(['ticketing']);
-  const [expandedModules, setExpandedModules] = useState<string[]>([ 'billing']);
+  const [expandedModules, setExpandedModules] = useState<string[]>(['billing']);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
   const router = useRouter();
   
@@ -719,9 +900,8 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handleSubItemClick = (screenId: string) => {
-   // setActiveScreen(screenId);
-    //setSidebarOpen(false);
+  const handleSubItemClick = () => {
+    // Reserved for future sub-item click handling
   };
 
   // Automatically expand modules and sub-modules when route changes
@@ -1045,6 +1225,9 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       z-index: 1040;
       display: none;
       transition: opacity 0.3s ease-in-out;
+      border: none;
+      padding: 0;
+      cursor: pointer;
     }
 
     .sidebar-backdrop.show {
@@ -1057,13 +1240,15 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
       <style>{customStyles}</style>
       
       {/* Backdrop for mobile */}
-      <div 
+      <button
+        type="button"
+        aria-label="Close sidebar"
         className={`sidebar-backdrop ${sidebarOpen ? 'show' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
       
       <div 
-        className={`sidebar-card sidebar-scrollbar ${!sidebarOpen ? 'collapsed' : ''}`}
+        className={`sidebar-card sidebar-scrollbar ${sidebarOpen ? '' : 'collapsed'}`}
       >
         <div style={{ padding: 0 }}>
           {/* Header */}
@@ -1090,194 +1275,18 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           {/* Menu Items */}
           <div style={{ padding: '0.5rem 0' }}>
             {mainMenuItems.map((module, index) => (
-              <div key={module.id}>
-                {/* Module Header */}
-
-                {module.url !== '' ? (
-                  <Link href={(BASE_URL || '') + (module.url || '/')}>
-                    <button
-                      className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
-                      style={{
-                        borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                        <div 
-                          className="module-icon-wrapper"
-                          style={{ backgroundColor: `${module.color}15` }}
-                        >
-                          {React.cloneElement(module.icon as React.ReactElement, { 
-                            style: { color: module.color }
-                          } as any)}
-                        </div>
-                        <span>{module.title}
-                        </span>
-                      </div>
-
-                      {module.subItems && module.subItems.length > 0 && (
-                      <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
-                        {expandedModules.includes(module.id) ? (
-                          <ChevronDown size={18} />
-                        ) : (
-                          <ChevronRight size={18} />
-                        )}
-                      </span>
-                      )}
-                    </button>
-                  </Link>
-                ) : (
-                  <button
-                    className={`module-header ${expandedModules.includes(module.id) ? 'expanded' : ''}`}
-                    style={{
-                      borderLeftColor: expandedModules.includes(module.id) ? module.color : 'transparent'
-                    }}
-                    onClick={() => toggleModule(module.id)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                      <div 
-                        className="module-icon-wrapper"
-                        style={{ backgroundColor: `${module.color}15` }}
-                      >
-                        {React.cloneElement(module.icon as React.ReactElement, { 
-                          style: { color: module.color }
-                        } as any)}
-                      </div>
-                      <span>{module.title}</span>
-                    </div>
-                    <span className={`chevron-icon ${expandedModules.includes(module.id) ? 'expanded' : ''}`}>
-                      {expandedModules.includes(module.id) ? (
-                        <ChevronDown size={18} />
-                      ) : (
-                        <ChevronRight size={18} />
-                      )}
-                    </span>
-                  </button>
-                )}
-                {/* Sub Items */}
-                {expandedModules.includes(module.id) && module.subItems && (
-                  <div>
-                    {module.subItems.map((subItem: SubMenuItem) => (
-                      <div key={subItem.id}>
-                        {subItem.subItems && subItem.subItems.length > 0 ? (
-                          // This is a nested sub-module with children
-                          <>
-
-                          {subItem.url !== '' ? (
-                            <Link href={subItem.url || '/'}>
-                              <button
-                                className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                                onClick={() => toggleSubModule(subItem.id)}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                  <span className="sub-item-icon">{subItem.icon}</span>
-                                  <span>{subItem.title}</span>
-                                </div>
-                                <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                  {expandedSubModules.includes(subItem.id) ? (
-                                    <ChevronDown size={16} />
-                                  ) : (
-                                    <ChevronRight size={16} />
-                                  )}
-                                </span>
-                              </button>
-                            </Link>
-                          ) : (
-                            <button
-                              className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                              onClick={() => toggleSubModule(subItem.id)}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                <span className="sub-item-icon">{subItem.icon}</span>
-                                <span>{subItem.title}</span>
-                              </div>
-
-                              {subItem.subItems && subItem.subItems.length > 0 && (
-                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                {expandedSubModules.includes(subItem.id) ? (
-                                  <ChevronDown size={16} />
-                                ) : (
-                                  <ChevronRight size={16} />
-                                )}
-                              </span>
-                              )}
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        // Regular sub-item without children
-                        <>
-                        {subItem.url !== '' ? (
-                          <Link href={subItem.url || '/'}>
-                            <button
-                              className={`sub-item 
-                                ${router.pathname === subItem.url ? 'active' : ''}
-                                ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                              onClick={() => toggleSubModule(subItem.id)}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                                <span className="sub-item-icon">{subItem.icon}</span>
-                                <span>{subItem.title}</span>
-                              </div>
-
-                              {subItem.subItems && subItem.subItems.length > 0 && (
-                              <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                                {expandedSubModules.includes(subItem.id) ? (
-                                  <ChevronDown size={16} />
-                                ) : (
-                                  <ChevronRight size={16} />
-                                )}
-                              </span>
-                              )}
-                            </button>
-                          </Link>
-                        ) : (
-                          <button
-                            className={`sub-module-header ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}
-                            onClick={() => toggleSubModule(subItem.id)}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-                              <span className="sub-item-icon">{subItem.icon}</span>
-                              <span>{subItem.title}</span>
-                            </div>
-                            {subItem.subItems && subItem.subItems.length > 0 && (
-                            <span className={`chevron-icon ${expandedSubModules.includes(subItem.id) ? 'expanded' : ''}`}>
-                              {expandedSubModules.includes(subItem.id) ? (
-                                <ChevronDown size={16} />
-                              ) : (
-                                <ChevronRight size={16} />
-                              )}
-                            </span>
-                            )}
-                          </button>
-                        )}
-                      </>
-                    )}
-                            {/* Nested Sub Items */}
-                            {subItem.subItems && subItem.subItems.length > 0 && expandedSubModules.includes(subItem.id) && (
-                              <div>
-                                {subItem.subItems.map((nestedItem: SubMenuItem) => (
-                                  <Link key={nestedItem.id} href={nestedItem.url || '/'}>
-                                    <button
-                                      className={`nested-sub-item`}
-                                      onClick={() => handleSubItemClick(nestedItem.id)}
-                                    >
-                                      <span className="nested-sub-item-icon">{nestedItem.icon}</span>
-                                      <span>{nestedItem.title}</span>
-                                    </button>
-                                  </Link>
-                                ))}
-                              </div>
-                            )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Divider between modules */}
-                {index < mainMenuItems.length - 1 && (
-                  <div className="module-divider" />
-                )}
-              </div>
+              <ModuleRow
+                key={module.id}
+                module={module}
+                index={index}
+                totalModules={mainMenuItems.length}
+                expandedModules={expandedModules}
+                expandedSubModules={expandedSubModules}
+                pathname={router.pathname}
+                onToggleModule={toggleModule}
+                onToggleSubModule={toggleSubModule}
+                onSubItemClick={handleSubItemClick}
+              />
             ))}
           </div>
         </div>

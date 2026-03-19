@@ -48,14 +48,14 @@ const widgetData: WidgetItem[] = [
 ];
 
 
-interface socialWidgetsItem {
+interface SocialWidgetsItem {
   id: number;
   img: string;
   percentage: string;
   bgImg: string;
 }
 
-const socialWidgetsData: socialWidgetsItem[] = [
+const socialWidgetsData: SocialWidgetsItem[] = [
   {
     id: 1,
     img: facebook,

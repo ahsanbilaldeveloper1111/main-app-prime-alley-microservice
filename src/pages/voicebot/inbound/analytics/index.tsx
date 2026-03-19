@@ -2,8 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { getCalls, getCallsStats } from "@utils/voicebot/inbound";
-import { GetCompanies } from "@utils/users";
+import { getCalls, getCallsStats, getCompanies } from "@utils/voicebot/inbound";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row } from "react-bootstrap";
 import { useSession } from "next-auth/react";
@@ -44,11 +43,7 @@ const AnalyticsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      if (res === false) {
-        setCompanies([]);
-        return;
-      }
+      const res = await getCompanies();
       setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
