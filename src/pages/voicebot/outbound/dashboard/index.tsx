@@ -6,7 +6,7 @@ import { Col, Form, Row, Spinner } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import { getAnalyticsDashboard } from "@utils/voicebot/outbound";
 import { formatDurationSeconds, formatFixed } from "@utils/voicebot/outbound/formatters";
-import { GetCompanies } from "@utils/users";
+import { getCompanies } from "@utils/voicebot/inbound";
 import { normalizeCompaniesResponse } from "@utils/companyOptions";
 
 import "@assets/scss/common.scss";
@@ -77,11 +77,7 @@ const OutboundDashboardPage = () => {
     let cancelled = false;
     async function fetchCompanies() {
       try {
-        const res = await GetCompanies();
-        if (res === false) {
-          if (!cancelled) setCompanies([]);
-          return;
-        }
+        const res = await getCompanies({ show_inactive: false });
         const opts = normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c) => ({
           id: c.company_id ?? c.identifier ?? c.id,
           name: c.name,

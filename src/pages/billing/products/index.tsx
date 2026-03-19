@@ -141,7 +141,10 @@ function getProductDisplayName(row: { id?: unknown; name?: string; title?: strin
   const name = row?.name ?? row?.title;
   if (name) return name;
   if (row?.id == null) return "N/A";
-  const idDisplay = typeof row.id === "object" ? "?" : String(row.id);
+  const idDisplay =
+    typeof row.id === "string" || typeof row.id === "number"
+      ? String(row.id)
+      : "?";
   return `Product #${idDisplay}`;
 }
 const getProductSku = (row: { sku?: string; data?: { sku?: string } } | null, emptyFallback = "--"): string =>
