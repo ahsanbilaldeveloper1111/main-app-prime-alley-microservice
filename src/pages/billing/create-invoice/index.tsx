@@ -383,7 +383,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
             <div style={{ maxWidth: 400 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: font, margin: "0 0 10px 0" }}>Add line items to your invoice</h3>
               <p style={{ fontSize: 14, color: "#555", fontFamily: font, margin: "0 0 14px 0", lineHeight: "21px" }}>Add line items for the products you're selling to your customer.</p>
-              <a style={{ ...t.link, display: "inline-flex", marginBottom: 20 }}>Learn more about the product library <ExternalLink size={12} /></a>
+              <button type="button" style={{ ...t.link, display: "inline-flex", marginBottom: 20, border: "none", background: "transparent", padding: 0 }}>Learn more about the product library <ExternalLink size={12} /></button>
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <div ref={productSelectWrapRef} style={{ position: "relative" as const }}>
                   <button type="button" onClick={() => { setProductSelectAnchor("empty"); setProductSelectOpen((v) => !v); }}
@@ -452,7 +452,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
         </div>
         <div style={{ padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <a style={t.link}>+ Add discount, fee, or tax</a><ChevronDown size={13} color="rgb(0,97,98)" />
+            <button type="button" style={{ ...t.link, border: "none", background: "transparent", padding: 0 }}>+ Add discount, fee, or tax</button><ChevronDown size={13} color="rgb(0,97,98)" />
             <InfoTip text="Add a discount, fee, or additional tax to this invoice." />
           </div>
         </div>
@@ -975,7 +975,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
               </div>
               <div>
                 <div style={t.label}>Payment terms *</div>
-                <select style={t.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as any)}>
+                <select style={t.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as "one_time" | "recurring" | "subscription")}>
                   <option value="one_time">One time</option>
                   <option value="recurring">Recurring</option>
                   <option value="subscription">Subscription</option>

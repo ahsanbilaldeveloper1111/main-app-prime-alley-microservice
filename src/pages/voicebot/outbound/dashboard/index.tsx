@@ -62,7 +62,11 @@ const OutboundDashboardPage = () => {
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
-  const isAdmin = String((session?.user as { is_admin?: unknown })?.is_admin ?? "") === "1";
+  const rawIsAdmin = (session?.user as { is_admin?: unknown })?.is_admin;
+  const isAdmin =
+    rawIsAdmin == null || typeof rawIsAdmin === "object"
+      ? false
+      : String(rawIsAdmin) === "1";
   const sessionCompanyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
   const effectiveCompanyId = isAdmin ? selectedCompanyId : sessionCompanyIdentifier;
 
@@ -136,9 +140,10 @@ const OutboundDashboardPage = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Outbound Dashboard" />
-      <PageHeader title="Outbound Dashboard" showSearch={false} />
-
-      {isAdmin && (
+      <PageHeader title="Outbound Dashboard" showSearch={false}
+        buttons={
+          <>
+           {isAdmin && (
         <Row className="mb-3 justify-content-end">
           <Col xs="auto">
             <Form.Group className="mb-0">
@@ -157,6 +162,12 @@ const OutboundDashboardPage = () => {
           </Col>
         </Row>
       )}
+          </>
+        }
+      
+      />
+
+     
 
       {loading && (
         <div className="d-flex justify-content-center py-5">

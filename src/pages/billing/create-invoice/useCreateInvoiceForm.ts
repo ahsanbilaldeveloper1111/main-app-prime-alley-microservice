@@ -247,12 +247,14 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
 
   const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
   const toVatPercent = (vat: string) => {
-    const n = Number(String(vat ?? "").replaceAll("%", "").trim());
+    const raw = typeof vat === "string" ? vat : "";
+    const n = Number(raw.replaceAll("%", "").trim());
     return Number.isFinite(n) ? n : 0;
   };
 
   const formatVatRate2 = useCallback((vat: unknown): string => {
-    const s = String(vat ?? "").replaceAll("%", "").trim();
+    const raw = vat == null || typeof vat === "object" ? "" : String(vat);
+    const s = raw.replaceAll("%", "").trim();
     const n = Number(s);
     if (!Number.isFinite(n)) return "0.00";
     return n.toFixed(2);
@@ -576,7 +578,10 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     (next: string) => {
       const trimmed = String(next).trim();
       const invDate = invoiceDate;
-      setDueDate(trimmed < invDate ? invDate : trimmed);
+      const trimmedMs = Date.parse(trimmed);
+      const invMs = Date.parse(invDate);
+      const maxMs = Math.max(trimmedMs, invMs);
+      setDueDate(Number.isFinite(maxMs) ? new Date(maxMs).toISOString().slice(0, 10) : (trimmed || invDate));
     },
     [invoiceDate],
   );
