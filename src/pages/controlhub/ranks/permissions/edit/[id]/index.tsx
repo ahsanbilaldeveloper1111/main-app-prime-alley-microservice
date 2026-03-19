@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
 import { ArrowLeft } from 'lucide-react'
-import { PermissionSwitch } from '../../PermissionSwitch'
+import { PermissionSwitch } from '@components/controlhub/PermissionSwitch'
 import '@assets/scss/common.scss';
 
 interface Permission {
