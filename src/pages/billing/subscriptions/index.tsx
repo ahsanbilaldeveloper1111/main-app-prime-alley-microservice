@@ -50,7 +50,8 @@ interface Product {
 const normalizePricingStatus = (
   value: unknown,
 ): CustomerProductPricingDataItem["status"] => {
-  const raw = value == null || typeof value === "object" ? "" : String(value);
+  const raw =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
   const s = raw.trim();
   if (
     s === "Active" ||
@@ -67,7 +68,8 @@ const normalizePricingStatus = (
 const normalizeBillingCycle = (
   value: unknown,
 ): CustomerProductPricingDataItem["billing_cycle"] => {
-  const raw = value == null || typeof value === "object" ? "" : String(value);
+  const raw =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
   const s = raw.trim();
   if (s === "one time" || s === "monthly" || s === "quarterly" || s === "yearly") {
     return s;

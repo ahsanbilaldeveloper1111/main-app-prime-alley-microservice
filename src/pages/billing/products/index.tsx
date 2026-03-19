@@ -138,7 +138,7 @@ const getRandomColor = (name: string): string => {
 
 // Product field accessors (shared between table columns and sidebar)
 const getProductDisplayName = (row: { id?: unknown; name?: string; title?: string } | null): string =>
-  row?.name ?? row?.title ?? (row?.id == null ? "N/A" : `Product #${row.id}`);
+  row?.name ?? row?.title ?? (row?.id == null ? "N/A" : `Product #${typeof row.id === "object" ? "?" : row.id}`);
 const getProductSku = (row: { sku?: string; data?: { sku?: string } } | null, emptyFallback = "--"): string =>
   row?.sku ?? row?.data?.sku ?? emptyFallback;
 const getProductTaxCategory = (row: { tax_category?: string; data?: { tax_category?: string } } | null): string =>

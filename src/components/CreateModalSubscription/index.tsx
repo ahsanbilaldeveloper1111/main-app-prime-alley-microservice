@@ -68,6 +68,224 @@ function isIsoDateBefore(a: string, b: string): boolean {
   return String(a) < String(b);
 }
 
+const STATUS_OPTIONS: SelectBoxOption[] = [
+  { value: "Active", label: "Active" },
+  { value: "Trial", label: "Trial" },
+  { value: "In Progress", label: "In Progress" },
+  { value: "Suspended", label: "Suspended" },
+  { value: "Inactive", label: "Inactive" },
+];
+
+const BILLING_CYCLE_OPTIONS: SelectBoxOption[] = [
+  { value: "one time", label: "One Time" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+];
+
+function parseDiscountValue(
+  value: string | number | (string | number)[] | null,
+): number | null {
+  const v = toSingleSelectValue(value);
+  return v == null || v === "" ? null : Number(v);
+}
+
+type PricingRowFormFieldsProps = {
+  row: CustomerProductPricingDataItem;
+  products: ProductData[];
+  updateRow: (productId: number, patch: Partial<CustomerProductPricingDataItem>) => void;
+  submitting: boolean;
+  showBasePrice?: boolean;
+  showFinalPrice?: boolean;
+  showRemoveButton?: boolean;
+  onRemove?: () => void;
+};
+
+function PricingRowFormFields({
+  row,
+  products,
+  updateRow,
+  submitting,
+  showBasePrice,
+  showFinalPrice,
+  showRemoveButton,
+  onRemove,
+}: Readonly<PricingRowFormFieldsProps>) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 12,
+      }}
+    >
+      {showBasePrice && (
+        <Field label="Base price">
+          <input
+            type="number"
+            value={String(row?.product?.base_price ?? 0)}
+            disabled
+            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
+          />
+        </Field>
+      )}
+      <Field label="Selling price">
+        <input
+          type="number"
+          value={String(row.selling_price)}
+          min={0}
+          onChange={(e) =>
+            updateRow(row.product_id, { selling_price: Number(e.target.value) })
+          }
+          disabled={submitting}
+          style={FIELD_INPUT}
+        />
+      </Field>
+      {showFinalPrice && (
+        <Field label="Final price">
+          <input
+            type="number"
+            value={String(row.selling_price)}
+            disabled
+            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
+          />
+        </Field>
+      )}
+      <Field label="Discount">
+        <SelectBox
+          options={[{ value: "", label: "No Discount" }]}
+          value={row.discount_applicability_id ?? ""}
+          onChange={(value) =>
+            updateRow(row.product_id, {
+              discount_applicability_id: parseDiscountValue(value),
+            })
+          }
+          isClearable={false}
+          isDisabled={submitting}
+        />
+      </Field>
+      <Field label="Status">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <ToggleSwitch
+            checked={row.is_active}
+            disabled={submitting}
+            onChange={(next) => updateRow(row.product_id, { is_active: next })}
+            ariaLabel="Toggle status"
+          />
+          <span style={{ fontSize: 12, color: "#141414" }}>
+            {row.is_active ? "Active" : "Inactive"}
+          </span>
+        </div>
+      </Field>
+      <Field label="Current period start date">
+        <input
+          type="date"
+          value={row.renewal_start_date}
+          onChange={(e) => {
+            const nextStart = e.target.value;
+            const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
+              ? nextStart
+              : row.renewal_end_date;
+            updateRow(row.product_id, {
+              renewal_start_date: nextStart,
+              renewal_end_date: nextEnd,
+            });
+          }}
+          disabled={submitting}
+          style={FIELD_INPUT}
+        />
+      </Field>
+      <Field label="Current period end date">
+        <input
+          type="date"
+          value={row.renewal_end_date}
+          min={row.renewal_start_date}
+          onChange={(e) =>
+            updateRow(row.product_id, {
+              renewal_end_date: isIsoDateBefore(
+                e.target.value,
+                row.renewal_start_date,
+              )
+                ? row.renewal_start_date
+                : e.target.value,
+            })
+          }
+          disabled={submitting}
+          style={FIELD_INPUT}
+        />
+      </Field>
+      <Field label="Status badge">
+        <SelectBox
+          options={STATUS_OPTIONS}
+          value={row.status}
+          onChange={(value) =>
+            updateRow(row.product_id, {
+              status: String(
+                toSingleSelectValue(value) ?? "Active",
+              ) as CustomerProductPricingDataItem["status"],
+            })
+          }
+          isClearable={false}
+          isDisabled={submitting}
+        />
+      </Field>
+      <Field label="Billing cycle">
+        <SelectBox
+          options={BILLING_CYCLE_OPTIONS}
+          value={row.billing_cycle}
+          onChange={(value) =>
+            updateRow(row.product_id, {
+              billing_cycle: String(
+                toSingleSelectValue(value) ?? "one time",
+              ) as CustomerProductPricingDataItem["billing_cycle"],
+            })
+          }
+          isClearable={false}
+          isDisabled={submitting}
+        />
+      </Field>
+      <Field label="Subscriptions">
+        <input
+          type="number"
+          min={0}
+          value={String(row.subscriptions)}
+          onChange={(e) =>
+            updateRow(row.product_id, {
+              subscriptions: Math.max(0, Number(e.target.value)),
+            })
+          }
+          disabled={submitting}
+          style={FIELD_INPUT}
+        />
+      </Field>
+      <Field label="Custom description" fullWidth>
+        <textarea
+          value={row.custom_description}
+          onChange={(e) =>
+            updateRow(row.product_id, { custom_description: e.target.value })
+          }
+          disabled={submitting}
+          style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
+          rows={2}
+          placeholder="Enter custom description"
+        />
+      </Field>
+      {showRemoveButton && onRemove && (
+        <Field label="" fullWidth>
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={submitting}
+            className="btn btn-danger"
+          >
+            Remove Product
+          </button>
+        </Field>
+      )}
+    </div>
+  );
+}
+
 export default function CreateSubscriptionModal({
   customerId,
   mode = "create",
@@ -554,196 +772,14 @@ export default function CreateSubscriptionModal({
                     </div>
 
                     <div style={{ padding: 14 }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                          gap: 12,
-                        }}
-                      >
-                        <Field label="Base price">
-                          <input
-                            type="number"
-                            value={String(row?.product?.base_price ?? 0)}
-                            disabled
-                            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
-                          />
-                        </Field>
-
-                        <Field label="Selling price">
-                          <input
-                            type="number"
-                            value={String(row.selling_price)}
-                            min={0}
-                            onChange={(e) =>
-                              updateRow(row.product_id, {
-                                selling_price: Number(e.target.value),
-                              })
-                            }
-                            disabled={submitting}
-                            style={FIELD_INPUT}
-                          />
-                        </Field>
-
-                        
-
-                        <Field label="Discount">
-                          <SelectBox
-                            options={[{ value: "", label: "No Discount" }]}
-                            value={row.discount_applicability_id ?? ""}
-                            onChange={(value) =>
-                              updateRow(row.product_id, {
-                                discount_applicability_id:
-                                  toSingleSelectValue(value) == null ||
-                                  toSingleSelectValue(value) === ""
-                                    ? null
-                                    : Number(toSingleSelectValue(value)),
-                              })
-                            }
-                            isClearable={false}
-                            isDisabled={submitting}
-                          />
-                        </Field>
-
-                        <Field label="Final price">
-                          <input
-                            type="number"
-                            value={String(row.selling_price)}
-                            disabled={true}
-                            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
-                          />
-                        </Field>
-
-                        <Field label="Status">
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <ToggleSwitch
-                              checked={row.is_active}
-                              disabled={submitting}
-                              onChange={(next) =>
-                                updateRow(row.product_id, { is_active: next })
-                              }
-                              ariaLabel="Toggle status"
-                            />
-                            <span style={{ fontSize: 12, color: "#141414" }}>
-                              {row.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                        </Field>
-
-                        <Field label="Current period start date">
-                          <input
-                            type="date"
-                            value={row.renewal_start_date}
-                            onChange={(e) =>
-                              updateRow(row.product_id, (() => {
-                                const nextStart = e.target.value;
-                                const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
-                                  ? nextStart
-                                  : row.renewal_end_date;
-                                return {
-                                  renewal_start_date: nextStart,
-                                  renewal_end_date: nextEnd,
-                                };
-                              })())
-                            }
-                            disabled={submitting}
-                            style={FIELD_INPUT}
-                          />
-                        </Field>
-
-                        <Field label="Current period end date">
-                          <input
-                            type="date"
-                            value={row.renewal_end_date}
-                            min={row.renewal_start_date}
-                            onChange={(e) =>
-                              updateRow(row.product_id, {
-                                renewal_end_date: isIsoDateBefore(
-                                  e.target.value,
-                                  row.renewal_start_date,
-                                )
-                                  ? row.renewal_start_date
-                                  : e.target.value,
-                              })
-                            }
-                            disabled={submitting}
-                            style={FIELD_INPUT}
-                          />
-                        </Field>
-
-                        <Field label="Status badge">
-                          <SelectBox
-                            options={[
-                              { value: "Active", label: "Active" },
-                              { value: "Trial", label: "Trial" },
-                              { value: "In Progress", label: "In Progress" },
-                              { value: "Suspended", label: "Suspended" },
-                              { value: "Inactive", label: "Inactive" },
-                            ]}
-                            value={row.status}
-                            onChange={(value) =>
-                              updateRow(row.product_id, {
-                                status: String(
-                                  toSingleSelectValue(value) ?? "Active",
-                                ) as CustomerProductPricingDataItem["status"],
-                              })
-                            }
-                            isClearable={false}
-                            isDisabled={submitting}
-                          />
-                        </Field>
-
-                        <Field label="Billing cycle">
-                          <SelectBox
-                            options={[
-                              { value: "one time", label: "One Time" },
-                              { value: "monthly", label: "Monthly" },
-                              { value: "quarterly", label: "Quarterly" },
-                              { value: "yearly", label: "Yearly" },
-                            ]}
-                            value={row.billing_cycle}
-                            onChange={(value) =>
-                              updateRow(row.product_id, {
-                                billing_cycle: String(
-                                  toSingleSelectValue(value) ?? "one time",
-                                ) as CustomerProductPricingDataItem["billing_cycle"],
-                              })
-                            }
-                            isClearable={false}
-                            isDisabled={submitting}
-                          />
-                        </Field>
-
-                        <Field label="Subscriptions">
-                          <input
-                            type="number"
-                            min={0}
-                            value={String(row.subscriptions)}
-                            onChange={(e) =>
-                              updateRow(row.product_id, {
-                                subscriptions: Math.max(0, Number(e.target.value)),
-                              })
-                            }
-                            disabled={submitting}
-                            style={FIELD_INPUT}
-                          />
-                        </Field>
-
-                        <Field label="Custom description" fullWidth>
-                          <textarea
-                            value={row.custom_description}
-                            onChange={(e) =>
-                              updateRow(row.product_id, {
-                                custom_description: e.target.value,
-                              })
-                            }
-                            disabled={submitting}
-                            style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
-                            rows={2}
-                            placeholder="Enter custom description"
-                          />
-                        </Field>
-                      </div>
+                      <PricingRowFormFields
+                        row={row}
+                        products={products}
+                        updateRow={updateRow}
+                        submitting={submitting}
+                        showBasePrice
+                        showFinalPrice
+                      />
                     </div>
                   </div>
                 );
@@ -829,187 +865,14 @@ export default function CreateSubscriptionModal({
 
                     {expanded && (
                       <div style={{ padding: 14 }}>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                            gap: 12,
-                          }}
-                        >
-                          <Field label="Selling price">
-                            <input
-                              type="number"
-                              value={String(row.selling_price)}
-                              min={0}
-                              onChange={(e) =>
-                                updateRow(row.product_id, {
-                                  selling_price: Number(e.target.value),
-                                })
-                              }
-                              disabled={submitting}
-                              style={FIELD_INPUT}
-                            />
-                          </Field>
-
-                          <Field label="Discount">
-                            <SelectBox
-                              options={[{ value: "", label: "No Discount" }]}
-                              value={row.discount_applicability_id ?? ""}
-                              onChange={(value) =>
-                                updateRow(row.product_id, {
-                                  discount_applicability_id:
-                                    toSingleSelectValue(value) == null ||
-                                    toSingleSelectValue(value) === ""
-                                      ? null
-                                      : Number(toSingleSelectValue(value)),
-                                })
-                              }
-                              isClearable={false}
-                              isDisabled={submitting}
-                            />
-                          </Field>
-
-                          <Field label="Status">
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <ToggleSwitch
-                                checked={row.is_active}
-                                disabled={submitting}
-                                onChange={(next) =>
-                                  updateRow(row.product_id, { is_active: next })
-                                }
-                                ariaLabel="Toggle status"
-                              />
-                              <span style={{ fontSize: 12, color: "#141414" }}>
-                                {row.is_active ? "Active" : "Inactive"}
-                              </span>
-                            </div>
-                          </Field>
-
-                          <Field label="Current period start date">
-                            <input
-                              type="date"
-                              value={row.renewal_start_date}
-                              onChange={(e) =>
-                                updateRow(row.product_id, (() => {
-                                  const nextStart = e.target.value;
-                                  const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
-                                    ? nextStart
-                                    : row.renewal_end_date;
-                                  return {
-                                    renewal_start_date: nextStart,
-                                    renewal_end_date: nextEnd,
-                                  };
-                                })())
-                              }
-                              disabled={submitting}
-                              style={FIELD_INPUT}
-                            />
-                          </Field>
-
-                          <Field label="Current period end date">
-                            <input
-                              type="date"
-                              value={row.renewal_end_date}
-                              min={row.renewal_start_date}
-                              onChange={(e) =>
-                                updateRow(row.product_id, {
-                                  renewal_end_date: isIsoDateBefore(
-                                    e.target.value,
-                                    row.renewal_start_date,
-                                  )
-                                    ? row.renewal_start_date
-                                    : e.target.value,
-                                })
-                              }
-                              disabled={submitting}
-                              style={FIELD_INPUT}
-                            />
-                          </Field>
-
-                          <Field label="Status badge">
-                            <SelectBox
-                              options={[
-                                { value: "Active", label: "Active" },
-                                { value: "Trial", label: "Trial" },
-                                { value: "In Progress", label: "In Progress" },
-                                { value: "Suspended", label: "Suspended" },
-                                { value: "Inactive", label: "Inactive" },
-                              ]}
-                              value={row.status}
-                              onChange={(value) =>
-                                updateRow(row.product_id, {
-                                  status: String(
-                                    toSingleSelectValue(value) ?? "Active",
-                                  ) as CustomerProductPricingDataItem["status"],
-                                })
-                              }
-                              isClearable={false}
-                              isDisabled={submitting}
-                            />
-                          </Field>
-
-                          <Field label="Billing cycle">
-                            <SelectBox
-                              options={[
-                                { value: "one time", label: "One Time" },
-                                { value: "monthly", label: "Monthly" },
-                                { value: "quarterly", label: "Quarterly" },
-                                { value: "yearly", label: "Yearly" },
-                              ]}
-                              value={row.billing_cycle}
-                              onChange={(value) =>
-                                updateRow(row.product_id, {
-                                  billing_cycle: String(
-                                    toSingleSelectValue(value) ?? "one time",
-                                  ) as CustomerProductPricingDataItem["billing_cycle"],
-                                })
-                              }
-                              isClearable={false}
-                              isDisabled={submitting}
-                            />
-                          </Field>
-
-                          <Field label="Subscriptions">
-                            <input
-                              type="number"
-                              min={0}
-                              value={String(row.subscriptions)}
-                              onChange={(e) =>
-                                updateRow(row.product_id, {
-                                  subscriptions: Math.max(0, Number(e.target.value)),
-                                })
-                              }
-                              disabled={submitting}
-                              style={FIELD_INPUT}
-                            />
-                          </Field>
-
-                          <Field label="Custom description" fullWidth>
-                            <textarea
-                              value={row.custom_description}
-                              onChange={(e) =>
-                                updateRow(row.product_id, {
-                                  custom_description: e.target.value,
-                                })
-                              }
-                              disabled={submitting}
-                              style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
-                              rows={2}
-                              placeholder="Enter custom description"
-                            />
-                          </Field>
-
-                          <Field label="" fullWidth>
-                            <button
-                              type="button"
-                              onClick={() => deleteRow(row.product_id)}
-                              disabled={submitting}
-                              className="btn btn-danger"
-                            >
-                              Remove Product
-                            </button>
-                          </Field>
-                        </div>
+                        <PricingRowFormFields
+                          row={row}
+                          products={products}
+                          updateRow={updateRow}
+                          submitting={submitting}
+                          showRemoveButton
+                          onRemove={() => deleteRow(row.product_id)}
+                        />
                       </div>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Col, Form, Row, Spinner } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import { getAnalyticsDashboard } from "@utils/voicebot/outbound";
+import { formatDurationSeconds, formatFixed } from "@utils/voicebot/outbound/formatters";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse } from "@utils/companyOptions";
 
@@ -27,23 +28,6 @@ interface DashboardResponse {
   data?: DashboardData;
 }
 
-function formatAvgDuration(sec?: number): string {
-  if (sec == null || !Number.isFinite(sec)) return "0:00";
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function formatSuccessRate(rate?: number): string {
-  if (rate == null || !Number.isFinite(rate)) return "0.0";
-  return rate.toFixed(1);
-}
-
-function formatCost(cost?: number): string {
-  if (cost == null || !Number.isFinite(cost)) return "0";
-  return cost.toFixed(4);
-}
-
 const METRIC_CARDS = [
   { key: "total_campaigns", label: "Total Companies" },
   { key: "published_bots", label: "Published Bots" },
@@ -64,9 +48,8 @@ const OutboundDashboardPage = () => {
 
   const rawIsAdmin = (session?.user as { is_admin?: unknown })?.is_admin;
   const isAdmin =
-    rawIsAdmin == null || typeof rawIsAdmin === "object"
-      ? false
-      : String(rawIsAdmin) === "1";
+    (typeof rawIsAdmin === "string" || typeof rawIsAdmin === "number") &&
+    String(rawIsAdmin) === "1";
   const sessionCompanyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
   const effectiveCompanyId = isAdmin ? selectedCompanyId : sessionCompanyIdentifier;
 
@@ -119,12 +102,12 @@ const OutboundDashboardPage = () => {
   const d = dashboard ?? {};
   const totalCampaigns = d.total_campaigns ?? 0;
   const publishedBots = totalCampaigns; // API has no separate field; use total campaigns
-  const successRate = formatSuccessRate(d.success_rate);
-  const avgDuration = formatAvgDuration(d.avg_call_duration);
+  const successRate = formatFixed(d.success_rate, 1, "0.0");
+  const avgDuration = formatDurationSeconds(d.avg_call_duration);
   const activeBots = d.active_campaigns ?? 0;
   const totalCalls = d.total_calls ?? 0;
   const transferRate = "0.0"; // Not provided by API
-  const totalCost = `$${formatCost(d.total_cost)}`;
+  const totalCost = `$${formatFixed(d.total_cost, 4, "0")}`;
 
   const cardValues: Record<string, string | number> = {
     total_campaigns: totalCampaigns,

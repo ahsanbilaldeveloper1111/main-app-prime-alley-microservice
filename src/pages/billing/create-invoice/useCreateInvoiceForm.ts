@@ -253,7 +253,8 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
   };
 
   const formatVatRate2 = useCallback((vat: unknown): string => {
-    const raw = vat == null || typeof vat === "object" ? "" : String(vat);
+    const raw =
+      typeof vat === "string" || typeof vat === "number" ? String(vat) : "";
     const s = raw.replaceAll("%", "").trim();
     const n = Number(s);
     if (!Number.isFinite(n)) return "0.00";
