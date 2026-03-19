@@ -275,7 +275,7 @@ export const getTasksCalendar = async (
   params?: Record<string, unknown>
 ): Promise<TasksCalendarData | null> => {
   try {
-    const response = await axiosInstance.get(`${prefix}/calendar`, { params });
+    const response = await axiosInstance.get(`${prefix}/tasks/calendar`, { params });
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {

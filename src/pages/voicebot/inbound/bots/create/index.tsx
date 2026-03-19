@@ -155,29 +155,25 @@ const BasicInfoPane = ({
           style={inputStyle}
         />
       </Form.Group>
-      <Form.Group className="mb-3">
-        <Form.Label style={labelStyle}>Company *</Form.Label>
-        <Form.Select
-          value={form.company}
-          onChange={(e) => isAdmin && setForm((f) => ({ ...f, company: e.target.value }))}
-          required
-          disabled={loadingCompanies || !isAdmin || isEditMode}
-          style={inputStyle}
-        >
-          <option value="">Select company</option>
-          {isAdmin &&
-            companies.map((c) => (
+      {isAdmin && (
+        <Form.Group className="mb-3">
+          <Form.Label style={labelStyle}>Company *</Form.Label>
+          <Form.Select
+            value={form.company}
+            onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+            required
+            disabled={loadingCompanies || isEditMode}
+            style={inputStyle}
+          >
+            <option value="">Select company</option>
+            {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-          {!isAdmin && userCompanyIdentifier && (
-            <option value={userCompanyIdentifier}>
-              {userCompanyName || userCompanyIdentifier}
-            </option>
-          )}
-        </Form.Select>
-      </Form.Group>
+          </Form.Select>
+        </Form.Group>
+      )}
     </div>
     <Form.Group className="mb-3">
       <Form.Label style={labelStyle}>Description *</Form.Label>

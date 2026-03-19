@@ -216,22 +216,16 @@ const VoicebotsPage = () => {
               <h2 className="mb-0">Voice Bots</h2>
             </div>
             <div className="d-flex align-items-center gap-2 flex-wrap">
-              {/* <Form.Control
-                type="search"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ width: "200px" }}
-              /> */}
-              <Form.Select
-                style={{ width: "220px" }}
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-              >
-                <option value="">All companies</option>
-                {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </Form.Select>
-             
+              {isAdmin && (
+                <Form.Select
+                  style={{ width: "220px" }}
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                >
+                  <option value="">All companies</option>
+                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Form.Select>
+              )}
               <Form.Select
                 style={{ width: "150px" }}
                 value={statusFilter}
