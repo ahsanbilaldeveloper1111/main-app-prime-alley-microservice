@@ -1,10 +1,7 @@
 import React,{ReactElement, useEffect, useState} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
-import { Button, Card, Col, Form, Modal, Row, OverlayTrigger, Tooltip } from 'react-bootstrap'
-import RolesSourceData from '@views/Table/DataTable/SourceData/RolesSourceData'
-import { toast } from 'react-toastify'
-import permissionsData from '@common/JsonData/PermissionsData'
+import { Button, Card, Col, Form, Row, OverlayTrigger, Tooltip } from 'react-bootstrap'
 import { useRouter } from 'next/router'
 import { viewRank } from '@utils/roles'
 import { ArrowLeft } from 'lucide-react'
@@ -241,13 +238,12 @@ const ViewRolePermission = () => {
             <Row>
                   <Col md={12}>
                   {filteredPermissions?.some(group => group.permissions.some(perm => perm.enabled)) ? (
-                        filteredPermissions.map((group: PermissionGroup, groupIdx: number) => {
+                        filteredPermissions.map((group: PermissionGroup) => {
                             const { nonSpecialPermissions, specialPermissions } = separatePermissions(group);
                             
                             return (
-                                <React.Fragment key={groupIdx}>
+                                <React.Fragment key={group.group}>
                                     {group.permissions.some(perm => perm.enabled) && (
-                                        <>
                                             <Card className="p-3 mb-3">
                                                 <div className="roles-box">
                                                     <div className="roles-box-header clearfix">
@@ -264,18 +260,18 @@ const ViewRolePermission = () => {
                                                             <div className="row">
                                                                 {nonSpecialPermissions
                                                                     .filter((perm: Permission) => perm.enabled)
-                                                                    .map((perm: Permission, permIdx: number) => (
-                                                                    <div className="col-md-4 mb-3" key={permIdx}>
+                                                                    .map((perm: Permission) => (
+                                                                    <div className="col-md-4 mb-3" key={perm.id}>
                                                                         <OverlayTrigger
                                                                             placement="right"
-                                                                            overlay={<Tooltip id={`tooltip-regular-${permIdx}`}>
+                                                                            overlay={<Tooltip id={`tooltip-regular-${perm.id}`}>
                                                                                 {perm?.description || 'No description available'}
                                                                             </Tooltip>}
                                                                         >
                                                                             <div className='d-inline-block'>
                                                                                 <Form.Check
                                                                                     type="switch"
-                                                                                    id={`regular-${permIdx}`}
+                                                                                    id={`regular-${perm.id}`}
                                                                                     label={perm.name}
                                                                                     readOnly
                                                                                     checked={perm.enabled}
@@ -297,24 +293,24 @@ const ViewRolePermission = () => {
                                                     {specialPermissions.length > 0 && (
                                                         <div className="mb-4">
                                                             <h6 className="text-warning mb-4" style={{borderBottom: '1px #d6d6d6 solid',paddingBottom: '10px'}}>
-                                                                <i className="fas fa-star me-2"></i>
-                                                                Special Permissions
+                                                                <i className="fas fa-star me-2" aria-hidden></i>
+                                                                {" "}Special Permissions
                                                             </h6>
                                                             <div className="row">
                                                                 {specialPermissions
                                                                     .filter((perm: Permission) => perm.enabled)
-                                                                    .map((perm: Permission, permIdx: number) => (
-                                                                    <div className="col-md-4 mb-3" key={permIdx}>
+                                                                    .map((perm: Permission) => (
+                                                                    <div className="col-md-4 mb-3" key={perm.id}>
                                                                         <OverlayTrigger
                                                                             placement="right"
-                                                                            overlay={<Tooltip id={`tooltip-special-${permIdx}`}>
+                                                                            overlay={<Tooltip id={`tooltip-special-${perm.id}`}>
                                                                                 {perm?.description || 'No description available'}
                                                                             </Tooltip>}
                                                                         >
                                                                             <div className='d-inline-block'>
                                                                                 <Form.Check
                                                                                     type="switch"
-                                                                                    id={`special-${permIdx}`}
+                                                                                    id={`special-${perm.id}`}
                                                                                     label={perm.name}
                                                                                     readOnly
                                                                                     checked={perm.enabled}
@@ -333,7 +329,6 @@ const ViewRolePermission = () => {
                                                     )}
                                                 </div>
                                             </Card>
-                                        </>
                                     )}
                                 </React.Fragment>
                             );
