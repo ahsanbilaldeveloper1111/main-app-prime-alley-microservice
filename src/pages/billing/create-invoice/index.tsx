@@ -7,7 +7,7 @@ import {
 import SelectBox, { type SelectBoxOption } from "@components/SelectBox";
 import type { ProductPricingData } from "@utils/accounts";
 import { getCompanyByCrmId } from "@utils/Helper";
-import { useCreateInvoiceForm, type InvoiceLineItem } from "./useCreateInvoiceForm";
+import { useCreateInvoiceForm, type InvoiceLineItem } from "@hooks/billing/useCreateInvoiceForm";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
