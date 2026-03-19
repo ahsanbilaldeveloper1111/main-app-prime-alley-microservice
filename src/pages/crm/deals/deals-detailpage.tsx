@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactElement, useCallback } from 'react';
+import React, { useState, useRef, useEffect, ReactElement, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
@@ -23,6 +23,8 @@ import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCti } from "@hooks/useCti";
+import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
@@ -32,6 +34,13 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import {
+  CrmRevenueQuoteToCash,
+  type SubscriptionItem,
+  type RevenueSection,
+  createDefaultRevenueSections,
+} from "@components/CrmRevenueQuoteToCash";
+import { useCrmSectionTab } from "@hooks/useCrmSectionTab";
 import { toast } from "react-toastify";
 
 // ============================================================================
@@ -44,32 +53,122 @@ interface KeyInfoField {
   copyable?: boolean;
 }
 
+type CollapsibleSectionHeaderProps = {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  title: string;
+  titleTag: 'h2' | 'h3';
+  titleFontSize: string;
+  chevronSize: number;
+  rightButtonLabel?: string;
+  onRightButtonClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  showBorderBottom?: boolean;
+};
+
+const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
+  isCollapsed,
+  onToggle,
+  title,
+  titleTag,
+  titleFontSize,
+  chevronSize,
+  rightButtonLabel,
+  onRightButtonClick,
+  showBorderBottom = false,
+}) => {
+  const chevronStyle: React.CSSProperties = {
+    color: '#141414',
+    transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+    transition: 'transform 0.2s ease',
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontSize: titleFontSize,
+    fontWeight: '600',
+    color: '#141414',
+    margin: 0,
+  };
+
+  let borderBottomStyle: React.CSSProperties['borderBottom'] = undefined;
+  if (showBorderBottom) {
+    if (isCollapsed) {
+      borderBottomStyle = 'none';
+    } else {
+      borderBottomStyle = '1px solid #cccccc';
+    }
+  }
+
+  const renderTitle = () => {
+    if (titleTag === 'h2') {
+      return <h2 style={titleStyle}>{title}</h2>;
+    }
+    return <h3 style={titleStyle}>{title}</h3>;
+  };
+
+  return rightButtonLabel ? (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '14px 20px',
+        cursor: 'pointer',
+        backgroundColor: '#ffffff',
+        borderBottom: borderBottomStyle,
+      }}
+      onClick={onToggle}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <ChevronDown size={chevronSize} style={chevronStyle} />
+        {renderTitle()}
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRightButtonClick?.(e);
+        }}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: '6px',
+          cursor: 'pointer',
+          color: '#141414',
+          fontSize: '14px',
+          fontWeight: '500',
+          borderRadius: '3px',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f5f8fa';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        type="button"
+      >
+        {rightButtonLabel}
+      </button>
+    </div>
+  ) : (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '16px',
+        cursor: 'pointer',
+      }}
+      onClick={onToggle}
+    >
+      <ChevronDown size={chevronSize} style={chevronStyle} />
+      {renderTitle()}
+    </div>
+  );
+};
+
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface SubscriptionItem {
-  id: string;
-  name: string;
-  status: 'active' | 'inactive' | 'cancelled';
-  nextBillingDate: string;
-  nextPaymentAmount: string;
-  contactEmail: string;
-  link: string;
-}
-
-interface RevenueSection {
-  id: string;
-  title: string;
-  count: number;
-  description: string;
-  buttonText: string;
-  buttonIcon?: React.ComponentType<{ size?: number }>;
-  items?: SubscriptionItem[];
-  onButtonClick: () => void;
-  addButtonText?: string;
-  onAddClick?: () => void;
-}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -85,7 +184,11 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [dealLoading, setDealLoading] = useState(true);
   const [dealError, setDealError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState('about');
+  const { activeTab, setActiveTab } = useCrmSectionTab(
+    router,
+    ["about", "activities", "revenue", "intelligence"],
+    "about",
+  );
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
@@ -119,18 +222,6 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-
-  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = new Set(["about", "activities", "revenue", "intelligence"]);
-  useEffect(() => {
-    if (!router.isReady) return;
-    const section = router.query.section;
-    const tabId =
-      typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.has(tabId)) {
-      setActiveTab(tabId);
-    }
-  }, [router.isReady, router.query.section]);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -218,58 +309,10 @@ const DealRecordPage: NextPageWithLayout = () => {
     },
   ];
 
-  const revenueSections: RevenueSection[] = [
-    {
-      id: 'quotes',
-      title: 'Quotes',
-      count: 0,
-      description: 'Track the sales documents associated with this record.',
-      buttonText: 'Create quote',
-      buttonIcon: FileText,
-      onButtonClick: () => console.log('Create quote'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add quote'),
-    },
-    {
-      id: 'invoices',
-      title: 'Invoices',
-      count: 0,
-      description: 'Send your customer a request for payment and associate it with this record.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add invoice'),
-    },
-    {
-      id: 'payment-links',
-      title: 'Payment Links',
-      count: 0,
-      description: 'Add a payment link to accept a payment and associate it with this record.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add payment link'),
-    },
-    {
-      id: 'subscriptions',
-      title: 'Subscriptions',
-      count: 1,
-      description: '',
-      buttonText: '',
-      items: subscriptionsData,
-      onButtonClick: () => console.log('Subscriptions'),
-      addButtonText: 'Add',
-      onAddClick: () => console.log('Add subscription'),
-    },
-    {
-      id: 'payments',
-      title: 'Payments',
-      count: 0,
-      description: 'Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.',
-      buttonText: 'Set up payments',
-      onButtonClick: () => console.log('Set up payments'),
-    },
-  ];
+  const revenueSections: RevenueSection[] = createDefaultRevenueSections(
+    subscriptionsData.length,
+    subscriptionsData,
+  );
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -337,22 +380,122 @@ const DealRecordPage: NextPageWithLayout = () => {
 
   const dealRecordPhone = (deal as any)?.phone ?? deal?.decision_maker_phone ?? "";
 
+  const {
+    dialNumber: ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    userAddress: ctiUserAddress,
+  } = useCti();
+
+  const phoneList = useMemo(() => {
+    const phone = dealRecordPhone;
+    if (!phone || typeof phone !== "string") return [];
+    return phone
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }, [dealRecordPhone]);
+
+  const hasPhone = phoneList.length > 0;
+  const numberToCall = hasPhone ? phoneList[0] : "";
+
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const [isDialing, setIsDialing] = useState(false);
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        return;
+      }
+      setIsDialing(true);
+      try {
+        const result = await ctiDialNumber(numberToDial);
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch {
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [ctiDialNumber, getAllUserDevices],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      setShowDeviceSelectionModal(false);
+      setAvailableDevices([]);
+      setPendingDialedNumber("");
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+      setIsDialing(true);
+      try {
+        const result = await makeCall({
+          callingAddress: ctiUserAddress ?? "",
+          calledAddress: numberToDial,
+          callingDeviceType: device.deviceType,
+          callingDeviceName: device.deviceName,
+        });
+        if (result?.error) {
+          toast.error(result.error);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to make call:", error);
+        toast.error("Failed to make call");
+      } finally {
+        setIsDialing(false);
+      }
+    },
+    [pendingDialedNumber, ctiUserAddress, makeCall],
+  );
+
+  const handleCallClick = useCallback(() => {
+    if (!hasPhone) {
+      toast.error("No phone number available");
+      return;
+    }
+    handleCall(numberToCall);
+  }, [hasPhone, numberToCall, handleCall]);
+
   const handleOpenEditDeal = useCallback(() => {
     if (!dealRecordId) return;
-    setEditDealIdForSidebar(dealRecordId);
+    const id = dealRecordId;
+    setEditDealIdForSidebar(id);
     setShowCreateDealSidebar(true);
   }, [dealRecordId]);
 
   const handleOpenDeleteDeal = useCallback(() => {
     if (!dealRecordId) return;
-    setDealToDelete({ id: dealRecordId, name: dealRecordName });
+    const payload = { id: dealRecordId, name: dealRecordName };
+    setDealToDelete(payload);
     setShowDeleteModal(true);
   }, [dealRecordId, dealRecordName]);
 
   const confirmDeleteDeal = useCallback(async () => {
     if (!dealToDelete) return;
     try {
-      await deleteDeal(dealToDelete.id);
+      const id = dealToDelete.id;
+      await deleteDeal(id);
       setShowDeleteModal(false);
       setDealToDelete(null);
       setShowSuccessfulModal(true);
@@ -369,7 +512,8 @@ const DealRecordPage: NextPageWithLayout = () => {
   const handleDealExport = useCallback(async () => {
     if (!dealRecordId) return;
     try {
-      await PDFDownloadDeal(dealRecordId);
+      const id = dealRecordId;
+      await PDFDownloadDeal(id);
       toast.success("Exported deal successfully!");
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -383,7 +527,8 @@ const DealRecordPage: NextPageWithLayout = () => {
       if (!dealRecordId) return;
       setDownloadingAttachmentId(attachmentId);
       try {
-        await downloadDealAttachment(dealRecordId, attachmentId);
+        const id = dealRecordId;
+        await downloadDealAttachment(id, attachmentId);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to download attachment:", error);
@@ -514,266 +659,17 @@ const DealRecordPage: NextPageWithLayout = () => {
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
-  const renderRevenueSection = (section: RevenueSection) => {
-    return (
-      <div
-        key={section.id}
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '20px',
-          marginBottom: '16px',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: section.items ? '16px' : '12px',
-        }}>
-          <h3 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: '#141414',
-            margin: 0,
-          }}>
-            {section.title} ({section.count})
-          </h3>
-          {section.addButtonText && (
-            <button
-              onClick={section.onAddClick}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#006162',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = 'underline';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = 'none';
-              }}
-            >
-              +{section.addButtonText}
-              <ChevronDown size={14} />
-            </button>
-          )}
-        </div>
-  
-        {section.items && section.items.length > 0 ? (
-          <>
-            {section.items.map(item => (
-              <div
-                key={item.id}
-                style={{
-                  padding: '16px',
-                  backgroundColor: '#f7fafc',
-                  border: '1px solid #eaf0f6',
-                  borderRadius: '5px',
-                  marginBottom: '12px',
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  marginBottom: '12px',
-                }}>
-                  <FileText size={18} color="#7c98b6" />
-                  <a
-                    href={item.link}
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      color: '#006162',
-                      textDecoration: 'none',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.textDecoration = 'underline';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.textDecoration = 'none';
-                    }}
-                  >
-                    {item.name}
-                  </a>
-                </div>
-  
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '12px',
-                  fontSize: '14px',
-                }}>
-                  <div>
-                    <span style={{ color: '#141414' }}>Status: </span>
-                    <span style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      color: '#141414',
-                    }}>
-                      <span style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: item.status === 'active' ? '#10b981' : '#ef4444',
-                        display: 'inline-block',
-                      }} />
-                      {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                    </span>
-                  </div>
-                  <div style={{ color: '#141414' }}>
-                    Next billing date: {item.nextBillingDate}
-                  </div>
-                  <div style={{ color: '#141414' }}>
-                    Next payment amount: {item.nextPaymentAmount}
-                  </div>
-                  <div>
-                    <span style={{ color: '#141414' }}>Contact email: </span>
-                    <a
-                      href={`mailto:${item.contactEmail}`}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = 'underline';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = 'none';
-                      }}
-                    >
-                      {item.contactEmail}
-                    </a>
-                    <ExternalLink size={12} style={{ marginLeft: '4px', display: 'inline' }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-  
-            <button
-              style={{
-                padding: '8px 16px',
-                backgroundColor: 'transparent',
-                border: '1px solid #cbd5e0',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#141414',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f7fafc';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              View all associated {section.title}
-              <ExternalLink size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{
-              fontSize: '14px',
-              color: '#141414',
-              lineHeight: '1.6',
-              marginBottom: '16px',
-            }}>
-              {section.description}
-            </p>
-  
-            {section.buttonText && (
-              <button
-                onClick={section.onButtonClick}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: 'transparent',
-                  border: '1px solid #cbd5e0',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#141414',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f7fafc';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                {section.buttonIcon && <section.buttonIcon size={16} />}
-                {section.buttonText}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
-
   // ============================================================================
   // LEFT SIDEBAR (Deal Info)
   // ============================================================================
 
   const renderLeftSidebar = () => (
-    <div className="sidebar-scrollbar" style={{
-      width: '385px',
-      backgroundColor: '#f0f0f0',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      flexShrink: 0,
-      overflowY: 'auto',
-      marginRight: '10px',
-    }}>
-      <div style={{
-        padding: '10px 0px',
-        borderRadius: '10px',
-        backgroundColor: '#ffffff',
-        marginBottom: '12px',
-        border: '1px solid #cccccc',
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingBottom: '10px',
-          borderBottom: '1px solid #cccccc',
-          paddingLeft: '24px',
-          paddingRight: '24px',
-        }}>
+    <div className="sidebar-scrollbar crmLeftSidebarContainer">
+      <div className="crmLeftSidebarHeaderCard">
+        <div className="crmLeftSidebarHeaderRow">
           <button
-            onClick={() => window.history.back()}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              color: '#141414',
-              fontWeight: '500',
-            }}
+            onClick={() => globalThis.history.back()}
+            className="crmLeftSidebarBackButton"
           >
             <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
             Deals
@@ -782,45 +678,14 @@ const DealRecordPage: NextPageWithLayout = () => {
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
               onClick={() => setShowActionsDropdown(!showActionsDropdown)}
-              style={{
-                padding: '6px 14px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#141414',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                borderRadius: '3px',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f8fa';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
+              className="crmLeftSidebarActionsButton"
             >
               Actions
               <ChevronDown size={14} />
             </button>
 
             {showActionsDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '4px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '5px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                minWidth: '180px',
-                zIndex: 1000,
-                overflow: 'hidden',
-              }}>
+              <div className="crmLeftSidebarActionsDropdownMenu">
                 {['Edit', 'Delete', 'Export'].map((action) => (
                   <button
                     key={action}
@@ -834,22 +699,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                         handleDealExport();
                       }
                     }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 16px',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      fontSize: '14px',
-                      color: '#141414',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f7fafc';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
+                    className="crmLeftSidebarActionsDropdownItem"
                   >
                     {action}
                   </button>
@@ -871,19 +721,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             gap: '12px',
             marginBottom: '12px',
           }}>
-            <div style={{
-              width: '40px',
-              height: '37px',
-              borderRadius: '26px',
-              background: '#e3f2fd',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: '400',
-              color: '#141414',
-              flexShrink: 0,
-            }}>
+            <div className="crmLeftSidebarAvatarCircle">
               <Handshake size={20} />
             </div>
             <div style={{ flex: 1 }}>
@@ -946,8 +784,8 @@ const DealRecordPage: NextPageWithLayout = () => {
             {
               icon: Phone,
               label: 'Call',
-              disabled: !dealRecordPhone,
-              onClick: undefined, 
+              disabled: !hasPhone || isDialing,
+              onClick: handleCallClick,
             },
             {
               icon: ClipboardList,
@@ -1091,61 +929,16 @@ const DealRecordPage: NextPageWithLayout = () => {
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
         border: '1px solid #cccccc',
       }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('key-info') ? 'none' : '1px solid #cccccc',
-          }}
-          onClick={() => toggleSection('key-info')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: '#141414',
-                transform: collapsedSections.has('key-info') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-            }}>
-              Key information
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '6px',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '14px',
-              fontWeight: '500',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            Actions
-          </button>
-        </div>
+        <CollapsibleSectionHeader
+          isCollapsed={collapsedSections.has('key-info')}
+          onToggle={() => toggleSection('key-info')}
+          title="Key information"
+          titleTag="h3"
+          titleFontSize="16px"
+          chevronSize={18}
+          rightButtonLabel="Actions"
+          showBorderBottom
+        />
 
         {!collapsedSections.has('key-info') && (
           <div style={{ padding: '20px' }}>
@@ -1374,78 +1167,22 @@ const DealRecordPage: NextPageWithLayout = () => {
 
         {activeTab === 'revenue' && (
           <div>
+            <CrmRevenueQuoteToCash
+              sections={revenueSections.slice(0, 5)}
+              isCollapsed={collapsedSections.has('quote-to-cash')}
+              onToggle={() => toggleSection('quote-to-cash')}
+            />
             <div style={{
               marginBottom: '24px',
             }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px',
-                  cursor: 'pointer',
-                }}
-                onClick={() => toggleSection('quote-to-cash')}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: '#141414',
-                    transform: collapsedSections.has('quote-to-cash') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-                <h2 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  Quote-to-cash
-                </h2>
-              </div>
-
-              {!collapsedSections.has('quote-to-cash') && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-                  gap: '16px',
-                }}>
-                  {revenueSections.slice(0, 5).map(section => renderRevenueSection(section))}
-                </div>
-              )}
-            </div>
-
-            <div style={{
-              marginBottom: '24px',
-            }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '16px',
-                  cursor: 'pointer',
-                }}
-                onClick={() => toggleSection('e-commerce')}
-              >
-                <ChevronDown
-                  size={20}
-                  style={{
-                    color: '#141414',
-                    transform: collapsedSections.has('e-commerce') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-                <h2 style={{
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  e-Commerce
-                </h2>
-              </div>
+              <CollapsibleSectionHeader
+                isCollapsed={collapsedSections.has('e-commerce')}
+                onToggle={() => toggleSection('e-commerce')}
+                title="e-Commerce"
+                titleTag="h2"
+                titleFontSize="18px"
+                chevronSize={20}
+              />
 
               {!collapsedSections.has('e-commerce') && (
                 <div style={{
@@ -1938,6 +1675,112 @@ const DealRecordPage: NextPageWithLayout = () => {
           .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #a0aec0;
           }
+
+          /* Deals left sidebar header (avoid Sonar duplication against other CRM pages) */
+          .crmLeftSidebarContainer {
+            width: 385px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+            overflow-y: auto;
+            margin-right: 10px;
+          }
+
+          .crmLeftSidebarHeaderCard {
+            padding: 10px 0px;
+            border-radius: 10px;
+            background-color: #ffffff;
+            margin-bottom: 12px;
+            border: 1px solid #cccccc;
+          }
+
+          .crmLeftSidebarHeaderRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #cccccc;
+            padding-left: 24px;
+            padding-right: 24px;
+          }
+
+          .crmLeftSidebarBackButton {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #141414;
+            font-weight: 500;
+          }
+
+          .crmLeftSidebarActionsButton {
+            padding: 6px 14px;
+            background-color: transparent;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #141414;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+          }
+
+          .crmLeftSidebarActionsButton:hover {
+            background-color: #f5f8fa;
+          }
+
+          .crmLeftSidebarActionsDropdownMenu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            min-width: 180px;
+            z-index: 1000;
+            overflow: hidden;
+          }
+
+          .crmLeftSidebarActionsDropdownItem {
+            width: 100%;
+            padding: 10px 16px;
+            background-color: transparent;
+            border: none;
+            text-align: left;
+            font-size: 14px;
+            color: #141414;
+            cursor: pointer;
+          }
+
+          .crmLeftSidebarActionsDropdownItem:hover {
+            background-color: #f7fafc;
+          }
+
+          .crmLeftSidebarAvatarCircle {
+            width: 40px;
+            height: 37px;
+            border-radius: 26px;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 400;
+            color: #141414;
+            flex-shrink: 0;
+          }
+
         `}
       </style>
 
@@ -1954,6 +1797,19 @@ const DealRecordPage: NextPageWithLayout = () => {
       </div>
 
       {activityModals.modals}
+
+      <DeviceSelectionModal
+        show={showDeviceSelectionModal}
+        onHide={() => {
+          setShowDeviceSelectionModal(false);
+          setAvailableDevices([]);
+          setPendingDialedNumber("");
+        }}
+        devices={availableDevices}
+        onSelectDevice={handleDeviceSelect}
+        extensionNumber={ctiUserAddress ?? ""}
+        userAddress={ctiUserAddress}
+      />
 
       {/* Delete Deal Modal */}
       <DeleteConfirmationModal

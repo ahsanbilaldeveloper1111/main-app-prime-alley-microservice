@@ -122,7 +122,7 @@ export interface SendSmsSuccessData {
 }
 
 export interface SendSmsSuccessResponse {
-  status: "success";
+  status: "success" | "error";
   message: string;
   data: SendSmsSuccessData;
 }
@@ -542,12 +542,19 @@ export const sendSms = async (
     `${prefix}/send-sms`,
     data,
   );
-  if (response?.status === 200) {
+  if (response?.status === 200 && response?.data?.status === "success") {
     toast.success(response.data.message || "SMS sent successfully");
     return response.data;
-  } else {
+  } else if (response?.status === 200 && response?.data?.status === "error") {
     toast.error(response.data.message || "Failed to send SMS");
-    throw new Error(response.data.message || "Failed to send SMS");
+    return {
+      status: "error",
+      message: response.data.message || "Failed to send SMS",
+      data: null,
+    } as unknown as SendSmsSuccessResponse;
+  } else {
+    toast.error("Failed to send SMS");
+    throw new Error("Failed to send SMS");
   }
 };
 

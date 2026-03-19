@@ -100,12 +100,17 @@ type CellContent =
   | { type: "check" }
   | { type: "empty" };
 
+const CHECK_CELL: CellContent = { type: "check" };
+const EMPTY_CELL: CellContent = { type: "empty" };
+const textCell = (value: string, isLink?: boolean): CellContent =>
+  isLink ? { type: "text", value, isLink } : { type: "text", value };
+
 interface PipelineRow {
   feature: string;
   isBold?: boolean;
   hasIcon?: boolean;
   iconColor?: string;
-  starter: CellContent;
+  standard: CellContent;
   professional: CellContent;
   enterprise: CellContent;
 }
@@ -114,85 +119,77 @@ interface PipelineRow {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    heading: "Platform Solutions",
-    items: ["Customer Platform", "Prime for Marketers"],
+    heading: "RingEdge Connect",
+    items: ["Plans", "Features", "Pricing"],
   },
   {
-    heading: "Products",
-    items: ["Smart CRM", "Marketing", "Sales", "Service", "Content", "Data", "Commerce"],
-  },
-  {
-    heading: "Enhancements",
-    items: ["Prime Credits", "Add-ons"],
+    heading: "Resources",
+    items: ["Documentation", "API Reference", "Support"],
   },
 ];
 
 const PLANS: Plan[] = [
   {
-    id: "starter",
-    name: "Starter",
-    description: "Essential sales tools to shorten sales cycles and improve close rates",
-    startsAt: "£9/mo/seat",
-    originalPrice: "£18/mo/seat",
-    credits: "500 Prime Credits",
-    featureIntro: "Free tools with increased limits, plus:",
+    id: "standard",
+    name: "Standard",
+    description: "For small teams getting started with cloud calling",
+    startsAt: "180 AED/mo/seat",
+    credits: "Max 2 seats",
+    featureIntro: "Includes:",
     features: [
-      "Breeze Assistant",
-      "Calling",
-      "Prime-provided phone numbers",
-      "Repeating tasks and task queues",
-      "Object Tags",
-      "Goals",
+      "Web dialer for agents",
+      "Inbound & outbound calls",
+      "Basic IVR and call routing",
+      "Call logs & dispositions",
+      "Call recordings (basic controls)",
+      "Email notifications",
     ],
-    buttons: [{ label: "See current plan", variant: "outline" }],
-    badge: "YOU OWN STARTER CUSTOMER PLATFORM",
-    badgeDark: false,
+    buttons: [
+      { label: "Start Free Trial", variant: "outline" },
+      { label: "Buy now", variant: "solid" },
+    ],
   },
   {
     id: "professional",
     name: "Professional",
-    description: "Comprehensive sales software to automate and scale your sales processes",
-    startsAt: "£77/mo/seat",
-    originalPrice: "£85/mo/seat",
-    credits: "3,000 Prime Credits",
-    featureIntro: "Sales Hub Starter, plus:",
+    description: "For growing contact centers that need more control",
+    startsAt: "290 AED/mo/seat",
+    credits: "Scalable seats",
+    featureIntro: "Includes all Standard features, plus:",
     features: [
-      "AI Meeting Assistant",
-      "Breeze Prospecting Agent",
-      "Call transcription and coaching",
-      "Sales analytics",
-      "Sales workspace",
-      "Forecasting",
-      "Sequences",
+      "Advanced IVR and routing policies",
+      "DNCR compliance checker",
+      "Supervisor live view & monitoring",
+      "Advanced wallboards and KPIs",
+      "Better recording controls & retention options",
+      "Channels: SMS & WhatsApp",
     ],
     buttons: [
+      { label: "Start Free Trial", variant: "outline" },
       { label: "Buy now", variant: "solid" },
-      { label: "Start 14-day trial", variant: "outline" },
-      { label: "Talk to Sales", variant: "outline" },
     ],
-    footnote: "*Cost shown does not include the required, one-time onboarding fee.",
+    badge: "POPULAR",
+    badgeDark: false,
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    description: "Our most powerful sales software for advanced control and flexibility",
-    startsAt: "£135/mo/seat",
-    credits: "5,000 Prime Credits",
-    featureIntro: "Sales Hub Professional, plus:",
+    description: "For large operations with complex needs",
+    startsAt: "437 AED/mo/seat",
+    credits: "Unlimited seats",
+    featureIntro: "Includes all Professional features, plus:",
     features: [
-      "AI call transcript enrichment (Beta)",
-      "Conversation intelligence",
-      "Deal splits",
-      "Deal journey analytics",
-      "Lead Form Routing",
-      "Pipeline approvals for Deals",
-      "Interactive Voice Response",
+      "Multi-site wallboards and reporting",
+      "Full DNCR & compliance suite",
+      "BYOC model for own carriers (add-on)",
+      "Advanced calling features (queues, whisper, barge, etc.)",
+      "High-touch support and onboarding",
+      "Custom routing design and policy consulting",
     ],
-    buttons: [{ label: "Talk to Sales", variant: "solid" }],
+    buttons: [{ label: "Contact Sales", variant: "solid" }],
     badge: "RECOMMENDED",
     badgeDark: true,
-    footnote:
-      "*Cost shown does not include the required, one-time Enterprise Onboarding for a fee of £3,050.",
+    footnote: "*Contact sales for pricing. Response guaranteed within 24 hours.",
   },
 ];
 
@@ -200,120 +197,144 @@ const PLANS: Plan[] = [
 
 const PIPELINE_ROWS: PipelineRow[] = [
   {
-    feature: "1-to-1 email",
+    feature: "Users",
     isBold: true,
-    starter: { type: "text", value: "Prime branding removed" },
-    professional: { type: "text", value: "Prime branding removed" },
-    enterprise: { type: "text", value: "Prime branding removed" },
+    standard: textCell("Max 2 seats"),
+    professional: textCell("Scalable"),
+    enterprise: textCell("Unlimited"),
   },
   {
-    feature: "Canned snippets",
-    starter: { type: "text", value: "Up to 5,000 snippets" },
-    professional: { type: "text", value: "Up to 5,000 snippets" },
-    enterprise: { type: "text", value: "Up to 5,000 snippets" },
+    feature: "Live Calls (real-time view + monitoring)",
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Email templates",
-    starter: { type: "text", value: "5,000 templates" },
-    professional: { type: "text", value: "5,000 templates" },
-    enterprise: { type: "text", value: "5,000 templates" },
+    feature: "Calls History (logs + recordings search/playback)",
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "1:1 video messaging",
-    starter: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    feature: "IVR",
+    standard: textCell("Basic"),
+    professional: textCell("Advanced"),
+    enterprise: textCell("Advanced"),
   },
   {
-    feature: "Sales email frequency controls",
-    hasIcon: true,
-    iconColor: "#666666",
-    starter: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    feature: "Telco Gateway (GSM gateway management)",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Calling",
+    feature: "Web Dialer (agent calling UI)",
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "Call Logs + Dispositions",
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "Call Recordings",
+    standard: textCell("Basic"),
+    professional: textCell("Full controls"),
+    enterprise: textCell("Full controls"),
+  },
+  {
+    feature: "Supervisor View (live status)",
+    standard: textCell("Limited"),
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "Live Wallboard",
+    standard: textCell("Basic"),
+    professional: textCell("Advanced"),
+    enterprise: textCell("Multi-site"),
+  },
+  {
+    feature: "Channels: Email notifications",
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "Channels: SMS",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "Channels: WhatsApp",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
+  },
+  {
+    feature: "DNCR Compliance Checker",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: textCell("Full suite"),
+  },
+  {
+    feature: "BYOC Model (Bring Your Own Carrier)",
     isBold: true,
-    starter: { type: "text", value: "500 minutes" },
-    professional: { type: "text", value: "3,000 minutes" },
-    enterprise: { type: "text", value: "12,000 minutes" },
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: textCell("Add-on available"),
   },
   {
-    feature: "Prime-provided phone numbers",
-    starter: { type: "text", value: "1 phone number. Not supported in all countries." },
-    professional: { type: "text", value: "Up to 3 phone numbers. Not supported in all countries." },
-    enterprise: { type: "text", value: "Up to 5 phone numbers. Not supported in all countries." },
+    feature: "Advanced Calling Features (queues, whisper, barge)",
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Call transcription and coaching",
-    starter: { type: "empty" },
-    professional: { type: "text", value: "Search, review, and comment on calls. 750 hours of transcription per account, per month." },
-    enterprise: { type: "text", value: "Search, review, and comment on calls. 1,500 hours of transcription per account, per month." },
+    feature: "Calling Routes / Routing Policies",
+    standard: EMPTY_CELL,
+    professional: EMPTY_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Coaching Playlists",
-    starter: { type: "empty" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
-  },
-  {
-    feature: "Conversation intelligence",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
-    professional: { type: "text", value: "Includes stats, insights, and call transcriptions.", isLink: true },
-    enterprise: { type: "text", value: "Includes stats, insights, call transcriptions, and tracked terms.", isLink: true },
-  },
-  {
-    feature: "AI call transcript enrichment (Beta)",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
-    professional: { type: "empty" },
-    enterprise: { type: "check" },
-  },
-  {
-    feature: "Interactive Voice Response",
-    hasIcon: true,
-    iconColor: LINK_COLOR,
-    starter: { type: "empty" },
-    professional: { type: "empty" },
-    enterprise: { type: "check" },
-  },
-  {
-    feature: "Prime mobile app",
+    feature: "Dashboards (basic KPIs)",
     isBold: true,
-    starter: { type: "check" },
-    professional: { type: "check" },
-    enterprise: { type: "check" },
+    standard: CHECK_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Live chat",
-    isBold: true,
-    starter: { type: "text", value: "Remove Prime branding", isLink: true },
-    professional: { type: "text", value: "Remove Prime branding", isLink: true },
-    enterprise: { type: "text", value: "Remove Prime branding", isLink: true },
+    feature: "Unified Reporting (CRM + Connect)",
+    standard: textCell("Basic"),
+    professional: textCell("Advanced filters"),
+    enterprise: textCell("Custom dashboards"),
   },
   {
-    feature: "Conversational bots",
-    starter: { type: "text", value: "Limited features", isLink: true },
-    professional: { type: "text", value: "Additional features" },
-    enterprise: { type: "text", value: "Additional features" },
+    feature: "Scheduled Reports",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
   {
-    feature: "Facebook Messenger integration",
-    starter: { type: "text", value: "Remove Prime branding", isLink: true },
-    professional: { type: "text", value: "Includes advanced Messenger bot branching and advanced reporting", isLink: true },
-    enterprise: { type: "text", value: "Includes the ability to use code snippets for custom Messenger bot actions", isLink: true },
+    feature: "AI Analytics (transcription, sentiment, QA scoring)",
+    standard: EMPTY_CELL,
+    professional: CHECK_CELL,
+    enterprise: CHECK_CELL,
   },
-  {
-    feature: "Sales automation",
-    isBold: true,
-    starter: { type: "text", value: "Trigger tasks and email notifications when deals change stages.", isLink: true },
-    professional: { type: "text", value: "Up to 300 fully customizable workflows." },
-    enterprise: { type: "text", value: "Up to 1,000 fully customizable workflows, with the ability to trigger sequences. Also includes quote-based workflows" },
-  },
+];
+
+const PLAN_COMPARISON_META: Array<{
+  id: Plan["id"];
+  ctaLabel: string;
+  ctaVariant: PlanButton["variant"];
+}> = [
+  { id: "standard", ctaLabel: "Get Started", ctaVariant: "outline" },
+  { id: "professional", ctaLabel: "Buy now", ctaVariant: "solid" },
+  { id: "enterprise", ctaLabel: "Contact Sales", ctaVariant: "solid" },
 ];
 
 // ─── Agent carousel data ──────────────────────────────────────────────────────
@@ -539,106 +560,16 @@ const AgentMiniTable: React.FC<{ slide: AgentSlide }> = ({ slide }) => (
 
 // ─── Prime Credits Section ──────────────────────────────────────────────────
 
-const PrimeCreditsSection: React.FC = () => {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const slide = AGENT_SLIDES[activeSlide];
 
-  const goNext = () => setActiveSlide((s) => (s + 1) % AGENT_SLIDES.length);
-  const goPrev = () => setActiveSlide((s) => (s - 1 + AGENT_SLIDES.length) % AGENT_SLIDES.length);
-
-  return (
-    <div style={{ borderRadius: "8px", overflow: "hidden", marginTop: "28px", border: "1px solid #e5e7eb", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", minHeight: "320px" }}>
-        <div style={{ flex: "0 0 50%", backgroundColor: "#ffffff", padding: "32px 0px 0 0px", display: "flex", flexDirection: "column", position: "relative", minHeight: 0 }}>
-          <div style={{ padding: "10px 218px 56px 40px" }}>
-            <h2 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: PRIMARY, margin: "0 0 0 0" }}>Prime Credits:</h2>
-            <p style={{ fontFamily: FONT, fontSize: "16px", fontWeight: 600, color: PRIMARY, lineHeight: "20px", margin: "8px 0 0 0", paddingInlineEnd: "80px" }}>
-              Fuel powerful features that scale work at your own pace
-            </p>
-            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "24px", marginBlockStart: "24px", marginTop: "24px", paddingInlineEnd: "32px", marginBottom: "0" }}>
-              Prime has powerful tools that scale work alongside your teams. You can take advantage of these tools with Prime Credits—a simple, flexible way to pay for what you use.
-            </p>
-          </div>
-          <div className="simple-flexible-section" style={{ backgroundColor: "#042729", display: "flex", gap: "0", flex: 1, alignItems: "stretch" }}>
-            <div style={{ flex: 1, padding: "32px 36px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <SparkleIcon color="#ff4800" />
-                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Simple</h3>
-              </div>
-              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  <strong>Get started fast</strong> and test the latest AI tools with included credits.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  See credit balance, track usage, and more—<strong>all in a single workspace</strong>.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  Report on exactly which tools are <strong>delivering the most value</strong>.
-                </li>
-              </ul>
-            </div>
-            <div style={{ width: "1px", backgroundColor: "#0f4345", margin: "24px 0" }} />
-            <div style={{ flex: 1, padding: "32px 36px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <SparkleIcon color="#ff4800" />
-                <h3 style={{ fontFamily: FONT, fontSize: "1.375rem", fontWeight: 500, lineHeight: 1.45454545, color: "#ffffff", margin: 0 }}>Flexible</h3>
-              </div>
-              <ul style={{ listStyle: "disc", paddingLeft: "18px", margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  <strong>Easily plan</strong> your spend with credit packs, or enable pay as you go.
-                </li>
-                <li style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#ffffff", lineHeight: 1.55555556 }}>
-                  Add more packs, adjust your spend cap, or pause features—<strong>staying in control</strong> without disruption.
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ flex: "0 0 50%", backgroundColor: "#fcece6", padding: "55px 60px 55px 60px", position: "relative", display: "flex", flexDirection: "column" }}>
-          <button onClick={goPrev} type="button" style={{ position: "absolute", left: "49px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.5 2L3.5 5L6.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <button onClick={goNext} type="button" style={{ position: "absolute", right: "52px", top: "50%", transform: "translateY(-50%)", width: "36px", height: "36px", borderRadius: "50%", border: "1px solid #d1d5db", backgroundColor: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5L3.5 8" stroke="#374151" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </button>
-          <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", padding: "40px 50px", flex: 1, display: "flex", flexDirection: "column", boxShadow: "0 2px 12px rgba(0,0,0,0.07)", position: "relative", overflow: "visible" }}>
-            <div style={{ position: "absolute", top: "-14px", left: "24px" }}>
-              <span style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 500, color: "#8b3a0f", backgroundColor: "#fcc6b1", padding: "3px 10px", borderRadius: "20px", display: "inline-block" }}>{slide.tag}</span>
-            </div>
-            <h3 style={{ fontFamily: FONT, fontSize: "1.125rem", fontWeight: 500, lineHeight: 1.55555556, color: PRIMARY, margin: "0 0 8px 0" }}>{slide.title}</h3>
-            <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: PRIMARY, lineHeight: "22px", margin: "0 0 6px 0" }}>
-              {slide.description}{" "}
-              {slide.learnMoreHref && (
-                <button type="button" style={{ ...LINK_BUTTON_STYLE, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                  Learn more <ExternalLinkIcon />
-                </button>
-              )}
-            </p>
-            <AgentMiniTable slide={slide} />
-            <div style={{ height: "1px", backgroundColor: "#e5e7eb", margin: "4px 0 14px" }} />
-            <div style={{ display: "flex", gap: "0", flex: 1, alignItems: "flex-start" }}>
-              {slide.stats.map((stat, i) => (
-                <React.Fragment key={`${stat.value}-${stat.label}`}>
-                  <div style={{ flex: 1, textAlign: "center", padding: "0 8px" }}>
-                    <p style={{ fontFamily: FONT, fontSize: "2.5rem", fontWeight: 500, lineHeight: 1.04545455, color: "rgb(255, 72, 0)", margin: "0 0 4px 0" }}>{stat.value}</p>
-                    <p style={{ fontFamily: FONT, fontSize: "0.875rem", fontWeight: 300, color: "#374151", lineHeight: "20px", margin: 0, whiteSpace: "pre-line", textAlign: "center" }}>{stat.label}</p>
-                  </div>
-                  {i < slide.stats.length - 1 && <div style={{ width: "1px", backgroundColor: "#e5e7eb", alignSelf: "stretch", margin: "0 4px" }} />}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ─── Build Pipeline Section ───────────────────────────────────────────────────
 
 const BuildPipelineSection: React.FC = () => {
   const [hoveredPlan, setHoveredPlan] = useState<Plan["id"] | null>(null);
+  const comparisonPlans = PLAN_COMPARISON_META.map((meta) => {
+    const plan = PLANS.find((p) => p.id === meta.id);
+    return { ...meta, plan };
+  }).filter((entry): entry is { id: Plan["id"]; ctaLabel: string; ctaVariant: PlanButton["variant"]; plan: Plan } => Boolean(entry.plan));
 
   // Column widths: first col = 35%, remaining 3 cols each = ~21.67%
   const firstColFlex = "0 0 35%";
@@ -723,83 +654,40 @@ const BuildPipelineSection: React.FC = () => {
             padding: "0",
             marginBlockStart: "40px",
           }}>
-            Build Pipeline
+            Feature Comparison
           </h2>
         </div>
 
-        {/* Col 2: Starter */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          border: "none",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Starter</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£9/mo/seat</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("outline", hoveredPlan === "starter")}
-              onMouseEnter={() => setHoveredPlan("starter")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Your current plan
-            </button>
+        {comparisonPlans.map(({ id, ctaLabel, ctaVariant, plan }) => (
+          <div
+            key={id}
+            style={{
+              flex: dataColFlex,
+              padding: "20px 16px 24px",
+              boxSizing: "border-box",
+              border: "none",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>{plan.name}</span>
+            <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>
+              {plan.startsAt.replace("/seat", "")}
+            </span>
+            <div style={{ width: "100%", marginTop: "8px" }}>
+              <button
+                type="button"
+                style={getButtonStyles(ctaVariant, hoveredPlan === id)}
+                onMouseEnter={() => setHoveredPlan(id)}
+                onMouseLeave={() => setHoveredPlan(null)}
+              >
+                {ctaLabel}
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Col 3: Professional */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          border: "none",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Professional</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£77/mo/seat</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("solid", hoveredPlan === "professional")}
-              onMouseEnter={() => setHoveredPlan("professional")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Buy now
-            </button>
-          </div>
-        </div>
-
-        {/* Col 4: Enterprise */}
-        <div style={{
-          flex: dataColFlex,
-          padding: "20px 16px 24px",
-          boxSizing: "border-box",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: "4px",
-        }}>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 600, color: PRIMARY, lineHeight: "18px" }}>Enterprise</span>
-          <span style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px" }}>£135/mo</span>
-          <div style={{ width: "100%", marginTop: "8px" }}>
-            <button
-              type="button"
-              style={getButtonStyles("solid", hoveredPlan === "enterprise")}
-              onMouseEnter={() => setHoveredPlan("enterprise")}
-              onMouseLeave={() => setHoveredPlan(null)}
-            >
-              Talk to Sales
-            </button>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* ── Feature comparison rows ── */}
@@ -830,9 +718,9 @@ const BuildPipelineSection: React.FC = () => {
               </span>
             </div>
 
-            {/* Starter */}
+            {/* Standard */}
             <div style={dataCellStyle}>
-              {renderCellContent(row.starter)}
+              {renderCellContent(row.standard)}
             </div>
 
             {/* Professional */}
@@ -911,10 +799,10 @@ const SalesHubPage = () => {
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "6px" }}>
             <HubIcon />
-            <h1 style={{ fontFamily: FONT, fontSize: "32px", fontWeight: 700, color: PRIMARY, lineHeight: "39px", margin: 0 }}>Sales Hub</h1>
+            <h1 style={{ fontFamily: FONT, fontSize: "32px", fontWeight: 700, color: PRIMARY, lineHeight: "39px", margin: 0 }}>RingEdge Connect</h1>
           </div>
           <p style={{ fontFamily: FONT, fontSize: "14px", fontWeight: 300, color: PRIMARY, lineHeight: "24px", margin: 0 }}>
-            Close more deals and accelerate growth with powerful sales software
+            Cloud calling solution with scalable pricing for teams of any size
           </p>
         </div>
 
@@ -927,8 +815,7 @@ const SalesHubPage = () => {
           ))}
         </div>
 
-        {/* Prime Credits Section */}
-        <PrimeCreditsSection />
+    
 
         {/* Build Pipeline Section */}
         <BuildPipelineSection />
