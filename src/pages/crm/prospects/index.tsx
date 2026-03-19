@@ -2999,7 +2999,7 @@ const CrmProspectsManagement = () => {
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
       router.push(
-        `/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`,
+        `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
       );
     },
     [router],
@@ -7404,7 +7404,7 @@ const CrmProspectsManagement = () => {
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
                 handleCloseProspectSidebar();
                 router.push(
-                  `/crm/prospects/prospects-detailpage?id=${prospectId}`,
+                  `/crm/detailspage?type=prospect&id=${prospectId}`,
                 );
               },
             }}
@@ -7538,7 +7538,7 @@ const CrmProspectsManagement = () => {
                     onClick: () => {
                       const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
                       if (id) {
-                        router.push(`/crm/prospects/prospects-detailpage?id=${id}`);
+                        router.push(`/crm/detailspage?type=prospect&id=${id}`);
                         handleCloseProspectSidebar();
                       }
                     },

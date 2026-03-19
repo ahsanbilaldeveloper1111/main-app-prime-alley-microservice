@@ -12,6 +12,9 @@ interface CrmAssociatedCompaniesCardProps {
   count?: number;
   /** Optional CRM company ID for navigating to detail view */
   companyId?: number | string | null;
+  viewAllLabel?: string;
+  viewAllHref?: string;
+  showViewAll?: boolean;
 }
 
 const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
@@ -24,6 +27,9 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
   phones,
   count,
   companyId,
+  viewAllLabel,
+  viewAllHref,
+  showViewAll = true,
 }) => {
   const companiesCount = count ?? (companyName ? 1 : 0);
   const phoneList =
@@ -42,6 +48,12 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
           },
         ]
       : []);
+
+  const resolvedViewAllHref =
+    viewAllHref ??
+    (companyId != null && companyId !== ""
+      ? `/crm/companies/company-detailpage?id=${encodeURIComponent(String(companyId))}`
+      : "/crm/companies");
 
   return (
     <div
@@ -201,34 +213,28 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
                     </p>
                   ))}
               </div>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const href =
-                    companyId != null && companyId !== ""
-                      ? `/crm/companies/company-detailpage?id=${encodeURIComponent(
-                          String(companyId),
-                        )}`
-                      : "/crm/companies";
-                  window.open(href, "_blank", "noopener,noreferrer");
-                }}
-                style={{
-                  fontSize: "12px",
-                  color: "#141414",
-                  textDecoration: "none",
-                  fontWeight: "300",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  border: "1px solid #cccccc",
-                  borderRadius: "6px",
-                  padding: "6px 12px",
-                }}
-              >
-                View all associated Companies
-                <ExternalLink size={12} />
-              </a>
+              {showViewAll && (
+                <a
+                  href={resolvedViewAllHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: "12px",
+                    color: "#141414",
+                    textDecoration: "none",
+                    fontWeight: "300",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    border: "1px solid #cccccc",
+                    borderRadius: "6px",
+                    padding: "6px 12px",
+                  }}
+                >
+                  {viewAllLabel ?? "View all associated Companies"}
+                  <ExternalLink size={12} />
+                </a>
+              )}
             </>
           )}
         </div>

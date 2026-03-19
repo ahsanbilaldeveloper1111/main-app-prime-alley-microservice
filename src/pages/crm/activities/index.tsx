@@ -2220,15 +2220,15 @@ const HistoryPage = () => {
                       setShowActivitySidebar(false);
                       if (type === "prospect")
                         router.push(
-                          `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                          `/crm/detailspage?type=prospect&id=${recordId}&section=activities`,
                         );
                       else if (type === "lead")
                         router.push(
-                          `/crm/leads/leads-detailpage?id=${recordId}&section=activities`,
+                          `/crm/detailspage?type=lead&id=${recordId}&section=activities`,
                         );
                       else if (type === "deal")
                         router.push(
-                          `/crm/deals/deals-detailpage?id=${recordId}&section=activities`,
+                          `/crm/detailspage?type=deal&id=${recordId}&section=activities`,
                         );
                       else if (type === "order")
                         router.push(

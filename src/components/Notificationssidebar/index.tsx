@@ -627,17 +627,17 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
         switch (target_type) {
           case 'prospect':
             if (hasPermission(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)) {
-              router.push(`/crm/prospects/prospects-detailpage?id=${target_id}`);
+              router.push(`/crm/detailspage?type=prospect&id=${target_id}`);
             }
             break;
           case 'lead':
             if (hasPermission(PERMISSIONS.VIEW_CRM_LEADS)) {
-              router.push(`/crm/leads/leads-detailpage?id=${target_id}`);
+              router.push(`/crm/detailspage?type=lead&id=${target_id}`);
             }
             break;
           case 'deal':
             if (hasPermission(PERMISSIONS.VIEW_CRM_DEALS)) {
-              router.push(`/crm/deals/deals-detailpage?id=${target_id}`);
+              router.push(`/crm/detailspage?type=deal&id=${target_id}`);
             }
             break;
           case 'order':

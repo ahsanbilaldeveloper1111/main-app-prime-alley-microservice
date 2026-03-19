@@ -1,77 +1,32 @@
-import React, {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-  ReactElement,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo, ReactElement } from "react";
 import { useRouter } from "next/router";
-import {
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
-  Mail,
-  Phone,
-  MoreHorizontal,
-  Calendar,
-  ClipboardList,
-  ExternalLink,
-  Copy,
-  RefreshCw,
-  AlertCircle,
-} from "lucide-react";
 import Layout from "@layout/index";
 import { getLead, deleteLead, type LeadData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel, {
-  type CrmActivitiesPanelRef,
-} from "@components/CrmActivitiesPanel";
-import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
-import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
-import CrmProfileSection from "@components/CrmProfileSection";
-import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-import { useCti } from "@hooks/useCti";
+import {
+  CrmDetailPageLayout,
+  type KeyInfoField,
+  type ProfileField,
+  type CrmDetailPageLayoutConfig,
+} from "@pages/crm/common/crm-detail-layout";
+import {
+  formatCrmSummaryUpdatedLabel,
+  getCrmExtensionDisplayName,
+} from "@pages/crm/common/crm-detail-formatters";
+import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
 import CreateLeadModal from "@components/CreateLeadModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import { toast } from "react-toastify";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
 import { exportRecordAsCsv } from "@utils/csvExport";
-import {
-  sidebarContainerStyle,
-  sidebarCardStyle,
-  sectionHeaderRowStyle,
-  chevronTitleRowStyle,
-  ghostActionButtonStyle,
-  dropdownMenuItemStyle,
-  quickActionCircleButtonBaseStyle,
-  viewAllLinkStyle,
-} from "@components/CrmDetailSharedStyles";
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-interface KeyInfoField {
-  label: string;
-  value: string;
-  copyable?: boolean;
-}
+import CrmAssociatedRecordsSectionCard from "@components/CrmAssociatedRecordsSectionCard";
+import CrmDealListItemCard from "@components/CrmDealListItemCard";
+import { buildCrmDealsDetailpageHref } from "@pages/crm/common/crm-detail-navigation";
 
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-// Add this function to toggle activity expansion
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 
 const ContactRecordPage: NextPageWithLayout = () => {
   const router = useRouter();
@@ -79,62 +34,58 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [lead, setLead] = useState<LeadData | null>(null);
   const [leadLoading, setLeadLoading] = useState(true);
   const [leadError, setLeadError] = useState<string | null>(null);
+  const [leadToDelete, setLeadToDelete] = useState<{ id: number; name?: string } | null>(null);
+  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [extensions, setExtensions] = useState<Record<string, unknown>[]>([]);
+
   const { hasPermission } = usePermissions();
   const canSendWhatsApp = hasPermission(
-    HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM,
+    HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM
   );
 
-  const [activeTab, setActiveTab] = useState("about");
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
-    new Set(),
-  );
-  const [showActionsDropdown, setShowActionsDropdown] = useState(false);
-  const [showMoreActivities, setShowMoreActivities] = useState(false);
-  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
-  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const moreActivitiesRef = useRef<HTMLDivElement>(null);
-  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
+  const leadRecordId = Number(leadId) || lead?.id || 0;
+  const leadRecordName = lead?.name ?? "Lead";
+  const contactPersons = (lead as unknown as Record<string, unknown>)?.contact_persons as
+    Array<{ email?: string; phone?: string }> | undefined;
+  const crmData = (lead as unknown as Record<string, unknown>)?.crm_data as Record<string, unknown> | undefined;
+  const crmDataDetails = (crmData?.data as Record<string, unknown> | undefined) ?? undefined;
+  const crmDataPhone = crmData?.phone as string | undefined;
+  const companyData = (lead as unknown as Record<string, unknown>)?.company as Record<string, unknown> | undefined;
+  const enrichmentData = (companyData?.enrichment_data as Record<string, unknown> | undefined) ?? undefined;
+  const structuredData = (enrichmentData?.structured_data as Record<string, unknown> | undefined) ?? undefined;
+  const headquartersData = (structuredData?.headquarters as Record<string, unknown> | undefined) ?? undefined;
+  const structuredEmails = Array.isArray(structuredData?.emails)
+    ? (structuredData.emails as Array<{ email?: string }>)
+    : undefined;
+  const structuredPhones = Array.isArray(structuredData?.phones)
+    ? (structuredData.phones as Array<{ number?: string; type?: string | null }>)
+    : undefined;
+  const leadRecordEmail =
+    contactPersons?.[0]?.email ??
+    (crmDataDetails?.email as string | undefined) ??
+    "";
+  const leadRecordPhone =
+    contactPersons?.[0]?.phone ??
+    crmDataPhone ??
+    lead?.company_contact ??
+    "";
 
-  // Edit Lead sidebar (same CreateLeadModal as list page)
-  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
-  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<
-    number | null
-  >(null);
+  const leadRecord = lead
+    ? {
+        data: {
+          id: lead.id,
+          name: lead.name,
+          phone: (lead as unknown as Record<string, unknown>).phone ?? lead.company_contact ?? null,
+          data: lead.campaign_field_values ?? {},
+        },
+        audit_trail: lead.audit_trail,
+      }
+    : null;
 
-  // Delete Lead modal
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [leadToDelete, setLeadToDelete] = useState<{
-    id: number;
-    name?: string;
-  } | null>(null);
-
-  // Success modal (reuse common SuccessfulModal)
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
-  const [successModalTitle, setSuccessModalTitle] = useState("");
-  const [successModalDescription, setSuccessModalDescription] = useState("");
-
-  // Export single lead (CSV)
-  const [exporting, setExporting] = useState(false);
-  const [extensions, setExtensions] = useState<any[]>([]);
-
-  // Open a specific tab when navigating with ?section= (e.g. ?section=activities)
-  const validTabIds = new Set(["about", "activities", "intelligence"]);
   useEffect(() => {
     if (!router.isReady) return;
-    const section = router.query.section;
-    const tabId =
-      typeof section === "string" ? section.toLowerCase().trim() : null;
-    if (tabId && validTabIds.has(tabId)) {
-      setActiveTab(tabId);
-    }
-  }, [router.isReady, router.query.section]);
-
-  // Fetch lead detail by ID from URL (same pattern as prospect detail page)
-  useEffect(() => {
-    if (!router.isReady) {
-      return;
-    }
     if (leadId == null || leadId === "") {
       setLeadLoading(false);
       setLead(null);
@@ -164,210 +115,176 @@ const ContactRecordPage: NextPageWithLayout = () => {
       });
   }, [router.isReady, leadId]);
 
-  // Load extensions (owners/associates) for friendly "Associate with" name
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
         const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
         if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
+          setExtensions((hierarchyData.extensions ?? []) as Record<string, unknown>[]);
         }
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error("Failed to fetch extensions:", error);
       }
     };
-
-    fetchExtensions().catch((error) => {
-      // eslint-disable-next-line no-console
-      console.error("Failed to fetch extensions:", error);
-    });
+    fetchExtensions();
   }, []);
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowActionsDropdown(false);
-      }
-      if (
-        moreActivitiesRef.current &&
-        !moreActivitiesRef.current.contains(event.target as Node)
-      ) {
-        setShowMoreActivities(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const leadAny = lead as Record<string, unknown> | null;
+  const leadContacts = leadAny?.contact_persons;
+  const primaryContact =
+    Array.isArray(leadContacts) && leadContacts.length > 0
+      ? (leadContacts[0] as { phone_country_code?: string; phone?: string; email?: string })
+      : null;
+  const primaryPhoneCountryCode = primaryContact?.phone_country_code ?? "";
+  const primaryPhoneNumber = primaryContact?.phone ?? "";
+  const formattedPhoneNumber =
+    primaryPhoneCountryCode && primaryPhoneNumber
+      ? `${primaryPhoneCountryCode} ${primaryPhoneNumber}`
+      : primaryPhoneNumber ||
+        crmDataPhone ||
+        lead?.company_contact ||
+        "--";
 
-  // Normalize lead for CrmActivitiesPanel (panel expects record.data / record.audit_trail)
-  const leadRecord = lead
-    ? {
-        data: {
-          id: lead.id,
-          name: lead.name,
-          phone: (lead as any).phone ?? lead.company_contact ?? null,
-          data: lead.campaign_field_values ?? {},
-        },
-        audit_trail: lead.audit_trail,
-      }
-    : null;
+  const associateName = (() => {
+    const rawAssociate =
+      (lead as unknown as Record<string, unknown>)?.user_extension ??
+      (lead as unknown as Record<string, unknown>)?.created_by ??
+      (lead as unknown as Record<string, unknown>)?.owner_id ??
+      null;
 
-  const leadRecordId = Number(leadId) || lead?.id || 0;
-  const leadRecordName = lead?.name ?? leadRecord?.data?.name ?? "Lead";
-  const leadRecordEmail =
-    (lead as any)?.contact_persons?.[0]?.email ??
-    (lead as any)?.crm_data?.data?.email ??
-    "";
-
-  const leadRecordPhone =
-    (lead as any)?.contact_persons?.[0]?.phone ??
-    (lead as any)?.crm_data?.phone ??
-    lead?.company_contact ??
-    "";
-
-  const {
-    dialNumber: ctiDialNumber,
-    getAllUserDevices,
-    makeCall,
-    userAddress: ctiUserAddress,
-  } = useCti();
-
-  const phoneList = useMemo(() => {
-    const phone = leadRecordPhone;
-    if (!phone || typeof phone !== "string") return [];
-    return phone
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-  }, [leadRecordPhone]);
-
-  const hasPhone = phoneList.length > 0;
-  const numberToCall = hasPhone ? phoneList[0] : "";
-
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
-    useState(false);
-  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
-  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
-  const [isDialing, setIsDialing] = useState(false);
-
-  const activityModals = useCrmActivityModals({
-    recordType: "lead",
-    recordId: leadRecordId,
-    recordName: leadRecordName,
-    recordEmail: leadRecordEmail,
-    recordPhone: leadRecordPhone,
-    onTaskCreated: () => tasksRefetch?.(),
-    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
-    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
-    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
-  });
-
-  const handleCall = useCallback(
-    async (phoneNumber: string) => {
-      const numberToDial = (phoneNumber || "").trim();
-      if (!numberToDial) {
-        toast.error("No phone number available to call");
-        return;
-      }
-      const userDevices = getAllUserDevices?.();
-      if (userDevices && userDevices.length > 1) {
-        setAvailableDevices(userDevices);
-        setPendingDialedNumber(numberToDial);
-        setShowDeviceSelectionModal(true);
-        return;
-      }
-      setIsDialing(true);
-      try {
-        const result = await ctiDialNumber(numberToDial);
-        if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [ctiDialNumber, getAllUserDevices],
-  );
-
-  const handleDeviceSelect = useCallback(
-    async (device: { deviceType: string; deviceName: string }) => {
-      const numberToDial = pendingDialedNumber;
-      setShowDeviceSelectionModal(false);
-      setAvailableDevices([]);
-      setPendingDialedNumber("");
-      const callerInfo = {
-        callingAddress: ctiUserAddress,
-        callingDeviceName: device.deviceName,
-        callingDeviceType: device.deviceType,
-        selectedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      setIsDialing(true);
-      try {
-        const result = await makeCall({
-          callingAddress: ctiUserAddress ?? "",
-          calledAddress: numberToDial,
-          callingDeviceType: device.deviceType,
-          callingDeviceName: device.deviceName,
-        });
-        if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [pendingDialedNumber, ctiUserAddress, makeCall],
-  );
-
-  const handleCallClick = useCallback(() => {
-    if (hasPhone) {
-      handleCall(numberToCall);
-    } else {
-      toast.error("No phone number available");
+    if (rawAssociate != null) {
+      return getCrmExtensionDisplayName(rawAssociate, extensions);
     }
-  }, [hasPhone, numberToCall, handleCall]);
 
-  const handleOpenEditLead = useCallback(() => {
-    if (!leadRecordId) return;
-    setEditLeadIdForSidebar(leadRecordId);
-    setShowCreateLeadModal(true);
-  }, [leadRecordId]);
+    return (
+      ((lead as unknown as Record<string, unknown>)?.created_by_name as string) ??
+      ((lead as unknown as Record<string, unknown>)?.owner_name as string) ??
+      ((lead as unknown as Record<string, unknown>)?.user_extension_name as string) ??
+      "--"
+    );
+  })();
 
-  const handleOpenDeleteLead = useCallback(() => {
-    if (!leadRecordId) return;
-    setLeadToDelete({ id: leadRecordId, name: leadRecordName });
-    setShowDeleteModal(true);
-  }, [leadRecordId, leadRecordName]);
+  const keyInfoFields: KeyInfoField[] = useMemo(
+    () => [
+      {
+        label: "Email",
+        value:
+          (primaryContact as { email?: string })?.email ??
+          (crmDataDetails?.email as string | undefined) ??
+          "--",
+        copyable: true,
+      },
+      { label: "Phone Number", value: formattedPhoneNumber, copyable: true },
+      { label: "Company Name", value: lead?.company_name ?? "--" },
+      { label: "Company Domain", value: lead?.company_domain ?? "--" },
+      { label: "Lead Status", value: lead?.status ?? "--" },
+      {
+        label: "Lifecycle Stage",
+        value:
+          (crmDataDetails?.lifecycle_stage as string | undefined) ??
+          lead?.stage?.name ??
+          "--",
+      },
+      { label: "Owner", value: associateName },
+      { label: "Source", value: ((lead as unknown as Record<string, unknown>)?.source as string | undefined) ?? "--" },
+    ],
+    [lead, primaryContact, formattedPhoneNumber, associateName]
+  );
 
-  const confirmDeleteLead = useCallback(async () => {
-    if (!leadToDelete) return;
+  const profileFields: ProfileField[] = useMemo(
+    () => [
+      {
+        label: "Company name",
+        value:
+          (structuredData?.official_company_name as string | undefined) ??
+          lead?.company_name ??
+          "--",
+      },
+      {
+        label: "Street address",
+        value:
+          (headquartersData?.address as string | undefined) ??
+          (crmDataDetails?.street_address as string | undefined) ??
+          lead?.campaign_field_values?.street_address ??
+          "--",
+      },
+      {
+        label: "City",
+        value:
+          (headquartersData?.city as string | undefined) ??
+          (crmDataDetails?.city as string | undefined) ??
+          lead?.campaign_field_values?.city ??
+          "--",
+      },
+      {
+        label: "Postal code",
+        value:
+          (crmDataDetails?.postal_code as string | undefined) ??
+          lead?.campaign_field_values?.postal_code ??
+          "--",
+      },
+      {
+        label: "State/Region",
+        value:
+          (crmDataDetails?.state as string | undefined) ??
+          lead?.campaign_field_values?.state ??
+          "--",
+      },
+      {
+        label: "Email",
+        value:
+          structuredEmails?.[0]?.email ??
+          contactPersons?.[0]?.email ??
+          (crmDataDetails?.email as string | undefined) ??
+          "--",
+        link: true,
+      },
+    ],
+    [lead, structuredEmails, contactPersons, crmDataDetails, headquartersData]
+  );
 
+  const associatedCompany = useMemo(
+    () => ({
+      companyName:
+        (structuredData?.official_company_name as string | undefined) ??
+        (companyData?.name as string | undefined) ??
+        lead?.company_name ??
+        null,
+      primaryPhone:
+        structuredPhones?.[0]?.number ??
+        (companyData?.phone as string | undefined) ??
+        lead?.company_contact ??
+        null,
+      phones: structuredPhones?.map(
+        (p: { number?: string; type?: string | null }) => ({
+          number: p?.number ?? "",
+          type: p?.type ?? null,
+        })
+      ),
+      companyId:
+        ((companyData?.id as string | number | undefined) ??
+        (lead as unknown as Record<string, unknown>)?.company_id ??
+        null) as string | number | null,
+    }),
+    [companyData, structuredData, lead, structuredPhones]
+  );
+
+  const handleRefreshSummary = useCallback(async () => {
+    const id = Number(leadId || lead?.id);
+    if (!id || Number.isNaN(id)) {
+      toast.error("Invalid lead ID");
+      return;
+    }
     try {
-      await deleteLead(leadToDelete.id);
-      setShowDeleteModal(false);
-      setLeadToDelete(null);
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("Lead Deleted");
-      setSuccessModalDescription("Lead has been deleted successfully");
-      router.push("/crm/leads");
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Failed to delete lead:", error);
-      toast.error("Failed to delete lead");
+      const refreshed = await getLead(id);
+      setLead(refreshed);
+      toast.success("Summary refreshed");
+    } catch {
+      toast.error("Failed to refresh summary");
     }
-  }, [leadToDelete, router]);
+  }, [leadId, lead?.id]);
 
-  const handleLeadsExport = useCallback(() => {
+  const handleExport = useCallback(() => {
     if (!lead) return;
     setExporting(true);
     try {
@@ -385,1400 +302,103 @@ const ContactRecordPage: NextPageWithLayout = () => {
     }
   }, [lead]);
 
-  const handleOpenExport = useCallback(() => {
-    if (!lead) return;
-    // Directly export the currently opened lead
-    handleLeadsExport();
-  }, [lead, handleLeadsExport]);
+  const handleDeleteSuccess = useCallback(async () => {
+    if (!leadToDelete) return;
+    await deleteLead(leadToDelete.id);
+  }, [leadToDelete]);
 
-  const toggleSection = (sectionId: string) => {
-    setCollapsedSections((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionId)) {
-        newSet.delete(sectionId);
-      } else {
-        newSet.add(sectionId);
+  const allDeals = ((lead as unknown as Record<string, unknown>)?.deals as unknown[]) ?? [];
+  const dealsCount = allDeals.length;
+  const detailStaticConfig = getCrmDetailStaticConfig("lead");
+
+  const config: CrmDetailPageLayoutConfig = {
+    recordType: "lead",
+    recordId: leadRecordId,
+    recordName: leadRecordName,
+    recordEmail: leadRecordEmail,
+    recordPhone: leadRecordPhone,
+    record: lead,
+    recordLoading: leadLoading,
+    recordError: leadError,
+    hasRecord: !!lead,
+    ...detailStaticConfig,
+    keyInfoFields,
+    profileFields,
+    summary:
+      ((((lead as unknown as Record<string, unknown>)?.crm_summary as Record<string, unknown> | undefined)?.summary as
+        string | undefined) ??
+        null),
+    summaryMetaLabel: formatCrmSummaryUpdatedLabel(lead?.updated_at),
+    onRefreshSummary: handleRefreshSummary,
+    company: companyData ?? null,
+    relatedCompany: lead?.company_name ?? "—",
+    exporting,
+    onEdit: () => {
+      if (leadRecordId) {
+        setEditLeadIdForSidebar(leadRecordId);
+        setShowCreateLeadModal(true);
       }
-      return newSet;
-    });
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
-  };
-
-  // Tabs
-  const tabs = [
-    { id: "about", label: "About" },
-    { id: "activities", label: "Activities" },
-    { id: "intelligence", label: "Intelligence" },
-  ];
-
-  // Key Information Fields – values from lead API response (same pattern as prospects)
-  const primaryContact = (lead as any)?.contact_persons?.[0] ?? null;
-  const primaryPhoneCountryCode = primaryContact?.phone_country_code || "";
-  const primaryPhoneNumber = primaryContact?.phone || "";
-  const formattedPhoneNumber =
-    primaryPhoneCountryCode && primaryPhoneNumber
-      ? `${primaryPhoneCountryCode} ${primaryPhoneNumber}`
-      : primaryPhoneNumber ||
-        (lead as any)?.crm_data?.phone ||
-        lead?.company_contact ||
-        "--";
-
-  const associateName = (() => {
-    const rawAssociate =
-      (lead as any)?.user_extension ??
-      (lead as any)?.created_by ??
-      (lead as any)?.owner_id ??
-      null;
-
-    if (rawAssociate != null) {
-      const match = extensions.find(
-        (ext: any) =>
-          String(ext.id) === String(rawAssociate) ||
-          String(ext.extension) === String(rawAssociate),
-      );
-      if (match) {
-        return match.display_name || match.name || String(rawAssociate);
-      }
-      return String(rawAssociate);
-    }
-
-    return (
-      (lead as any)?.created_by_name ||
-      (lead as any)?.owner_name ||
-      (lead as any)?.user_extension_name ||
-      "--"
-    );
-  })();
-
-  const keyInfoFields: KeyInfoField[] = [
-    {
-      label: "Email",
-      value:
-        primaryContact?.email ??
-        (lead as any)?.crm_data?.data?.email ??
-        "--",
-      copyable: true,
     },
-    {
-      label: "Phone Number",
-      value: formattedPhoneNumber,
-      copyable: true,
-    },
-    { label: "Company Name", value: lead?.company_name ?? "--" },
-    { label: "Company Domain", value: lead?.company_domain ?? "--" },
-    { label: "Lead Status", value: lead?.status ?? "--" },
-    {
-      label: "Lifecycle Stage",
-      value:
-        (lead as any)?.crm_data?.data?.lifecycle_stage ??
-        lead?.stage?.name ??
-        "--",
-    },
-    {
-      label: "Owner",
-      value: associateName,
-    },
-    { label: "Source", value: (lead as any)?.source ?? "--" },
-  ];
-
-  // Intelligence tab is now a shared component (CrmIntelligenceTab)
-  // ============================================================================
-  // LEFT SIDEBAR (Contact Info)
-  // ============================================================================
-
-  const renderLeftSidebar = () => (
-    <div
-      className="sidebar-scrollbar"
-      style={{
-        width: "385px",
-        marginRight: "10px",
-        ...sidebarContainerStyle,
-      }}
-    >
-      {/* Header Card */}
-      <div
-        style={{
-          padding: "10px 0px",
-          marginBottom: "12px",
-          ...sidebarCardStyle,
-        }}
-      >
-        {/* Top Bar - Breadcrumb and Actions */}
-        <div
-          style={{
-            ...sectionHeaderRowStyle,
-            paddingBottom: "10px",
-            borderBottom: "1px solid #cccccc",
-            paddingLeft: "24px",
-            paddingRight: "24px",
+    onDelete: () => setLeadToDelete({ id: leadRecordId, name: leadRecordName }),
+    onExport: handleExport,
+    deleteItemName: leadToDelete?.name ?? leadRecordName,
+    onDeleteSuccess: handleDeleteSuccess,
+    avatarDisplayName: lead?.name ?? "—",
+    avatarSubtitle: lead?.company_name ? `at ${lead.company_name}` : "—",
+    primaryEmail:
+      contactPersons?.[0]?.email ??
+      (crmDataDetails?.email as string | undefined) ??
+      "",
+    activitiesRecord: leadRecord,
+    associatedCompany,
+    renderEditModal: () =>
+      showCreateLeadModal ? (
+        <CreateLeadModal
+          show={showCreateLeadModal}
+          onHide={() => {
+            setShowCreateLeadModal(false);
+            setEditLeadIdForSidebar(null);
           }}
-        >
-          <button
-            onClick={() => globalThis.history.back()}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "14px",
-              color: "#141414",
-              fontWeight: "500",
-            }}
-          >
-            <ChevronDown size={16} style={{ transform: "rotate(90deg)" }} />
-            Leads
-          </button>
-
-          <div style={{ position: "relative" }} ref={dropdownRef}>
-            <button
-              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
-              style={{
-                padding: "6px 14px",
-                fontSize: "14px",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                ...ghostActionButtonStyle,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#f5f8fa";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              Actions
-              <ChevronDown size={14} />
-            </button>
-
-            {showActionsDropdown && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "180px",
-                  zIndex: 1000,
-                  overflow: "hidden",
-                }}
-              >
-                {["Edit", "Delete", "Export"].map((action) => (
-                  <button
-                    key={action}
-                    disabled={action === "Export" && exporting}
-                    onClick={() => {
-                      setShowActionsDropdown(false);
-                      if (action === "Edit") {
-                        handleOpenEditLead();
-                      } else if (action === "Delete") {
-                        handleOpenDeleteLead();
-                      } else if (action === "Export") {
-                        handleOpenExport();
-                      }
-                    }}
-                    style={dropdownMenuItemStyle}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Avatar and Contact Info */}
-        <div
-          style={{
-            paddingTop: "16px",
-            paddingBottom: "0px",
-
-            paddingLeft: "24px",
-            paddingRight: "24px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "12px",
-              marginBottom: "12px",
-            }}
-          >
-            <div
-              style={{
-                width: "40px",
-                height: "37px",
-                borderRadius: "26px",
-                background: "#efe7f0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "10px",
-                fontWeight: "400",
-                color: "#141414",
-                flexShrink: 0,
-              }}
-            >
-              {lead?.name
-                ? (lead.name.match(/\b\w/g) ?? [])
-                    .slice(0, 2)
-                    .join("")
-                    .toUpperCase()
-                : "—"}
-            </div>
-            <div style={{ flex: 1 }}>
-              <h2
-                style={{
-                  fontSize: "22px",
-                  fontWeight: "500",
-                  color: "#141414",
-                  margin: "0 0 4px 0",
-                  lineHeight: "1.3",
-                }}
-              >
-                {lead?.name ?? "—"}
-              </h2>
-              <p
-                style={{
-                  fontSize: "14px",
-                  color: "#718096",
-                  margin: "0 0 8px 0",
-                  lineHeight: "1.4",
-                }}
-              >
-                {lead?.company_name ? `at ${lead.company_name}` : "—"}
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
-                {((lead as any)?.contact_persons?.[0]?.email ??
-                (lead as any)?.crm_data?.data?.email) ? (
-                  <>
-                    <a
-                      href={`mailto:${(lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email}`}
-                      style={{
-                        fontSize: "14px",
-                        color: "#006162",
-                        textDecoration: "none",
-                        fontWeight: "500",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = "underline";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = "none";
-                      }}
-                    >
-                      {(lead as any)?.contact_persons?.[0]?.email ??
-                        (lead as any)?.crm_data?.data?.email}
-                    </a>
-                    <button
-                      onClick={() =>
-                        copyToClipboard(
-                          (lead as any)?.contact_persons?.[0]?.email ??
-                            (lead as any)?.crm_data?.data?.email ??
-                            "",
-                        )
-                      }
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        color: "#718096",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Copy email"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </>
-                ) : (
-                  <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "17px",
-            paddingTop: "6px",
-            paddingBottom: "4px",
-            paddingLeft: "24px",
-            paddingRight: "24px",
-          }}
-        >
-          {[
-            {
-              icon: ClipboardList,
-              label: "Note",
-              disabled: false,
-              onClick: activityModals.openNote,
-            },
-            {
-              icon: Mail,
-              label: "Email",
-              disabled: false,
-              onClick: activityModals.openEmail,
-            },
-            {
-              icon: Phone,
-              label: "Call",
-              disabled: !hasPhone || isDialing,
-              onClick: handleCallClick,
-            },
-            {
-              icon: ClipboardList,
-              label: "Task",
-              disabled: false,
-              onClick: activityModals.openTask,
-            },
-            {
-              icon: Calendar,
-              label: "Meeting",
-              disabled: false,
-              onClick: activityModals.openMeeting,
-            },
-          ].map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <div
-                key={action.label}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <button
-                  type="button"
-                  disabled={action.disabled}
-                  onClick={action.onClick}
-                  style={{
-                    ...quickActionCircleButtonBaseStyle,
-                    cursor: action.disabled ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <Icon size={20} />
-                </button>
-                <span
-                  style={{
-                    fontSize: "12px",
-                    color: "#141414",
-                    fontWeight: "300",
-                  }}
-                >
-                  {action.label}
-                </span>
-              </div>
-            );
-          })}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px",
-              position: "relative",
-            }}
-            ref={moreActivitiesRef}
-          >
-            <button
-              onClick={() => setShowMoreActivities(!showMoreActivities)}
-              style={{
-                ...quickActionCircleButtonBaseStyle,
-                cursor: "pointer",
-              }}
-            >
-              <MoreHorizontal size={20} />
-            </button>
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#141414",
-                fontWeight: "300",
-              }}
-            >
-              More
-            </span>
-
-            {showMoreActivities && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: "4px",
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "5px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  minWidth: "150px",
-                  zIndex: 1000,
-                }}
-              >
-                {[
-                  { label: "SMS", onClick: activityModals.openSms },
-                  { label: "WhatsApp", onClick: activityModals.openWhatsApp },
-                ].map(({ label, onClick }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      setShowMoreActivities(false);
-                      onClick();
-                    }}
-                    style={dropdownMenuItemStyle}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f7fafc";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* <div style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #cccccc',
-              borderRadius: '10px',
-            }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '16px 20px',
-                  cursor: 'pointer',
-                  borderBottom: collapsedSections.has('enrollments') ? 'none' : '1px solid #eaf0f6',
-                }}
-                onClick={() => toggleSection('enrollments')}
-              >
-                <ChevronDown
-                  size={18}
-                  style={{
-                    color: '#141414',
-                    marginRight: '10px',
-                    transform: collapsedSections.has('enrollments') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-                <h3 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  Enrollments
-                </h3>
-              </div>
-
-              {!collapsedSections.has('enrollments') && (
-                <div style={{ padding: '20px' }}>
-                  <h4 style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    marginBottom: '12px',
-                  }}>
-                    Communication subscriptions
-                  </h4>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#666666',
-                    marginBottom: '12px',
-                  }}>
-                    Ahmad Hussain has not specified any preferences.
-                  </p>
-                  <a
-                    href="#"
-                    style={{
-                      fontSize: '14px',
-                      color: '#006162',
-                      textDecoration: 'none',
-                      fontWeight: '500',
-                    }}
-                  >
-                    View subscriptions
-                  </a>
-                </div>
-              )}
-            </div> */}
-
-      {/* Key Information Card */}
-      <div
-        style={{
-          borderRadius: "5px",
-          marginBottom: "12px",
-          overflow: "hidden",
-          ...sidebarCardStyle,
-        }}
-      >
-        <div
-          style={{
-            ...sectionHeaderRowStyle,
-            padding: "14px 20px",
-            cursor: "pointer",
-            backgroundColor: "#ffffff",
-            borderBottom: collapsedSections.has("key-info")
-              ? "none"
-              : "1px solid #cccccc",
-          }}
-          onClick={() => toggleSection("key-info")}
-        >
-          <div style={chevronTitleRowStyle}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: "#141414",
-                transform: collapsedSections.has("key-info")
-                  ? "rotate(-90deg)"
-                  : "rotate(0deg)",
-                transition: "transform 0.2s ease",
-              }}
-            />
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "600",
-                color: "#141414",
-                margin: 0,
-              }}
-            >
-              Key information
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "6px",
-              cursor: "pointer",
-              color: "#141414",
-              fontSize: "14px",
-              fontWeight: "500",
-              borderRadius: "3px",
-              transition: "background-color 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f5f8fa";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Actions
-          </button>
-        </div>
-
-        {!collapsedSections.has("key-info") && (
-          <div style={{ padding: "20px" , maxHeight: "480px",
-            overflowY: "auto",}}>
-            {keyInfoFields.map((field) => (
-              <div key={field.label} style={{ marginBottom: "16px" }}>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: "400",
-                    color: "#666",
-                    marginBottom: "4px",
-                  }}
-                >
-                  {field.label}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      color: "#141414",
-                      fontWeight: "400",
-                      flex: 1,
-                    }}
-                  >
-                    {field.value}
-                  </div>
-                  {field.copyable && field.value !== "--" && (
-                    <button
-                      onClick={() => copyToClipboard(field.value ?? "")}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        color: "#141414",
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "3px",
-                      }}
-                      title="Copy"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f5f8fa";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <Copy size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // ============================================================================
-  // MAIN CONTENT (Center with Tabs)
-  // ============================================================================
-
-  const renderMainContent = () => (
-    <div
-      style={{
-        flex: 1,
-        backgroundColor: "transparent",
-        overflowY: "auto",
-        display: "flex",
-        flexDirection: "column",
-        marginLeft: "6px",
-        marginRight: "6px",
-        borderTop: "1px solid #cccccc",
-        borderRadius: "10px",
-      }}
-    >
-      {/* Tabs */}
-      {/* Tabs */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
-          // borderBottom: '1px solid #cbd5e0',
-          backgroundColor: "#f5f8fa",
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          gap: "0",
-          borderLeft: "1px solid #cccccc",
-          borderRight: "1px solid #cccccc",
-          borderRadius: "10px 10px 0 0",
-        }}
-      >
-        {tabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: "14px 20px",
-              backgroundColor: activeTab === tab.id ? "#ffffff" : "#f5f5f5",
-              border: "none",
-              borderRight:
-                index < tabs.length - 1 ? "1px solid #cbd5e0" : "none",
-              borderBottom:
-                activeTab === tab.id
-                  ? "1px solid #ffffff"
-                  : "1px solid #cbd5e0",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: activeTab === tab.id ? "600" : "400",
-              color: activeTab === tab.id ? "#141414" : "#141414",
-              transition: "all 0.2s",
-              textAlign: "center",
-              position: "relative",
-            }}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.backgroundColor = "#eaf0f6";
+          onSuccess={async () => {
+            setShowCreateLeadModal(false);
+            setEditLeadIdForSidebar(null);
+            if (leadRecordId) {
+              try {
+                const data = await getLead(leadRecordId);
+                setLead(data);
+              } catch {
+                // ignore refresh errors
               }
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id) {
-                e.currentTarget.style.backgroundColor = "#f5f8fa";
-              }
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      <div style={{ padding: "14px 0", flex: 1 }}>
-        {activeTab === "about" && (
-          <>
-            {/* Record Summary */}
-            <CrmRecordSummarySection
-              isCollapsed={collapsedSections.has("breeze")}
-              onToggle={() => toggleSection("breeze")}
-              summary={(lead as any)?.crm_summary?.summary ?? null}
-              metaLabel={
-                lead?.updated_at
-                  ? `Updated ${new Date(lead.updated_at).toLocaleDateString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}`
-                  : undefined
-              }
-              onRefreshClick={async () => {
-                const id = Number(leadId || lead?.id);
-                if (!id || Number.isNaN(id)) {
-                  toast.error("Invalid lead ID");
-                  return;
-                }
-                try {
-                  const refreshed = await getLead(id);
-                  setLead(refreshed);
-                  toast.success("Summary refreshed");
-                } catch {
-                  toast.error("Failed to refresh summary");
-                }
-              }}
-            />
-
-            {/* Contact Profile */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                border: "1px solid #cccccc",
-                borderRadius: "10px",
-                marginBottom: "20px",
-              }}
-            >
-              <CrmProfileSection
-                title="Contact profile"
-                fields={[
-                  {
-                    label: "Company name",
-                    value:
-                      (lead as any)?.company?.enrichment_data?.structured_data
-                        ?.official_company_name ?? lead?.company_name ?? "--",
-                  },
-                  {
-                    label: "Street address",
-                    value:
-                      (lead as any)?.company?.enrichment_data?.structured_data
-                        ?.headquarters?.address ??
-                      (lead as any)?.crm_data?.data?.street_address ??
-                      lead?.campaign_field_values?.street_address ??
-                      "--",
-                  },
-                  {
-                    label: "City",
-                    value:
-                      (lead as any)?.company?.enrichment_data?.structured_data
-                        ?.headquarters?.city ??
-                      (lead as any)?.crm_data?.data?.city ??
-                      lead?.campaign_field_values?.city ??
-                      "--",
-                  },
-                  {
-                    label: "Postal code",
-                    value:
-                      (lead as any)?.crm_data?.data?.postal_code ??
-                      lead?.campaign_field_values?.postal_code ??
-                      "--",
-                  },
-                  {
-                    label: "State/Region",
-                    value:
-                      (lead as any)?.crm_data?.data?.state ??
-                      lead?.campaign_field_values?.state ??
-                      "--",
-                  },
-                  {
-                    label: "Email",
-                    value:
-                      (lead as any)?.company?.enrichment_data?.structured_data
-                        ?.emails?.[0]?.email ??
-                      (lead as any)?.contact_persons?.[0]?.email ??
-                      (lead as any)?.crm_data?.data?.email ??
-                      "--",
-                    link: true,
-                  },
-                ]}
-              />
-            </div>
-          </>
-        )}
-
-        {activeTab === "activities" && (
-          <CrmActivitiesPanel
-            ref={activitiesPanelRef}
-            recordType="lead"
-            recordId={leadRecordId}
-            record={leadRecord}
-            recordLoading={leadLoading}
-            recordName={leadRecordName}
-            canSendWhatsApp={canSendWhatsApp}
-            onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
-            {...activityModals.crmActivitiesPanelProps}
-          />
-        )}
-
-        {activeTab === "intelligence" && (
-          <CrmIntelligenceTab
-            company={(lead as any)?.company ?? null}
-            relatedCompany={lead?.company_name ?? "—"}
-          />
-        )}
-      </div>
-    </div>
-  );
-
-  // ============================================================================
-  // RIGHT SIDEBAR (Associated Records)
-  // ============================================================================
-
-  const renderRightSidebar = () => (
-    <div
-      style={{
-        position: "relative",
-        width: isRightSidebarCollapsed ? "0px" : "385px",
-        marginLeft: isRightSidebarCollapsed ? "0px" : "10px",
-        flexShrink: 0,
-        transition: "width 0.3s ease, margin-left 0.3s ease",
-      }}
-    >
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)}
-        style={{
-          position: "fixed",
-          top: "100px",
-          right: isRightSidebarCollapsed ? "10px" : "calc(395px)",
-          zIndex: 101,
-          backgroundColor: "#ffffff",
-          border: "1px solid #8a8a8a",
-          borderRadius: "30px",
-          padding: "3px",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.3s ease",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#f5f8fa";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#ffffff";
-        }}
-        title={isRightSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {isRightSidebarCollapsed ? (
-          <ChevronLeft size={20} style={{ color: "#141414" }} />
-        ) : (
-          <ChevronRight size={20} style={{ color: "#141414" }} />
-        )}
-      </button>
-
-      {!isRightSidebarCollapsed && (
-        <div
-          className="sidebar-scrollbar"
-          style={{
-            width: "100%",
-            backgroundColor: "#f0f0f0",
-            display: "flex",
-            flexDirection: "column",
-            height: "100%",
-            overflowY: "auto",
-            padding: "0",
-
-            borderRadius: "10px",
-          }}
-        >
-          <div
-            style={{
-              paddingTop: "0px",
-              paddingBottom: "0",
-            }}
-          >
-            {(() => {
-              const company = (lead as any)?.company ?? null;
-              const struct = company?.enrichment_data?.structured_data ?? null;
-              const companyName =
-                struct?.official_company_name ??
-                company?.name ??
-                lead?.company_name ??
-                null;
-              const primaryPhone =
-                struct?.phones?.[0]?.number ??
-                company?.phone ??
-                lead?.company_contact ??
-                null;
-              const phones =
-                struct?.phones?.map((p: any) => ({
-                  number: p?.number ?? "",
-                  type: p?.type ?? null,
-                })) ?? undefined;
-              const companyId =
-                company?.id ??
-                (lead as any)?.company_id ??
-                null;
-              return (
-                <CrmAssociatedCompaniesCard
-                  sectionId="companies"
-                  collapsedSections={collapsedSections}
-                  toggleSection={toggleSection}
-                  companyName={companyName}
-                  primaryPhone={primaryPhone}
-                  phones={phones}
-                  companyId={companyId}
-                />
-              );
-            })()}
-
-            {/* Deals - from (lead as any).deals if API returns them */}
-            {(() => {
-              const allDeals = (lead as any)?.deals ?? [];
-              const dealsCount = allDeals.length;
-              const formatAmount = (deal: any) => {
-                const curr = deal.currency ?? "";
-                const val = deal.net_value ?? deal.grand_total ?? "";
-                return val ? `${curr} ${val}` : "--";
-              };
-              const formatDate = (d: string | null | undefined) =>
-                d
-                  ? new Date(d).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "--";
-              return (
-                <div
-                  style={{
-                    backgroundColor: "#ffffff",
-                    borderRadius: "10px",
-                    marginBottom: "12px",
-                    overflow: "hidden",
-                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-                    border: "1px solid #cccccc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 20px 0",
-                      cursor: "pointer",
-                      backgroundColor: "#ffffff",
-                    }}
-                    onClick={() => toggleSection("deals")}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        flex: 1,
-                      }}
-                    >
-                      <ChevronDown
-                        size={18}
-                        style={{
-                          color: "#141414",
-                          transform: collapsedSections.has("deals")
-                            ? "rotate(-90deg)"
-                            : "rotate(0deg)",
-                          transition: "transform 0.2s ease",
-                        }}
-                      />
-                      <h3
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: "600",
-                          color: "#141414",
-                          margin: 0,
-                          lineHeight: "1.2",
-                        }}
-                      >
-                        Deals ({dealsCount})
-                      </h3>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#141414",
-                        fontSize: "20px",
-                        padding: "6px",
-                        borderRadius: "3px",
-                        transition: "background-color 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f5f8fa";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <span style={{ fontSize: "14px", fontWeight: "300" }}>
-                        +
-                      </span>{" "}
-                      <span style={{ fontSize: "12px", fontWeight: "500" }}>
-                        Add
-                      </span>
-                    </button>
-                  </div>
-
-                  {!collapsedSections.has("deals") && (
-                    <div style={{ padding: "20px" }}>
-                      {dealsCount === 0 ? (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#666666",
-                            margin: 0,
-                          }}
-                        >
-                          No deals associated.
-                        </p>
-                      ) : (
-                        <>
-                          {allDeals.map((deal: any) => (
-                            <div
-                              key={deal.id}
-                              style={{
-                                marginBottom: "16px",
-                                border: "1px solid #cccccc",
-                                borderRadius: "10px",
-                                padding: "15px",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  fontSize: "14px",
-                                  color: "#006162",
-                                  fontWeight: "500",
-                                  display: "block",
-                                  marginBottom: "8px",
-                                }}
-                              >
-                                {deal.name}
-                              </span>
-                              <p
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#666666",
-                                  margin: "4px 0",
-                                }}
-                              >
-                                Amount: {formatAmount(deal)}
-                              </p>
-                              <p
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#666666",
-                                  margin: "4px 0",
-                                }}
-                              >
-                                Close Date:{" "}
-                                {formatDate(deal.expected_close_date)}
-                              </p>
-                              <p
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#666666",
-                                  margin: "4px 0",
-                                }}
-                              >
-                                Deal Stage: {deal.status ?? "--"}
-                              </p>
-                            </div>
-                          ))}
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const firstDeal = allDeals[0];
-                          const id = firstDeal?.id;
-                          const href = id
-                            ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
-                                String(id),
-                              )}`
-                            : "/crm/deals";
-                          window.open(href, "_blank", "noopener,noreferrer");
-                        }}
-                        style={viewAllLinkStyle}
-                      >
-                        View all associated Deals
-                        <ExternalLink size={12} />
-                      </a>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
-
-  if (leadLoading) {
-    return (
-      <Layout>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "calc(100vh - 120px)",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
-          <RefreshCw
-            size={32}
-            style={{ color: "#006162", animation: "spin 1s linear infinite" }}
-          />
-          <p style={{ fontSize: "14px", color: "#718096" }}>Loading lead...</p>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (leadError || (leadId == null && !lead)) {
-    return (
-      <Layout>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "calc(100vh - 120px)",
-            flexDirection: "column",
-            gap: "12px",
-            padding: "24px",
-          }}
-        >
-          <AlertCircle size={48} style={{ color: "#e53e3e" }} />
-          <p style={{ fontSize: "16px", color: "#141414", fontWeight: 500 }}>
-            {leadError || "No lead selected"}
-          </p>
-          <button
-            onClick={() => router.push("/crm/leads")}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#006162",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontSize: "14px",
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            Back to leads
-          </button>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!lead) {
-    return null;
-  }
-
-  return (
-    <>
-      <style>
-        {`
-          * {
-            box-sizing: border-box;
-          }
-
-          body {
-            margin: 0;
-            padding: 0;
-            
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-          }
-
-          ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-          }
-
-          ::-webkit-scrollbar-track {
-            background: #f7fafc;
-          }
-
-          ::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 4px;
-          }
-
-          ::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0;
-          }
-
-          .sidebar-scrollbar::-webkit-scrollbar {
-            width: 8px;
-          }
-          .sidebar-scrollbar::-webkit-scrollbar-track {
-            background: #f7fafc;
-          }
-          .sidebar-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e0;
-            border-radius: 4px;
-          }
-          .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0;
-          }
-        `}
-      </style>
-
-      <div
-        style={{
-          display: "flex",
-          width: "100%",
-          height: "calc(100vh - 60px)",
-          overflow: "hidden",
-          backgroundColor: "transparent",
-        }}
-      >
-        {/* Left Sidebar - Contact Info */}
-        {renderLeftSidebar()}
-
-        {/* Main Content - Tabs */}
-        {renderMainContent()}
-
-        {/* Right Sidebar - Associated Records */}
-        {renderRightSidebar()}
-      </div>
-
-      <DeviceSelectionModal
-        show={showDeviceSelectionModal}
-        onHide={() => {
-          setShowDeviceSelectionModal(false);
-          setAvailableDevices([]);
-          setPendingDialedNumber("");
-        }}
-        devices={availableDevices}
-        onSelectDevice={handleDeviceSelect}
-        extensionNumber={ctiUserAddress ?? ""}
-        userAddress={ctiUserAddress}
-      />
-
-      {activityModals.modals}
-
-      {/* Delete Lead Modal (same as list page) */}
-      <DeleteConfirmationModal
-        show={showDeleteModal}
-        onHide={() => {
-          setShowDeleteModal(false);
-          setLeadToDelete(null);
-        }}
-        onConfirm={confirmDeleteLead}
-        itemName={leadToDelete?.name}
-        itemType="lead"
-      />
-
-      {/* Success Modal for delete and other lead actions */}
-      <SuccessfulModal
-        show={showSuccessfulModal}
-        onHide={() => setShowSuccessfulModal(false)}
-        title={successModalTitle}
-        description={successModalDescription}
-      />
-
-      {/* Edit Lead sidebar (CreateLeadModal in edit mode) */}
-      <CreateLeadModal
-        show={showCreateLeadModal}
-        onHide={() => {
-          setShowCreateLeadModal(false);
-          setEditLeadIdForSidebar(null);
-        }}
-        onSuccess={async () => {
-          setShowCreateLeadModal(false);
-          setEditLeadIdForSidebar(null);
-          if (leadRecordId) {
-            try {
-              const data = await getLead(leadRecordId);
-              setLead(data);
-            } catch {
-              // ignore refresh errors
             }
-          }
+          }}
+          type="lead"
+          editLeadId={editLeadIdForSidebar}
+        />
+      ) : null,
+    renderRightSidebarExtra: ({ collapsedSections, toggleSection }) => (
+      <CrmAssociatedRecordsSectionCard
+        sectionId="deals"
+        title="Deals"
+        count={dealsCount}
+        collapsedSections={collapsedSections}
+        toggleSection={toggleSection}
+        items={allDeals as Record<string, unknown>[]}
+        showAddButton
+        renderItem={(deal) => <CrmDealListItemCard deal={deal} />}
+        emptyState={<p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>No deals associated.</p>}
+        viewAllLabel="View all associated Deals"
+        onViewAllClick={() => {
+          const firstDeal = allDeals[0] as Record<string, unknown>;
+          const href = buildCrmDealsDetailpageHref(firstDeal?.id as string | number | null | undefined);
+          window.open(href, "_blank", "noopener,noreferrer");
         }}
-        type="lead"
-        editLeadId={editLeadIdForSidebar}
       />
-    </>
-  );
+    ),
+  };
+
+  return <CrmDetailPageLayout config={config} canSendWhatsApp={canSendWhatsApp} />;
 };
 
-ContactRecordPage.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+ContactRecordPage.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
 
 export default ContactRecordPage;

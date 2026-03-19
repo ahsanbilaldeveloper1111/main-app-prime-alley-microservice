@@ -10,24 +10,35 @@ import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import { getOrder, getDeal, getLead } from "@utils/crm";
+import { deleteOrder, getDeal, getLead, getOrder } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
 import { toast } from "react-toastify";
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel, { CrmActivitiesRecord, type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
 import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
+import {
+  buildOrderKeyInfoFields,
+  buildOrderProfileFields,
+  buildOrderRecordForActivities,
+} from "@pages/crm/common/crm-order-detail-builders";
+import {
+  CrmDetailPageLayout,
+} from "@pages/crm/common/crm-detail-layout";
+import { formatCrmSummaryUpdatedLabel } from "@pages/crm/common/crm-detail-formatters";
+import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
+import CrmAssociatedRecordsSectionCard from "@components/CrmAssociatedRecordsSectionCard";
+import CrmDealListItemCard from "@components/CrmDealListItemCard";
+import CrmTicketListItemCard from "@components/CrmTicketListItemCard";
+import {
+  buildCrmDealsDetailpageHref,
+  buildCrmLeadsDetailpageHref,
+} from "@pages/crm/common/crm-detail-navigation";
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
-
-interface KeyInfoField {
-  label: string;
-  value: string;
-  copyable?: boolean;
-}
 
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
@@ -70,6 +81,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<{ id: number; name?: string } | null>(null);
   const [relatedDeal, setRelatedDeal] = useState<any>(null);
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [extensions, setExtensions] = useState<any[]>([]);
@@ -260,18 +272,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
   ];
 
   // Include audit_trail so Activity tab shows order history
-  const orderRecord: CrmActivitiesRecord | null = orderData
-    ? {
-        id: orderData.id,
-        data: {
-          id: orderData.id,
-          name: orderData.order_number || orderData.customer_name || '',
-          phone: orderData.customer_phone || '',
-          data: orderData,
-        },
-        audit_trail: orderData.audit_trail ?? [],
-      }
-    : null;
+  const orderRecord = buildOrderRecordForActivities(orderData);
 
   const orderRecordId = Number(id) || orderData?.id || 0;
   const orderRecordName = orderData?.order_number || orderData?.customer_name || 'Order';
@@ -291,22 +292,8 @@ const OrderRecordPage: NextPageWithLayout = () => {
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
-  // Key Information Fields - Order specific
-  const keyInfoFields: KeyInfoField[] = [
-    { 
-      label: 'Order Value', 
-      value: orderData?.final_amount || orderData?.total_amount 
-        ? `${orderData?.currency || 'AED'} ${Number.parseFloat(String(orderData.final_amount || orderData.total_amount)).toLocaleString()}`
-        : 'N/A', 
-      copyable: true 
-    },
-    { label: 'Stage', value: orderData?.stage?.name || 'N/A' },
-    { label: 'Order Status', value: orderData?.status || 'N/A' },
-    { label: 'Order Date', value: orderData?.order_date ? formatDateForTable(orderData.order_date) : 'N/A' },
-    { label: 'Expected Delivery', value: orderData?.expected_delivery_date ? formatDateForTable(orderData.expected_delivery_date) : 'N/A' },
-    { label: 'Company Name', value: orderData?.customer_name || 'N/A' },
-    { label: 'Order Owner', value: extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.display_name || extensions.find((ext: any) => ext?.id == orderData?.assigned_to || ext?.extension == orderData?.assigned_to)?.name || orderData?.assigned_to || 'N/A' },
-  ];
+  // Key Information Fields - extracted to common builder
+  const keyInfoFields = buildOrderKeyInfoFields(orderData, extensions);
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -1121,64 +1108,10 @@ const OrderRecordPage: NextPageWithLayout = () => {
               }}>
                 <CrmProfileSection
                   title="Order profile"
-                  fields={[
-                    {
-                      label: "Company name",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.official_company_name ??
-                        (relatedDeal as any)?.company?.name ??
-                        orderData?.customer_name ??
-                        "--",
-                    },
-                    {
-                      label: "Street address",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.headquarters?.address ??
-                        (relatedDeal as any)?.company?.address ??
-                        (orderData as any)?.billing_address ??
-                        (orderData as any)?.shipping_address ??
-                        "--",
-                    },
-                    {
-                      label: "City",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.headquarters?.city ??
-                        (relatedDeal as any)?.company?.city ??
-                        (orderData as any)?.billing_city ??
-                        (orderData as any)?.city ??
-                        "--",
-                    },
-                    {
-                      label: "Postal code",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.headquarters?.postal_code ??
-                        (orderData as any)?.postal_code ??
-                        (orderData as any)?.billing_postal_code ??
-                        "--",
-                    },
-                    {
-                      label: "State/Region",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.headquarters?.state ??
-                        (orderData as any)?.state ??
-                        (orderData as any)?.billing_state ??
-                        "--",
-                    },
-                    {
-                      label: "Email",
-                      value:
-                        (relatedDeal as any)?.company?.enrichment_data?.structured_data
-                          ?.emails?.[0]?.email ??
-                        orderData?.customer_email ??
-                        "--",
-                      link: true,
-                    },
-                  ]}
+                  fields={buildOrderProfileFields({
+                    orderData,
+                    relatedDeal,
+                  })}
                 />
               </div>
             </>
@@ -1449,7 +1382,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                       </p>
                     </div>
                    <a
-                     href={`/crm/deals/deals-detailpage?id=${encodeURIComponent(String(relatedDeal?.id ?? ''))}`}
+                     href={`/crm/detailspage?type=deal&id=${encodeURIComponent(String(relatedDeal?.id ?? ''))}`}
                      target="_blank"
                      rel="noopener noreferrer"
                      style={{
@@ -1677,6 +1610,321 @@ const OrderRecordPage: NextPageWithLayout = () => {
   if (!router.isReady) {
     return null;
   }
+
+  const detailStaticConfig = getCrmDetailStaticConfig("order");
+
+  const profileFields = buildOrderProfileFields({
+    orderData,
+    relatedDeal,
+  });
+
+  const associatedCompany = (() => {
+    const company = (relatedDeal as any)?.company ?? null;
+    const struct = company?.enrichment_data?.structured_data ?? null;
+
+    const companyName =
+      struct?.official_company_name ??
+      company?.name ??
+      orderData?.customer_name ??
+      null;
+
+    const primaryPhone =
+      struct?.phones?.[0]?.number ??
+      company?.phone ??
+      orderData?.customer_phone ??
+      null;
+
+    const phones =
+      struct?.phones?.map((p: any) => ({
+        number: p?.number ?? "",
+        type: p?.type ?? null,
+      })) ?? undefined;
+
+    const companyId = company?.id ?? orderData?.customer_id ?? null;
+
+    return { companyName, primaryPhone, phones, companyId };
+  })();
+
+  return (
+    <CrmDetailPageLayout
+      config={{
+        recordType: "order",
+        recordId: orderRecordId,
+        recordName: orderRecordName,
+        recordEmail: orderRecordEmail,
+        recordPhone: orderRecordPhone,
+        record: orderData,
+        recordLoading: loading,
+        recordError: orderError,
+        hasRecord: !!orderData,
+        ...detailStaticConfig,
+        keyInfoFields,
+        profileFields,
+        profileSectionTitle: "Order profile",
+        summary: (orderData as any)?.crm_summary?.summary ?? null,
+        summaryMetaLabel: formatCrmSummaryUpdatedLabel(
+          (orderData as any)?.crm_summary?.updated_at
+        ),
+        onRefreshSummary: async () => {
+          const idNum = Number(orderRecordId || id || 0);
+          if (!idNum || Number.isNaN(idNum)) {
+            toast.error("Invalid order ID");
+            return;
+          }
+          try {
+            const refreshed = await getOrder(idNum);
+            setOrderData(refreshed);
+            toast.success("Summary refreshed");
+          } catch {
+            toast.error("Failed to refresh summary");
+          }
+        },
+        company: (relatedDeal as any)?.company ?? null,
+        relatedCompany:
+          orderData?.customer_name ??
+          (relatedDeal as any)?.company_name ??
+          "—",
+        exporting: false,
+        onEdit: () => {
+          if (!orderRecordId) return;
+          router.push(`/crm/orders/${orderRecordId}/edit`);
+        },
+        onDelete: () =>
+          setOrderToDelete({
+            id: orderRecordId,
+            name: orderRecordName,
+          }),
+        onExport: () => {
+          // Intentionally no-op for now.
+        },
+        deleteItemName: orderToDelete?.name ?? orderRecordName,
+        onDeleteSuccess: async () => {
+          const idToDelete = orderToDelete?.id ?? orderRecordId;
+          if (!idToDelete) return;
+          await deleteOrder(idToDelete);
+        },
+        avatarDisplayName: orderRecordName,
+        avatarSubtitle: orderData?.stage?.name ?? "—",
+        headerSecondaryText: orderData?.expected_delivery_date
+          ? `Expected Delivery: ${formatDateForTable(
+              orderData.expected_delivery_date
+            )}`
+          : undefined,
+        primaryEmail: orderRecordEmail,
+        activitiesRecord:
+          orderRecord?.data != null
+            ? { data: orderRecord.data as unknown, audit_trail: orderRecord.audit_trail }
+            : null,
+        associatedCompany,
+        showAssociatedCompanyCard: Boolean(relatedDeal),
+        tabs,
+        renderCustomTabContent: (tabId, ctx) => {
+          if (tabId !== "revenue") return undefined;
+
+          return (
+            <div>
+              <div style={{ marginBottom: "24px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "16px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => ctx.toggleSection("quote-to-cash")}
+                >
+                  <ChevronDown
+                    size={20}
+                    style={{
+                      color: "#141414",
+                      transform: ctx.collapsedSections.has("quote-to-cash")
+                        ? "rotate(-90deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
+                  <h2
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "600",
+                      color: "#141414",
+                      margin: 0,
+                    }}
+                  >
+                    Quote-to-cash
+                  </h2>
+                </div>
+
+                {!ctx.collapsedSections.has("quote-to-cash") && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(400px, 1fr))",
+                      gap: "16px",
+                    }}
+                  >
+                    {revenueSections.slice(0, 5).map((section) =>
+                      renderRevenueSection(section)
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: "24px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "16px",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => ctx.toggleSection("e-commerce")}
+                >
+                  <ChevronDown
+                    size={20}
+                    style={{
+                      color: "#141414",
+                      transform: ctx.collapsedSections.has("e-commerce")
+                        ? "rotate(-90deg)"
+                        : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                    }}
+                  />
+                  <h2
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "600",
+                      color: "#141414",
+                      margin: 0,
+                    }}
+                  >
+                    e-Commerce
+                  </h2>
+                </div>
+
+                {!ctx.collapsedSections.has("e-commerce") && (
+                  <div
+                    style={{
+                      padding: "40px",
+                      textAlign: "center",
+                      backgroundColor: "#f7fafc",
+                      borderRadius: "5px",
+                      border: "1px solid #eaf0f6",
+                    }}
+                  >
+                    <ShoppingCart
+                      size={48}
+                      style={{ marginBottom: "16px", color: "#cbd5e0" }}
+                    />
+                    <p style={{ fontSize: "14px", color: "#7c98b6", margin: 0 }}>
+                      No e-commerce data available
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        },
+        renderRightSidebarExtra: ({ collapsedSections, toggleSection }) => {
+          const dealItems = relatedDeal ? [relatedDeal] : [];
+          const contactItems = relatedLead ? [relatedLead] : [];
+          const attachmentsItems: Array<Record<string, unknown>> = [];
+
+          return (
+            <>
+              {relatedDeal && (
+                <CrmAssociatedRecordsSectionCard
+                  sectionId="deals"
+                  title="Deals"
+                  count={1}
+                  collapsedSections={collapsedSections}
+                  toggleSection={toggleSection}
+                  items={dealItems}
+                  renderItem={(deal) => (
+                    <CrmDealListItemCard
+                      deal={deal as Record<string, unknown>}
+                    />
+                  )}
+                  emptyState={
+                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+                      No deals associated.
+                    </p>
+                  }
+                  viewAllLabel="View all associated Deals"
+                  onViewAllClick={() => {
+                    const href = buildCrmDealsDetailpageHref(
+                      (relatedDeal as any)?.id
+                    );
+                    window.open(href, "_blank", "noopener,noreferrer");
+                  }}
+                />
+              )}
+
+              {relatedLead && (
+                <CrmAssociatedRecordsSectionCard
+                  sectionId="contacts"
+                  title="Contacts"
+                  count={1}
+                  collapsedSections={collapsedSections}
+                  toggleSection={toggleSection}
+                  items={contactItems}
+                  renderItem={(lead) => (
+                    <CrmTicketListItemCard
+                      lead={lead as Record<string, unknown>}
+                    />
+                  )}
+                  emptyState={
+                    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+                      No contacts associated.
+                    </p>
+                  }
+                  viewAllLabel="View all associated Contacts"
+                  onViewAllClick={() => {
+                    const href = buildCrmLeadsDetailpageHref(
+                      (relatedLead as any)?.id
+                    );
+                    window.open(href, "_blank", "noopener,noreferrer");
+                  }}
+                />
+              )}
+
+              <CrmAssociatedRecordsSectionCard
+                sectionId="attachments"
+                title="Attachments"
+                count={0}
+                collapsedSections={collapsedSections}
+                toggleSection={toggleSection}
+                items={attachmentsItems}
+                renderItem={() => null}
+                emptyState={
+                  <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                    <Paperclip
+                      size={48}
+                      style={{ color: "#cbd5e0", marginBottom: "16px" }}
+                    />
+                    <p
+                      style={{
+                        fontSize: "14px",
+                        color: "#718096",
+                        margin: 0,
+                        lineHeight: "1.6",
+                      }}
+                    >
+                      No attachments yet
+                    </p>
+                  </div>
+                }
+              />
+            </>
+          );
+        },
+      }}
+      canSendWhatsApp={canSendWhatsApp}
+    />
+  );
 
   if (loading && !orderData) {
     return (
