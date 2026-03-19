@@ -6,6 +6,7 @@ import {
   onSubBarBtnEnter,
   onSubBarBtnLeave,
 } from "@components/shared/modalUiHelpers";
+import { ToggleSwitch } from "@components/shared/ToggleSwitch";
 
 const modalContainerStyle: CSSProperties = {
   position: "fixed",
@@ -79,31 +80,6 @@ const activeInfoStyle: CSSProperties = {
   cursor: "help",
 };
 
-const activeToggleStyle = (isActive: boolean): CSSProperties => ({
-  padding: 0,
-  border: "none",
-  width: "44px",
-  height: "24px",
-  borderRadius: "12px",
-  backgroundColor: isActive ? "#2d6ae0" : "#ccc",
-  cursor: "pointer",
-  transition: "background-color 150ms ease-out",
-  position: "relative",
-  flexShrink: 0,
-});
-
-const activeKnobStyle = (isActive: boolean): CSSProperties => ({
-  position: "absolute",
-  top: "3px",
-  left: isActive ? "23px" : "3px",
-  width: "18px",
-  height: "18px",
-  borderRadius: "50%",
-  backgroundColor: "#fff",
-  transition: "left 150ms ease-out",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-});
-
 export function FullScreenModalShell({
   title,
   onClose,
@@ -111,6 +87,8 @@ export function FullScreenModalShell({
   subBarLeft,
   isActive,
   onToggleActive,
+  hideActiveToggle = false,
+  hideSubBar = false,
   activeInfoTitle = "When active, this product is available for use in quotes",
   children,
 }: Readonly<{
@@ -120,6 +98,8 @@ export function FullScreenModalShell({
   subBarLeft?: ReactNode;
   isActive: boolean;
   onToggleActive: () => void;
+  hideActiveToggle?: boolean;
+  hideSubBar?: boolean;
   activeInfoTitle?: string;
   children: ReactNode;
 }>) {
@@ -145,26 +125,26 @@ export function FullScreenModalShell({
         <div style={topBarActionsStyle}>{topBarActions}</div>
       </div>
 
-      <div style={subBarStyle}>
-        <div>{subBarLeft}</div>
+      {!hideSubBar && (
+        <div style={subBarStyle}>
+          <div>{subBarLeft}</div>
 
-        <div style={activeWrapStyle}>
-          <span style={activeLabelStyle}>Active:</span>
-          <span style={activeInfoStyle} title={activeInfoTitle}>
-            ⓘ
-          </span>
-          <button
-            type="button"
-            aria-label="Toggle active"
-            aria-pressed={isActive}
-            onClick={onToggleActive}
-            style={activeToggleStyle(isActive)}
-          >
-            <div style={activeKnobStyle(isActive)} />
-          </button>
-          {isActive && <span style={{ fontSize: "14px", color: "#2d6ae0" }}>✓</span>}
+          {!hideActiveToggle && (
+            <div style={activeWrapStyle}>
+              <span style={activeLabelStyle}>Active:</span>
+              <span style={activeInfoStyle} title={activeInfoTitle}>
+                ⓘ
+              </span>
+              <ToggleSwitch
+                checked={isActive}
+                onChange={() => onToggleActive()}
+                ariaLabel="Toggle active"
+              />
+              {isActive && <span style={{ fontSize: "14px", color: "#2d6ae0" }}>✓</span>}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       <div style={scrollBodyStyle}>{children}</div>
     </div>

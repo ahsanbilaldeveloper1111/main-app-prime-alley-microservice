@@ -1,9 +1,12 @@
-import { useState } from "react";
+import React from "react";
 import {
   Info, Calendar, ChevronDown, Plus, Pencil,
   MoreHorizontal, Star, Bold, Italic, Underline,
   Link, List, ChevronRight, ExternalLink,
 } from "lucide-react";
+import SelectBox from "@components/SelectBox";
+import { getCompanyByCrmId } from "@utils/Helper";
+import { useCreateInvoiceForm } from "./useCreateInvoiceForm";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -72,7 +75,13 @@ const t = {
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DateInput({ value }: { value: string }) {
+type DateInputProps = Readonly<{
+  value: string;
+  onChange: (next: string) => void;
+  min?: string;
+}>;
+
+function DateInput({ value, onChange, min }: DateInputProps) {
   return (
     <div style={{
       backgroundColor: "rgb(255,255,255)", border: "1px solid rgb(138,138,138)",
@@ -80,7 +89,7 @@ function DateInput({ value }: { value: string }) {
       display: "flex", alignItems: "center", paddingInline: 12, gap: 8, cursor: "pointer",
     }}>
       <Calendar size={14} color="#555" style={{ flexShrink: 0 }} />
-      <input type="text" defaultValue={value} style={{
+      <input type="date" value={value} onChange={(e) => onChange(e.target.value)} min={min} style={{
         border: "none", outline: "none", fontFamily: font, fontSize: 14,
         color: "#141414", flex: 1, background: "transparent", padding: 0,
       }} />
@@ -88,13 +97,34 @@ function DateInput({ value }: { value: string }) {
   );
 }
 
-function AddBox({ icon, label }: { icon: React.ReactNode; label: string }) {
+type AddBoxProps = Readonly<{
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}>;
+
+function AddBox({ icon, label, onClick }: AddBoxProps) {
+  const isDisabled = !onClick;
   return (
-    <div style={{
-      border: "1px solid rgb(204,204,204)", borderRadius: 6, width: 360, height: 120,
-      boxSizing: "border-box" as const, display: "flex", alignItems: "center", gap: 16,
-      paddingInline: 20, cursor: "pointer", backgroundColor: "#fff", marginBottom: 4,
-    }}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isDisabled}
+      style={{
+        border: "1px solid rgb(204,204,204)",
+        borderRadius: 6,
+        width: 360,
+        height: 120,
+        boxSizing: "border-box" as const,
+        display: "flex",
+        alignItems: "center",
+        gap: 16,
+        paddingInline: 20,
+        cursor: isDisabled ? "default" : "pointer",
+        backgroundColor: "#fff",
+        marginBottom: 4,
+      }}
+    >
       <div style={{
         width: 44, height: 44, borderRadius: 6, backgroundColor: "#f5f5f5",
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -102,25 +132,57 @@ function AddBox({ icon, label }: { icon: React.ReactNode; label: string }) {
         {icon}
       </div>
       <span style={t.link}><Plus size={13} /> {label}</span>
-    </div>
+    </button>
   );
 }
 
-function Checkbox({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+type CheckboxProps = Readonly<{
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}>;
+
+function Checkbox({ checked, onChange, disabled }: CheckboxProps) {
   return (
-    <div onClick={disabled ? undefined : onChange} style={{
-      width: 16, height: 16, borderRadius: 3,
-      border: `2px solid ${checked ? "#141414" : "#888"}`,
-      backgroundColor: checked ? "#141414" : "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      flexShrink: 0, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1,
-    }}>
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={onChange}
+      disabled={disabled}
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: 3,
+        border: `2px solid ${checked ? "#141414" : "#888"}`,
+        backgroundColor: checked ? "#141414" : "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        padding: 0,
+      }}
+    >
       {checked && (
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
           <polyline points="1.5,4.5 3.5,7 7.5,2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )}
-    </div>
+    </button>
+  );
+}
+
+type InfoTipProps = Readonly<{
+  text: string;
+  size?: number;
+}>;
+
+function InfoTip({ text, size = 13 }: InfoTipProps) {
+  return (
+    <span title={text} aria-label={text} style={{ display: "inline-flex", alignItems: "center" }}>
+      <Info size={size} color="#888" />
+    </span>
   );
 }
 
@@ -224,13 +286,89 @@ const lineItemBtnStyle1: React.CSSProperties = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function CreateInvoicePage() {
-  const [acceptOnline, setAcceptOnline] = useState(true);
-  const [collectBilling, setCollectBilling] = useState(false);
-  const [collectShipping, setCollectShipping] = useState(false);
-  const [storePayment, setStorePayment] = useState(false);
-  const [partialPayments, setPartialPayments] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+type CreateInvoicePageProps = {
+  editInvoiceId?: string;
+};
+
+type CreateInvoiceFormState = ReturnType<typeof useCreateInvoiceForm>;
+
+function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState }>) {
+  const {
+    acceptOnline,
+    setAcceptOnline,
+    collectBilling,
+    setCollectBilling,
+    collectShipping,
+    setCollectShipping,
+    storePayment,
+    setStorePayment,
+    partialPayments,
+    setPartialPayments,
+    advancedOpen,
+    setAdvancedOpen,
+    companyOptions,
+    loadingCompanies,
+    companySelectOpen,
+    setCompanySelectOpen,
+    companySelectWrapRef,
+    selectedCompanyId,
+    selectedCompanyName,
+    customerData,
+    resolvingCustomer,
+    currencyCode,
+    customerModalOpen,
+    setCustomerModalOpen,
+    customerModalSection,
+    customerForm,
+    setCustomerForm,
+    customerProducts,
+    productSelectOpen,
+    setProductSelectOpen,
+    productSelectAnchor,
+    setProductSelectAnchor,
+    productSelectWrapRef,
+    productSelectWrapRefTop,
+    invoiceDate,
+    setInvoiceDate,
+    dueDate,
+    endDate,
+    setEndDate,
+    paymentMode,
+    setPaymentMode,
+    poNumber,
+    setPoNumber,
+    notes,
+    setNotes,
+    termsConditions,
+    setTermsConditions,
+    submitting,
+    items,
+    loadingEditInvoice,
+    isEditMode,
+    toSingleSelectString,
+    formatCustomerAddress,
+    openCustomerModal,
+    saveCustomerModal,
+    round2,
+    lineTax,
+    lineTotal,
+    subtotal,
+    taxAmount,
+    totalAmount,
+    availableProductOptions,
+    selectedProductIds,
+    productSelectDisabled,
+    productSelectPlaceholder,
+    formatVatRate2,
+    onCompanyChange,
+    addProductToInvoice,
+    cloneItem,
+    removeItem,
+    updateItem,
+    handleDueDateChange,
+    handleCreateInvoice,
+    router,
+  } = form;
 
   return (
     <div style={{ fontFamily: font, color: "#141414", backgroundColor: "#f5f5f5", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -243,7 +381,15 @@ export default function CreateInvoicePage() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {["Exit", "Save"].map(lbl => (
-            <button key={lbl} style={{ background: "none", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 4, color: "#fff", fontFamily: font, fontSize: 13, fontWeight: 400, padding: "5px 14px", cursor: "pointer" }}>
+            <button
+              key={lbl}
+              type="button"
+              onClick={() => {
+                if (lbl !== "Exit") return;
+                router.push("/billing/invoices").catch(() => undefined);
+              }}
+              style={{ background: "none", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 4, color: "#fff", fontFamily: font, fontSize: 13, fontWeight: 400, padding: "5px 14px", cursor: "pointer" }}
+            >
               {lbl}
             </button>
           ))}
@@ -252,14 +398,40 @@ export default function CreateInvoicePage() {
           </span>
         </div>
         <span style={{ position: "absolute" as const, left: "50%", transform: "translateX(-50%)", color: "#fff", fontSize: 15, fontWeight: 400, fontFamily: font }}>
-          Create invoice
+          {isEditMode ? "Edit invoice" : "Create invoice"}
         </span>
         <div style={{ position: "relative" }}>
-          <button style={{ background: "#fff", border: "none", borderRadius: 4, color: "#141414", fontFamily: font, fontSize: 13, fontWeight: 600, padding: "6px 20px", cursor: "pointer" }}>
-            Create
+          <button
+            onClick={() => handleCreateInvoice().then(() => undefined)}
+            disabled={
+              submitting ||
+              resolvingCustomer ||
+              loadingEditInvoice ||
+              (!isEditMode && !selectedCompanyId)
+            }
+            style={{
+              background: "#fff",
+              border: "none",
+              borderRadius: 4,
+              color: "#141414",
+              fontFamily: font,
+              fontSize: 13,
+              fontWeight: 600,
+              padding: "6px 20px",
+              cursor:
+                submitting || resolvingCustomer || loadingEditInvoice || (!isEditMode && !selectedCompanyId)
+                  ? "not-allowed"
+                  : "pointer",
+              opacity:
+                submitting || resolvingCustomer || loadingEditInvoice || (!isEditMode && !selectedCompanyId)
+                  ? 0.7
+                  : 1,
+            }}
+          >
+            {isEditMode ? "Save" : "Create"}
           </button>
           <span style={{ position: "absolute" as const, top: -6, right: -6, backgroundColor: "#e53935", border: "2px solid #2d2d2d", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            2
+            {items.length}
           </span>
         </div>
       </div>
@@ -276,9 +448,26 @@ export default function CreateInvoicePage() {
 
       {/* ── Right floating icons ── */}
       <div style={{ position: "fixed" as const, right: 0, top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column" as const, backgroundColor: "#fff", border: "1px solid #e5e5e5", borderRadius: "8px 0 0 8px", overflow: "hidden", zIndex: 20 }}>
-        {[<MoreHorizontal size={16} />, <Star size={16} />].map((icon, i, arr) => (
-          <button key={i} style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderBottom: i < arr.length - 1 ? "1px solid #f0f0f0" : "none", cursor: "pointer", color: "#666" }}>
-            {icon}
+        {[
+          { key: "more", icon: <MoreHorizontal size={16} /> },
+          { key: "star", icon: <Star size={16} /> },
+        ].map((item, i, arr) => (
+          <button
+            key={item.key}
+            style={{
+              width: 40,
+              height: 40,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "none",
+              border: "none",
+              borderBottom: i < arr.length - 1 ? "1px solid #f0f0f0" : "none",
+              cursor: "pointer",
+              color: "#666",
+            }}
+          >
+            {item.icon}
           </button>
         ))}
       </div>
@@ -305,7 +494,9 @@ export default function CreateInvoicePage() {
             <h2 style={{ fontSize: 20, fontWeight: 700, fontFamily: font, margin: "0 0 24px 0" }}>Bill to</h2>
 
             <div style={{ marginBottom: 22 }}>
-              <div style={t.label}>Billing Contact <Info size={13} color="#888" /></div>
+              <div style={t.label}>
+                Billing Contact <InfoTip text="Billing contact details shown on the invoice." />
+              </div>
               <AddBox
                 icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5"><rect x="4" y="2" width="16" height="20" rx="2" /><circle cx="12" cy="9" r="3" /><path d="M6 20c0-3 2.7-5 6-5s6 2 6 5" /><line x1="16" y1="5" x2="20" y2="5" /><line x1="16" y1="8" x2="20" y2="8" /></svg>}
                 label="Add contact"
@@ -313,23 +504,72 @@ export default function CreateInvoicePage() {
             </div>
 
             <div style={{ marginBottom: 22 }}>
-              <div style={t.label}>Company</div>
-              <AddBox
-                icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5"><rect x="3" y="7" width="18" height="14" rx="1.5" /><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" /></svg>}
-                label="Add company"
-              />
+              <div style={t.label}>Company *</div>
+              {isEditMode ? (
+                <div style={{
+                  border: "1px solid rgb(204,204,204)", borderRadius: 6, width: 360, minHeight: 48,
+                  boxSizing: "border-box" as const, display: "flex", alignItems: "center", paddingInline: 16,
+                  backgroundColor: "#f5f5f5", color: "#141414", fontFamily: font, fontSize: 14,
+                }}>
+                  {getCompanyByCrmId(selectedCompanyId, companyOptions.map((o) => ({ id: o.value, name: o.label }))) ||
+                  customerData?.name ||
+                  selectedCompanyName ||
+                  "—"}
+                </div>
+                
+              ) : (
+                <div ref={companySelectWrapRef} style={{ position: "relative" as const }}>
+                <AddBox
+                  icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="1.5"><rect x="3" y="7" width="18" height="14" rx="1.5" /><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" /></svg>}
+                  label={selectedCompanyId ? selectedCompanyName : "Add company"}
+                  onClick={() => setCompanySelectOpen((v) => !v)}
+                />
+                {companySelectOpen && (
+                  <div style={{ position: "absolute", top: 126, left: 0, width: 360, zIndex: 60 }}>
+                    <SelectBox
+                      options={companyOptions}
+                      value={selectedCompanyId}
+                      onChange={onCompanyChange}
+                      placeholder={loadingCompanies ? "Loading companies..." : "Select company"}
+                      isClearable={true}
+                      isDisabled={loadingCompanies || resolvingCustomer}
+                    />
+                  </div>
+                )}
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: 18 }}>
-              <div style={t.label}>Billing address <Info size={13} color="#888" /></div>
-              <p style={t.muted}>No billing address</p>
-              <a style={t.linkSm}><Pencil size={12} /> Edit address</a>
+              <div style={t.label}>
+                Billing address <InfoTip text="Billing address printed on the invoice." />
+              </div>
+              <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
+                {formatCustomerAddress(customerData)}
+              </p>
+              <button
+                type="button"
+                style={{ ...t.linkSm, border: "none", background: "transparent", padding: 0 }}
+                onClick={() => openCustomerModal("billing")}
+                disabled={resolvingCustomer}
+              >
+                <Pencil size={12} /> Edit address
+              </button>
             </div>
 
             <div>
               <div style={t.label}>Shipping address</div>
-              <p style={t.muted}>No shipping address</p>
-              <a style={t.linkSm}><Pencil size={12} /> Edit address</a>
+              <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
+                {formatCustomerAddress(customerData)}
+              </p>
+              <button
+                type="button"
+                style={{ ...t.linkSm, border: "none", background: "transparent", padding: 0 }}
+                onClick={() => openCustomerModal("shipping")}
+                disabled={resolvingCustomer}
+              >
+                <Pencil size={12} /> Edit address
+              </button>
             </div>
           </div>
 
@@ -337,31 +577,45 @@ export default function CreateInvoicePage() {
           <div style={{ paddingTop: 48 }}>
             <div style={{ display: "flex", gap: 12, marginBottom: 22, flexWrap: "wrap" as const }}>
               <div>
-                <div style={t.label}>Invoice date * <Info size={12} color="#888" /></div>
-                <DateInput value="08/03/2026" />
+                <div style={t.label}>
+                  Invoice date * <InfoTip size={12} text="Date the invoice is issued." />
+                </div>
+                <DateInput value={invoiceDate} onChange={setInvoiceDate} />
               </div>
               <div>
                 <div style={t.label}>Payment terms *</div>
-                <select style={t.select} defaultValue="receipt">
-                  <option value="receipt">Due on receipt</option>
-                  <option value="net15">Net 15</option>
-                  <option value="net30">Net 30</option>
+                <select style={t.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as any)}>
+                  <option value="one_time">One time</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="subscription">Subscription</option>
                 </select>
               </div>
               <div>
-                <div style={t.label}>Due date * <Info size={12} color="#888" /></div>
-                <DateInput value="08/03/2026" />
+                <div style={t.label}>
+                  Due date * <InfoTip size={12} text="Date payment is due." />
+                </div>
+                <DateInput
+                  value={dueDate}
+                  min={invoiceDate}
+                  onChange={handleDueDateChange}
+                />
               </div>
             </div>
 
             <div style={{ marginBottom: 22 }}>
-              <div style={t.label}>Next invoice number <Info size={12} color="#888" /></div>
+              <div style={t.label}>
+                Next invoice number <InfoTip size={12} text="Auto-generated invoice number." />
+              </div>
               <input style={{ ...t.inputFixed, backgroundColor: "#f5f5f5" }} type="text" defaultValue="INV-1005" readOnly />
             </div>
 
             <div>
               <div style={t.label}>PO number</div>
-              <input style={t.input360} type="text" defaultValue="" />
+              <input style={t.input360} type="text" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <div style={t.label}>End date</div>
+              <DateInput value={endDate || ""} onChange={setEndDate} />
             </div>
           </div>
         </div>
@@ -374,7 +628,7 @@ export default function CreateInvoicePage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 14, fontFamily: font }}>Currency:</span>
-            <select style={{
+            <select disabled style={{
               backgroundColor: "#fff", border: "1px solid #ccc", borderRadius: 4,
               color: "#141414", fontFamily: font, fontSize: 14, height: 36,
               paddingInline: "10px 28px", appearance: "none" as const,
@@ -382,15 +636,52 @@ export default function CreateInvoicePage() {
               backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
               cursor: "pointer", outline: "none",
             }}>
-              <option>United Arab Emirates Dir…</option>
-              <option>US Dollar (USD)</option>
+              <option>{currencyCode}</option>
             </select>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button style={lineItemBtnStyle}>Edit columns</button>
-            <button style={{ ...lineItemBtnStyle, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <div ref={productSelectWrapRefTop} style={{ position: "relative" as const }}>
+            <button
+              type="button"
+              onClick={() => {
+                setProductSelectAnchor("top");
+                setProductSelectOpen((v) => !v);
+              }}
+              disabled={productSelectDisabled}
+              style={{
+                ...lineItemBtnStyle,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: productSelectDisabled ? "not-allowed" : "pointer",
+                opacity: productSelectDisabled ? 0.7 : 1,
+              }}
+            >
               Add line item <ChevronDown size={13} />
             </button>
+            {productSelectOpen && productSelectAnchor === "top" && (
+              <div style={{ position: "absolute", top: 38, right: 0, width: 420, zIndex: 80 }}>
+                <SelectBox
+                  options={availableProductOptions}
+                  value={null}
+                  isClearable={true}
+                  isDisabled={productSelectDisabled}
+                  placeholder={productSelectPlaceholder}
+                  onChange={(value) => {
+                    const v = toSingleSelectString(value);
+                    const id = Number(v);
+                    if (!Number.isFinite(id) || id <= 0) return;
+                    if (selectedProductIds.has(id)) return;
+                    const found = customerProducts.find((cp) => Number(cp?.product?.id ?? cp.product_id) === id);
+                    if (!found) return;
+                    addProductToInvoice(found);
+                    setProductSelectOpen(false);
+                  }}
+                />
+              </div>
+            )}
+            </div>
           </div>
         </div>
 
@@ -410,6 +701,8 @@ export default function CreateInvoicePage() {
           gap: 64,
           minHeight: 260,
         }}>
+          {items.length === 0 ? (
+          <>
           <div style={{ maxWidth: 400 }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: font, margin: "0 0 10px 0" }}>
               Add line items to your invoice
@@ -421,11 +714,122 @@ export default function CreateInvoicePage() {
               Learn more about the product library <ExternalLink size={12} />
             </a>
             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-              <button style={lineItemBtnStyle1}>Select from product library</button>
+              <div ref={productSelectWrapRef} style={{ position: "relative" as const }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setProductSelectAnchor("empty");
+                  setProductSelectOpen((v) => !v);
+                }}
+                style={lineItemBtnStyle1}
+                disabled={productSelectDisabled}
+              >
+                Select from product library
+              </button>
+              {productSelectOpen && productSelectAnchor === "empty" && (
+                <div style={{ position: "absolute", top: 48, left: 0, width: 420, zIndex: 60 }}>
+                  <SelectBox
+                    options={availableProductOptions}
+                    value={null}
+                    isClearable={true}
+                    isDisabled={productSelectDisabled}
+                    placeholder={productSelectPlaceholder}
+                    onChange={(value) => {
+                      const v = toSingleSelectString(value);
+                      const id = Number(v);
+                      if (!Number.isFinite(id) || id <= 0) return;
+                      if (selectedProductIds.has(id)) return;
+                      const found = customerProducts.find((cp) => Number(cp?.product?.id ?? cp.product_id) === id);
+                      if (!found) return;
+                      if (process.env.NODE_ENV !== "production") {
+                        // eslint-disable-next-line no-console
+                        console.log("Selected product", { id, customerProduct: found });
+                      }
+                      addProductToInvoice(found);
+                      setProductSelectOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+              </div>
               <button style={lineItemBtnStyle1}>Create custom line item</button>
             </div>
           </div>
           <PackageIllustration />
+          </>
+          ) : (
+            <div style={{ width: "100%" }}>
+              {items.map((it) => (
+                <div key={it.id} style={{ borderBottom: "1px solid #eee", padding: "14px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, fontFamily: font }}>{it.product_name}</div>
+                      <div style={{ fontSize: 12, color: "#666", fontFamily: font, marginTop: 4 }}>
+                        {it.product_description || "—"}
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        <div style={t.label}>Description</div>
+                        <input
+                          style={{ ...t.inputFixed, width: "100%" }}
+                          type="text"
+                          value={it.description}
+                          onChange={(e) => updateItem(it.id, { description: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button style={lineItemBtnStyle} onClick={() => cloneItem(it.id)}>Clone</button>
+                      <button style={{ ...lineItemBtnStyle, borderColor: "rgba(220,53,69,0.45)", color: "#dc3545" }} onClick={() => removeItem(it.id)}>Remove</button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
+                    <div>
+                      <div style={t.label}>Quantity</div>
+                      <input
+                        style={t.inputFixed}
+                        type="number"
+                        min={0}
+                        value={it.quantity}
+                        onChange={(e) => updateItem(it.id, { quantity: Math.max(0, Number(e.target.value) || 0) })}
+                      />
+                    </div>
+                    <div>
+                      <div style={t.label}>Unit Price</div>
+                      <input
+                        style={t.inputFixed}
+                        type="number"
+                        value={it.unit_price}
+                        onChange={(e) => updateItem(it.id, { unit_price: Number(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div>
+                      <div style={t.label}>Tax (%)</div>
+                      <input
+                        style={t.inputFixed}
+                        type="number"
+                        step="0.01"
+                        value={it.vat_rate}
+                        onChange={(e) => updateItem(it.id, { vat_rate: formatVatRate2(e.target.value) })}
+                      />
+                    </div>
+                    <div>
+                      <div style={t.label}>Tax Amount</div>
+                      <div style={{ fontSize: 14, color: "#141414", fontFamily: font, paddingTop: 9 }}>
+                        {currencyCode} {round2(lineTax(it))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={t.label}>Line Total</div>
+                      <div style={{ fontSize: 14, color: "#141414", fontFamily: font, paddingTop: 9 }}>
+                        {currencyCode} {round2(lineTotal(it))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Summary (attached below line items, no gap) ── */}
@@ -442,23 +846,31 @@ export default function CreateInvoicePage() {
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
             <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Subtotal</span>
-            <span style={{ fontSize: 14, color: "#aaa", fontFamily: font }}>--</span>
+            <span style={{ fontSize: 14, color: "#141414", fontFamily: font }}> {currencyCode} {subtotal}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Tax Amount</span>
+            <span style={{ fontSize: 14, color: "#141414", fontFamily: font }}>{currencyCode} {taxAmount}</span>
           </div>
 
           <div style={{ padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <a style={t.link}>+ Add discount, fee, or tax</a>
               <ChevronDown size={13} color="rgb(0,97,98)" />
-              <Info size={13} color="#888" />
+              <InfoTip text="Add a discount, fee, or additional tax to this invoice." />
             </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0 0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 14, fontWeight: 700, fontFamily: font }}>Total</span>
-              <Info size={13} color="#888" />
+              <InfoTip text="Total = Subtotal + Tax Amount." />
             </div>
-            <span style={{ fontSize: 14, color: "#aaa", fontFamily: font }}>--</span>
+            <span style={{ fontSize: 14, color: "#141414", fontFamily: font }}>{currencyCode} {totalAmount}</span>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12, color: "#666", fontFamily: font }}>
+            Items: <strong style={{ color: "#141414" }}>{items.length}</strong> · Currency:{" "}
+            <strong style={{ color: "#141414" }}>{currencyCode}</strong>
           </div>
         </div>
 
@@ -469,6 +881,8 @@ export default function CreateInvoicePage() {
         <div style={{ border: "1px solid rgb(138,138,138)", borderRadius: 4, backgroundColor: "#fff", overflow: "hidden", maxWidth: 460 }}>
           <textarea
             placeholder="Enter any extra notes that you would like to appear in this invoice."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
             style={{
               width: "100%", border: "none", outline: "none", fontFamily: font,
               fontSize: 13, color: "#888", padding: "12px 14px", resize: "none" as const,
@@ -476,9 +890,13 @@ export default function CreateInvoicePage() {
             }}
           />
           <div style={{ borderTop: "1px solid #e5e5e5", padding: "7px 12px", display: "flex", alignItems: "center", gap: 4 }}>
-            {([<Bold size={14} />, <Italic size={14} />, <Underline size={14} />] as React.ReactNode[]).map((icon, i) => (
-              <button key={i} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", padding: "3px 5px", display: "flex", alignItems: "center", borderRadius: 3 }}>
-                {icon}
+            {([
+              { key: "bold", icon: <Bold size={14} /> },
+              { key: "italic", icon: <Italic size={14} /> },
+              { key: "underline", icon: <Underline size={14} /> },
+            ] as Array<{ key: string; icon: React.ReactNode }>).map((item) => (
+              <button key={item.key} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", padding: "3px 5px", display: "flex", alignItems: "center", borderRadius: 3 }}>
+                {item.icon}
               </button>
             ))}
             <button style={{ background: "none", border: "none", cursor: "pointer", color: "#555", fontFamily: font, fontSize: 13, padding: "3px 5px", fontStyle: "italic", textDecoration: "underline", borderRadius: 3 }}>I</button>
@@ -487,11 +905,30 @@ export default function CreateInvoicePage() {
               More <ChevronDown size={11} />
             </button>
             <span style={{ color: "#ddd", margin: "0 4px" }}>|</span>
-            {([<Link size={14} />, <List size={14} />] as React.ReactNode[]).map((icon, i) => (
-              <button key={i} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", padding: "3px 5px", display: "flex", alignItems: "center", borderRadius: 3 }}>
-                {icon}
+            {([
+              { key: "link", icon: <Link size={14} /> },
+              { key: "list", icon: <List size={14} /> },
+            ] as Array<{ key: string; icon: React.ReactNode }>).map((item) => (
+              <button key={item.key} style={{ background: "none", border: "none", cursor: "pointer", color: "#555", padding: "3px 5px", display: "flex", alignItems: "center", borderRadius: 3 }}>
+                {item.icon}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 22 }}>
+          <h2 style={t.secHeading}>Terms &amp; Conditions</h2>
+          <div style={{ border: "1px solid rgb(138,138,138)", borderRadius: 4, backgroundColor: "#fff", overflow: "hidden", maxWidth: 460 }}>
+            <textarea
+              placeholder="Enter terms & conditions"
+              value={termsConditions}
+              onChange={(e) => setTermsConditions(e.target.value)}
+              style={{
+                width: "100%", border: "none", outline: "none", fontFamily: font,
+                fontSize: 13, color: "#888", padding: "12px 14px", resize: "none" as const,
+                minHeight: 80, boxSizing: "border-box" as const, backgroundColor: "transparent", lineHeight: "20px",
+              }}
+            />
           </div>
         </div>
 
@@ -531,14 +968,20 @@ export default function CreateInvoicePage() {
 
         {/* ON toggle button — styled as the design: black box with ON label + checkmark */}
         <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 24 }}>
-          <div
+          <button
+            type="button"
+            aria-pressed={acceptOnline}
             onClick={() => setAcceptOnline(!acceptOnline)}
             style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
               backgroundColor: acceptOnline ? "#141414" : "#f0f0f0",
               border: `1px solid ${acceptOnline ? "#141414" : "#ccc"}`,
-              borderRadius: 4, padding: "8px 14px",
-              cursor: "pointer", transition: "150ms ease-out",
+              borderRadius: 4,
+              padding: "8px 14px",
+              cursor: "pointer",
+              transition: "150ms ease-out",
             }}
           >
             <span style={{ fontSize: 14, fontWeight: 700, fontFamily: font, color: acceptOnline ? "#fff" : "#888", letterSpacing: 0.5 }}>
@@ -551,7 +994,7 @@ export default function CreateInvoicePage() {
                 </svg>
               </div>
             )}
-          </div>
+          </button>
         </div>
 
         {/* Online payment options container */}
@@ -571,7 +1014,7 @@ export default function CreateInvoicePage() {
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Accepted forms of payment *</span>
-                <Info size={13} color="#888" />
+                <InfoTip text="Payment methods your customer can use at checkout." />
               </div>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <Checkbox checked={true} onChange={() => {}} disabled />
@@ -585,43 +1028,55 @@ export default function CreateInvoicePage() {
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Billing address</span>
-                <Info size={13} color="#888" />
+                <InfoTip text="Ask for billing address during checkout." />
               </div>
-              <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => setCollectBilling(!collectBilling)}>
+              <button
+                type="button"
+                onClick={() => setCollectBilling(!collectBilling)}
+                style={{ display: "flex", alignItems: "center", cursor: "pointer", border: "none", background: "transparent", padding: 0 }}
+              >
                 <Checkbox checked={collectBilling} onChange={() => setCollectBilling(!collectBilling)} />
                 <span style={{ position: "relative" as const, lineHeight: "normal", fontWeight: 100, maxWidth: "100%", fontSize: 15, paddingLeft: 12, fontFamily: font, color: "#141414" }}>
                   Collect billing address for credit card purchases
                 </span>
-              </div>
+              </button>
             </div>
 
             {/* Shipping address */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Shipping address</span>
-                <Info size={13} color="#888" />
+                <InfoTip text="Ask for shipping address during checkout." />
               </div>
-              <div style={{ display: "flex", alignItems: "center", cursor: "pointer", opacity: 0.4 }} onClick={() => setCollectShipping(!collectShipping)}>
+              <button
+                type="button"
+                onClick={() => setCollectShipping(!collectShipping)}
+                style={{ display: "flex", alignItems: "center", cursor: "pointer", opacity: 0.4, border: "none", background: "transparent", padding: 0 }}
+              >
                 <Checkbox checked={collectShipping} onChange={() => setCollectShipping(!collectShipping)} />
                 <span style={{ position: "relative" as const, lineHeight: "normal", maxWidth: "100%", fontSize: 16, paddingLeft: 12, fontFamily: font, color: "#141414" }}>
                   Collect shipping address
                 </span>
-              </div>
+              </button>
             </div>
 
             {/* Store payment methods */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Store payment methods for future charges</span>
-                <Info size={13} color="#888" />
+                <InfoTip text="Store payment details for future charges." />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 0, cursor: "pointer" }} onClick={() => setStorePayment(!storePayment)}>
+              <button
+                type="button"
+                onClick={() => setStorePayment(!storePayment)}
+                style={{ display: "flex", alignItems: "center", gap: 0, cursor: "pointer", border: "none", background: "transparent", padding: 0 }}
+              >
                 <Checkbox checked={storePayment} onChange={() => setStorePayment(!storePayment)} />
                 <span style={{ position: "relative" as const, lineHeight: "normal", fontWeight: 100, maxWidth: "100%", fontSize: 15, paddingLeft: 12, fontFamily: font, color: "#141414", display: "flex", alignItems: "center", gap: 8 }}>
                   Collect your customer's payment details at checkout for future charges
-                  <Info size={13} color="#888" />
+                  <InfoTip text="Your customer’s payment details can be reused for future charges." />
                 </span>
-              </div>
+              </button>
             </div>
 
             {/* Partial payments */}
@@ -629,12 +1084,16 @@ export default function CreateInvoicePage() {
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Partial payments</span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => setPartialPayments(!partialPayments)}>
+              <button
+                type="button"
+                onClick={() => setPartialPayments(!partialPayments)}
+                style={{ display: "flex", alignItems: "center", cursor: "pointer", border: "none", background: "transparent", padding: 0 }}
+              >
                 <Checkbox checked={partialPayments} onChange={() => setPartialPayments(!partialPayments)} />
                 <span style={{ position: "relative" as const, fontWeight: 100, lineHeight: "normal", maxWidth: "100%", fontSize: 15, paddingLeft: 12, fontFamily: font, color: "#141414" }}>
                   Allow your customer to pay an amount less than the balance due
                 </span>
-              </div>
+              </button>
             </div>
 
           </div>
@@ -643,16 +1102,27 @@ export default function CreateInvoicePage() {
         <hr style={t.divider} />
 
         {/* ── ADVANCED SETTINGS ── */}
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" as const }}
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
           onClick={() => setAdvancedOpen(!advancedOpen)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            userSelect: "none" as const,
+            border: "none",
+            background: "transparent",
+            padding: 0,
+          }}
         >
           <ChevronRight
             size={18}
             style={{ transform: advancedOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 200ms", color: "#141414" }}
           />
           <span style={{ fontSize: 18, fontWeight: 700, fontFamily: font, color: "#141414" }}>Advanced settings</span>
-        </div>
+        </button>
 
         {advancedOpen && (
           <div style={{ paddingLeft: 28, marginTop: 24 }}>
@@ -694,7 +1164,150 @@ export default function CreateInvoicePage() {
           </div>
         )}
 
+        {customerModalOpen && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 200 }}>
+            <button
+              type="button"
+              aria-label="Close customer modal"
+              onClick={() => setCustomerModalOpen(false)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                background: "rgba(0,0,0,0.45)",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
+            />
+            <dialog
+              open
+              aria-label="Customer details"
+              style={{
+                width: "min(720px, calc(100% - 32px))",
+                margin: "auto",
+                padding: 0,
+                borderRadius: 10,
+                border: "1px solid #e5e5e5",
+                boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
+                overflow: "hidden",
+                fontFamily: font,
+              }}
+            >
+              <div style={{ padding: "14px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>
+                  Customer details {customerModalSection === "billing" ? "— Billing" : "— Shipping"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCustomerModalOpen(false)}
+                  style={{ background: "transparent", border: "1px solid #ddd", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ padding: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <div>
+                    <div style={t.label}>Phone</div>
+                    <input
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.phone}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div style={t.label}>Email</div>
+                    <input
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.email}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))}
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={t.label}>Address</div>
+                    <textarea
+                      style={{
+                        ...t.input360,
+                        width: "100%",
+                        height: 88,
+                        paddingBlock: 10,
+                        resize: "vertical",
+                        lineHeight: "20px",
+                      }}
+                      value={customerForm.address}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, address: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div style={t.label}>Postal code</div>
+                    <input
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.postal_code}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, postal_code: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <div style={t.label}>City</div>
+                    <input
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.city}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, city: e.target.value }))}
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={t.label}>Country</div>
+                    <input
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.country}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, country: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: 16, borderTop: "1px solid #eee", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setCustomerModalOpen(false)}
+                  style={{ background: "#fff", border: "1px solid #ccc", borderRadius: 6, padding: "8px 14px", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveCustomerModal().then(() => undefined)}
+                  disabled={resolvingCustomer}
+                  style={{
+                    background: "#006162",
+                    color: "#fff",
+                    border: "1px solid #006162",
+                    borderRadius: 6,
+                    padding: "8px 14px",
+                    cursor: resolvingCustomer ? "not-allowed" : "pointer",
+                    opacity: resolvingCustomer ? 0.7 : 1,
+                    fontWeight: 700,
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </dialog>
+          </div>
+        )}
+
       </div>
     </div>
   );
+}
+
+export function CreateInvoicePageContent(props: Readonly<CreateInvoicePageProps>) {
+  const form = useCreateInvoiceForm({ editInvoiceId: props.editInvoiceId });
+  return <CreateInvoicePageView form={form} />;
+}
+
+export default function CreateInvoicePage() {
+  return <CreateInvoicePageContent />;
 }

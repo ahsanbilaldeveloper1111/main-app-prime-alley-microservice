@@ -1,16 +1,14 @@
 import {
-  useCallback,
   useEffect,
   useState,
+  type ReactNode,
 } from "react";
 import {
-  createProduct,
-  createCustomerProductPricing,
-  getProductCategoriesList,
-  type ProductCategoryData,
-} from "@utils/accounts";
-import {
   BASE_BUTTON,
+  FIELD_INPUT,
+  FIELD_TEXTAREA,
+  FIELD_TEXTAREA_SMALL,
+  FIELD_INPUT_DISABLED_STYLE
 } from "@components/shared/productModalStyles";
 import {
   onDarkBorderEnter,
@@ -19,62 +17,140 @@ import {
   onLightBgLeave,
 } from "@components/shared/modalUiHelpers";
 import { FullScreenModalShell, SubBarButton } from "@components/shared/FullScreenModalShell";
-import { ProductInformationCard } from "@components/shared/ProductInformationCard";
-import { BillingDetailsCard } from "@components/shared/BillingDetailsCard";
-import { PricingConfigurationCard } from "@components/shared/PricingConfigurationCard";
-import { formatAedMargin } from "@components/shared/pricingUtils";
+import { ToggleSwitch } from "@components/shared/ToggleSwitch";
+import SelectBox, { type SelectBoxOption } from "@components/SelectBox";
+import { getErrorMessage } from "@utils/errors";
+import { getMinifiedCompanies } from "@utils/crm";
+import {
+  createCustomer,
+  createCustomerProductPricingBulk,
+  type CustomerProductPricingDataItem,
+  type CustomerProductPricingUpsertPayload,
+  getCustomer,
+  getProducts,
+  type ProductData,
+  upsertCustomerProductPricing,
+} from "@utils/accounts";
 
 interface CreateSubscriptionModalProps {
   customerId: string | number;
+  mode?: "create" | "edit";
+  initialPricingData?: CustomerProductPricingDataItem[];
   onClose: () => void;
   onCreate: () => void;
   onCreateAndAddAnother: () => void;
 }
 
+const Field = ({
+  label,
+  fullWidth,
+  children,
+}: {
+  label: string;
+  fullWidth?: boolean;
+  children: ReactNode;
+}) => (
+  <div style={{ gridColumn: fullWidth ? "1 / -1" : undefined }}>
+    <div style={{ fontSize: 12, color: "#444", marginBottom: 6 }}>{label}</div>
+    {children}
+  </div>
+);
+
+function toSingleSelectValue(
+  value: string | number | (string | number)[] | null,
+): string | number | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
+}
+
+function isIsoDateBefore(a: string, b: string): boolean {
+  // Dates are in YYYY-MM-DD format, so lexicographic compare works.
+  return String(a) < String(b);
+}
+
 export default function CreateSubscriptionModal({
   customerId,
+  mode = "create",
+  initialPricingData,
   onClose,
   onCreate,
   onCreateAndAddAnother,
 }: Readonly<CreateSubscriptionModalProps>) {
-  const [pricingTab, setPricingTab] = useState("flat");
+  const isEditMode = mode === "edit";
+  const isCompanyLocked = customerId !== "";
+  const today = new Date().toISOString().slice(0, 10);
+  const [resolvingCustomer, setResolvingCustomer] = useState(false);
+  const [customerReady, setCustomerReady] = useState(false);
 
-  const [billingFrequency, setBillingFrequency] = useState("one-time");
-  const [productType, setProductType] = useState("");
-  const [additionalOpen, setAdditionalOpen] = useState(false);
-  const [isActive, setIsActive] = useState(true);
-  const [unitCost, setUnitCost] = useState("");
-  const [priceAED, setPriceAED] = useState("");
-  const [priceUSD, setPriceUSD] = useState("");
+  const [companyOptions, setCompanyOptions] = useState<
+    { id: string | number; name?: string }[]
+  >([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
+    customerId ?? "",
+  );
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
-  const [productName, setProductName] = useState("");
-  const [productSku, setProductSku] = useState("");
-  const [productDescription, setProductDescription] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [currency, setCurrency] = useState<"AED" | "USD">("AED");
-  const [categories, setCategories] = useState<ProductCategoryData[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [products, setProducts] = useState<ProductData[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+
+  const [pricingData, setPricingData] = useState<CustomerProductPricingDataItem[]>(
+    () => initialPricingData ?? [],
+  );
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+
   const [submitting, setSubmitting] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const margin = formatAedMargin({ unitCost, priceAed: priceAED });
+  const hasCompanySelected = String(selectedCompanyId ?? "").trim() !== "";
+  const formEnabled = hasCompanySelected && customerReady && !resolvingCustomer;
+  const hasSelectedProducts = pricingData.length > 0;
+  const submitEnabled = formEnabled && hasSelectedProducts && !submitting;
+  let productSelectPlaceholder = "Select product";
+  if (loadingProducts) {
+    productSelectPlaceholder = "Loading products...";
+  }
+
+  const companySelectOptions: SelectBoxOption[] = companyOptions.map((c) => ({
+    value: c.id,
+    label: c?.name ? c.name : `Company #${String(c.id)}`,
+  }));
+
+  const selectedProductIds = new Set(pricingData.map((p) => p.product_id));
+  const productSelectOptions: SelectBoxOption[] = products
+    .filter((p) => !selectedProductIds.has(p.id))
+    .map((p) => ({
+      value: p.id,
+      label: p?.name ? p.name : `Product #${String(p.id)}`,
+    }));
+
+  useEffect(() => {
+    setSelectedCompanyId(customerId ?? "");
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!initialPricingData) return;
+    setPricingData(initialPricingData);
+    setExpandedRows(
+      Object.fromEntries(initialPricingData.map((r) => [r.product_id, true])),
+    );
+  }, [initialPricingData]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoadingCategories(true);
-    getProductCategoriesList()
-      .then((list) => {
+    setLoadingCompanies(true);
+    getMinifiedCompanies({ send_all: "true" })
+      .then((result) => {
         if (cancelled) return;
-        setCategories(Array.isArray(list) ? list : []);
+        setCompanyOptions(Array.isArray(result) ? result : []);
       })
-      .catch((e) => {
+      .catch((error) => {
         if (cancelled) return;
-        console.error("Failed to load product categories:", e);
-        setCategories([]);
+        setSubmitError(getErrorMessage(error, "Failed to load companies"));
       })
       .finally(() => {
         if (cancelled) return;
-        setLoadingCategories(false);
+        setLoadingCompanies(false);
       });
 
     return () => {
@@ -82,106 +158,198 @@ export default function CreateSubscriptionModal({
     };
   }, []);
 
-  const validatePayload = useCallback((): string | null => {
-    if (!productName.trim()) return "Name is mandatory";
-    if (!categoryId) {
-      setAdditionalOpen(true);
-      return "Category is mandatory";
-    }
-    if (!String(priceAED ?? "").trim()) return "Base price is mandatory";
-    return null;
-  }, [categoryId, priceAED, productName, setAdditionalOpen]);
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingProducts(true);
+    getProducts({ page: 1, per_page: 200 })
+      .then((response) => {
+        if (cancelled) return;
+        const list = response?.data ?? [];
+        setProducts(Array.isArray(list) ? list : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSubmitError(getErrorMessage(error, "Failed to load products"));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoadingProducts(false);
+      });
 
-  const submitCreateProduct = useCallback(
-    async (mode: "create" | "create_and_add_another") => {
-      const validationError = validatePayload();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!hasCompanySelected) {
+      setCustomerReady(false);
+      setResolvingCustomer(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setResolvingCustomer(true);
+    setCustomerReady(false);
+    setSubmitError(null);
+
+    (async () => {
+      try {
+        const existing: any = await getCustomer(selectedCompanyId);
+        if (cancelled) return;
+
+        const message = String(existing?.message ?? existing?.mesg ?? "").trim();
+        const isNotFound =
+          existing?.success === false && message.toLowerCase() === "not found";
+
+        if (isNotFound) {
+          await createCustomer({
+            crm_company_id: selectedCompanyId,
+            profile: { vat_exemption: false },
+          });
+          if (cancelled) return;
+          const createdOrFetched: any = await getCustomer(selectedCompanyId);
+          if (cancelled) return;
+          setCustomerReady(createdOrFetched?.success !== false);
+          return;
+        }
+
+        setCustomerReady(true);
+      } catch (error) {
+        if (cancelled) return;
+        setSubmitError(getErrorMessage(error, "Failed to load customer"));
+        setCustomerReady(false);
+      } finally {
+        if (cancelled) return;
+        setResolvingCustomer(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasCompanySelected, selectedCompanyId]);
+
+  const upsertProductRow = (productId: number) => {
+    setExpandedRows((prev) => ({ ...prev, [productId]: true }));
+    setPricingData((prev) => {
+      if (prev.some((r) => r.product_id === productId)) return prev;
+
+      const product = products.find((p) => p.id === productId);
+      const defaultPriceRaw =
+        String(product?.effective_price ?? "").trim() ||
+        String(product?.base_price ?? "").trim() ||
+        "0";
+      const defaultPrice = Number(defaultPriceRaw);
+
+      return [
+        ...prev,
+        {
+          product_id: productId,
+          selling_price: Number.isFinite(defaultPrice) ? defaultPrice : 0,
+          discount_applicability_id: null,
+          custom_description: "",
+          is_active: true,
+          renewal_start_date: today,
+          renewal_end_date: today,
+          status: "Active",
+          billing_cycle: "one time",
+          subscriptions: 0,
+        },
+      ];
+    });
+  };
+
+  const updateRow = (
+    productId: number,
+    patch: Partial<CustomerProductPricingDataItem>,
+  ) => {
+    setPricingData((prev) =>
+      prev.map((r) => (r.product_id === productId ? { ...r, ...patch } : r)),
+    );
+  };
+
+  const deleteRow = (productId: number) => {
+    setExpandedRows((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+    setPricingData((prev) => prev.filter((r) => r.product_id !== productId));
+  };
+
+  const buildUpsertPayload = (
+    row: CustomerProductPricingDataItem,
+  ): CustomerProductPricingUpsertPayload => ({
+    product_id: String(row.product_id),
+    selling_price: Number(row.selling_price),
+    custom_description: String(row.custom_description ?? "").trim() ? row.custom_description : null,
+    is_active: Boolean(row.is_active),
+    discount_applicability_id: row.discount_applicability_id ?? null,
+    renewal_start_date: row.renewal_start_date ? String(row.renewal_start_date) : null,
+    renewal_end_date: row.renewal_end_date ? String(row.renewal_end_date) : null,
+    status: row.status,
+    billing_cycle: row.billing_cycle,
+    subscriptions: Math.max(0, Number(row.subscriptions ?? 0) || 0),
+  });
+
+  const getSubmitValidationError = (): string | null => {
+    if (!selectedCompanyId) return "Please select a company first";
+    if (!formEnabled) return "Please wait until the customer is ready";
+    if (pricingData.length === 0) return "Please choose at least one product";
+    if (pricingData.some((r) => !Number.isFinite(Number(r.selling_price)))) {
+      return "Selling price must be a valid number";
+    }
+    if (isEditMode && pricingData.length !== 1) {
+      return "Edit requires exactly one selected product";
+    }
+    return null;
+  };
+
+  const handleSubmitMode = async (
+    submitMode: "create" | "create_and_add_another",
+  ) => {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const validationError = getSubmitValidationError();
       if (validationError) {
         setSubmitError(validationError);
         return;
       }
 
-      setSubmitting(true);
-      setSubmitError(null);
-      try {
-        if (customerId === "") {
-          setSubmitError("Please select a company first");
-          return;
-        }
-
-        const payload = {
-          name: productName.trim(),
-          sku: productSku.trim() ? productSku.trim() : undefined,
-          description: productDescription.trim() ? productDescription.trim() : undefined,
-          category_id: categoryId,
-          base_price: Number(priceAED),
-          is_active: isActive,
-          is_service: productType === "service",
-          currency,
-        };
-        const created = await createProduct(payload);
-        console.log("Created product:", created);
-
-        const createdProductId = created?.id;
-        if (createdProductId == null) {
-          throw new Error("Product created but id is missing");
-        }
-
-        await createCustomerProductPricing(customerId, {
-          product_id: String(createdProductId),
-          selling_price: String(payload.base_price ?? 0),
+      if (isEditMode) {
+        const row = pricingData[0];
+        await upsertCustomerProductPricing(selectedCompanyId, buildUpsertPayload(row));
+      } else {
+        await createCustomerProductPricingBulk(selectedCompanyId, {
+          pricing_data: pricingData,
         });
-
-        if (mode === "create_and_add_another") {
-          onCreateAndAddAnother();
-        } else {
-          onCreate();
-        }
-      } catch (e: any) {
-        console.error("Failed to create subscription:", e);
-        setSubmitError(e?.message || "Failed to create subscription");
-      } finally {
-        setSubmitting(false);
       }
-    },
-    [
-      categoryId,
-      customerId,
-      currency,
-      isActive,
-      onCreate,
-      onCreateAndAddAnother,
-      priceAED,
-      productDescription,
-      productName,
-      productSku,
-      productType,
-      validatePayload,
-    ],
-  );
 
-  const handleSubmitMode = useCallback(
-    (mode: "create" | "create_and_add_another") => {
-      submitCreateProduct(mode).then(() => undefined);
-    },
-    [submitCreateProduct],
-  );
+      if (submitMode === "create") {
+        onCreate();
+      } else {
+        setPricingData([]);
+        onCreateAndAddAnother();
+      }
+    } catch (error) {
+      setSubmitError(
+        getErrorMessage(
+          error,
+          isEditMode ? "Failed to update subscription" : "Failed to create subscription",
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  const topBarActions = (
-    <>
-      <button
-        onClick={() => handleSubmitMode("create_and_add_another")}
-        style={{
-          ...BASE_BUTTON,
-          backgroundColor: "transparent",
-          borderColor: "rgba(255,255,255,0.35)",
-          color: "#fff",
-        }}
-        onMouseEnter={onDarkBorderEnter}
-        onMouseLeave={onDarkBorderLeave}
-        disabled={submitting}
-      >
-        Create and add another
-      </button>
+  const topBarActions =
+    mode === "edit" ? (
       <div style={{ position: "relative" }}>
         <button
           onClick={() => handleSubmitMode("create")}
@@ -194,64 +362,664 @@ export default function CreateSubscriptionModal({
           }}
           onMouseEnter={onLightBgEnter}
           onMouseLeave={onLightBgLeave}
-          disabled={submitting}
+          disabled={!submitEnabled}
         >
-          Create
+          Save
         </button>
       </div>
-    </>
-  );
+    ) : (
+      <>
+        <button
+          onClick={() => handleSubmitMode("create_and_add_another")}
+          style={{
+            ...BASE_BUTTON,
+            backgroundColor: "transparent",
+            borderColor: "rgba(255,255,255,0.35)",
+            color: "#fff",
+          }}
+          onMouseEnter={onDarkBorderEnter}
+          onMouseLeave={onDarkBorderLeave}
+          disabled={!submitEnabled}
+        >
+          Create and add another
+        </button>
+        <div style={{ position: "relative" }}>
+          <button
+            onClick={() => handleSubmitMode("create")}
+            style={{
+              ...BASE_BUTTON,
+              backgroundColor: "#fff",
+              color: "#141414",
+              fontWeight: 400,
+              paddingInline: "20px",
+            }}
+            onMouseEnter={onLightBgEnter}
+            onMouseLeave={onLightBgLeave}
+            disabled={!submitEnabled}
+          >
+            Create
+          </button>
+        </div>
+      </>
+    );
 
   return (
     <FullScreenModalShell
-      title="Create Subscription"
+      title={`${mode === "edit" ? "Edit" : "Create"} Subscription`}
       onClose={onClose}
       topBarActions={topBarActions}
       subBarLeft={<SubBarButton>Edit this form</SubBarButton>}
       isActive={isActive}
+
+      hideActiveToggle={true}
+      hideSubBar={true}
       onToggleActive={() => setIsActive((v) => !v)}
     >
-      <ProductInformationCard
-        error={submitError}
-        productName={productName}
-        onProductNameChange={setProductName}
-        productSku={productSku}
-        onProductSkuChange={setProductSku}
-        productDescription={productDescription}
-        onProductDescriptionChange={setProductDescription}
-        categoryId={categoryId}
-        onCategoryIdChange={setCategoryId}
-        categories={categories}
-        loadingCategories={loadingCategories}
-        submitting={submitting}
-        productType={productType}
-        onProductTypeChange={setProductType}
-        additionalOpen={additionalOpen}
-        onAdditionalOpenChange={setAdditionalOpen}
-        idPrefix="cms"
-      />
+      <div style={{  margin: "0 auto" }}>
+        {submitError && (
+          <div
+            style={{
+              background: "#fff3f3",
+              border: "1px solid #ffd2d2",
+              color: "#9b1c1c",
+              padding: "12px 14px",
+              borderRadius: 10,
+              marginBottom: 14,
+              fontSize: 13,
+            }}
+          >
+            {submitError}
+          </div>
+        )}
 
-      <BillingDetailsCard
-        billingFrequency={billingFrequency}
-        onBillingFrequencyChange={setBillingFrequency}
-        idPrefix="cms"
-      />
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e8e8e8",
+            borderRadius: 12,
+            padding: 16,
+          }}
+        >
+          {mode !== "edit" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: "#444", marginBottom: 6 }}>
+                  Company <span style={{ color: "#cc4444" }}>*</span>
+                </div>
+                <SelectBox
+                  options={companySelectOptions}
+                  value={hasCompanySelected ? selectedCompanyId : null}
+                  onChange={(value) => {
+                    const v = toSingleSelectValue(value);
+                    const next = v ?? "";
+                    setSelectedCompanyId(next);
+                    setPricingData([]);
+                    setExpandedRows({});
+                  }}
+                  placeholder={loadingCompanies ? "Loading companies..." : "Select company"}
+                  isClearable={!isCompanyLocked}
+                  isDisabled={isCompanyLocked || loadingCompanies || submitting}
+                />
+                {isCompanyLocked && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#777" }}>
+                    Company is pre-selected from the subscriptions page.
+                  </div>
+                )}
+                {!isCompanyLocked && resolvingCustomer && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#777" }}>
+                    Preparing customer...
+                  </div>
+                )}
+              </div>
 
-      <PricingConfigurationCard
-        pricingTab={pricingTab as "flat" | "tiered"}
-        onPricingTabChange={(t) => setPricingTab(t)}
-        currency={currency}
-        onCurrencyChange={setCurrency}
-        priceAed={priceAED}
-        onPriceAedChange={setPriceAED}
-        priceUsd={priceUSD}
-        onPriceUsdChange={setPriceUSD}
-        unitCost={unitCost}
-        onUnitCostChange={setUnitCost}
-        marginText={margin}
-        submitting={submitting}
-        idPrefix="cms"
-      />
+              <div>
+                <div style={{ fontSize: 12, color: "#444", marginBottom: 6 }}>
+                  Product <span style={{ color: "#cc4444" }}>*</span>
+                </div>
+                <SelectBox
+                  options={productSelectOptions}
+                  value={null}
+                  onChange={(value) => {
+                    const v = toSingleSelectValue(value);
+                    const id = Number(v);
+                    if (Number.isFinite(id) && id > 0) {
+                      upsertProductRow(id);
+                    }
+                  }}
+                  placeholder={productSelectPlaceholder}
+                  isClearable={false}
+                  isDisabled={loadingProducts || submitting}
+                />
+                {!hasCompanySelected && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#777" }}>
+                    Company is mandatory to submit.
+                  </div>
+                )}
+                {!hasSelectedProducts && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#777" }}>
+                    Please choose at least one product to enable Create.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            {pricingData.length === 0 ? (
+              <div
+                style={{
+                  padding: "14px 12px",
+                  border: "1px dashed #d0d0d0",
+                  borderRadius: 12,
+                  color: "#777",
+                  textAlign: "center",
+                  background: "#fafafa",
+                }}
+              >
+                Select a product to add it here.
+              </div>
+            ) : (
+              <>
+                {mode === "edit"
+                  ? pricingData.map((row, idx) => {
+                const product = products.find((p) => p.id === row.product_id);
+                const name = row?.product?.name ?? product?.name ?? `Product #${row.product_id}`;
+                const description = String(row?.product?.description ?? product?.description ?? "").trim();
+
+
+                return (
+                  <div
+                    key={String(row.product_id)}
+                    style={{
+                      border: "1px solid #e8e8e8",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      marginBottom: 10,
+                      background: "#fff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        background: "#fafafa",
+                        borderBottom: "1px solid #eee",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: "#141414" }}>
+                         {name}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                        {description || "No description"}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: 14 }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                          gap: 12,
+                        }}
+                      >
+                        <Field label="Base price">
+                          <input
+                            type="number"
+                            value={String(row?.product?.base_price ?? 0)}
+                            disabled
+                            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
+                          />
+                        </Field>
+
+                        <Field label="Selling price">
+                          <input
+                            type="number"
+                            value={String(row.selling_price)}
+                            min={0}
+                            onChange={(e) =>
+                              updateRow(row.product_id, {
+                                selling_price: Number(e.target.value),
+                              })
+                            }
+                            disabled={submitting}
+                            style={FIELD_INPUT}
+                          />
+                        </Field>
+
+                        
+
+                        <Field label="Discount">
+                          <SelectBox
+                            options={[{ value: "", label: "No Discount" }]}
+                            value={row.discount_applicability_id ?? ""}
+                            onChange={(value) =>
+                              updateRow(row.product_id, {
+                                discount_applicability_id:
+                                  toSingleSelectValue(value) == null ||
+                                  toSingleSelectValue(value) === ""
+                                    ? null
+                                    : Number(toSingleSelectValue(value)),
+                              })
+                            }
+                            isClearable={false}
+                            isDisabled={submitting}
+                          />
+                        </Field>
+
+                        <Field label="Final price">
+                          <input
+                            type="number"
+                            value={String(row.selling_price)}
+                            disabled={true}
+                            style={{ ...FIELD_INPUT, ...FIELD_INPUT_DISABLED_STYLE }}
+                          />
+                        </Field>
+
+                        <Field label="Status">
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <ToggleSwitch
+                              checked={row.is_active}
+                              disabled={submitting}
+                              onChange={(next) =>
+                                updateRow(row.product_id, { is_active: next })
+                              }
+                              ariaLabel="Toggle status"
+                            />
+                            <span style={{ fontSize: 12, color: "#141414" }}>
+                              {row.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        </Field>
+
+                        <Field label="Current period start date">
+                          <input
+                            type="date"
+                            value={row.renewal_start_date}
+                            onChange={(e) =>
+                              updateRow(row.product_id, (() => {
+                                const nextStart = e.target.value;
+                                const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
+                                  ? nextStart
+                                  : row.renewal_end_date;
+                                return {
+                                  renewal_start_date: nextStart,
+                                  renewal_end_date: nextEnd,
+                                };
+                              })())
+                            }
+                            disabled={submitting}
+                            style={FIELD_INPUT}
+                          />
+                        </Field>
+
+                        <Field label="Current period end date">
+                          <input
+                            type="date"
+                            value={row.renewal_end_date}
+                            min={row.renewal_start_date}
+                            onChange={(e) =>
+                              updateRow(row.product_id, {
+                                renewal_end_date: isIsoDateBefore(
+                                  e.target.value,
+                                  row.renewal_start_date,
+                                )
+                                  ? row.renewal_start_date
+                                  : e.target.value,
+                              })
+                            }
+                            disabled={submitting}
+                            style={FIELD_INPUT}
+                          />
+                        </Field>
+
+                        <Field label="Status badge">
+                          <SelectBox
+                            options={[
+                              { value: "Active", label: "Active" },
+                              { value: "Trial", label: "Trial" },
+                              { value: "In Progress", label: "In Progress" },
+                              { value: "Suspended", label: "Suspended" },
+                              { value: "Inactive", label: "Inactive" },
+                            ]}
+                            value={row.status}
+                            onChange={(value) =>
+                              updateRow(row.product_id, {
+                                status: String(
+                                  toSingleSelectValue(value) ?? "Active",
+                                ) as CustomerProductPricingDataItem["status"],
+                              })
+                            }
+                            isClearable={false}
+                            isDisabled={submitting}
+                          />
+                        </Field>
+
+                        <Field label="Billing cycle">
+                          <SelectBox
+                            options={[
+                              { value: "one time", label: "One Time" },
+                              { value: "monthly", label: "Monthly" },
+                              { value: "quarterly", label: "Quarterly" },
+                              { value: "yearly", label: "Yearly" },
+                            ]}
+                            value={row.billing_cycle}
+                            onChange={(value) =>
+                              updateRow(row.product_id, {
+                                billing_cycle: String(
+                                  toSingleSelectValue(value) ?? "one time",
+                                ) as CustomerProductPricingDataItem["billing_cycle"],
+                              })
+                            }
+                            isClearable={false}
+                            isDisabled={submitting}
+                          />
+                        </Field>
+
+                        <Field label="Subscriptions">
+                          <input
+                            type="number"
+                            min={0}
+                            value={String(row.subscriptions)}
+                            onChange={(e) =>
+                              updateRow(row.product_id, {
+                                subscriptions: Math.max(0, Number(e.target.value)),
+                              })
+                            }
+                            disabled={submitting}
+                            style={FIELD_INPUT}
+                          />
+                        </Field>
+
+                        <Field label="Custom description" fullWidth>
+                          <textarea
+                            value={row.custom_description}
+                            onChange={(e) =>
+                              updateRow(row.product_id, {
+                                custom_description: e.target.value,
+                              })
+                            }
+                            disabled={submitting}
+                            style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
+                            rows={2}
+                            placeholder="Enter custom description"
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+                  : pricingData.map((row, idx) => {
+                const product = products.find((p) => p.id === row.product_id);
+                const expanded = !!expandedRows[row.product_id];
+                const name = product?.name ?? `Product #${row.product_id}`;
+                const description = String(product?.description ?? "").trim();
+
+                return (
+                  <div
+                    key={String(row.product_id)}
+                    style={{
+                      border: "1px solid #e8e8e8",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      marginBottom: 10,
+                      background: "#fff",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "12px 14px",
+                        background: expanded ? "#f7f8fb" : "#fafafa",
+                        cursor: "pointer",
+                        border: "none",
+                        width: "100%",
+                        textAlign: "left",
+                      }}
+                      onClick={() =>
+                        setExpandedRows((prev) => ({
+                          ...prev,
+                          [row.product_id]: !prev[row.product_id],
+                        }))
+                      }
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div style={{ width: 18, textAlign: "center", color: "#666" }}>
+                          {expanded ? "▾" : "▸"}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: "#141414",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 380,
+                            }}
+                          >
+                            {idx + 1}. {name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#666",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 520,
+                              marginTop: 2,
+                            }}
+                          >
+                            {description || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ fontSize: 12, color: "#141414", whiteSpace: "nowrap" }}>
+                          Status: {row.is_active ? "Active" : "Inactive"}
+                        </div>
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div style={{ padding: 14 }}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                            gap: 12,
+                          }}
+                        >
+                          <Field label="Selling price">
+                            <input
+                              type="number"
+                              value={String(row.selling_price)}
+                              min={0}
+                              onChange={(e) =>
+                                updateRow(row.product_id, {
+                                  selling_price: Number(e.target.value),
+                                })
+                              }
+                              disabled={submitting}
+                              style={FIELD_INPUT}
+                            />
+                          </Field>
+
+                          <Field label="Discount">
+                            <SelectBox
+                              options={[{ value: "", label: "No Discount" }]}
+                              value={row.discount_applicability_id ?? ""}
+                              onChange={(value) =>
+                                updateRow(row.product_id, {
+                                  discount_applicability_id:
+                                    toSingleSelectValue(value) == null ||
+                                    toSingleSelectValue(value) === ""
+                                      ? null
+                                      : Number(toSingleSelectValue(value)),
+                                })
+                              }
+                              isClearable={false}
+                              isDisabled={submitting}
+                            />
+                          </Field>
+
+                          <Field label="Status">
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <ToggleSwitch
+                                checked={row.is_active}
+                                disabled={submitting}
+                                onChange={(next) =>
+                                  updateRow(row.product_id, { is_active: next })
+                                }
+                                ariaLabel="Toggle status"
+                              />
+                              <span style={{ fontSize: 12, color: "#141414" }}>
+                                {row.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </Field>
+
+                          <Field label="Current period start date">
+                            <input
+                              type="date"
+                              value={row.renewal_start_date}
+                              onChange={(e) =>
+                                updateRow(row.product_id, (() => {
+                                  const nextStart = e.target.value;
+                                  const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
+                                    ? nextStart
+                                    : row.renewal_end_date;
+                                  return {
+                                    renewal_start_date: nextStart,
+                                    renewal_end_date: nextEnd,
+                                  };
+                                })())
+                              }
+                              disabled={submitting}
+                              style={FIELD_INPUT}
+                            />
+                          </Field>
+
+                          <Field label="Current period end date">
+                            <input
+                              type="date"
+                              value={row.renewal_end_date}
+                              min={row.renewal_start_date}
+                              onChange={(e) =>
+                                updateRow(row.product_id, {
+                                  renewal_end_date: isIsoDateBefore(
+                                    e.target.value,
+                                    row.renewal_start_date,
+                                  )
+                                    ? row.renewal_start_date
+                                    : e.target.value,
+                                })
+                              }
+                              disabled={submitting}
+                              style={FIELD_INPUT}
+                            />
+                          </Field>
+
+                          <Field label="Status badge">
+                            <SelectBox
+                              options={[
+                                { value: "Active", label: "Active" },
+                                { value: "Trial", label: "Trial" },
+                                { value: "In Progress", label: "In Progress" },
+                                { value: "Suspended", label: "Suspended" },
+                                { value: "Inactive", label: "Inactive" },
+                              ]}
+                              value={row.status}
+                              onChange={(value) =>
+                                updateRow(row.product_id, {
+                                  status: String(
+                                    toSingleSelectValue(value) ?? "Active",
+                                  ) as CustomerProductPricingDataItem["status"],
+                                })
+                              }
+                              isClearable={false}
+                              isDisabled={submitting}
+                            />
+                          </Field>
+
+                          <Field label="Billing cycle">
+                            <SelectBox
+                              options={[
+                                { value: "one time", label: "One Time" },
+                                { value: "monthly", label: "Monthly" },
+                                { value: "quarterly", label: "Quarterly" },
+                                { value: "yearly", label: "Yearly" },
+                              ]}
+                              value={row.billing_cycle}
+                              onChange={(value) =>
+                                updateRow(row.product_id, {
+                                  billing_cycle: String(
+                                    toSingleSelectValue(value) ?? "one time",
+                                  ) as CustomerProductPricingDataItem["billing_cycle"],
+                                })
+                              }
+                              isClearable={false}
+                              isDisabled={submitting}
+                            />
+                          </Field>
+
+                          <Field label="Subscriptions">
+                            <input
+                              type="number"
+                              min={0}
+                              value={String(row.subscriptions)}
+                              onChange={(e) =>
+                                updateRow(row.product_id, {
+                                  subscriptions: Math.max(0, Number(e.target.value)),
+                                })
+                              }
+                              disabled={submitting}
+                              style={FIELD_INPUT}
+                            />
+                          </Field>
+
+                          <Field label="Custom description" fullWidth>
+                            <textarea
+                              value={row.custom_description}
+                              onChange={(e) =>
+                                updateRow(row.product_id, {
+                                  custom_description: e.target.value,
+                                })
+                              }
+                              disabled={submitting}
+                              style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
+                              rows={2}
+                              placeholder="Enter custom description"
+                            />
+                          </Field>
+
+                          <Field label="" fullWidth>
+                            <button
+                              type="button"
+                              onClick={() => deleteRow(row.product_id)}
+                              disabled={submitting}
+                              className="btn btn-danger"
+                            >
+                              Remove Product
+                            </button>
+                          </Field>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
         {/* Bottom spacing */}
         <div style={{ height: "40px" }} />

@@ -191,7 +191,7 @@ const BillingManagement = () => {
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [] as Array<{
       id: string;
       field_name: string;
