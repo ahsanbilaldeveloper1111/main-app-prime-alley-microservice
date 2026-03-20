@@ -3,13 +3,10 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import Layout from "@layout/index";
 import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
-import ProspectDetailPage from "@pages/crm/prospects/prospects-detailpage";
-import LeadDetailPage from "@pages/crm/leads/leads-detailpage";
-import DealDetailPage from "@pages/crm/deals/deals-detailpage";
-import OrderDetailPage from "@pages/crm/orders/[id]/order-detailpage";
-import CompanyDetailPage from "@pages/crm/companies/company-detailpage";
-
-type SupportedCrmDetailType = "lead" | "prospect" | "deal" | "order" | "company";
+import type {
+  SupportedCrmDetailType,
+} from "@pages/crm/common/crm-detail-unified";
+import { getCrmDetailPageForType } from "@pages/crm/common/crm-detail-unified";
 
 const getSingleQueryValue = (
   value: unknown
@@ -105,11 +102,7 @@ export default function CrmDetailsPage() {
   }
 
   let SelectedDetailPage: React.ComponentType | null = null;
-  if (recordType === "lead") SelectedDetailPage = LeadDetailPage;
-  else if (recordType === "prospect") SelectedDetailPage = ProspectDetailPage;
-  else if (recordType === "deal") SelectedDetailPage = DealDetailPage;
-  else if (recordType === "order") SelectedDetailPage = OrderDetailPage;
-  else if (recordType === "company") SelectedDetailPage = CompanyDetailPage;
+  if (recordType) SelectedDetailPage = getCrmDetailPageForType(recordType);
 
   if (!SelectedDetailPage) return errorView;
 
