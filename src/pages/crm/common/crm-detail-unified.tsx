@@ -8,23 +8,14 @@ import React, {
 import { useRouter } from "next/router";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Mail,
   ExternalLink,
-  Phone,
-  MoreHorizontal,
-  Calendar,
-  ClipboardList,
   FileText,
   Paperclip,
   ShoppingCart,
   Download as DownloadIcon,
   Upload,
   Trash2,
-  Copy,
   Ticket,
-  ShoppingBag,
 } from "lucide-react";
 import { Modal, Button, Form, Card } from "react-bootstrap";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
@@ -36,8 +27,6 @@ import {
   getOrder,
   getCompany,
   deleteDeal,
-  approveDeal,
-  rejectDeal,
   PDFDownloadDeal,
   downloadDealAttachment,
   getDealAttachments,
@@ -82,10 +71,6 @@ import { exportRecordAsCsv } from "@utils/csvExport";
 import CrmAssociatedRecordsSectionCard from "@components/CrmAssociatedRecordsSectionCard";
 import CrmDealListItemCard from "@components/CrmDealListItemCard";
 import CrmTicketListItemCard from "@components/CrmTicketListItemCard";
-import CrmProfileSection from "@components/CrmProfileSection";
-import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import {
   buildOrderKeyInfoFields,
   buildOrderProfileFields,
@@ -113,6 +98,296 @@ let customFieldIdCounter = 0;
 const createCustomFieldId = () =>
   `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 
+const getCrmStatusColor = (status: unknown): string => {
+  const s = typeof status === "string" ? status : "";
+  if (s === "active") return "#10b981";
+  if (s === "cancelled") return "#ef4444";
+  return "#f59e0b";
+};
+
+const buildDealKeyInfoFields = (params: {
+  deal: DealData | null;
+  extensions: Array<Record<string, unknown>>;
+  formatDealAmount: (d: DealData | null) => string;
+}): KeyInfoField[] => {
+  const { deal, extensions, formatDealAmount } = params;
+
+  return [
+    { label: "Deal Value", value: formatDealAmount(deal), copyable: true },
+    { label: "Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
+    { label: "Probability", value: deal == null ? "--" : `${deal.probability ?? 0}%` },
+    { label: "Expected Close Date", value: formatCrmShortDate(deal?.expected_close_date) },
+    { label: "Company Name", value: deal?.company_name ?? "--" },
+    {
+      label: "Owner",
+      value: (() => {
+        const rawOwner = deal?.assigned_to ?? null;
+        return getCrmExtensionDisplayName(rawOwner, extensions);
+      })(),
+    },
+  ];
+};
+
+const buildDealProfileFields = (deal: DealData | null): ProfileField[] => {
+  const d = deal as any;
+
+  return [
+    {
+      label: "Company name",
+      value:
+        d?.company?.enrichment_data?.structured_data?.official_company_name ??
+        d?.company_name ??
+        "--",
+    },
+    {
+      label: "Street address",
+      value:
+        d?.company?.enrichment_data?.structured_data?.headquarters?.address ??
+        d?.company?.address ??
+        "--",
+    },
+    {
+      label: "City",
+      value:
+        d?.company?.enrichment_data?.structured_data?.headquarters?.city ??
+        d?.company?.city ??
+        "--",
+    },
+    {
+      label: "Postal code",
+      value: d?.company?.postal_code ?? d?.company?.zip ?? "--",
+    },
+    {
+      label: "State/Region",
+      value: d?.company?.state ?? d?.company?.province ?? "--",
+    },
+    {
+      label: "Email",
+      value:
+        d?.company?.enrichment_data?.structured_data?.emails?.[0]?.email ??
+        d?.decision_maker_email ??
+        d?.contact_email ??
+        "--",
+      link: true,
+    },
+  ];
+};
+
+const buildLeadKeyInfoFields = (params: {
+  lead: LeadData | null;
+  primaryContact: { email?: string } | null;
+  formattedPhoneNumber: string;
+  associateName: string;
+  crmDataDetails: Record<string, unknown> | undefined;
+}): KeyInfoField[] => {
+  const { lead, primaryContact, formattedPhoneNumber, associateName, crmDataDetails } = params;
+  const l = lead as any;
+  const d = crmDataDetails ?? {};
+
+  return [
+    {
+      label: "Email",
+      value: (primaryContact?.email ?? (d as any)?.email ?? "--") as string,
+      copyable: true,
+    },
+    { label: "Phone Number", value: formattedPhoneNumber, copyable: true },
+    { label: "Company Name", value: l?.company_name ?? "--" },
+    { label: "Company Domain", value: l?.company_domain ?? "--" },
+    { label: "Lead Status", value: l?.status ?? "--" },
+    {
+      label: "Lifecycle Stage",
+      value: (d as any)?.lifecycle_stage ?? l?.stage?.name ?? "--",
+    },
+    { label: "Owner", value: associateName },
+    { label: "Source", value: (l?.source ?? "--") as string },
+  ];
+};
+
+const buildLeadProfileFields = (params: {
+  lead: LeadData | null;
+  structuredData: Record<string, unknown> | undefined;
+  headquartersData: Record<string, unknown> | undefined;
+  crmDataDetails: Record<string, unknown> | undefined;
+  structuredEmails: Array<{ email?: string }> | undefined;
+  contactPersons: Array<{ email?: string; phone?: string }> | undefined;
+}): ProfileField[] => {
+  const {
+    lead,
+    structuredData,
+    headquartersData,
+    crmDataDetails,
+    structuredEmails,
+    contactPersons,
+  } = params;
+
+  const l = lead as any;
+  const s = structuredData ?? {};
+  const h = headquartersData ?? {};
+  const d = crmDataDetails ?? {};
+
+  return [
+    {
+      label: "Company name",
+      value: (s as any)?.official_company_name ?? l?.company_name ?? "--",
+    },
+    {
+      label: "Street address",
+      value:
+        (h as any)?.address ??
+        (d as any)?.street_address ??
+        l?.campaign_field_values?.street_address ??
+        "--",
+    },
+    {
+      label: "City",
+      value:
+        (h as any)?.city ?? (d as any)?.city ?? l?.campaign_field_values?.city ?? "--",
+    },
+    {
+      label: "Postal code",
+      value: (d as any)?.postal_code ?? l?.campaign_field_values?.postal_code ?? "--",
+    },
+    {
+      label: "State/Region",
+      value: (d as any)?.state ?? l?.campaign_field_values?.state ?? "--",
+    },
+    {
+      label: "Email",
+      value:
+        structuredEmails?.[0]?.email ??
+        contactPersons?.[0]?.email ??
+        (d as any)?.email ??
+        "--",
+      link: true,
+    },
+  ];
+};
+
+const buildProspectKeyInfoFields = (params: {
+  prospect: CrmDataItem | null;
+  firstTicket:
+    | { company_name?: string }
+    | undefined;
+  extensions: Array<Record<string, unknown>>;
+}): KeyInfoField[] => {
+  const { prospect, firstTicket, extensions } = params;
+  const data = prospect?.data as any;
+
+  return [
+    {
+      label: "Email",
+      value: data?.data?.email ?? "--",
+      copyable: true,
+    },
+    {
+      label: "Phone Number",
+      value: data?.phone ?? "--",
+      copyable: true,
+    },
+    {
+      label: "Company Name",
+      value:
+        firstTicket?.company_name ??
+        data?.company_name ??
+        data?.name ??
+        "--",
+    },
+    {
+      label: "Company Domain",
+      value: data?.company_domain ?? "--",
+    },
+    {
+      label: "Owner",
+      value: (() => {
+        const ownerId = data?.user_extension;
+        return getCrmExtensionDisplayName(ownerId, extensions);
+      })(),
+    },
+  ];
+};
+
+const buildProspectProfileFields = (prospect: CrmDataItem | null): ProfileField[] => {
+  const data = prospect?.data as any;
+
+  return [
+    {
+      label: "Company name",
+      value:
+        data?.company?.enrichment_data?.structured_data
+          ?.official_company_name ?? data?.company_name ?? "--",
+    },
+    {
+      label: "Street address",
+      value:
+        data?.company?.enrichment_data?.structured_data?.headquarters?.address ??
+        data?.company?.address ??
+        "--",
+    },
+    {
+      label: "City",
+      value:
+        data?.company?.enrichment_data?.structured_data?.headquarters?.city ??
+        "--",
+    },
+    {
+      label: "Postal code",
+      value: data?.data?.postal_code ?? "--",
+    },
+    {
+      label: "State/Region",
+      value:
+        data?.company?.enrichment_data?.structured_data?.headquarters?.state ??
+        "--",
+    },
+    {
+      label: "Email",
+      value:
+        data?.company?.enrichment_data?.structured_data?.emails?.[0]?.email ??
+        "--",
+      link: true,
+    },
+  ];
+};
+
+const buildCompanyKeyInfoFields = (params: {
+  company: CompanyData | null;
+  primaryPhoneRaw: string;
+  websiteUrl: string | null;
+}): KeyInfoField[] => {
+  const { company, primaryPhoneRaw, websiteUrl } = params;
+  const createdValue = company?.created_at ? formatCrmShortDate(company.created_at) : "--";
+
+  return [
+    { label: "Email", value: company?.email ?? "--", copyable: true },
+    { label: "Phone", value: primaryPhoneRaw || "--", copyable: true },
+    { label: "City", value: company?.city ?? "--" },
+    { label: "Country", value: company?.country ?? "--" },
+    { label: "Industry", value: company?.industry ?? "--" },
+    { label: "Domain", value: company?.domain ?? "--" },
+    { label: "Website", value: websiteUrl ?? "--", copyable: !!websiteUrl },
+    { label: "Created", value: createdValue },
+  ];
+};
+
+const buildCompanyProfileFields = (params: {
+  company: CompanyData | null;
+  primaryPhoneRaw: string;
+  websiteUrl: string | null;
+}): ProfileField[] => {
+  const { company, primaryPhoneRaw, websiteUrl } = params;
+
+  return [
+    { label: "Company name", value: company?.name ?? "--" },
+    { label: "Phone", value: primaryPhoneRaw || "--" },
+    { label: "Email", value: company?.email ?? "--", link: true },
+    { label: "City", value: company?.city ?? "--" },
+    { label: "Country", value: company?.country ?? "--" },
+    { label: "Industry", value: company?.industry ?? "--" },
+    { label: "Domain", value: company?.domain ?? "--" },
+    { label: "Website", value: websiteUrl ?? "--" },
+  ];
+};
+
 const staticTags = [
   { value: "hot-lead", label: "Hot Lead" },
   { value: "cold-lead", label: "Cold Lead" },
@@ -129,6 +404,78 @@ type CrmId = string | number | null | undefined;
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
+
+const renderAssociatedRecordsCard = (params: {
+  sectionId: string;
+  title: string;
+  count: number;
+  collapsedSections: Set<string>;
+  toggleSection: (id: string) => void;
+  items: Array<Record<string, unknown>>;
+  renderItem: (item: Record<string, unknown>) => React.ReactNode;
+  emptyState: React.ReactNode;
+  viewAllLabel?: string;
+  onViewAllClick?: () => void;
+  showAddButton?: boolean;
+}) => {
+  const {
+    sectionId,
+    title,
+    count,
+    collapsedSections,
+    toggleSection,
+    items,
+    renderItem,
+    emptyState,
+    viewAllLabel,
+    onViewAllClick,
+    showAddButton,
+  } = params;
+
+  return (
+    <CrmAssociatedRecordsSectionCard
+      sectionId={sectionId}
+      title={title}
+      count={count}
+      collapsedSections={collapsedSections}
+      toggleSection={toggleSection}
+      items={items}
+      renderItem={renderItem}
+      emptyState={emptyState}
+      viewAllLabel={viewAllLabel}
+      onViewAllClick={onViewAllClick}
+      {...(showAddButton ? { showAddButton: true } : {})}
+    />
+  );
+};
+
+const renderCompanyAssociatedRecordsExtra = (): React.ReactNode => (
+  <div
+    style={{
+      backgroundColor: "#ffffff",
+      borderRadius: "10px",
+      marginBottom: "12px",
+      overflow: "hidden",
+      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+      border: "1px solid #cccccc",
+      padding: "20px",
+    }}
+  >
+    <h3
+      style={{
+        fontSize: "16px",
+        fontWeight: "600",
+        color: "#141414",
+        margin: "0 0 12px 0",
+      }}
+    >
+      Associated records
+    </h3>
+    <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+      Deals and leads linked to this company will appear here when available.
+    </p>
+  </div>
+);
 
 const ProspectDetailPage: NextPageWithLayout = () => {
   const router = useRouter();
@@ -401,85 +748,17 @@ const ProspectDetailPage: NextPageWithLayout = () => {
     | undefined;
 
   const keyInfoFields: KeyInfoField[] = useMemo(
-    () => [
-      {
-        label: "Email",
-        value: (prospect?.data as { data?: { email?: string } })?.data?.email ?? "--",
-        copyable: true,
-      },
-      {
-        label: "Phone Number",
-        value: (prospect?.data as { phone?: string })?.phone ?? "--",
-        copyable: true,
-      },
-      {
-        label: "Company Name",
-        value:
-          firstTicket?.company_name ??
-          (prospect?.data as { company_name?: string })?.company_name ??
-          (prospect?.data as { name?: string })?.name ??
-          "--",
-      },
-      {
-        label: "Company Domain",
-        value: (prospect?.data as { company_domain?: string })?.company_domain ?? "--",
-      },
-      {
-        label: "Owner",
-        value: (() => {
-          const ownerId = (prospect?.data as { user_extension?: number })?.user_extension;
-          return getCrmExtensionDisplayName(ownerId, extensions);
-        })(),
-      },
-    ],
+    () =>
+      buildProspectKeyInfoFields({
+        prospect,
+        firstTicket,
+        extensions,
+      }),
     [prospect, firstTicket, extensions]
   );
 
   const profileFields: ProfileField[] = useMemo(
-    () => [
-      {
-        label: "Company name",
-        value:
-          (prospect?.data as { company?: { enrichment_data?: { structured_data?: { official_company_name?: string } } } })
-            ?.company?.enrichment_data?.structured_data?.official_company_name ??
-          (prospect?.data as { company_name?: string })?.company_name ??
-          "--",
-      },
-      {
-        label: "Street address",
-        value:
-          (prospect?.data as { company?: { enrichment_data?: { structured_data?: { headquarters?: { address?: string } }; headquarters?: { address?: string } } } })
-            ?.company?.enrichment_data?.structured_data?.headquarters?.address ??
-          (prospect?.data as { company?: { address?: string } })?.company?.address ??
-          "--",
-      },
-      {
-        label: "City",
-        value:
-          (prospect?.data as { company?: { enrichment_data?: { structured_data?: { headquarters?: { city?: string } } } } })
-            ?.company?.enrichment_data?.structured_data?.headquarters?.city ??
-          "--",
-      },
-      {
-        label: "Postal code",
-        value: (prospect?.data as { data?: { postal_code?: string } })?.data?.postal_code ?? "--",
-      },
-      {
-        label: "State/Region",
-        value:
-          (prospect?.data as { company?: { enrichment_data?: { structured_data?: { headquarters?: { state?: string } } } } })
-            ?.company?.enrichment_data?.structured_data?.headquarters?.state ??
-          "--",
-      },
-      {
-        label: "Email",
-        value:
-          (prospect?.data as { company?: { enrichment_data?: { structured_data?: { emails?: { email?: string }[] } } } })
-            ?.company?.enrichment_data?.structured_data?.emails?.[0]?.email ??
-          "--",
-        link: true,
-      },
-    ],
+    () => buildProspectProfileFields(prospect),
     [prospect]
   );
 
@@ -738,57 +1017,53 @@ const ProspectDetailPage: NextPageWithLayout = () => {
     },
     renderRightSidebarExtra: ({ collapsedSections, toggleSection }) => (
       <>
-        <CrmAssociatedRecordsSectionCard
-          sectionId="deals"
-          title="Deals"
-          count={allDeals.length}
-          collapsedSections={collapsedSections}
-          toggleSection={toggleSection}
-          items={allDeals as Record<string, unknown>[]}
-          renderItem={(deal) => <CrmDealListItemCard deal={deal} />}
-          emptyState={
+        {renderAssociatedRecordsCard({
+          sectionId: "deals",
+          title: "Deals",
+          count: allDeals.length,
+          collapsedSections,
+          toggleSection,
+          items: allDeals as Record<string, unknown>[],
+          renderItem: (deal) => <CrmDealListItemCard deal={deal} />,
+          emptyState: (
             <div style={{ padding: "32px 20px", textAlign: "center" }}>
               <Ticket size={48} style={{ color: "#cbd5e0", marginBottom: "16px" }} />
               <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>
                 Track the customer requests associated with this record.
               </p>
             </div>
-          }
-          viewAllLabel="View all associated Deals"
-          onViewAllClick={() => {
+          ),
+          viewAllLabel: "View all associated Deals",
+          onViewAllClick: () => {
             const firstDeal = allDeals[0] as Record<string, unknown>;
-            const href = buildCrmDealsDetailpageHref(
-              firstDeal?.id as CrmId
-            );
+            const href = buildCrmDealsDetailpageHref(firstDeal?.id as CrmId);
             window.open(href, "_blank", "noopener,noreferrer");
-          }}
-        />
+          },
+        })}
 
-        <CrmAssociatedRecordsSectionCard
-          sectionId="tickets"
-          title="Leads"
-          count={leads.length}
-          collapsedSections={collapsedSections}
-          toggleSection={toggleSection}
-          items={leads as Record<string, unknown>[]}
-          renderItem={(lead) => <CrmTicketListItemCard lead={lead} />}
-          emptyState={
+        {renderAssociatedRecordsCard({
+          sectionId: "tickets",
+          title: "Leads",
+          count: leads.length,
+          collapsedSections,
+          toggleSection,
+          items: leads as Record<string, unknown>[],
+          renderItem: (lead) => <CrmTicketListItemCard lead={lead} />,
+          emptyState: (
             <div style={{ padding: "32px 20px", textAlign: "center" }}>
               <Ticket size={48} style={{ color: "#cbd5e0", marginBottom: "16px" }} />
               <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>
                 Track the customer requests associated with this record.
               </p>
             </div>
-          }
-          viewAllLabel="View all associated Leads"
-          onViewAllClick={() => {
+          ),
+          viewAllLabel: "View all associated Leads",
+          onViewAllClick: () => {
             const firstLead = leads[0] as Record<string, unknown>;
-            const href = buildCrmLeadsDetailpageHref(
-              firstLead?.id as CrmId
-            );
+            const href = buildCrmLeadsDetailpageHref(firstLead?.id as CrmId);
             window.open(href, "_blank", "noopener,noreferrer");
-          }}
-        />
+          },
+        })}
       </>
     ),
   };
@@ -946,81 +1221,27 @@ const LeadDetailPage: NextPageWithLayout = () => {
   })();
 
   const keyInfoFields: KeyInfoField[] = useMemo(
-    () => [
-      {
-        label: "Email",
-        value:
-          (primaryContact as { email?: string })?.email ??
-          (crmDataDetails?.email as string | undefined) ??
-          "--",
-        copyable: true,
-      },
-      { label: "Phone Number", value: formattedPhoneNumber, copyable: true },
-      { label: "Company Name", value: lead?.company_name ?? "--" },
-      { label: "Company Domain", value: lead?.company_domain ?? "--" },
-      { label: "Lead Status", value: lead?.status ?? "--" },
-      {
-        label: "Lifecycle Stage",
-        value:
-          (crmDataDetails?.lifecycle_stage as string | undefined) ??
-          lead?.stage?.name ??
-          "--",
-      },
-      { label: "Owner", value: associateName },
-      { label: "Source", value: ((lead as unknown as Record<string, unknown>)?.source as string | undefined) ?? "--" },
-    ],
+    () =>
+      buildLeadKeyInfoFields({
+        lead,
+        primaryContact,
+        formattedPhoneNumber,
+        associateName,
+        crmDataDetails,
+      }),
     [lead, primaryContact, formattedPhoneNumber, associateName]
   );
 
   const profileFields: ProfileField[] = useMemo(
-    () => [
-      {
-        label: "Company name",
-        value:
-          (structuredData?.official_company_name as string | undefined) ??
-          lead?.company_name ??
-          "--",
-      },
-      {
-        label: "Street address",
-        value:
-          (headquartersData?.address as string | undefined) ??
-          (crmDataDetails?.street_address as string | undefined) ??
-          lead?.campaign_field_values?.street_address ??
-          "--",
-      },
-      {
-        label: "City",
-        value:
-          (headquartersData?.city as string | undefined) ??
-          (crmDataDetails?.city as string | undefined) ??
-          lead?.campaign_field_values?.city ??
-          "--",
-      },
-      {
-        label: "Postal code",
-        value:
-          (crmDataDetails?.postal_code as string | undefined) ??
-          lead?.campaign_field_values?.postal_code ??
-          "--",
-      },
-      {
-        label: "State/Region",
-        value:
-          (crmDataDetails?.state as string | undefined) ??
-          lead?.campaign_field_values?.state ??
-          "--",
-      },
-      {
-        label: "Email",
-        value:
-          structuredEmails?.[0]?.email ??
-          contactPersons?.[0]?.email ??
-          (crmDataDetails?.email as string | undefined) ??
-          "--",
-        link: true,
-      },
-    ],
+    () =>
+      buildLeadProfileFields({
+        lead,
+        structuredData,
+        headquartersData,
+        crmDataDetails,
+        structuredEmails,
+        contactPersons,
+      }),
     [lead, structuredEmails, contactPersons, crmDataDetails, headquartersData]
   );
 
@@ -1154,25 +1375,27 @@ const LeadDetailPage: NextPageWithLayout = () => {
         />
       ) : null,
     renderRightSidebarExtra: ({ collapsedSections, toggleSection }) => (
-      <CrmAssociatedRecordsSectionCard
-        sectionId="deals"
-        title="Deals"
-        count={dealsCount}
-        collapsedSections={collapsedSections}
-        toggleSection={toggleSection}
-        items={allDeals as Record<string, unknown>[]}
-        showAddButton
-        renderItem={(deal) => <CrmDealListItemCard deal={deal} />}
-        emptyState={<p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>No deals associated.</p>}
-        viewAllLabel="View all associated Deals"
-        onViewAllClick={() => {
+      renderAssociatedRecordsCard({
+        sectionId: "deals",
+        title: "Deals",
+        count: dealsCount,
+        collapsedSections,
+        toggleSection,
+        items: allDeals as Record<string, unknown>[],
+        renderItem: (deal) => <CrmDealListItemCard deal={deal} />,
+        showAddButton: true,
+        emptyState: (
+          <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
+            No deals associated.
+          </p>
+        ),
+        viewAllLabel: "View all associated Deals",
+        onViewAllClick: () => {
           const firstDeal = allDeals[0] as Record<string, unknown>;
-          const href = buildCrmDealsDetailpageHref(
-              firstDeal?.id as CrmId
-          );
+          const href = buildCrmDealsDetailpageHref(firstDeal?.id as CrmId);
           window.open(href, "_blank", "noopener,noreferrer");
-        }}
-      />
+        },
+      })
     ),
   };
 
@@ -1301,18 +1524,6 @@ const DealDetailPage: NextPageWithLayout = () => {
   const canSendWhatsApp = hasPermission(
     HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM
   );
-  const canApproveReject = hasPermission(
-    HEADER_CONSTANTS.PERMISSIONS.APPROVE_REJECT_CRM_DEALS
-  );
-
-  const approvalQuery = router.query.approval;
-  const approvalMode = Array.isArray(approvalQuery)
-    ? approvalQuery[0] === "1" ||
-      approvalQuery[0] === "true" ||
-      approvalQuery[0] === "approval"
-    : approvalQuery === "1" ||
-      approvalQuery === "true" ||
-      approvalQuery === "approval";
 
   const [deal, setDeal] = useState<DealData | null>(null);
   const [dealLoading, setDealLoading] = useState(true);
@@ -1336,14 +1547,6 @@ const DealDetailPage: NextPageWithLayout = () => {
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
-
-  const approvalStatusRaw = (deal as any)?.approval_status ?? (deal as any)?.approvalStatus ?? null;
-  const approvalStatusNormalized =
-    typeof approvalStatusRaw === "string" ? approvalStatusRaw.toLowerCase() : "";
-  const isApprovalPending = approvalMode && approvalStatusNormalized.includes("pending");
-
-  const [isApproving, setIsApproving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -1413,23 +1616,11 @@ const DealDetailPage: NextPageWithLayout = () => {
   };
 
   // Key Information Fields - from deal API
-  const keyInfoFields: KeyInfoField[] = [
-    { label: "Deal Value", value: formatDealAmount(deal), copyable: true },
-    { label: "Stage", value: deal?.stage?.name ?? deal?.status ?? "--" },
-    { label: "Probability", value: deal == null ? "--" : `${deal.probability ?? 0}%` },
-    { label: "Expected Close Date", value: formatCrmShortDate(deal?.expected_close_date) },
-    { label: "Company Name", value: deal?.company_name ?? "--" },
-    {
-      label: "Owner",
-      value: (() => {
-        const rawOwner = deal?.assigned_to ?? null;
-        return getCrmExtensionDisplayName(
-          rawOwner,
-          extensions as Record<string, unknown>[]
-        );
-      })(),
-    },
-  ];
+  const keyInfoFields: KeyInfoField[] = buildDealKeyInfoFields({
+    deal,
+    extensions: extensions as Array<Record<string, unknown>>,
+    formatDealAmount,
+  });
 
   // Normalize deal for CrmActivitiesPanel (include audit_trail so Activity tab shows deal history)
   const dealRecord = deal
@@ -1476,35 +1667,6 @@ const DealDetailPage: NextPageWithLayout = () => {
       setExporting(false);
     }
   }, [dealRecordId]);
-  const handleApproveDeal = useCallback(async () => {
-    if (!dealRecordId || isApproving || isRejecting) return;
-    setIsApproving(true);
-    try {
-      await approveDeal(dealRecordId);
-      toast.success("Deal approved successfully!");
-      const refreshed = await getDeal(dealRecordId);
-      setDeal(refreshed);
-    } catch {
-      toast.error("Failed to approve deal");
-    } finally {
-      setIsApproving(false);
-    }
-  }, [dealRecordId, isApproving, isRejecting]);
-
-  const handleRejectDeal = useCallback(async () => {
-    if (!dealRecordId || isApproving || isRejecting) return;
-    setIsRejecting(true);
-    try {
-      await rejectDeal(dealRecordId);
-      toast.success("Deal rejected successfully!");
-      const refreshed = await getDeal(dealRecordId);
-      setDeal(refreshed);
-    } catch {
-      toast.error("Failed to reject deal");
-    } finally {
-      setIsRejecting(false);
-    }
-  }, [dealRecordId, isApproving, isRejecting]);
 
   const handleDownloadAttachment = useCallback(
     async (attachmentId: number) => {
@@ -1589,6 +1751,113 @@ const DealDetailPage: NextPageWithLayout = () => {
     return `Attachment ${attachment.id}`;
   };
 
+  const renderAttachmentCard = (attachment: any): React.ReactNode => {
+    const backgroundColor = getAttachmentBackgroundColor(attachment.mime_type);
+    const displayName = getAttachmentDisplayName(attachment);
+
+    return (
+      <Card key={attachment.id} className="border shadow-sm">
+        <Card.Body className="p-3">
+          <div className="d-flex align-items-center justify-content-between">
+            <div className="d-flex align-items-center gap-3 flex-grow-1">
+              <div
+                className="rounded d-flex align-items-center justify-content-center"
+                style={{
+                  width: "45px",
+                  height: "45px",
+                  background: backgroundColor,
+                  color: "white",
+                }}
+              >
+                <FileText size={22} />
+              </div>
+              <div className="flex-grow-1">
+                <div className="fw-semibold" style={{ fontSize: "14px" }}>
+                  {displayName}
+                </div>
+                <div style={{ fontSize: "12px", color: "#6c757d" }}>
+                  {attachment.file_size == null
+                    ? null
+                    : formatFileSize(attachment.file_size)}
+                  {attachment.created_at
+                    ? ` • ${formatDateForTable(attachment.created_at)}`
+                    : ""}
+                </div>
+              </div>
+            </div>
+            <div className="d-flex gap-1">
+              <Button
+                variant="link"
+                size="sm"
+                className="p-2 text-primary"
+                title="Download"
+                onClick={() => handleDownloadAttachment(attachment.id)}
+              >
+                <DownloadIcon size={18} />
+              </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-2 text-danger"
+                title="Delete"
+                onClick={() => {
+                  setAttachmentToDelete({
+                    id: attachment.id,
+                    name: getAttachmentDisplayName(attachment),
+                  });
+                  setShowDeleteAttachmentModal(true);
+                }}
+              >
+                <Trash2 size={18} />
+              </Button>
+            </div>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  };
+
+  const renderAttachmentsEmptyState = (): React.ReactNode => (
+    <div className="text-center py-4 text-muted">
+      <Paperclip size={48} className="mb-3 opacity-25" />
+      <div>No attachments yet</div>
+      <small>Upload files using the form above</small>
+    </div>
+  );
+
+  const renderAttachmentUploadPanel = (): React.ReactNode => (
+    <div className="mb-4 p-4 border rounded" style={{ background: "#f8f9fa" }}>
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
+          <small className="text-muted">
+            Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
+          </small>
+        </div>
+      </div>
+      <div className="d-flex gap-2">
+        <Form.Control
+          ref={(input) => setFileInputRef(input as HTMLInputElement)}
+          type="file"
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const files = e.target.files;
+            if (files?.length) handleDealFileUpload(files[0]);
+          }}
+          accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
+          style={{ flex: 1 }}
+          disabled={uploadingFile}
+        />
+        <Button
+          variant="primary"
+          className="d-flex align-items-center gap-2"
+          disabled={uploadingFile}
+        >
+          {uploadingFile ? "Uploading..." : <><Upload size={16} />Upload</>}
+        </Button>
+      </div>
+    </div>
+  );
+
   const handleDealFileUpload = async (file: File) => {
     if (!dealRecordId) return;
     setUploadingFile(true);
@@ -1633,54 +1902,7 @@ const DealDetailPage: NextPageWithLayout = () => {
     setAttachmentToDelete(null);
   }, [attachmentToDelete, handleDeleteDealAttachment]);
 
-  const profileFields: ProfileField[] = [
-    {
-      label: "Company name",
-      value:
-        (deal as any)?.company?.enrichment_data?.structured_data
-          ?.official_company_name ?? deal?.company_name ?? "--",
-    },
-    {
-      label: "Street address",
-      value:
-        (deal as any)?.company?.enrichment_data?.structured_data
-          ?.headquarters?.address ??
-        (deal as any)?.company?.address ??
-        "--",
-    },
-    {
-      label: "City",
-      value:
-        (deal as any)?.company?.enrichment_data?.structured_data
-          ?.headquarters?.city ??
-        (deal as any)?.company?.city ??
-        "--",
-    },
-    {
-      label: "Postal code",
-      value:
-        (deal as any)?.company?.postal_code ??
-        (deal as any)?.company?.zip ??
-        "--",
-    },
-    {
-      label: "State/Region",
-      value:
-        (deal as any)?.company?.state ??
-        (deal as any)?.company?.province ??
-        "--",
-    },
-    {
-      label: "Email",
-      value:
-        (deal as any)?.company?.enrichment_data?.structured_data
-          ?.emails?.[0]?.email ??
-        (deal as any)?.decision_maker_email ??
-        (deal as any)?.contact_email ??
-        "--",
-      link: true,
-    },
-  ];
+  const profileFields: ProfileField[] = buildDealProfileFields(deal);
 
   const detailStaticConfig = getCrmDetailStaticConfig("deal");
 
@@ -2126,41 +2348,7 @@ const DealDetailPage: NextPageWithLayout = () => {
               </Modal.Title>
             </Modal.Header>
             <Modal.Body className="p-4">
-              <div
-                className="mb-4 p-4 border rounded"
-                style={{ background: "#f8f9fa" }}
-              >
-                <div className="d-flex align-items-center justify-content-between mb-3">
-                  <div>
-                    <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
-                    <small className="text-muted">
-                      Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
-                    </small>
-                  </div>
-                </div>
-                <div className="d-flex gap-2">
-                  <Form.Control
-                    ref={(input) =>
-                      setFileInputRef(input as HTMLInputElement)
-                    }
-                    type="file"
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const files = e.target.files;
-                      if (files?.length) handleDealFileUpload(files[0]);
-                    }}
-                    accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
-                    style={{ flex: 1 }}
-                    disabled={uploadingFile}
-                  />
-                  <Button
-                    variant="primary"
-                    className="d-flex align-items-center gap-2"
-                    disabled={uploadingFile}
-                  >
-                    {uploadingFile ? "Uploading..." : <><Upload size={16} />Upload</>}
-                  </Button>
-                </div>
-              </div>
+              {renderAttachmentUploadPanel()}
               <div>
                 <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
                   <FileText size={18} />
@@ -2168,94 +2356,13 @@ const DealDetailPage: NextPageWithLayout = () => {
                 </h6>
                 {!loadingAttachments && attachments.length > 0 && (
                   <div className="d-flex flex-column gap-2 mb-4">
-                    {attachments.map((attachment: any) => {
-                      const backgroundColor = getAttachmentBackgroundColor(
-                        attachment.mime_type
-                      );
-                      const displayName =
-                        getAttachmentDisplayName(attachment);
-                      return (
-                        <Card
-                          key={attachment.id}
-                          className="border shadow-sm"
-                        >
-                          <Card.Body className="p-3">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                                <div
-                                  className="rounded d-flex align-items-center justify-content-center"
-                                  style={{
-                                    width: "45px",
-                                    height: "45px",
-                                    background: backgroundColor,
-                                    color: "white",
-                                  }}
-                                >
-                                  <FileText size={22} />
-                                </div>
-                                <div className="flex-grow-1">
-                                  <div
-                                    className="fw-semibold"
-                                    style={{ fontSize: "14px" }}
-                                  >
-                                    {displayName}
-                                  </div>
-                                  <div style={{ fontSize: "12px", color: "#6c757d" }}>
-                                    {attachment.file_size == null
-                                      ? null
-                                      : formatFileSize(attachment.file_size)}
-                                    {attachment.created_at
-                                      ? ` • ${formatDateForTable(attachment.created_at)}`
-                                      : ""}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-primary"
-                                  title="Download"
-                                  onClick={() =>
-                                    handleDownloadAttachment(
-                                      attachment.id
-                                    )
-                                  }
-                                >
-                                  <DownloadIcon size={18} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    setAttachmentToDelete({
-                                      id: attachment.id,
-                                      name: getAttachmentDisplayName(
-                                        attachment
-                                      ),
-                                    });
-                                    setShowDeleteAttachmentModal(true);
-                                  }}
-                                >
-                                  <Trash2 size={18} />
-                                </Button>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      );
-                    })}
+                    {attachments.map((attachment: any) =>
+                      renderAttachmentCard(attachment)
+                    )}
                   </div>
                 )}
-                {!loadingAttachments && attachments.length === 0 && (
-                  <div className="text-center py-4 text-muted">
-                    <Paperclip size={48} className="mb-3 opacity-25" />
-                    <div>No attachments yet</div>
-                    <small>Upload files using the form above</small>
-                  </div>
-                )}
+                {!loadingAttachments && attachments.length === 0 &&
+                  renderAttachmentsEmptyState()}
               </div>
             </Modal.Body>
             <Modal.Footer className="border-0">
@@ -2581,12 +2688,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
                       width: "8px",
                       height: "8px",
                       borderRadius: "50%",
-                      backgroundColor:
-                        item.status === "active"
-                          ? "#10b981"
-                          : item.status === "cancelled"
-                            ? "#ef4444"
-                            : "#f59e0b",
+                      backgroundColor: getCrmStatusColor(item.status),
                       display: "inline-block",
                     }}
                   />
@@ -2768,73 +2870,69 @@ const OrderDetailPage: NextPageWithLayout = () => {
 
       return (
         <>
-          {relatedDeal && (
-            <CrmAssociatedRecordsSectionCard
-              sectionId="deals"
-              title="Deals"
-              count={1}
-              collapsedSections={collapsedSections}
-              toggleSection={toggleSection}
-              items={dealItems}
-              renderItem={(deal) => (
+          {relatedDeal &&
+            renderAssociatedRecordsCard({
+              sectionId: "deals",
+              title: "Deals",
+              count: 1,
+              collapsedSections,
+              toggleSection,
+              items: dealItems,
+              renderItem: (deal) => (
                 <CrmDealListItemCard deal={deal as Record<string, unknown>} />
-              )}
-              emptyState={
+              ),
+              emptyState: (
                 <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
                   No deals associated.
                 </p>
-              }
-              viewAllLabel="View all associated Deals"
-              onViewAllClick={() => {
-                const href = buildCrmDealsDetailpageHref(
-                  (relatedDeal as any)?.id
-                );
+              ),
+              viewAllLabel: "View all associated Deals",
+              onViewAllClick: () => {
+                const href = buildCrmDealsDetailpageHref((relatedDeal as any)?.id);
                 window.open(href, "_blank", "noopener,noreferrer");
-              }}
-            />
-          )}
+              },
+            })}
 
-          {relatedLead && (
-            <CrmAssociatedRecordsSectionCard
-              sectionId="contacts"
-              title="Contacts"
-              count={1}
-              collapsedSections={collapsedSections}
-              toggleSection={toggleSection}
-              items={contactItems}
-              renderItem={(lead) => (
+          {relatedLead &&
+            renderAssociatedRecordsCard({
+              sectionId: "contacts",
+              title: "Contacts",
+              count: 1,
+              collapsedSections,
+              toggleSection,
+              items: contactItems,
+              renderItem: (lead) => (
                 <CrmTicketListItemCard lead={lead as Record<string, unknown>} />
-              )}
-              emptyState={
+              ),
+              emptyState: (
                 <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
                   No contacts associated.
                 </p>
-              }
-              viewAllLabel="View all associated Contacts"
-              onViewAllClick={() => {
+              ),
+              viewAllLabel: "View all associated Contacts",
+              onViewAllClick: () => {
                 const href = buildCrmLeadsDetailpageHref((relatedLead as any)?.id);
                 window.open(href, "_blank", "noopener,noreferrer");
-              }}
-            />
-          )}
+              },
+            })}
 
-          <CrmAssociatedRecordsSectionCard
-            sectionId="attachments"
-            title="Attachments"
-            count={0}
-            collapsedSections={collapsedSections}
-            toggleSection={toggleSection}
-            items={attachmentsItems}
-            renderItem={() => null}
-            emptyState={
+          {renderAssociatedRecordsCard({
+            sectionId: "attachments",
+            title: "Attachments",
+            count: 0,
+            collapsedSections,
+            toggleSection,
+            items: attachmentsItems,
+            renderItem: (_item) => null,
+            emptyState: (
               <div style={{ padding: "32px 20px", textAlign: "center" }}>
                 <Paperclip size={48} style={{ color: "#cbd5e0", marginBottom: "16px" }} />
                 <p style={{ fontSize: "14px", color: "#718096", margin: 0, lineHeight: "1.6" }}>
                   No attachments yet
                 </p>
               </div>
-            }
-          />
+            ),
+          })}
         </>
       );
     },
@@ -3027,20 +3125,11 @@ const CompanyDetailPage: NextPageWithLayout = () => {
   );
 
   const keyInfoFields: KeyInfoField[] = useMemo(() => {
-    const createdValue = company?.created_at
-      ? formatCrmShortDate(company.created_at)
-      : "--";
-
-    return [
-      { label: "Email", value: company?.email ?? "--", copyable: true },
-      { label: "Phone", value: primaryPhoneRaw || "--", copyable: true },
-      { label: "City", value: company?.city ?? "--" },
-      { label: "Country", value: company?.country ?? "--" },
-      { label: "Industry", value: company?.industry ?? "--" },
-      { label: "Domain", value: company?.domain ?? "--" },
-      { label: "Website", value: websiteUrl ?? "--", copyable: !!websiteUrl },
-      { label: "Created", value: createdValue },
-    ];
+    return buildCompanyKeyInfoFields({
+      company,
+      primaryPhoneRaw,
+      websiteUrl,
+    });
   }, [
     company?.city,
     company?.country,
@@ -3053,16 +3142,12 @@ const CompanyDetailPage: NextPageWithLayout = () => {
   ]);
 
   const profileFields: ProfileField[] = useMemo(
-    () => [
-      { label: "Company name", value: company?.name ?? "--" },
-      { label: "Phone", value: primaryPhoneRaw || "--" },
-      { label: "Email", value: company?.email ?? "--", link: true },
-      { label: "City", value: company?.city ?? "--" },
-      { label: "Country", value: company?.country ?? "--" },
-      { label: "Industry", value: company?.industry ?? "--" },
-      { label: "Domain", value: company?.domain ?? "--" },
-      { label: "Website", value: websiteUrl ?? "--" },
-    ],
+    () =>
+      buildCompanyProfileFields({
+        company,
+        primaryPhoneRaw,
+        websiteUrl,
+      }),
     [
       company?.city,
       company?.country,
@@ -3166,33 +3251,7 @@ const CompanyDetailPage: NextPageWithLayout = () => {
         </div>
       );
     },
-    renderRightSidebarExtra: () => (
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "10px",
-          marginBottom: "12px",
-          overflow: "hidden",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-          border: "1px solid #cccccc",
-          padding: "20px",
-        }}
-      >
-        <h3
-          style={{
-            fontSize: "16px",
-            fontWeight: "600",
-            color: "#141414",
-            margin: "0 0 12px 0",
-          }}
-        >
-          Associated records
-        </h3>
-        <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
-          Deals and leads linked to this company will appear here when available.
-        </p>
-      </div>
-    ),
+    renderRightSidebarExtra: () => renderCompanyAssociatedRecordsExtra(),
     renderEditModal: () =>
       showEditCompanySidebar ? (
         <CreateCompanySidebar
