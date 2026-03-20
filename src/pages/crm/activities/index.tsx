@@ -2232,7 +2232,7 @@ const HistoryPage = () => {
                         );
                       else if (type === "order")
                         router.push(
-                          `/crm/orders/${recordId}/order-detailpage?section=activities`,
+                          `/crm/detailspage?type=order&id=${recordId}&section=activities`,
                         );
                     },
                   },

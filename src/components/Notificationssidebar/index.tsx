@@ -642,7 +642,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             break;
           case 'order':
             if (hasPermission(PERMISSIONS.VIEW_CRM_ORDERS)) {
-              router.push(`/crm/orders/${target_id}/order-detailpage`);
+              router.push(`/crm/detailspage?type=order&id=${target_id}`);
             }
             break;
         }

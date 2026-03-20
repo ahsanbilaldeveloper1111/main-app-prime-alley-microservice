@@ -6418,7 +6418,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         return `/crm/detailspage?type=deal&id=${effectiveId}&section=activities`;
       case "order":
       default:
-        return `/crm/orders/${effectiveId}/order-detailpage?section=activities`;
+        return `/crm/detailspage?type=order&id=${effectiveId}&section=activities`;
     }
   };
 
@@ -6809,7 +6809,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           loading: orderLoading,
           data: orderData as Record<string, unknown> | null,
           detailPath: (id: number) =>
-            `/crm/orders/${id}/order-detailpage?section=activities`,
+            `/crm/detailspage?type=order&id=${id}&section=activities`,
         };
       case "activity":
         return {
@@ -6831,7 +6831,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               case "deal":
                 return `/crm/detailspage?type=deal&id=${id}&section=activities`;
               default:
-                return `/crm/orders/${id}/order-detailpage?section=activities`;
+                return `/crm/detailspage?type=order&id=${id}&section=activities`;
             }
           },
         };
