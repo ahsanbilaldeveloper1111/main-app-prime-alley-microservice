@@ -3,13 +3,13 @@ import { Col, Row } from 'react-bootstrap';
 import '@assets/scss/custom-datatable.scss';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 
-// Types for better type safety
-export interface Column {
+// Types for better type safety (rows must be objects for GenericTable)
+export interface Column<T extends Record<string, unknown> = Record<string, unknown>> {
   key: string;
   name: string;
-  selector: (row: any) => any;
+  selector: (row: T) => unknown;
   sortable?: boolean;
-  cell?: (props: any) => React.ReactNode;
+  cell?: (row: T) => React.ReactNode;
 }
 
 export interface ServerPaginationInfo {
@@ -19,9 +19,9 @@ export interface ServerPaginationInfo {
   perPage: number;
 }
 
-export interface CustomDataTableProps {
-  columns: Column[];
-  data: any[];
+export interface CustomDataTableProps<T extends Record<string, unknown> = Record<string, unknown>> {
+  columns: Column<T>[];
+  data: T[];
   title?: string;
   loading?: boolean;
   pageSizeOptions?: number[];
@@ -33,12 +33,12 @@ export interface CustomDataTableProps {
   className?: string;
   striped?: boolean;
   highlightOnHover?: boolean;
-  onRowClick?: (row: any) => void;
+  onRowClick?: (row: T) => void;
   // Feature flags
   rowClick?: boolean;
   // Row selection
   rowSelection?: boolean;
-  onSelectionChange?: (selectedRows: any[]) => void;
+  onSelectionChange?: (selectedRows: T[]) => void;
   keyField?: string;
   // Server-side pagination props
   serverSide?: boolean;
@@ -60,7 +60,7 @@ export interface CustomDataTableProps {
   pageName?: string;
 }
 
-const CustomDataTable: React.FC<CustomDataTableProps> = ({
+function CustomDataTable<T extends Record<string, unknown> = Record<string, unknown>>({
   columns,
   data,
   title,
@@ -99,7 +99,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   newText = 'New GSM',
   // Page identifier for localStorage
   pageName,
-}) => {
+}: Readonly<CustomDataTableProps<T>>) {
   const domId = useId();
   const lengthControlId = `${domId}-length`;
   const searchControlId = `${domId}-search`;
@@ -124,7 +124,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => columns.map((col) => col.key));
-  const [selectedRows, setSelectedRows] = useState<any[]>([]);
+  const [selectedRows, setSelectedRows] = useState<T[]>([]);
 
   // Keep selected columns valid when incoming columns change and default to all.
   useEffect(() => {
@@ -180,9 +180,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
       // For server-side, return data as-is since filtering is handled by server
       return data;
     }
-    
+
     if (!searchTerm.trim()) return data;
-    
+
     const q = searchTerm.toLowerCase();
     return data.filter((row) =>
       Object.values(row).some((value) =>
@@ -191,16 +191,16 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     );
   }, [data, searchTerm, serverSide]);
 
-  const genericColumns = useMemo<TableColumn<any>[]>(() => {
+  const genericColumns = useMemo(() => {
     return columns.map((col) => ({
       key: col.key,
       label: col.name,
       sortable: col.sortable,
       type: col.cell ? 'custom' : 'text',
-      accessor: col.selector,
-      render: col.cell ? (row: any) => col.cell?.(row) : undefined,
+      accessor: col.selector as (row: T) => unknown,
+      render: col.cell ? (row: T) => col.cell?.(row) : undefined,
       emptyValue: '--',
-    }));
+    })) as TableColumn<T>[];
   }, [columns]);
 
   const clientPagedData = useMemo(() => {
@@ -224,7 +224,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   const handlePageSizeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newPageSize = Number(event.target.value);
     setPageSize(newPageSize);
-    
+
     if (serverSide && onPerPageChange) {
       onPerPageChange(newPageSize);
     }
@@ -232,7 +232,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
 
   const handlePerRowsChange = (newPerPage: number) => {
     setPageSize(newPerPage);
-    
+
     if (serverSide && onPerPageChange) {
       onPerPageChange(newPerPage);
     }
@@ -272,9 +272,6 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
         </Row>
       )} */}
 
-     
-
-      
       <div className={`table-content ${tableStyle}`}>
 
          {/* Controls Section */}
@@ -306,14 +303,14 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
 
 
         {/* Search Control */}
-        
+
         <Col sm={12} md={showPageSizeSelector ? 6 : 12}>
           <div className='d-flex align-items-center justify-content-end gap-2'>
             {/* Search Box */}
             {showSearch && (
               <div>
-                <label className="d-flex align-items-center justify-content-end">
-                  {/* Search: */}
+                <label className="d-flex align-items-center justify-content-end" htmlFor={searchControlId}>
+                  <span className="visually-hidden">{searchPlaceholder}</span>
                   <input
                     id={searchControlId}
                     type="search"
@@ -328,7 +325,6 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
             )}
           </div>
         </Col>
-       
 
 
       </Row>
@@ -341,10 +337,10 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
             {showSearch && (
               <div className="search-container" style={{ flex: '1'}}>
                 <div className="position-relative">
-                  <i className="fas fa-search position-absolute" style={{ 
-                    left: '12px', 
-                    top: '50%', 
-                    transform: 'translateY(-50%)', 
+                  <i className="fas fa-search position-absolute" style={{
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
                     color: '#999',
                     fontSize: '14px',
                     zIndex: 1
@@ -354,6 +350,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                     type="search"
                     className="form-control"
                     placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
                     aria-controls={lengthControlId}
                     onChange={handleSearchChange}
                     value={searchTerm}
@@ -377,6 +374,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
               {/* Filters Button */}
               {onFiltersClick && (
                 <button
+                  type="button"
                   className="btn"
                   onClick={onFiltersClick}
                   style={{
@@ -403,6 +401,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
               {/* Export Button */}
               {onExportClick && (
                 <button
+                  type="button"
                   className="btn"
                   onClick={onExportClick}
                   style={{
@@ -429,6 +428,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
               {/* New GSM Button */}
               {onNewClick && (
                 <button
+                  type="button"
                   className="btn"
                   onClick={onNewClick}
                   style={{
@@ -458,7 +458,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
         </Row>
         )}
 
-        
+
         {/* GenericTable */}
       <GenericTable
         data={clientPagedData}
@@ -512,11 +512,15 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
             // Ignore quota / private mode errors
           }
         }}
-        onRowClick={rowClick && onRowClick ? onRowClick : undefined}
+        onRowClick={
+          rowClick && onRowClick
+            ? (row, _index) => onRowClick(row)
+            : undefined
+        }
       />
       </div>
     </div>
   );
-};
+}
 
-export default CustomDataTable; 
+export default CustomDataTable;
