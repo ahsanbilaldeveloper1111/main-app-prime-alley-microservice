@@ -19,10 +19,116 @@ function normalizeAuditResponse(result: unknown): unknown[] {
   return [];
 }
 
+const DISPLAY_OBJECT_KEYS = [
+  "label",
+  "name",
+  "display_name",
+  "title",
+  "email",
+  "id",
+  "extension_number",
+  "extension",
+  "user_id",
+  "value",
+  "text",
+] as const;
+
+function displayStringFromPlainObject(o: Record<string, unknown>): string {
+  for (const k of DISPLAY_OBJECT_KEYS) {
+    const v = o[k];
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      const s = String(v);
+      if (s !== "") return s;
+    }
+  }
+  if (typeof o.$date === "string" || typeof o.$date === "number") {
+    return scalarToDisplayString(o.$date);
+  }
+  if (o.user != null && typeof o.user === "object" && !Array.isArray(o.user)) {
+    const u = o.user as Record<string, unknown>;
+    const inner = scalarToDisplayString(u.display_name ?? u.name ?? u.email);
+    if (inner !== "") return inner;
+  }
+  return "";
+}
+
+/**
+ * Safe display string for primitives and plain objects (avoids "[object Object]" in UI).
+ * For objects, tries common label/id fields only.
+ */
+function scalarToDisplayString(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((x) => scalarToDisplayString(x))
+      .filter((p) => p !== "")
+      .join(", ");
+  }
+  if (typeof value === "object") {
+    return displayStringFromPlainObject(value as Record<string, unknown>);
+  }
+  return "";
+}
+
+function momentFormatIfValid(value: moment.MomentInput, pattern: string): string | null {
+  const m = moment(value);
+  return m.isValid() ? m.format(pattern) : null;
+}
+
+/** Format audit date/time for display; returns "—" when value is missing or not parseable. */
+function formatAuditTimestampOrDash(value: unknown, pattern: string): string {
+  if (value == null || value === "") return "—";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return moment(value).format(pattern);
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return momentFormatIfValid(value, pattern) ?? "—";
+  }
+  if (typeof value === "string") {
+    return momentFormatIfValid(value, pattern) ?? "—";
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    if ("$date" in o) return formatAuditTimestampOrDash(o.$date, pattern);
+    if (o.date != null) return formatAuditTimestampOrDash(o.date, pattern);
+  }
+  return "—";
+}
+
+/** Format audit date for table cells: empty string if unparseable (so || fallthrough works). */
+function formatAuditTimestampOrEmpty(value: unknown, pattern: string): string {
+  const s = formatAuditTimestampOrDash(value, pattern);
+  return s === "—" ? "" : s;
+}
+
+function hierarchyExtOptionValue(ext: Record<string, unknown>): string {
+  for (const k of ["id", "extension_number", "extension", "user_id"] as const) {
+    const s = scalarToDisplayString(ext[k]);
+    if (s !== "") return s;
+  }
+  return "";
+}
+
+function hierarchyExtOptionLabel(ext: Record<string, unknown>): string {
+  for (const k of ["display_name", "name", "extension_number", "extension", "id"] as const) {
+    const s = scalarToDisplayString(ext[k]);
+    if (s !== "") return s;
+  }
+  return "Unknown";
+}
+
 /** Format value: replace underscores with spaces, capitalize each word (e.g. user_requests → User Requests). */
 function formatLabel(value: unknown): string {
-  if (value == null || value === "") return "—";
-  return String(value)
+  const base = scalarToDisplayString(value);
+  if (base === "") return "—";
+  return base
     .replaceAll("_", " ")
     .replaceAll(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -39,7 +145,14 @@ function changesSummaryColumn(): TableColumn<Record<string, unknown>> {
       if (summary == null || summary.length === 0) return "—";
       const suffix = summary.length === 1 ? "" : "s";
       return (
-        <span title={summary.map((c) => `${c.field}: ${c.type} ${c.new || c.old || ""}`).join("\n")}>
+        <span
+          title={summary
+            .map(
+              (c) =>
+                `${scalarToDisplayString(c.field)}: ${scalarToDisplayString(c.type)} ${scalarToDisplayString(c.new) || scalarToDisplayString(c.old) || ""}`,
+            )
+            .join("\n")}
+        >
           {summary.length} change{suffix}
         </span>
       );
@@ -104,7 +217,9 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) =>
-        (row.formatted_timestamp as string) || (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null) || "—",
+        scalarToDisplayString(row.formatted_timestamp) ||
+        formatAuditTimestampOrEmpty(row.created_at, "MMM D, YYYY HH:mm:ss") ||
+        "—",
       emptyValue: "—",
     },
     {
@@ -113,7 +228,10 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) =>
-        (row.formatted_action as string) || formatLabel(row.action) || (row.action as string) || "—",
+        scalarToDisplayString(row.formatted_action) ||
+        (row.action != null && row.action !== "" ? formatLabel(row.action) : "") ||
+        scalarToDisplayString(row.action) ||
+        "—",
       emptyValue: "—",
     },
     {
@@ -143,7 +261,9 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) =>
-        (row.created_at_formatted as string) || (row.created_at ? moment(String(row.created_at)).format("YYYY-MM-DD HH:mm:ss") : null) || "—",
+        scalarToDisplayString(row.created_at_formatted) ||
+        formatAuditTimestampOrEmpty(row.created_at, "YYYY-MM-DD HH:mm:ss") ||
+        "—",
       emptyValue: "—",
     },
     {
@@ -151,7 +271,8 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "Action",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) => (row.action_display as string) || formatLabel(row.event) || "—",
+      accessor: (row: Record<string, unknown>) =>
+        scalarToDisplayString(row.action_display) || formatLabel(row.event) || "—",
       emptyValue: "—",
     },
     {
@@ -167,7 +288,7 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "Entity Name",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) => (row.entity_name as string) || "—",
+      accessor: (row: Record<string, unknown>) => scalarToDisplayString(row.entity_name) || "—",
       emptyValue: "—",
     },
     {
@@ -177,10 +298,12 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       type: "text",
       accessor: (row: Record<string, unknown>) => {
         const u = row.user_extension;
-        if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+        if (row.user_display != null && row.user_display !== "") {
+          return scalarToDisplayString(row.user_display) || "—";
+        }
         const userObj = toUserLike(u);
         if (userObj) return userObj.display_name || userObj.name || "—";
-        if (u != null && u !== "") return String(u);
+        if (u != null && u !== "") return scalarToDisplayString(u) || "—";
         return "—";
       },
       emptyValue: "—",
@@ -195,7 +318,9 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) =>
-        (row.formatted_timestamp as string) || (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null) || "—",
+        scalarToDisplayString(row.formatted_timestamp) ||
+        formatAuditTimestampOrEmpty(row.created_at, "MMM D, YYYY HH:mm:ss") ||
+        "—",
       emptyValue: "—",
     },
     {
@@ -204,7 +329,10 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) =>
-        (row.formatted_action as string) || formatLabel(row.action) || (row.action as string) || "—",
+        scalarToDisplayString(row.formatted_action) ||
+        (row.action != null && row.action !== "" ? formatLabel(row.action) : "") ||
+        scalarToDisplayString(row.action) ||
+        "—",
       emptyValue: "—",
     },
     {
@@ -212,7 +340,8 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       label: "Resource",
       sortable: true,
       type: "text",
-      accessor: (row: Record<string, unknown>) => formatLabel((row.record_type ?? row.resource_type) as string) || "—",
+      accessor: (row: Record<string, unknown>) =>
+        formatLabel(row.record_type ?? row.resource_type) || "—",
       emptyValue: "—",
     },
     {
@@ -221,15 +350,17 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
       sortable: true,
       type: "text",
       accessor: (row: Record<string, unknown>) => {
-        if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+        if (row.user_display != null && row.user_display !== "") {
+          return scalarToDisplayString(row.user_display) || "—";
+        }
         const uExt = row.user_extension;
         const uExtObj = toUserLike(uExt);
         if (uExtObj) return uExtObj.display_name || uExtObj.name || uExtObj.email || "—";
         const u = row.user_id;
         const uObj = toUserLike(u);
         if (uObj) return uObj.display_name || uObj.name || "—";
-        if (u != null && u !== "") return String(u);
-        if (uExt != null && uExt !== "") return String(uExt);
+        if (u != null && u !== "") return scalarToDisplayString(u) || "—";
+        if (uExt != null && uExt !== "") return scalarToDisplayString(uExt) || "—";
         return "—";
       },
       emptyValue: "—",
@@ -317,13 +448,12 @@ const DEFAULT_SIDEBAR_FIELDS = AUDIT_SIDEBAR_FIELDS_BY_MODULE["Staff management"
 
 type UserLike = { display_name?: string; name?: string; email?: string };
 function asStringOrEmpty(value: unknown): string {
-  if (value == null || value === "") return "";
-  return String(value);
+  return scalarToDisplayString(value);
 }
 
 function valueOrDash(value: unknown): string {
-  if (value == null || value === "") return "—";
-  return String(value);
+  const s = scalarToDisplayString(value);
+  return s === "" ? "—" : s;
 }
 type HierarchyResponse = { extensions?: Array<Record<string, unknown>> };
 
@@ -333,14 +463,16 @@ function toUserLike(value: unknown): UserLike | null {
 }
 
 function userDisplayFromRow(row: Record<string, unknown>): string {
-  if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+  if (row.user_display != null && row.user_display !== "") {
+    return scalarToDisplayString(row.user_display) || "—";
+  }
   const uExt = row.user_extension;
   const uExtObj = toUserLike(uExt);
   if (uExtObj) return uExtObj.display_name || uExtObj.name || uExtObj.email || "—";
-  if (uExt != null && uExt !== "") return String(uExt);
+  if (uExt != null && uExt !== "") return scalarToDisplayString(uExt) || "—";
   const uObj = toUserLike(row.user);
   if (uObj) return uObj.display_name || uObj.email || uObj.name || "—";
-  if (row.user_id != null && row.user_id !== "") return String(row.user_id);
+  if (row.user_id != null && row.user_id !== "") return scalarToDisplayString(row.user_id) || "—";
   return "—";
 }
 
@@ -348,7 +480,7 @@ function companyNameFromRow(row: Record<string, unknown>): string {
   const company = row.company;
   if (company && typeof company === "object" && !Array.isArray(company)) {
     const name = (company as { name?: unknown }).name;
-    if (name != null && name !== "") return String(name);
+    if (name != null && name !== "") return scalarToDisplayString(name) || "—";
   }
   return "—";
 }
@@ -358,37 +490,36 @@ function getSidebarFieldValue(row: Record<string, unknown>, key: string): string
   if (key === "company") return companyNameFromRow(row);
   if (key === "resource_type") return formatLabel(row.record_type ?? row.resource_type);
   if (key === "formatted_timestamp") {
-    const v = row.formatted_timestamp;
-    if (v != null && v !== "") return String(v);
-    if (row.created_at) return moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss");
-    return "—";
+    const v = scalarToDisplayString(row.formatted_timestamp);
+    if (v !== "") return v;
+    return formatAuditTimestampOrDash(row.created_at, "MMM D, YYYY HH:mm:ss");
   }
   if (key === "formatted_action") {
-    const v = row.formatted_action;
-    if (v != null && v !== "") return String(v);
+    const v = scalarToDisplayString(row.formatted_action);
+    if (v !== "") return v;
     const formattedAction = formatLabel(row.action);
     if (formattedAction !== "—") return formattedAction;
-    if (row.action != null && row.action !== "") return String(row.action);
+    if (row.action != null && row.action !== "") return scalarToDisplayString(row.action) || "—";
     return "—";
   }
   if (key === "created_at_formatted") {
-    const v = row.created_at_formatted;
-    if (v != null && v !== "") return String(v);
-    if (row.created_at) return moment(String(row.created_at)).format("YYYY-MM-DD HH:mm:ss");
-    return "—";
+    const v = scalarToDisplayString(row.created_at_formatted);
+    if (v !== "") return v;
+    return formatAuditTimestampOrDash(row.created_at, "YYYY-MM-DD HH:mm:ss");
   }
   if (key === "action_display") {
-    return (row.action_display as string) || formatLabel(row.event) || "—";
+    return scalarToDisplayString(row.action_display) || formatLabel(row.event) || "—";
   }
   if (key === "entity_type") return formatLabel(row.entity_type) || "—";
   if (key === "changes_summary") {
     const summary = row.changes_summary as ChangeItem[] | undefined;
     if (summary == null || summary.length === 0) return "—";
     const suffix = summary.length === 1 ? "" : "s";
-    return `${summary.length} change${suffix}: ${summary.map((c) => c.field).filter(Boolean).join(", ")}`;
+    return `${summary.length} change${suffix}: ${summary.map((c) => scalarToDisplayString(c.field)).filter(Boolean).join(", ")}`;
   }
   const v = row[key];
-  return v != null && v !== "" ? String(v) : "—";
+  if (v == null || v === "") return "—";
+  return scalarToDisplayString(v) || "—";
 }
 
 /** Resolve API param keys for date range from service/module timestamp config. */
@@ -421,7 +552,8 @@ function deriveChangesFromOldNew(
 ): ChangeItem[] {
   const old = oldValues && typeof oldValues === "object" ? oldValues : {};
   const newV = newValues && typeof newValues === "object" ? newValues : {};
-  const format = (v: unknown): string => (v == null || v === "" ? "—" : String(v));
+  const format = (v: unknown): string =>
+    v == null || v === "" ? "—" : scalarToDisplayString(v) || "—";
   const allKeys = new Set([...Object.keys(old), ...Object.keys(newV)]);
   const items: ChangeItem[] = [];
   allKeys.forEach((key) => {
@@ -443,14 +575,16 @@ function deriveChangesFromOldNew(
 /** Normalize CRM changes: object { fieldKey: { old, new } } or array -> ChangeItem[]. */
 function normalizeCrmChanges(changes: unknown): ChangeItem[] {
   if (!changes) return [];
-  const format = (v: unknown): string => (v == null || v === "" ? "—" : String(v));
+  const format = (v: unknown): string =>
+    v == null || v === "" ? "—" : scalarToDisplayString(v) || "—";
   if (Array.isArray(changes)) {
     return changes.map((c) => {
       const obj = c as Record<string, unknown>;
       const fieldValue = valueOrDash(obj.field);
       const fieldKeyValue = valueOrDash(obj.fieldKey) === "—" ? "—" : formatLabel(obj.fieldKey);
       const field = fieldValue === "—" ? fieldKeyValue : fieldValue;
-      const type = valueOrDash(obj.type) === "—" ? "updated" : String(obj.type);
+      const type =
+        valueOrDash(obj.type) === "—" ? "updated" : scalarToDisplayString(obj.type) || "updated";
       return {
         field,
         type,
@@ -502,21 +636,23 @@ const AuditLogsNewPage = () => { // NOSONAR
   { label: "Action",         value: "Perform" },
   {
     label: "Date of change",
-    value: selectedRow.formatted_timestamp as string,
+    value:
+      scalarToDisplayString(selectedRow.formatted_timestamp) ||
+      formatAuditTimestampOrDash(selectedRow.created_at, "MMM D, YYYY HH:mm:ss"),
   },
   {
     label: "Modified by",
     value: "",
     isUser: true,
-    userName: selectedRowUser?.display_name || "Unknown",
-    userEmail: selectedRowUser?.email || "",
+    userName: scalarToDisplayString(selectedRowUser?.display_name) || "Unknown",
+    userEmail: scalarToDisplayString(selectedRowUser?.email) || "",
     sectionBreakAfter: true,
   },
-  { label: "Country",        value: selectedRow.country != null && selectedRow.country !== "" ? String(selectedRow.country) : "—" },
-  { label: "Region",         value: selectedRow.region != null && selectedRow.region !== "" ? String(selectedRow.region) : "—" },
-  { label: "Login Type",     value: selectedRow.login_type != null && selectedRow.login_type !== "" ? String(selectedRow.login_type) : "—" },
-  { label: "User Agent",     value: selectedRow.user_agent != null && selectedRow.user_agent !== "" ? String(selectedRow.user_agent) : "—" },
-  { label: "IP Address",     value: selectedRow.ip_address != null && selectedRow.ip_address !== "" ? String(selectedRow.ip_address) : "—" },
+  { label: "Country",        value: valueOrDash(selectedRow.country) },
+  { label: "Region",         value: valueOrDash(selectedRow.region) },
+  { label: "Login Type",     value: valueOrDash(selectedRow.login_type) },
+  { label: "User Agent",     value: valueOrDash(selectedRow.user_agent) },
+  { label: "IP Address",     value: valueOrDash(selectedRow.ip_address) },
 ] : [];
 
   const visibleAuditModules = useMemo(() => {
@@ -590,9 +726,9 @@ const AuditLogsNewPage = () => { // NOSONAR
         if (cancelled || !data?.extensions || !Array.isArray(data.extensions)) return;
         setAuditUserOptions(
           data.extensions.map((ext) => ({
-            value: String(ext.id ?? ext.extension_number ?? ext.extension ?? ext.user_id ?? ""),
-            label: String(ext.display_name ?? ext.name ?? ext.extension_number ?? ext.extension ?? ext.id ?? "Unknown"),
-          }))
+            value: hierarchyExtOptionValue(ext),
+            label: hierarchyExtOptionLabel(ext),
+          })),
         );
       })
       .catch(() => { if (!cancelled) setAuditUserOptions([]); });
@@ -690,11 +826,20 @@ const AuditLogsNewPage = () => { // NOSONAR
         const userDisplay =
           auditUserOptions.find((o) => String(o.value) === ext)?.label ??
           (userExtObj ? userExtObj.display_name || userExtObj.name : null);
+        const formattedTimestamp =
+          scalarToDisplayString(rowObj.formatted_timestamp) ||
+          formatAuditTimestampOrEmpty(rowObj.created_at, "MMM D, YYYY HH:mm:ss") ||
+          null;
+        const formattedAction =
+          scalarToDisplayString(rowObj.formatted_action) ||
+          (rowObj.action != null && rowObj.action !== "" ? formatLabel(rowObj.action) : "") ||
+          scalarToDisplayString(rowObj.action) ||
+          null;
         return {
           ...rowObj,
           resource_type: rowObj.record_type ?? rowObj.resource_type,
-          formatted_timestamp: rowObj.formatted_timestamp ?? (rowObj.created_at ? moment(String(rowObj.created_at)).format("MMM D, YYYY HH:mm:ss") : null),
-          formatted_action: rowObj.formatted_action ?? (rowObj.action ? formatLabel(rowObj.action) : null) ?? rowObj.action,
+          formatted_timestamp: formattedTimestamp,
+          formatted_action: formattedAction,
           changes_summary: rowObj.changes_summary ?? derived,
           ...(userDisplay != null && userDisplay !== "" ? { user_display: userDisplay } : {}),
         };

@@ -124,7 +124,9 @@ const AddRecords = () => {
 
     // Fetch data on mount and when pagination/filters change
     useEffect(() => {
-      void fetchData();
+      fetchData().catch((err: unknown) => {
+        console.error('Failed to fetch DND records:', err);
+      });
     }, [fetchData]);
 
     const resetCsvSelection = useCallback(() => {
@@ -387,7 +389,9 @@ const AddRecords = () => {
     // Refresh data
     const handleRefresh = () => {
       handleResetFilters();
-      void fetchData();
+      fetchData().catch((err: unknown) => {
+        console.error('Failed to refresh DND records:', err);
+      });
     };
 
     const handleItemsPerPageChange = (value: number) => {
