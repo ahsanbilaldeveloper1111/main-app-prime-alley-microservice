@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Modal, Table, Form, Button, Dropdown } from "react-bootstrap";
+import { Modal, Form, Button, Dropdown } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import GenericTable, { TableColumn, PaginationConfig } from "@components/GenericTable";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
-import { StatsCardData } from "@components/GenericStatsCards";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import AuditLogSidebar, { AuditSidebarField } from "@components/AuditLogSidebar";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
@@ -471,34 +471,6 @@ function normalizeCrmChanges(changes: unknown): ChangeItem[] {
   return [];
 }
 
-function ChangesSummaryTable({ changes }: Readonly<{ changes: ChangeItem[] }>) {
-  if (!changes?.length) {
-    return <span className="text-muted">—</span>;
-  }
-  return (
-    <Table size="sm" bordered className="mb-0 small">
-      <thead>
-        <tr>
-          <th>Field</th>
-          <th>Type</th>
-          <th>New</th>
-          <th>Old</th>
-        </tr>
-      </thead>
-      <tbody>
-        {changes.map((c) => (
-          <tr key={`${c.field ?? "field"}-${c.type ?? "type"}-${c.new ?? ""}-${c.old ?? ""}`}>
-            <td>{c.field ?? "—"}</td>
-            <td>{c.type ?? "—"}</td>
-            <td className="text-break">{c.new ?? "—"}</td>
-            <td className="text-break">{c.old ?? "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  );
-}
-
 const AuditLogsNewPage = () => { // NOSONAR
   const { data: session } = useSession();
   const [selectedAuditModule, setSelectedAuditModule] = useState<AuditFilterNode | null>(null);
@@ -595,7 +567,7 @@ const AuditLogsNewPage = () => { // NOSONAR
       title: formatLabel(key),
       value: Number(s[key]),
     }));
-  }, [auditLogsSummary, auditLogsData?.length, auditTotal]);
+  }, [auditLogsSummary]);
 
   useEffect(() => {
     const moduleSlug =
@@ -806,6 +778,7 @@ const AuditLogsNewPage = () => { // NOSONAR
               <div className="d-flex align-items-center gap-2 flex-wrap">
                 {visibleAuditModules.map((module: AuditFilterNode) => (
                   <button
+                    type="button"
                     key={module.moduleName}
                     className={`gt-filter-pill${selectedAuditModule?.moduleName === module.moduleName ? " gt-filter-pill-active" : ""}`}
                     onClick={() => handleAuditModuleChange(module.moduleName)}
@@ -824,9 +797,17 @@ const AuditLogsNewPage = () => { // NOSONAR
                       {selectedAuditService ? selectedAuditService.serviceName : "Select Resources"}
                     </Dropdown.Toggle>
                     <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
-                      <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
-                        <Form.Control size="sm" type="text" placeholder="Search..." value={serviceSearch}
-                          onChange={(e) => setServiceSearch(e.target.value)} autoFocus />
+                      <div className="px-2 pb-2">
+                        <Form.Control
+                          size="sm"
+                          type="search"
+                          placeholder="Search..."
+                          value={serviceSearch}
+                          onChange={(e) => setServiceSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
                       </div>
                       {visibleAuditServices
                         .filter((s: AuditFilterService) => s.serviceName.toLowerCase().includes(serviceSearch.toLowerCase()))
@@ -845,9 +826,17 @@ const AuditLogsNewPage = () => { // NOSONAR
                       {selectedAuditAction || "Select Action"}
                     </Dropdown.Toggle>
                     <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
-                      <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
-                        <Form.Control size="sm" type="text" placeholder="Search..." value={actionSearch}
-                          onChange={(e) => setActionSearch(e.target.value)} autoFocus />
+                      <div className="px-2 pb-2">
+                        <Form.Control
+                          size="sm"
+                          type="search"
+                          placeholder="Search..."
+                          value={actionSearch}
+                          onChange={(e) => setActionSearch(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
                       </div>
                       <Dropdown.Item onClick={() => { setSelectedAuditAction(""); setActionSearch(""); }}>All</Dropdown.Item>
                       {actionOptions
@@ -884,9 +873,17 @@ const AuditLogsNewPage = () => { // NOSONAR
                           : "Select User"}
                       </Dropdown.Toggle>
                       <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
-                        <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
-                          <Form.Control size="sm" type="text" placeholder="Search..." value={userSearch}
-                            onChange={(e) => setUserSearch(e.target.value)} autoFocus />
+                        <div className="px-2 pb-2">
+                          <Form.Control
+                            size="sm"
+                            type="search"
+                            placeholder="Search..."
+                            value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
                         </div>
                         <Dropdown.Item onClick={() => { setSelectedAuditUser(""); setUserSearch(""); }}>All users</Dropdown.Item>
                         {auditUserOptions
@@ -902,6 +899,10 @@ const AuditLogsNewPage = () => { // NOSONAR
                 </div>
               )}
             </div>
+          )}
+
+          {auditLogsStatsCards.length > 0 && (
+            <StatsCards data={auditLogsStatsCards} gridMinWidth="160px" valueFontSize="28px" />
           )}
 
           <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>

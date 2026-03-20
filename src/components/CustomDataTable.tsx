@@ -104,12 +104,28 @@ function CustomDataTable<T extends Record<string, unknown> = Record<string, unkn
   const lengthControlId = `${domId}-length`;
   const searchControlId = `${domId}-search`;
 
-  // Helper function to convert title to a valid localStorage key
+  // Build a safe localStorage key without regex (avoids ReDoS / Sonar S5852 on user-facing titles).
   const titleToKey = (titleStr: string | undefined): string => {
     if (!titleStr) return 'default';
-    let key = titleStr.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'); // Replace non-alphanumeric with hyphens
-    // Remove leading and trailing hyphens
-    key = key.replace(/^-+/, '').replace(/-+$/, '');
+    const lower = titleStr.toLowerCase();
+    const segments: string[] = [];
+    let buf = '';
+    const flush = () => {
+      if (buf.length > 0) {
+        segments.push(buf);
+        buf = '';
+      }
+    };
+    for (const ch of lower) {
+      const cp = ch.codePointAt(0);
+      if (cp === undefined) continue;
+      const isAlnum =
+        (cp >= 48 && cp <= 57) || (cp >= 97 && cp <= 122);
+      if (isAlnum) buf += ch;
+      else flush();
+    }
+    flush();
+    const key = segments.join('-');
     return key || 'default';
   };
 
