@@ -1,14 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Col, Row, Dropdown } from 'react-bootstrap';
-import dynamic from 'next/dynamic';
-import { Tooltip } from 'react-tooltip';
+import React, { useState, useMemo, useEffect, useId } from 'react';
+import { Col, Row } from 'react-bootstrap';
 import '@assets/scss/custom-datatable.scss';
-import { Layers } from 'lucide-react';
-
-// Dynamic import for DataTable to avoid SSR issues
-const DataTable = dynamic(() => import("react-data-table-component"), {
-  ssr: false
-});
+import GenericTable, { TableColumn } from '@components/GenericTable';
 
 // Types for better type safety
 export interface Column {
@@ -40,13 +33,9 @@ export interface CustomDataTableProps {
   className?: string;
   striped?: boolean;
   highlightOnHover?: boolean;
-  pointerOnHover?: boolean;
-  paginationComponentOptions?: any;
-  conditionalRowStyles?: any[];
   onRowClick?: (row: any) => void;
   // Feature flags
   rowClick?: boolean;
-  showCanvas?: boolean;
   // Row selection
   rowSelection?: boolean;
   onSelectionChange?: (selectedRows: any[]) => void;
@@ -67,7 +56,6 @@ export interface CustomDataTableProps {
   filtersText?: string;
   exportText?: string;
   newText?: string;
-  noTableHead?: boolean;
   // Page identifier for localStorage (if not provided, will use title)
   pageName?: string;
 }
@@ -87,25 +75,9 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   striped = true,
   highlightOnHover = true,
   tableStyle = 'table-style-1',
-  pointerOnHover = true,
-  noTableHead = false,
-  paginationComponentOptions = {
-    rowsPerPageText: "Data per page",
-    rangeSeparatorText: "of",
-    selectAllRowsItem: false
-  },
-  conditionalRowStyles = [
-    {
-      when: () => true,
-      style: {
-        animation: 'fadeInUp 0.9s ease-in-out',
-      },
-    },
-  ],
   onRowClick,
   // Feature flags
   rowClick = false,
-  showCanvas = false,
   // Row selection
   rowSelection = false,
   onSelectionChange,
@@ -115,7 +87,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   onPageChange,
   onPerPageChange,
   onSearch,
-  pagination=true,
+  pagination = true,
   keyField = "id",
   clearSelectedRows = false,
   // Style-2 specific props
@@ -126,14 +98,18 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   exportText = 'Export',
   newText = 'New GSM',
   // Page identifier for localStorage
-  pageName
+  pageName,
 }) => {
+  const domId = useId();
+  const lengthControlId = `${domId}-length`;
+  const searchControlId = `${domId}-search`;
+
   // Helper function to convert title to a valid localStorage key
   const titleToKey = (titleStr: string | undefined): string => {
     if (!titleStr) return 'default';
     let key = titleStr.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'); // Replace non-alphanumeric with hyphens
     // Remove leading and trailing hyphens
-    key = key.replace(/^(\-+)/, '').replace(/(\-+)$/, '');
+    key = key.replace(/^-+/, '').replace(/-+$/, '');
     return key || 'default';
   };
 
@@ -143,65 +119,38 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     return `datatable-columns-${key}`;
   };
 
-  const loadColumnVisibility = (): string[] => {
-    try {
-      if (globalThis.window?.localStorage) {
-        const stored = globalThis.window.localStorage.getItem(getStorageKey());
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          // Validate that all stored columns still exist in current columns
-          const validColumns = parsed.filter((key: string) => 
-            columns.some(col => col.key === key)
-          );
-          // If we have valid columns, use them; otherwise return all columns
-          if (validColumns.length > 0) {
-            return validColumns;
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading column visibility from localStorage:', error);
-    }
-    
-    // Default: return all columns
-    return columns.map(col => col.key);
-  };
-
-  const saveColumnVisibility = (visibleCols: string[]) => {
-    try {
-      if (globalThis.window?.localStorage) {
-        globalThis.window.localStorage.setItem(getStorageKey(), JSON.stringify(visibleCols));
-      }
-    } catch (error) {
-      console.error('Error saving column visibility to localStorage:', error);
-    }
-  };
-
   // State management
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => loadColumnVisibility());
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => columns.map((col) => col.key));
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
 
-  // Update localStorage whenever visibleColumns changes
+  // Keep selected columns valid when incoming columns change and default to all.
   useEffect(() => {
-    saveColumnVisibility(visibleColumns);
-  }, [visibleColumns]);
+    const allColumnKeys = columns.map((col) => col.key);
 
-  // Update visibleColumns when columns prop changes (e.g., new columns added)
-  useEffect(() => {
-    const currentVisible = loadColumnVisibility();
-    // Ensure all current visible columns still exist
-    const validVisible = currentVisible.filter(key => 
-      columns.some(col => col.key === key)
-    );
-    // If no valid columns or columns changed significantly, reset to all
-    if (validVisible.length === 0 || validVisible.length < columns.length * 0.5) {
-      setVisibleColumns(columns.map(col => col.key));
-    } else {
-      setVisibleColumns(validVisible);
+    try {
+      const storedRaw = globalThis.window?.localStorage?.getItem(getStorageKey());
+      if (storedRaw) {
+        const parsed: unknown = JSON.parse(storedRaw);
+        if (!Array.isArray(parsed)) {
+          setSelectedColumns(allColumnKeys);
+          return;
+        }
+        const stored = parsed.filter((key): key is string => typeof key === 'string');
+        const validStored = stored.filter((key) => allColumnKeys.includes(key));
+        const missingColumns = allColumnKeys.filter((key) => !validStored.includes(key));
+        const merged = [...validStored, ...missingColumns];
+        setSelectedColumns(merged.length > 0 ? merged : allColumnKeys);
+        return;
+      }
+    } catch {
+      // Ignore corrupt or unavailable localStorage (private mode, quota, etc.)
     }
-  }, [columns.length]); // Only re-run when number of columns changes
+
+    setSelectedColumns(allColumnKeys);
+  }, [columns, pageName, title]);
 
   // Sync pageSize with server-side prop
   useEffect(() => {
@@ -209,6 +158,18 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
       setPageSize(paginationInfo.perPage);
     }
   }, [serverSide, paginationInfo?.perPage]);
+
+  // Keep client pagination at first page whenever filter or page size changes.
+  useEffect(() => {
+    if (!serverSide) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, pageSize, serverSide]);
+
+  useEffect(() => {
+    if (!rowSelection || !clearSelectedRows) return;
+    setSelectedRows([]);
+  }, [clearSelectedRows, rowSelection]);
 
   // Get the current page size - always use paginationInfo.perPage for server-side
   const currentPageSize = serverSide ? (paginationInfo?.perPage || defaultPageSize) : pageSize;
@@ -222,19 +183,42 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     
     if (!searchTerm.trim()) return data;
     
+    const q = searchTerm.toLowerCase();
     return data.filter((row) =>
-      Object.values(row).some(
-        (value) =>
-          value &&
-          value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      Object.values(row).some((value) =>
+        (value?.toString() ?? '').toLowerCase().includes(q),
+      ),
     );
   }, [data, searchTerm, serverSide]);
 
-  // Visible columns data
-  const visibleColumnsData = useMemo(() => {
-    return columns.filter(col => visibleColumns.includes(col.key));
-  }, [columns, visibleColumns]);
+  const genericColumns = useMemo<TableColumn<any>[]>(() => {
+    return columns.map((col) => ({
+      key: col.key,
+      label: col.name,
+      sortable: col.sortable,
+      type: col.cell ? 'custom' : 'text',
+      accessor: col.selector,
+      render: col.cell ? (row: any) => col.cell?.(row) : undefined,
+      emptyValue: '--',
+    }));
+  }, [columns]);
+
+  const clientPagedData = useMemo(() => {
+    if (serverSide || !pagination) return filteredData;
+    const start = (currentPage - 1) * currentPageSize;
+    return filteredData.slice(start, start + currentPageSize);
+  }, [serverSide, pagination, filteredData, currentPage, currentPageSize]);
+
+  const tablePagination = useMemo(() => {
+    if (!pagination) return undefined;
+
+    return {
+      currentPage: serverSide ? (paginationInfo?.currentPage || 1) : currentPage,
+      rowsPerPage: currentPageSize,
+      totalRows: serverSide ? (paginationInfo?.totalRows || 0) : filteredData.length,
+      pageSizeOptions,
+    };
+  }, [pagination, serverSide, paginationInfo?.currentPage, paginationInfo?.totalRows, currentPage, currentPageSize, filteredData.length, pageSizeOptions]);
 
   // Event handlers
   const handlePageSizeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -252,37 +236,19 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     if (serverSide && onPerPageChange) {
       onPerPageChange(newPerPage);
     }
+    if (!serverSide) {
+      setCurrentPage(1);
+    }
   };
 
   const handlePageChange = (page: number) => {
     if (serverSide && onPageChange) {
       onPageChange(page);
+      return;
     }
-  };
 
-  const toggleColumnVisibility = (columnKey: string) => {
-    setVisibleColumns(prev => {
-      const newVisible = prev.includes(columnKey)
-        ? prev.filter(key => key !== columnKey)
-        : [...prev, columnKey];
-      // Ensure at least one column is visible
-      if (newVisible.length === 0 && columns.length > 0) {
-        return [columns[0].key];
-      }
-      return newVisible;
-    });
-  };
-
-  const showAllColumns = () => {
-    const allColumns = columns.map(col => col.key);
-    setVisibleColumns(allColumns);
-  };
-
-  const hideAllColumns = () => {
-    // Keep at least the first column visible
-    const firstColumn = columns[0]?.key;
-    if (firstColumn) {
-      setVisibleColumns([firstColumn]);
+    if (!serverSide) {
+      setCurrentPage(page);
     }
   };
 
@@ -291,13 +257,8 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
     onSearch?.(e.target.value);
   };
 
-  const handleRowSelectionChange = (selected: { allSelected: boolean; selectedCount: number; selectedRows: unknown[] }) => {
-    setSelectedRows(selected.selectedRows);
-    onSelectionChange?.(selected.selectedRows);
-  };
-
   return (
-    <div className={`custom-datatable ${tableStyle}`}>
+    <div className={`custom-datatable ${tableStyle} ${className}`.trim()}>
       {/* Title Section
       {title && (
         <Row className="mb-3">
@@ -321,10 +282,11 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
         {/* Page Size Selector */}
         {showPageSizeSelector  && (
           <Col sm={12} md={6}>
-            <div className="dataTables_length" id="dom-jqry_length">
-              <label className="d-flex align-items-center">
+            <div className="dataTables_length" id={lengthControlId}>
+              <label className="d-flex align-items-center" htmlFor={`${lengthControlId}-select`}>
                 Show{" "}
                 <select
+                  id={`${lengthControlId}-select`}
                   onChange={handlePageSizeChange}
                   className="form-select form-select-sm mx-1"
                   style={{ width: "auto" }}
@@ -343,7 +305,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
         )}
 
 
-        {/* Search and Column Controls */}
+        {/* Search Control */}
         
         <Col sm={12} md={showPageSizeSelector ? 6 : 12}>
           <div className='d-flex align-items-center justify-content-end gap-2'>
@@ -353,58 +315,15 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                 <label className="d-flex align-items-center justify-content-end">
                   {/* Search: */}
                   <input
+                    id={searchControlId}
                     type="search"
                     className="form-control form-control-sm ms-1"
                     placeholder={searchPlaceholder}
-                    aria-controls="dom-jqry"
+                    aria-controls={lengthControlId}
                     onChange={handleSearchChange}
                     value={searchTerm}
                   />
                 </label>
-              </div>
-            )}
-
-            {/* Column Visibility Controls */}
-            {showColumnVisibility && (
-              <div className="d-flex align-items-center justify-content-end">
-                <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" size="sm">
-                  <Layers size={14} className="me-1" />
-                  Customize Columns 
-                  {/* ({visibleColumns.length}/{columns.length}) */}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Header>Select Columns to Show</Dropdown.Header>
-                    <Dropdown.Divider />
-                    {columns.map((column) => (
-                      <div key={column.key} className="px-3 py-1">
-                        <div className="form-check">
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={visibleColumns.includes(column.key)}
-                            onChange={() => toggleColumnVisibility(column.key)}
-                            id={`column-${column.key}`}
-                          />
-                          <label
-                            className="form-check-label"
-                            htmlFor={`column-${column.key}`}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            {column.name}
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                    <Dropdown.Divider />
-                    <Dropdown.Item onClick={showAllColumns}>
-                      Select All
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setVisibleColumns(columns.map(col => col.key))}>
-                      Reset to Default
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
               </div>
             )}
           </div>
@@ -415,6 +334,7 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
       </Row>
 
       {tableStyle === 'table-style-2222' && (
+        <Row className="mb-3 g-0">
         <Col sm={12} md={12}>
           <div className='d-flex align-items-center justify-content-between w-100' style={{ gap: '12px' }}>
             {/* Search Box - Left Side */}
@@ -430,10 +350,11 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                     zIndex: 1
                   }}></i>
                   <input
+                    id={`${searchControlId}-alt`}
                     type="search"
                     className="form-control"
                     placeholder={searchPlaceholder}
-                    aria-controls="dom-jqry"
+                    aria-controls={lengthControlId}
                     onChange={handleSearchChange}
                     value={searchTerm}
                     style={{
@@ -531,104 +452,69 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                 </button>
               )}
 
-              {/* Column Visibility Controls */}
-              {showColumnVisibility && (
-                <div className="d-flex align-items-center">
-                  <Dropdown>
-                    <Dropdown.Toggle variant="outline-secondary" size="sm" style={{ 
-                      height: '36px', 
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      padding: '6px 12px'
-                    }}>
-                      <i className="fas fa-cog me-1"></i>
-                      Customize ({visibleColumns.length}/{columns.length})
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu>
-                      <Dropdown.Header>Select Columns to Show</Dropdown.Header>
-                      <Dropdown.Divider />
-                      {columns.map((column) => (
-                        <div key={column.key} className="px-3 py-1">
-                          <div className="form-check">
-                            <input
-                              type="checkbox"
-                              className="form-check-input"
-                              checked={visibleColumns.includes(column.key)}
-                              onChange={() => toggleColumnVisibility(column.key)}
-                              id={`column-${column.key}`}
-                            />
-                            <label
-                              className="form-check-label"
-                              htmlFor={`column-${column.key}`}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              {column.name}
-                            </label>
-                          </div>
-                        </div>
-                      ))}
-                      <Dropdown.Divider />
-                      <Dropdown.Item onClick={showAllColumns}>
-                        Select All
-                      </Dropdown.Item>
-                      <Dropdown.Item onClick={() => setVisibleColumns(columns.map(col => col.key))}>
-                        Reset to Default
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                </div>
-              )}
             </div>
           </div>
         </Col>
+        </Row>
         )}
 
         
-        {/* DataTable */}
-      {visibleColumnsData.length > 0 ? (
-        <DataTable
-          key={`datatable-${currentPageSize}-${visibleColumns.length}-${serverSide ? 'server' : 'client'}`}
-          striped={striped}
-          columns={visibleColumnsData}
-          data={filteredData}
-          paginationComponentOptions={paginationComponentOptions}
-          pagination={pagination}
-          paginationPerPage={currentPageSize}
-          paginationRowsPerPageOptions={pageSizeOptions}
-          onChangeRowsPerPage={handlePerRowsChange}
-          onChangePage={handlePageChange}
-          highlightOnHover={highlightOnHover}
-          pointerOnHover={rowClick ? true : pointerOnHover}
-          conditionalRowStyles={conditionalRowStyles}
-          className={className}
-          progressPending={loading}
-          onRowClicked={rowClick && onRowClick ? onRowClick : undefined}
-          paginationTotalRows={serverSide ? paginationInfo?.totalRows : undefined}
-          paginationServer={serverSide}
-          selectableRows={rowSelection}
-          onSelectedRowsChange={handleRowSelectionChange}
-          clearSelectedRows={clearSelectedRows}
-          keyField={keyField}
-          noTableHead={noTableHead}
-          selectableRowsComponentProps={{ 
-            style: { 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'center',
-              width: '100%'
-            } 
-          }}
-        />
-      ) : (
-        <div className="text-center p-4 border rounded">
-          <p className="mb-0">
-            No columns selected. Please select at least one column to display the table.
-          </p>
-        </div>
-      )}
-      </div>
+        {/* GenericTable */}
+      <GenericTable
+        data={clientPagedData}
+        columns={genericColumns}
+        loading={loading}
+        emptyMessage="No data available"
+        hover={highlightOnHover}
+        striped={striped}
+        selectable={rowSelection}
+        selectedRows={selectedRows}
+        onSelectionChange={(rows) => {
+          setSelectedRows(rows);
+          onSelectionChange?.(rows);
+        }}
+        uniqueKey={keyField}
+        showActions={false}
+        actions={[]}
+        showToolbar={false}
+        noBorder={false}
+        pagination={tablePagination}
+        onPaginationChange={(page, rowsPerPage) => {
+          if (rowsPerPage !== currentPageSize) {
+            handlePerRowsChange(rowsPerPage);
+            if (serverSide) {
+              onPageChange?.(1);
+            }
+            return;
+          }
+          handlePageChange(page);
+        }}
+        customizableColumns={showColumnVisibility}
+        selectedColumns={selectedColumns}
+        defaultSelectedColumns={columns.map((col) => col.key)}
+        columnStorageKey={getStorageKey()}
+        onColumnChange={(updatedColumns) => {
+          const allColumnKeys = columns.map((col) => col.key);
+          const validColumns = updatedColumns.filter((key) =>
+            allColumnKeys.includes(key),
+          );
+          const fallbackColumns = validColumns.length > 0
+            ? validColumns
+            : allColumnKeys;
 
-      <Tooltip id="my-tooltip" />
+          setSelectedColumns(fallbackColumns);
+          try {
+            globalThis.window?.localStorage?.setItem(
+              getStorageKey(),
+              JSON.stringify(fallbackColumns),
+            );
+          } catch {
+            // Ignore quota / private mode errors
+          }
+        }}
+        onRowClick={rowClick && onRowClick ? onRowClick : undefined}
+      />
+      </div>
     </div>
   );
 };

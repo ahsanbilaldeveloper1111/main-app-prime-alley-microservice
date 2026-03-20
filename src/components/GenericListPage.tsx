@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CustomDataTable, { Column, ServerPaginationInfo } from '@components/CustomDataTable';
 import SimpleCanvas from '@components/SimpleCanvas';
-import { Card } from 'react-bootstrap';
 
 interface GenericListPageProps {
     columns: Column[];
@@ -30,7 +29,6 @@ interface GenericListPageProps {
     filtersText?: string;
     exportText?: string;
     newText?: string;
-    noTableHead?: boolean;
     pageName?: string;
 }
 
@@ -44,7 +42,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     filters = {},
     refreshKey = 0,
     search = true,
-    pagination=true,
+    pagination = true,
     // Feature flags
     rowClick = false,
     showCanvas = false,
@@ -61,8 +59,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     filtersText,
     exportText,
     newText,
-    noTableHead = false,
-   
+    pageName,
 
 }) => {
     const [data, setData] = useState<any[]>([]);
@@ -78,14 +75,13 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     // Canvas state
     const [canvasVisible, setCanvasVisible] = useState<boolean>(false);
     const [selectedRowData, setSelectedRowData] = useState<any>(null);
-    //console.log("ZEZEZE", selectedRowData);
     const fetchAndSetData = useCallback(async (page = 1, perPage = defaultPageSize, search = '') => {
         setLoading(true);
         try {
             const response = await fetchData(page, perPage, search);
             
             // Handle the response structure where pagination data is directly in the response
-            if (response && response.data) {
+            if (response?.data) {
                 setData(response.data || []);
                 setPaginationInfo({
                     totalRows: response.total || 0,
@@ -103,7 +99,6 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                     currentPage: response?.meta?.current_page || 1,
                     perPage,
                 });
-                //console.log('paginationInfo fallback:', paginationInfo);
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -176,7 +171,6 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                             onRowClick={rowClick || showCanvas ? handleRowClickWithCanvas : onRowClick}
                             // Feature flags
                             rowClick={rowClick}
-                            showCanvas={showCanvas}
                             serverSide={true}
                             paginationInfo={paginationInfo}
                             onPageChange={handlePageChange}
@@ -196,8 +190,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                             filtersText={filtersText}
                             exportText={exportText}
                             newText={newText}
-                            noTableHead={noTableHead}
-                            
+                            pageName={pageName}
                         />
             
             {showCanvas && (

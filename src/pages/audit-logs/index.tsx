@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Modal, Table, Form, Button } from "react-bootstrap";
+import { Modal, Table, Form, Button, Dropdown } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import GenericTable, { TableColumn, PaginationConfig, ToolbarConfig, FilterPill } from "@components/GenericTable";
+import GenericTable, { TableColumn, PaginationConfig } from "@components/GenericTable";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
 import { StatsCardData } from "@components/GenericStatsCards";
@@ -519,6 +519,9 @@ const AuditLogsNewPage = () => { // NOSONAR
   const [showAuditDateCustomModal, setShowAuditDateCustomModal] = useState(false);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [actionSearch, setActionSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
 
   const selectedRowUser = toUserLike(selectedRow?.user);
   const sidebarFields: AuditSidebarField[] = selectedRow ? [
@@ -546,20 +549,20 @@ const AuditLogsNewPage = () => { // NOSONAR
 
   const visibleAuditModules = useMemo(() => {
     const perms = session?.user?.permissions ?? [];
-    return AuditFilterConfig.filter((n) => perms.includes(n.isShow));
+    return AuditFilterConfig.filter((n: AuditFilterNode) => perms.includes(n.isShow));
   }, [session?.user?.permissions]);
 
   const visibleAuditServices = useMemo(() => {
     if (!selectedAuditModule) return [];
     const perms = session?.user?.permissions ?? [];
-    return selectedAuditModule.services.filter((s) => perms.includes(s.isShow ?? ""));
+    return selectedAuditModule.services.filter((s: AuditFilterService) => perms.includes(s.isShow ?? ""));
   }, [selectedAuditModule, session?.user?.permissions]);
 
   const handleAuditModuleChange = useCallback((moduleName: string) => {
     if (selectedAuditModule?.moduleName === moduleName) return;
     setAuditLogsData(null);
     setAuditLogsSummary(null);
-    const node = visibleAuditModules.find((n) => n.moduleName === moduleName) ?? null;
+    const node = visibleAuditModules.find((n: AuditFilterNode) => n.moduleName === moduleName) ?? null;
     setSelectedAuditModule(node);
     setSelectedAuditService(null);
     setSelectedAuditAction("");
@@ -571,7 +574,7 @@ const AuditLogsNewPage = () => { // NOSONAR
 
   const handleAuditServiceChange = useCallback((serviceName: string) => {
     if (selectedAuditService?.serviceName === serviceName) return;
-    const svc = visibleAuditServices.find((s) => s.serviceName === serviceName) ?? null;
+    const svc = visibleAuditServices.find((s: AuditFilterService) => s.serviceName === serviceName) ?? null;
     setSelectedAuditService(svc);
     setSelectedAuditAction("");
     setAuditStartDate("");
@@ -753,104 +756,24 @@ const AuditLogsNewPage = () => { // NOSONAR
     return raw;
   }, [auditLogsData, selectedAuditModule?.moduleName, auditUserOptions]);
 
-  const filterPills = useMemo<FilterPill[]>(() => {
-    if (visibleAuditModules.length === 0) return [];
+  const actionOptions = useMemo<string[]>(() => {
+    if (selectedAuditService) {
+      return ((selectedAuditService.actions ?? []) as unknown[]).filter((a: unknown): a is string => typeof a === "string");
+    }
+    return Array.from(
+      new Set(
+        visibleAuditServices
+          .flatMap((s: AuditFilterService) => (s.actions ?? []) as unknown[])
+          .filter((a: unknown): a is string => typeof a === "string")
+      )
+    );
+  }, [selectedAuditService, visibleAuditServices]);
 
-    const modulePills: FilterPill[] = visibleAuditModules.map((module) => ({
-      id: `audit_module_${module.moduleName}`,
-      label: String(module.moduleName),
-      active: selectedAuditModule?.moduleName === module.moduleName,
-      onClick: () => handleAuditModuleChange(module.moduleName),
-      onClear:
-        selectedAuditModule?.moduleName === module.moduleName
-          ? () => handleAuditModuleChange("")
-          : undefined,
-    }));
-    if (!selectedAuditModule) return modulePills;
-
-    const actionOptions = selectedAuditService
-      ? selectedAuditService.actions
-      : Array.from(new Set(visibleAuditServices.flatMap((s) => s.actions)));
-
-    const dateLabel = (() => {
-      const hasRange = auditStartDate && auditEndDate;
-      if (!hasRange) return "Select Audit date";
-      if (auditStartDate === auditEndDate) return moment(auditStartDate).format("MMM D, YYYY");
-      const start = moment(auditStartDate).format("MMM D");
-      const end = moment(auditEndDate).format("MMM D, YYYY");
-      return `${start} - ${end}`;
-    })();
-
-    const servicePill: FilterPill = {
-      id: "audit_service",
-      searchable: true,
-      label: selectedAuditService ? String(selectedAuditService.serviceName) : "Select Resources",
-      showDropdown: true,
-      dropdownOptions: visibleAuditServices.map((s) => ({
-        label: String(s.serviceName),
-        value: String(s.serviceName),
-        onClick: () => handleAuditServiceChange(s.serviceName),
-      })),
-    };
-
-    const actionPill: FilterPill = {
-      id: "audit_action",
-      label: selectedAuditAction || "Select Action",
-      showDropdown: true,
-      searchable: true,
-      dropdownOptions: [
-        { label: "All", value: "", onClick: () => setSelectedAuditAction("") },
-        ...(actionOptions?.map((a) => ({ label: String(a), value: String(a), onClick: () => setSelectedAuditAction(a ?? "") })) ?? []),
-      ],
-    };
-
-    const datePill: FilterPill = {
-      id: "audit_date",
-      label: dateLabel,
-      showDropdown: true,
-      dropdownOptions: [
-        { label: "All Time", value: "all", onClick: () => { setAuditStartDate(""); setAuditEndDate(""); } },
-        { label: "Today", value: "today", onClick: () => { const t = moment().format("YYYY-MM-DD"); setAuditStartDate(t); setAuditEndDate(t); } },
-        { label: "Last 7 Days", value: "week", onClick: () => { setAuditStartDate(moment().subtract(7, "days").format("YYYY-MM-DD")); setAuditEndDate(moment().format("YYYY-MM-DD")); } },
-        { label: "Last 30 Days", value: "month", onClick: () => { setAuditStartDate(moment().subtract(30, "days").format("YYYY-MM-DD")); setAuditEndDate(moment().format("YYYY-MM-DD")); } },
-        { label: "Custom range...", value: "custom", onClick: () => { setCustomStartDate(auditStartDate || ""); setCustomEndDate(auditEndDate || ""); setShowAuditDateCustomModal(true); } },
-      ],
-    };
-
-    const moduleUsesUsers =
-      selectedAuditModule.users === "hierarchy" || selectedAuditModule.users === "dropdown";
-    const serviceUsesUsers =
-      selectedAuditService?.users === "hierarchy" || selectedAuditService?.users === "dropdown";
-    const showUserPill = moduleUsesUsers || serviceUsesUsers;
-    if (!showUserPill) return [...modulePills, servicePill, actionPill, datePill];
-
-    const selectedUserLabel =
-      selectedAuditUser
-        ? auditUserOptions.find((o) => o.value === selectedAuditUser)?.label || selectedAuditUser
-        : "Select User";
-    const userPill: FilterPill = {
-      id: "audit_user",
-      label: selectedUserLabel,
-      showDropdown: true,
-      searchable: true,
-      dropdownOptions: [
-        { label: "All users", value: "", onClick: () => setSelectedAuditUser("") },
-        ...auditUserOptions.map((o) => ({ label: o.label, value: o.value, onClick: () => setSelectedAuditUser(o.value) })),
-      ],
-    };
-    return [...modulePills, servicePill, actionPill, datePill, userPill];
-  }, [visibleAuditModules, visibleAuditServices, selectedAuditModule, selectedAuditService, selectedAuditAction, auditStartDate, auditEndDate, selectedAuditUser, auditUserOptions, handleAuditModuleChange, handleAuditServiceChange]);
-
-  const toolbarConfig: ToolbarConfig = useMemo(() => ({
-    showTabs: false,
-    showSearch: false,
-    showFiltersButton: false,
-    showFilterPills: true,
-    showSortButton: false,
-    showExportButton: false,
-    filterPills,
-    showAdvancedFilters: false,
-  }), [filterPills]);
+  const dateLabel = useMemo(() => {
+    if (!auditStartDate || !auditEndDate) return "Select Audit date";
+    if (auditStartDate === auditEndDate) return moment(auditStartDate).format("MMM D, YYYY");
+    return `${moment(auditStartDate).format("MMM D")} - ${moment(auditEndDate).format("MMM D, YYYY")}`;
+  }, [auditStartDate, auditEndDate]);
 
   const pagination: PaginationConfig = useMemo(() => ({
     currentPage: auditPage,
@@ -866,13 +789,6 @@ const AuditLogsNewPage = () => { // NOSONAR
 
   return (
     <>
-      <style>{`
-        .gt-toolbar-main,
-        .gt-filter-pills {
-          border: none !important;
-          padding: 0 !important;
-        }
-      `}</style>
       <BreadcrumbItem mainTitle="Audit Logs" mainLink="/audit-logs" subTitle="Audit Logs" />
       <div style={{ backgroundColor: "#ffffff", minHeight: "100vh" }}>
         <div style={{ padding: "20px" }}>
@@ -882,6 +798,112 @@ const AuditLogsNewPage = () => { // NOSONAR
           <p style={{ fontSize: "14px", fontWeight: 100, color: "#666", marginBottom: "20px" }}>
             View audit logs by module and service
           </p>
+
+          {/* Custom two-row audit filter section */}
+          {visibleAuditModules.length > 0 && (
+            <div style={{ marginBottom: "12px" }}>
+              {/* Row 1: Module pills */}
+              <div className="d-flex align-items-center gap-2 flex-wrap">
+                {visibleAuditModules.map((module: AuditFilterNode) => (
+                  <button
+                    key={module.moduleName}
+                    className={`gt-filter-pill${selectedAuditModule?.moduleName === module.moduleName ? " gt-filter-pill-active" : ""}`}
+                    onClick={() => handleAuditModuleChange(module.moduleName)}
+                  >
+                    {module.moduleName}
+                  </button>
+                ))}
+              </div>
+
+              {/* Row 2: Sub-filter dropdowns (shown after a module is selected) */}
+              {selectedAuditModule && (
+                <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: "8px" }}>
+                  {/* Service */}
+                  <Dropdown>
+                    <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-filter-pill">
+                      {selectedAuditService ? selectedAuditService.serviceName : "Select Resources"}
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
+                      <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
+                        <Form.Control size="sm" type="text" placeholder="Search..." value={serviceSearch}
+                          onChange={(e) => setServiceSearch(e.target.value)} autoFocus />
+                      </div>
+                      {visibleAuditServices
+                        .filter((s: AuditFilterService) => s.serviceName.toLowerCase().includes(serviceSearch.toLowerCase()))
+                        .map((s: AuditFilterService) => (
+                          <Dropdown.Item key={s.serviceName}
+                            onClick={() => { handleAuditServiceChange(s.serviceName); setServiceSearch(""); }}>
+                            {s.serviceName}
+                          </Dropdown.Item>
+                        ))}
+                    </Dropdown.Menu>
+                  </Dropdown>
+
+                  {/* Action */}
+                  <Dropdown>
+                    <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-filter-pill">
+                      {selectedAuditAction || "Select Action"}
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
+                      <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
+                        <Form.Control size="sm" type="text" placeholder="Search..." value={actionSearch}
+                          onChange={(e) => setActionSearch(e.target.value)} autoFocus />
+                      </div>
+                      <Dropdown.Item onClick={() => { setSelectedAuditAction(""); setActionSearch(""); }}>All</Dropdown.Item>
+                      {actionOptions
+                        .filter((a) => a.toLowerCase().includes(actionSearch.toLowerCase()))
+                        .map((a) => (
+                          <Dropdown.Item key={a} onClick={() => { setSelectedAuditAction(a); setActionSearch(""); }}>
+                            {a}
+                          </Dropdown.Item>
+                        ))}
+                    </Dropdown.Menu>
+                  </Dropdown>
+
+                  {/* Date */}
+                  <Dropdown>
+                    <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-filter-pill">
+                      {dateLabel}
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      <Dropdown.Item onClick={() => { setAuditStartDate(""); setAuditEndDate(""); }}>All Time</Dropdown.Item>
+                      <Dropdown.Item onClick={() => { const t = moment().format("YYYY-MM-DD"); setAuditStartDate(t); setAuditEndDate(t); }}>Today</Dropdown.Item>
+                      <Dropdown.Item onClick={() => { setAuditStartDate(moment().subtract(7, "days").format("YYYY-MM-DD")); setAuditEndDate(moment().format("YYYY-MM-DD")); }}>Last 7 Days</Dropdown.Item>
+                      <Dropdown.Item onClick={() => { setAuditStartDate(moment().subtract(30, "days").format("YYYY-MM-DD")); setAuditEndDate(moment().format("YYYY-MM-DD")); }}>Last 30 Days</Dropdown.Item>
+                      <Dropdown.Item onClick={() => { setCustomStartDate(auditStartDate || ""); setCustomEndDate(auditEndDate || ""); setShowAuditDateCustomModal(true); }}>Custom range...</Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown>
+
+                  {/* User (conditional) */}
+                  {(selectedAuditModule.users === "hierarchy" || selectedAuditModule.users === "dropdown" ||
+                    selectedAuditService?.users === "hierarchy" || selectedAuditService?.users === "dropdown") && (
+                    <Dropdown>
+                      <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-filter-pill">
+                        {selectedAuditUser
+                          ? auditUserOptions.find((o) => o.value === selectedAuditUser)?.label || selectedAuditUser
+                          : "Select User"}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ maxHeight: "280px", overflowY: "auto" }}>
+                        <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
+                          <Form.Control size="sm" type="text" placeholder="Search..." value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)} autoFocus />
+                        </div>
+                        <Dropdown.Item onClick={() => { setSelectedAuditUser(""); setUserSearch(""); }}>All users</Dropdown.Item>
+                        {auditUserOptions
+                          .filter((o) => o.label.toLowerCase().includes(userSearch.toLowerCase()))
+                          .map((o) => (
+                            <Dropdown.Item key={o.value} onClick={() => { setSelectedAuditUser(o.value); setUserSearch(""); }}>
+                              {o.label}
+                            </Dropdown.Item>
+                          ))}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <GenericTable
               data={dataList as Record<string, unknown>[]}
@@ -905,9 +927,7 @@ const AuditLogsNewPage = () => { // NOSONAR
               uniqueKey="id"
               fixedHeight
               maxHeight="calc(100vh - 280px)"
-              showToolbar
-              toolbar={toolbarConfig}
-              statsCards={selectedAuditModule ? auditLogsStatsCards : []}
+              showToolbar={false}
               showToolbarActions={false}
               noBorder={true}
             />
