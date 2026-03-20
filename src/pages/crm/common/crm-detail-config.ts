@@ -2,7 +2,7 @@ import type { CrmDetailPageLayoutConfig } from "@pages/crm/common/crm-detail-lay
 
 type SupportedCrmDetailType = Extract<
   CrmDetailPageLayoutConfig["recordType"],
-  "lead" | "prospect" | "deal" | "order"
+  "lead" | "prospect" | "deal" | "order" | "company"
 >;
 
 type CrmDetailStaticConfig = Pick<
@@ -52,6 +52,15 @@ const DETAIL_STATIC_CONFIG: Record<SupportedCrmDetailType, CrmDetailStaticConfig
     deleteItemType: "order",
     successTitle: "Order Deleted",
     successDescription: "Order has been deleted successfully",
+  },
+  company: {
+    breadcrumbLabel: "Companies",
+    listPath: "/crm/companies",
+    loadingMessage: "Loading company...",
+    errorNoRecordMessage: "No company selected",
+    deleteItemType: "company",
+    successTitle: "Company Deleted",
+    successDescription: "Company has been deleted successfully",
   },
 };
 

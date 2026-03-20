@@ -1,6 +1,5 @@
 import React, { type ReactNode } from "react";
 import { ChevronDown, ExternalLink } from "lucide-react";
-import { viewAllLinkStyle } from "@components/CrmDetailSharedStyles";
 
 type CrmAssociatedRecordsSectionCardProps<TItem> = {
   sectionId: string;
@@ -104,7 +103,18 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
                     e.preventDefault();
                     onViewAllClick();
                   }}
-                  style={viewAllLinkStyle}
+                  style={{
+                    fontSize: "12px",
+                    color: "#141414",
+                    textDecoration: "none",
+                    fontWeight: "300",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    border: "1px solid #cccccc",
+                    borderRadius: "6px",
+                    padding: "6px 12px",
+                  }}
                 >
                   {viewAllLabel}
                   <ExternalLink size={12} />

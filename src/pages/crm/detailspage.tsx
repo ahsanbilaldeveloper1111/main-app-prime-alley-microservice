@@ -6,8 +6,10 @@ import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
 import ProspectDetailPage from "@pages/crm/prospects/prospects-detailpage";
 import LeadDetailPage from "@pages/crm/leads/leads-detailpage";
 import DealDetailPage from "@pages/crm/deals/deals-detailpage";
+import OrderDetailPage from "@pages/crm/orders/[id]/order-detailpage";
+import CompanyDetailPage from "@pages/crm/companies/company-detailpage";
 
-type SupportedCrmDetailType = "lead" | "prospect" | "deal";
+type SupportedCrmDetailType = "lead" | "prospect" | "deal" | "order" | "company";
 
 const getSingleQueryValue = (
   value: unknown
@@ -30,6 +32,8 @@ const normalizeCrmType = (raw: string | undefined): SupportedCrmDetailType | nul
   if (t === "lead" || t === "leads") return "lead";
   if (t === "prospect" || t === "prospects") return "prospect";
   if (t === "deal" || t === "deals") return "deal";
+  if (t === "order" || t === "orders") return "order";
+  if (t === "company" || t === "companies") return "company";
 
   return null;
 };
@@ -75,7 +79,7 @@ export default function CrmDetailsPage() {
           <div style={{ padding: 24, maxWidth: 720, margin: "0 auto" }}>
             <h2 style={{ fontSize: 18, margin: "0 0 8px 0" }}>Invalid CRM detail link</h2>
             <p style={{ margin: "0 0 16px 0", color: "#718096" }}>
-              Expected <code>type</code> (lead|deal|prospect) and <code>id</code>.
+              Expected <code>type</code> (lead|deal|prospect|order|companies) and <code>id</code>.
             </p>
             {staticConfig ? (
               <Link href={staticConfig.listPath} style={{ color: "#006162", textDecoration: "none" }}>
@@ -104,6 +108,8 @@ export default function CrmDetailsPage() {
   if (recordType === "lead") SelectedDetailPage = LeadDetailPage;
   else if (recordType === "prospect") SelectedDetailPage = ProspectDetailPage;
   else if (recordType === "deal") SelectedDetailPage = DealDetailPage;
+  else if (recordType === "order") SelectedDetailPage = OrderDetailPage;
+  else if (recordType === "company") SelectedDetailPage = CompanyDetailPage;
 
   if (!SelectedDetailPage) return errorView;
 

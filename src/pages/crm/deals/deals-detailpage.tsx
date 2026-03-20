@@ -11,6 +11,8 @@ import Layout from "@layout/index";
 import {
   getDeal,
   deleteDeal,
+  approveDeal,
+  rejectDeal,
   PDFDownloadDeal,
   downloadDealAttachment,
   getDealAttachments,
@@ -177,6 +179,12 @@ const DealRecordPage: NextPageWithLayout = () => {
   const { id: dealId } = router.query;
   const { hasPermission } = usePermissions();
   const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
+  const canApproveReject = hasPermission(HEADER_CONSTANTS.PERMISSIONS.APPROVE_REJECT_CRM_DEALS);
+
+  const approvalQuery = router.query.approval;
+  const approvalMode = Array.isArray(approvalQuery)
+    ? approvalQuery[0] === "1" || approvalQuery[0] === "true" || approvalQuery[0] === "approval"
+    : approvalQuery === "1" || approvalQuery === "true" || approvalQuery === "approval";
 
   const [deal, setDeal] = useState<DealData | null>(null);
   const [dealLoading, setDealLoading] = useState(true);
@@ -201,6 +209,17 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
+
+  const approvalStatusRaw =
+    (deal as any)?.approval_status ??
+    (deal as any)?.approvalStatus ??
+    null;
+  const approvalStatusNormalized =
+    typeof approvalStatusRaw === "string" ? approvalStatusRaw.toLowerCase() : "";
+  const isApprovalPending = approvalMode && approvalStatusNormalized.includes("pending");
+
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -333,6 +352,36 @@ const DealRecordPage: NextPageWithLayout = () => {
       setExporting(false);
     }
   }, [dealRecordId]);
+
+  const handleApproveDeal = useCallback(async () => {
+    if (!dealRecordId || isApproving || isRejecting) return;
+    setIsApproving(true);
+    try {
+      await approveDeal(dealRecordId);
+      toast.success("Deal approved successfully!");
+      const refreshed = await getDeal(dealRecordId);
+      setDeal(refreshed);
+    } catch {
+      toast.error("Failed to approve deal");
+    } finally {
+      setIsApproving(false);
+    }
+  }, [dealRecordId, isApproving, isRejecting]);
+
+  const handleRejectDeal = useCallback(async () => {
+    if (!dealRecordId || isApproving || isRejecting) return;
+    setIsRejecting(true);
+    try {
+      await rejectDeal(dealRecordId);
+      toast.success("Deal rejected successfully!");
+      const refreshed = await getDeal(dealRecordId);
+      setDeal(refreshed);
+    } catch {
+      toast.error("Failed to reject deal");
+    } finally {
+      setIsRejecting(false);
+    }
+  }, [dealRecordId, isApproving, isRejecting]);
 
   const handleDownloadAttachment = useCallback(
     async (attachmentId: number) => {
@@ -596,7 +645,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             viewAllLabel="View all associated Companies"
             viewAllHref={
               (deal as any)?.company?.id != null
-                ? `/crm/companies/company-detailpage?id=${encodeURIComponent(String((deal as any)?.company?.id))}`
+                ? `/crm/detailspage?type=companies&id=${encodeURIComponent(String((deal as any)?.company?.id))}`
                 : "/crm/companies"
             }
           />
@@ -631,11 +680,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                         </p>
                       </div>
                       <a
-                        href={
-                          (deal as any)?.main_decision_maker?.id != null
-                            ? `/crm/contacts/contact-detailpage?id=${encodeURIComponent(String((deal as any)?.main_decision_maker?.id))}`
-                            : "/crm/contacts"
-                        }
+                        href="/crm/contacts"
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{

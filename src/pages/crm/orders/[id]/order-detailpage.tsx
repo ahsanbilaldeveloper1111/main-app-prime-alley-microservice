@@ -10,7 +10,7 @@ import CrmIntelligenceTab from "@components/CrmIntelligenceTab";
 import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
-import { deleteOrder, getDeal, getLead, getOrder } from "@utils/crm";
+import { getDeal, getLead, getOrder } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
 import { toast } from "react-toastify";
@@ -81,7 +81,6 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
-  const [orderToDelete, setOrderToDelete] = useState<{ id: number; name?: string } | null>(null);
   const [relatedDeal, setRelatedDeal] = useState<any>(null);
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [extensions, setExtensions] = useState<any[]>([]);
@@ -271,7 +270,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
-  // Include audit_trail so Activity tab shows order history
+  // Include audit_trail in case related activity views are enabled elsewhere
   const orderRecord = buildOrderRecordForActivities(orderData);
 
   const orderRecordId = Number(id) || orderData?.id || 0;
@@ -1233,8 +1232,6 @@ const OrderRecordPage: NextPageWithLayout = () => {
             <CrmIntelligenceTab
               company={(relatedDeal as any)?.company ?? null}
               relatedCompany={orderData?.customer_name ?? relatedDeal?.company_name ?? '—'}
-              industryName={(relatedDeal as any)?.industries?.[0]?.name ?? null}
-              industryDescription={(relatedDeal as any)?.industries?.[0]?.description ?? null}
             />
           )}
         </div>
@@ -1685,23 +1682,20 @@ const OrderRecordPage: NextPageWithLayout = () => {
           (relatedDeal as any)?.company_name ??
           "—",
         exporting: false,
+        showEdit: false,
+        showDelete: false,
         onEdit: () => {
-          if (!orderRecordId) return;
-          router.push(`/crm/orders/${orderRecordId}/edit`);
+          // No edit action for orders in this unified view.
         },
-        onDelete: () =>
-          setOrderToDelete({
-            id: orderRecordId,
-            name: orderRecordName,
-          }),
+        onDelete: () => {
+          // No delete action for orders in this unified view.
+        },
         onExport: () => {
           // Intentionally no-op for now.
         },
-        deleteItemName: orderToDelete?.name ?? orderRecordName,
+        deleteItemName: orderRecordName,
         onDeleteSuccess: async () => {
-          const idToDelete = orderToDelete?.id ?? orderRecordId;
-          if (!idToDelete) return;
-          await deleteOrder(idToDelete);
+          // No delete operation.
         },
         avatarDisplayName: orderRecordName,
         avatarSubtitle: orderData?.stage?.name ?? "—",

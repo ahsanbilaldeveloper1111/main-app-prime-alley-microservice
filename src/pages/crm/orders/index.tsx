@@ -1424,7 +1424,7 @@ const CrmOrders = () => {
     (order: any) => {
       const orderId = order.rawData?.id || order.id;
       if (orderId) {
-        router.push(`/crm/orders/${orderId}/order-detailpage`);
+        router.push(`/crm/detailspage?type=order&id=${orderId}`);
       }
     },
     [router],

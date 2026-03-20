@@ -52,7 +52,7 @@ const CrmAssociatedCompaniesCard: React.FC<CrmAssociatedCompaniesCardProps> = ({
   const resolvedViewAllHref =
     viewAllHref ??
     (companyId != null && companyId !== ""
-      ? `/crm/companies/company-detailpage?id=${encodeURIComponent(String(companyId))}`
+      ? `/crm/detailspage?type=companies&id=${encodeURIComponent(String(companyId))}`
       : "/crm/companies");
 
   return (

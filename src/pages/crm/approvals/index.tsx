@@ -1419,7 +1419,7 @@ const CrmDeals = () => {
       const id = deal?.id ?? deal?.rawData?.id;
       router.push(
         id
-          ? `/crm/detailspage?type=deal&id=${id}`
+          ? `/crm/detailspage?type=deal&id=${id}&approval=1`
           : "/crm/deals",
       );
     },
@@ -3424,7 +3424,7 @@ const CrmDeals = () => {
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
                   setShowDealSidebar(false);
-                  router.push(`/crm/detailspage?type=deal&id=${dealId}`);
+                  router.push(`/crm/detailspage?type=deal&id=${dealId}&approval=1`);
                 }
               },
             }}

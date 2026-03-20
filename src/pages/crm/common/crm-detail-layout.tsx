@@ -24,6 +24,8 @@ import {
   RefreshCw,
   AlertCircle,
   Handshake,
+  Building2,
+  ShoppingBag,
 } from "lucide-react";
 import CrmActivitiesPanel, {
   type CrmActivitiesPanelRef,
@@ -86,6 +88,10 @@ export interface CrmDetailPageLayoutConfig {
   onEdit: () => void;
   onDelete: () => void;
   onExport: () => void;
+  /** Hide Edit from the Actions dropdown (used by some record types). */
+  showEdit?: boolean;
+  /** Hide Delete from the Actions dropdown (used by some record types). */
+  showDelete?: boolean;
   deleteItemName?: string;
   deleteItemType: "lead" | "prospect" | "deal" | "order" | "company";
   successTitle: string;
@@ -192,6 +198,27 @@ export function CrmDetailPageLayout({
       .map((p) => p.trim())
       .filter(Boolean);
   }, [config.recordPhone]);
+
+  const orderAmountStageText = useMemo(() => {
+    if (config.recordType !== "order") return null;
+    const order = config.record as unknown as Record<string, unknown> | null;
+    if (!order) return config.avatarSubtitle ?? "—";
+
+    // Match existing order UI: treat 0 as "no amount" (via `||`).
+    const amountValue = (order.final_amount as any) || (order.total_amount as any);
+    const amountText =
+      amountValue != null && amountValue !== ""
+        ? (() => {
+            const n = Number.parseFloat(String(amountValue));
+            if (Number.isNaN(n)) return "N/A";
+            const currency = (order.currency as string | undefined) ?? "AED";
+            return `${currency} ${n.toLocaleString()}`;
+          })()
+        : "N/A";
+
+    const stageName = (order.stage as any)?.name ?? "No Stage";
+    return `${amountText} • ${stageName}`;
+  }, [config.recordType, config.record, config.avatarSubtitle]);
   const hasPhone = phoneList.length > 0;
   const numberToCall = hasPhone ? phoneList[0] : "";
 
@@ -529,7 +556,11 @@ export function CrmDetailPageLayout({
                       overflow: "hidden",
                     }}
                   >
-                    {["Edit", "Delete", "Export"].map((action) => (
+                    {[
+                      ...(config.showEdit === false ? [] : ["Edit"]),
+                      ...(config.showDelete === false ? [] : ["Delete"]),
+                      "Export",
+                    ].map((action) => (
                       <button
                         key={action}
                         disabled={action === "Export" && config.exporting}
@@ -572,69 +603,170 @@ export function CrmDetailPageLayout({
                   >
                     <Handshake size={20} />
                   </div>
+                ) : config.recordType === "order" ? (
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "37px",
+                      borderRadius: "26px",
+                      background: "#e3f2fd",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ShoppingBag size={20} />
+                  </div>
                 ) : (
                   <div
                     style={{
                       width: "40px",
                       height: "37px",
                       borderRadius: "26px",
-                      background: "#efe7f0",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "10px",
-                      fontWeight: "400",
-                      color: "#141414",
                       flexShrink: 0,
                     }}
                   >
-                    {config.avatarDisplayName
-                      ? (config.avatarDisplayName.match(/\b\w/g) ?? []).slice(0, 2).join("").toUpperCase()
-                      : "—"}
+                    {config.recordType === "company" ? (
+                      <div
+                        style={{
+                          width: "40px",
+                          height: "37px",
+                          borderRadius: "26px",
+                          background: "#e0e7f0",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Building2 size={20} style={{ color: "#4f46e5" }} />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: "40px",
+                          height: "37px",
+                          borderRadius: "26px",
+                          background: "#efe7f0",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "10px",
+                          fontWeight: "400",
+                          color: "#141414",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {config.avatarDisplayName
+                          ? (config.avatarDisplayName.match(/\b\w/g) ?? [])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase()
+                          : "—"}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div style={{ flex: 1 }}>
                   <h2 style={{ fontSize: "22px", fontWeight: "500", color: "#141414", margin: "0 0 4px 0", lineHeight: "1.3" }}>
                     {config.avatarDisplayName ?? "—"}
                   </h2>
-                  <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
-                    {config.avatarSubtitle ?? "—"}
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {config.headerSecondaryText ? (
-                      <span style={{ fontSize: "14px", color: "#718096" }}>
-                        {config.headerSecondaryText}
-                      </span>
-                    ) : config.primaryEmail ? (
-                      <>
-                        <a
-                          href={`mailto:${config.primaryEmail}`}
-                          style={{ fontSize: "14px", color: "#006162", textDecoration: "none", fontWeight: "500" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
-                        >
-                          {config.primaryEmail}
-                        </a>
-                        <button
-                          onClick={() => copyToClipboard(config.primaryEmail)}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            padding: "4px",
-                            cursor: "pointer",
-                            color: "#718096",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                          title="Copy email"
-                        >
-                          <Copy size={14} />
-                        </button>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
-                    )}
-                  </div>
+                  {config.recordType === "order" ? (
+                    <>
+                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                        {orderAmountStageText ?? "N/A"}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "14px", color: "#718096" }}>
+                          {config.headerSecondaryText ?? "No delivery date"}
+                        </span>
+                      </div>
+                    </>
+                  ) : config.recordType === "company" ? (
+                    <>
+                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                        {config.avatarSubtitle ?? "—"}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {config.primaryEmail ? (
+                          <>
+                            <a
+                              href={`mailto:${config.primaryEmail}`}
+                              style={{
+                                fontSize: "14px",
+                                color: "#006162",
+                                textDecoration: "none",
+                                fontWeight: "500",
+                              }}
+                            >
+                              {config.primaryEmail}
+                            </a>
+                            <button
+                              onClick={() => copyToClipboard(config.primaryEmail)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                padding: "4px",
+                                cursor: "pointer",
+                                color: "#718096",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                              title="Copy email"
+                              type="button"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: "14px", color: "#718096" }}>No email</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                        {config.avatarSubtitle ?? "—"}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {config.headerSecondaryText ? (
+                          <span style={{ fontSize: "14px", color: "#718096" }}>
+                            {config.headerSecondaryText}
+                          </span>
+                        ) : config.primaryEmail ? (
+                          <>
+                            <a
+                              href={`mailto:${config.primaryEmail}`}
+                              style={{ fontSize: "14px", color: "#006162", textDecoration: "none", fontWeight: "500" }}
+                              onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                            >
+                              {config.primaryEmail}
+                            </a>
+                            <button
+                              onClick={() => copyToClipboard(config.primaryEmail)}
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                padding: "4px",
+                                cursor: "pointer",
+                                color: "#718096",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                              title="Copy email"
+                              type="button"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -719,24 +851,30 @@ export function CrmDetailPageLayout({
                 />
                 <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>Key information</h3>
               </div>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "6px",
-                  cursor: "pointer",
-                  color: "#141414",
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  borderRadius: "3px",
-                  transition: "background-color 0.2s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f5f8fa"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                Actions
-              </button>
+              {config.recordType !== "company" && (
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "6px",
+                    cursor: "pointer",
+                    color: "#141414",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    borderRadius: "3px",
+                    transition: "background-color 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f5f8fa";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Actions
+                </button>
+              )}
             </div>
             {!collapsedSections.has("key-info") && (
               <div style={{ padding: "20px", maxHeight: "480px", overflowY: "auto" }}>
@@ -859,7 +997,11 @@ export function CrmDetailPageLayout({
                 {...activityModals.crmActivitiesPanelProps}
               />
             ) : activeTab === "intelligence" ? (
-              <CrmIntelligenceTab company={config.company} relatedCompany={config.relatedCompany} />
+              <CrmIntelligenceTab
+                company={config.company}
+                relatedCompany={config.relatedCompany}
+                showCompanyEnrichmentUI={config.recordType === "company"}
+              />
             ) : null}
           </div>
         </div>
