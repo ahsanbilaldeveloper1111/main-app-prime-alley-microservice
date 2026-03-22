@@ -627,9 +627,11 @@ const CompaniesPage = () => {
                 checked={showInactive}
                 onChange={(e) => setShowInactive(e.target.checked)}
               />
-              <Button variant="primary" onClick={() => openAddModal(isAdmin, userCompanyIdentifier, userCompanyName, setForm, setShowAddModal)}>
-                <Plus size={18} className="me-1" /> Add Company
-              </Button>
+              {isAdmin && (
+                <Button variant="primary" onClick={() => openAddModal(isAdmin, userCompanyIdentifier, userCompanyName, setForm, setShowAddModal)}>
+                  <Plus size={18} className="me-1" /> Add Company
+                </Button>
+              )}
             </div>
           </div>
         </Col>

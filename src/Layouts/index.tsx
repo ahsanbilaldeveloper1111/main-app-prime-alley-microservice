@@ -26,7 +26,7 @@ import {
     } from 'lucide-react';
 import {Button} from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
-import { useIncomingCall } from '../contexts/IncomingCallContext';
+import { useIncomingCall, type IncomingCallData } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
 import { getSearchableRoutes, canAccessRoute, getRequiredPermissions } from '../config/permissions';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
@@ -43,29 +43,77 @@ interface LayoutProps {
 	children: ReactNode;
 }
 
-const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTANTS;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
-function findMatchingActiveCall(activeCalls: Map<any, any>, incomingCall: any) {
+/** Device row from CTI dnsMap (before dialer normalization). */
+interface CtiDnsDevice {
+	deviceName?: string;
+	deviceType?: string;
+	terminalState?: string;
+}
+
+/** Active call entry from CTI `activeCalls` map (see `CtiContext`). */
+interface CtiActiveCallEntry {
+	id: string;
+	number: string;
+	startTime: Date;
+	status: string;
+	callId?: string;
+	callingAddress?: string;
+	calledAddress?: string;
+	callingDeviceName?: string;
+	callingDeviceType?: string;
+	duration?: number;
+}
+
+/** Normalized device list from `getAllUserDevices` (see `src/utils/dialer.ts`). */
+interface CtiDialerDevice {
+	deviceName: string;
+	deviceType: string;
+	terminalState: string;
+	when: string;
+	details: string;
+}
+
+type DnsMapLike = Record<
+	string,
+	{ devices?: Record<string, CtiDnsDevice> }
+> | null | undefined;
+
+function findMatchingActiveCall(
+	activeCalls: Map<string, CtiActiveCallEntry>,
+	incomingCall: IncomingCallData
+): CtiActiveCallEntry | undefined {
 	const calls = Array.from(activeCalls.values());
-	return calls.find((call: any) =>
-		call.callId === incomingCall.callId ||
-		(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
+	return calls.find(
+		(call) =>
+			call.callId === incomingCall.callId ||
+			(call.callingAddress === incomingCall.callingAddress &&
+				call.calledAddress === incomingCall.calledAddress)
 	);
 }
 
-function getUserDevicesFromDnsMap(dnsMap: any, userAddress: string | undefined | null): any[] {
+function getUserDevicesFromDnsMap(
+	dnsMap: DnsMapLike,
+	userAddress: string | undefined | null
+): CtiDnsDevice[] {
 	const userDeviceInfo = dnsMap?.[userAddress || ''];
 	if (!userDeviceInfo?.devices) return [];
 	return Object.values(userDeviceInfo.devices);
 }
 
-function pickControllerDevice(userDevices: any[], preferredDeviceName?: string | null): any {
+function pickControllerDevice(
+	userDevices: CtiDnsDevice[],
+	preferredDeviceName?: string | null
+): CtiDnsDevice | null {
 	if (!userDevices.length) return null;
 	if (preferredDeviceName) {
-		const match = userDevices.find((device: any) => device.deviceName === preferredDeviceName);
+		const match = userDevices.find((device) => device.deviceName === preferredDeviceName);
 		if (match) return match;
 	}
-	return userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0] || null;
+	return (
+		userDevices.find((device) => device.terminalState === 'REGISTERED') || userDevices[0] || null
+	);
 }
 
 const Layout = ({ children }: LayoutProps) => {
@@ -95,11 +143,12 @@ const Layout = ({ children }: LayoutProps) => {
   const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
 	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
 	const [dialedNumber, setDialedNumber] = useState('');
 	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
-	const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+	const [availableDevices, setAvailableDevices] = useState<CtiDialerDevice[]>([]);
 	const [pendingDialedNumber, setPendingDialedNumber] = useState('');
 	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
 	const headerLogoUrlRef = useRef<string | null>(null);
@@ -190,6 +239,9 @@ const Layout = ({ children }: LayoutProps) => {
 				setShowSearchSuggestions(false);
 				setSearchQuery('');
 			}
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
 		};
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -266,7 +318,7 @@ const Layout = ({ children }: LayoutProps) => {
 			return false;
 		}
 		
-		return userDevices.some((device: any) => device.terminalState === 'REGISTERED');
+		return userDevices.some((device: CtiDnsDevice) => device.terminalState === 'REGISTERED');
 	}, [userAddress, dnsMap]);
 
 	const incomingCallUserData = useMemo(() => {
@@ -314,11 +366,13 @@ const Layout = ({ children }: LayoutProps) => {
 	useEffect(() => {
 		if (!showIncomingCallModal || !incomingCall) return;
 		const calls = Array.from(activeCalls.values());
-		const answeredMatch = calls.find((call: any) => {
-			const sameCall = call.callId === incomingCall.callId ||
-				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress);
+		const answeredMatch = calls.find((call) => {
+			const sameCall =
+				call.callId === incomingCall.callId ||
+				(call.callingAddress === incomingCall.callingAddress &&
+					call.calledAddress === incomingCall.calledAddress);
 			const notRinging = call.status && call.status !== "ringing";
-			return sameCall && notRinging;
+			return Boolean(sameCall && notRinging);
 		});
 		if (answeredMatch) {
 			setShowIncomingCallModal(false);
@@ -389,7 +443,7 @@ const Layout = ({ children }: LayoutProps) => {
 				controllerAddress: userAddress || '',
 				controllerDeviceName: controllerDevice.deviceName || '',
 				controllerDeviceType: controllerDevice.deviceType || ''
-			} as any);
+			});
 		} catch (error) {
 			toast.error(`Unable to reject call: ${getErrorMessage(error)}`, {
 				toastId: "layout_reject_call_failed",
@@ -437,7 +491,7 @@ const Layout = ({ children }: LayoutProps) => {
 		}
 	};
 
-	const handleDeviceSelect = async (device: any) => {
+	const handleDeviceSelect = async (device: CtiDialerDevice) => {
 		const callingDevice = {
 			callingAddress: userAddress,
 			callingDeviceType: device.deviceType,
@@ -1079,6 +1133,7 @@ font-weight:600;
                 <div >
                 
                 <button
+                  type="button"
                   className="crm-prime-create-btn"
                   onClick={() => setShowCreateDropdown(!showCreateDropdown)}
                   title="Create new"
@@ -1109,7 +1164,7 @@ font-weight:600;
                     />
                       <div className="create-dropdown-menu">
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
-                        <button className="create-dropdown-item" onClick={() => {
+                        <button type="button" className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           setShowCreateLeadModal(true);
                         }}>
@@ -1127,7 +1182,7 @@ font-weight:600;
                         )}
 
                         {session?.user?.permissions?.includes(PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM) && (
-                        <button className="create-dropdown-item" onClick={() => {
+                        <button type="button" className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
                           router.push('/crm/inbox');
                         }}>
@@ -1145,7 +1200,7 @@ font-weight:600;
                       )}
 
                         {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
-                        <button className="create-dropdown-item" onClick={() => {
+                        <button type="button" className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false); /* Add Task handler */
                           router.push('/planner/tasks');
                         }}>
@@ -1165,6 +1220,7 @@ font-weight:600;
               {/* Dialer Button */}
               {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
                 <button
+                  type="button"
                   ref={dialerButtonRef}
                   className="crm-prime-topbar-icon"
                   disabled={!isInitialized}
@@ -1184,8 +1240,9 @@ font-weight:600;
                 {/* Dialer Button */}
               {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
                 <button
+                  type="button"
                   className="crm-prime-topbar-icon"
-                  onClick={(e) => {
+                  onClick={() => {
                     router.push('/communications/wallboards-live');
                   }}
                   title="Wallboards (Live)"
@@ -1198,6 +1255,7 @@ font-weight:600;
 {/* Notifications - opens sidebar */}
 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
 <button
+                type="button"
                 className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
                 data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                 onClick={() => setShowNotificationsSidebar(true)}
@@ -1209,7 +1267,7 @@ font-weight:600;
  {/* Help Icon */}
 
  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
-                <button className="crm-prime-topbar-icon" title="Help"
+                <button type="button" className="crm-prime-topbar-icon" title="Help"
                 onClick={() => router.push('/help-center')}
                 >
                 <HelpCircle size={18} />
@@ -1218,7 +1276,7 @@ font-weight:600;
 
                 {/* Settings Icon */}
               {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
-                <button className="crm-prime-topbar-icon" title="Settings"
+                <button type="button" className="crm-prime-topbar-icon" title="Settings"
                 onClick={() => router.push('/main-settings')}
                 >
                 <Settings size={18} />
@@ -1236,6 +1294,7 @@ font-weight:600;
                 {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
                 {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
               <button 
+                type="button"
                 className="crm-prime-topbar-icon" 
                 title="AI Assistant" 
                 style={{ width: 'auto', padding: '0 12px', gap: '6px' }}
@@ -1259,8 +1318,9 @@ font-weight:600;
             
 
               {/* User Menu with Dropdown */}
-              <div style={{ position: 'relative' }}>
+              <div ref={userDropdownRef} style={{ position: 'relative' }}>
                 <button
+                  type="button"
                   className="crm-prime-user-menu"
                   onClick={() => setShowUserDropdown(!showUserDropdown)}
                 >
@@ -1281,26 +1341,6 @@ font-weight:600;
 
                 {/* User Dropdown Menu */}
                 {showUserDropdown && (
-                  <>
-                    {/* Backdrop to close dropdown */}
-                    <button
-                      type="button"
-                      aria-label="Close user menu"
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 1040,
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'default',
-                      }}
-                      onClick={() => setShowUserDropdown(false)}
-                    />
-                    
                     <div className="user-dropdown-menu">
                       {/* Header */}
                       <div className="user-dropdown-header">
@@ -1374,14 +1414,14 @@ font-weight:600;
                       <div className="user-dropdown-section">
                         
                           {session?.user?.permissions?.includes('tickets-tickets') && (
-                            <button className="user-dropdown-item" onClick={() => router.push('/crm/tickets')}>
+                            <button type="button" className="user-dropdown-item" onClick={() => router.push('/crm/tickets')}>
                               {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
                               <span className="user-dropdown-item-text">Raise a ticket</span>
                             </button>
                           )}
                           
                           {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRICING_FEATURES) && (
-                        <button className="user-dropdown-item" onClick={() => router.push('/pricing')}>
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/pricing')}>
                           {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
                           <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
@@ -1389,7 +1429,7 @@ font-weight:600;
                           )}
                           
                           {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
-                        <button className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
                         </button>
@@ -1397,13 +1437,13 @@ font-weight:600;
 
                           
 {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
-                        <button className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Tasks</span>
                         </button>
                         )}
 
-<button className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
+<button type="button" className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Calendar</span>
                         </button>
@@ -1412,19 +1452,19 @@ font-weight:600;
 
 
                           
-                        <button className="user-dropdown-item user-dropdown-credits-head">
+                        <button type="button" className="user-dropdown-item user-dropdown-credits-head">
                          
                             <span className="user-dropdown-item-text">CRM Prime Credits</span>
                             
                           
                           <div className="user-dropdown-credits-count">1500 of 1500 credits available</div>
                         </button>
-                        <button className="user-dropdown-item">
+                        <button type="button" className="user-dropdown-item">
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Product Updates</span>
                         </button>
                         
-                        <button className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Settings</span>
                         </button>
@@ -1451,7 +1491,6 @@ font-weight:600;
                         </button>
                       </div>
                     </div>
-                  </>
                 )}
               </div>
             </div>
@@ -1503,6 +1542,7 @@ font-weight:600;
 						</div>
 						<div className="d-flex gap-2">
 							<button
+								type="button"
 								onClick={handleRejectCall}
 								className="btn btn-sm btn-outline-danger rounded-circle"
 								style={{ width: '36px', height: '36px', padding: 0 }}
@@ -1510,6 +1550,7 @@ font-weight:600;
 								<X size={18} />
 							</button>
 							<button
+								type="button"
 								onClick={handleAttendCall}
 								disabled={isDialing}
 								className="btn btn-sm btn-success rounded-circle"
@@ -1600,6 +1641,7 @@ font-weight:600;
 								{dialpadButtons.map((btn) => (
 									<div key={btn.num} className="col-4">
 										<button
+											type="button"
 											onClick={() => handleNumberClick(btn.num)}
 											className="btn btn-outline-secondary w-100"
 											disabled={!isDeviceRegistered}
@@ -1613,6 +1655,7 @@ font-weight:600;
 						</div>
 
 						<button
+							type="button"
 							onClick={() => handleDial()}
 							disabled={!dialedNumber.trim() || isDialing || !isDeviceRegistered}
 							className="btn btn-primary w-100"
@@ -1712,8 +1755,14 @@ font-weight:600;
 			<CreateCompanySidebar
 				onClose={() => setShowCreateCompanySidebar(false)}
 				onSave={async (data: CompanyFormPayload) => {
-					await createCompany(data);
-					setShowCreateCompanySidebar(false);
+					try {
+						await createCompany(data);
+						setShowCreateCompanySidebar(false);
+					} catch (error) {
+						toast.error(`Failed to create company: ${getErrorMessage(error)}`, {
+							toastId: "layout_create_company_failed",
+						});
+					}
 				}}
 			/>
 		)}

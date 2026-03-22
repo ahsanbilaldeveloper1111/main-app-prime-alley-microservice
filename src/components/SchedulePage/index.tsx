@@ -4,17 +4,17 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   ChevronRight,
   ChevronLeft,
-  CalendarDays,
   Check,
   ChevronDown,
   Mail,
   Phone,
-  Linkedin,
+  Share2,
   X,
   List,
   ChevronsUp,
   ChevronsDown,
 } from "lucide-react";
+import type { CalendarEvent as ApiCalendarEvent, TasksCalendarData } from "@utils/work-planner";
 
 const FONT    = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const PRIMARY = "#141414";
@@ -37,6 +37,55 @@ interface CalendarEvent {
   durationMins: number;
   title: string;
   type: "todo" | "email" | "call" | "linkedin";
+}
+
+type EventType = CalendarEvent["type"];
+
+function mapPriorityToType(priority: string | undefined): EventType {
+  const p = String(priority ?? "").toLowerCase();
+  if (p.includes("email")) return "email";
+  if (p.includes("call") || p.includes("phone")) return "call";
+  if (p.includes("linkedin") || p.includes("linked")) return "linkedin";
+  return "todo";
+}
+
+function apiEventToInternal(ev: ApiCalendarEvent): CalendarEvent {
+  const startDate = new Date(ev.start);
+  const endDate = new Date(ev.end);
+  const durationMs = endDate.getTime() - startDate.getTime();
+  const durationMins = Math.max(1, Math.round(durationMs / 60000));
+  return {
+    date: new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()),
+    hour: startDate.getHours(),
+    minute: startDate.getMinutes(),
+    durationMins,
+    title: ev.title,
+    type: mapPriorityToType(ev.priority),
+  };
+}
+
+function apiEventsToTasks(events: ApiCalendarEvent[]): TaskDue[] {
+  const byDate = new Map<string, TaskDue>();
+  for (const ev of events) {
+    const d = new Date(ev.start);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const type = mapPriorityToType(ev.priority);
+    if (!byDate.has(key)) {
+      byDate.set(key, {
+        date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+        todos: [],
+        emails: [],
+        calls: [],
+        linkedin: [],
+      });
+    }
+    const t = byDate.get(key)!;
+    if (type === "todo") t.todos.push(ev.title);
+    else if (type === "email") t.emails.push(ev.title);
+    else if (type === "call") t.calls.push(ev.title);
+    else t.linkedin.push(ev.title);
+  }
+  return Array.from(byDate.values());
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -147,7 +196,7 @@ interface TaskPopoverProps {
   onClose: () => void;
 }
 
-function TaskPopover({ task, anchorRect, onClose }: TaskPopoverProps) {
+function TaskPopover({ task, anchorRect, onClose }: Readonly<TaskPopoverProps>) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -184,7 +233,7 @@ function TaskPopover({ task, anchorRect, onClose }: TaskPopoverProps) {
       <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid #f0f0f0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: "13px", fontWeight: 700, color: PRIMARY, marginBottom: "2px" }}>
-            {totalTasks} task{totalTasks !== 1 ? "s" : ""} due
+            {totalTasks} task{totalTasks === 1 ? "" : "s"} due
           </div>
           <div style={{ fontSize: "11px", color: "#666", fontWeight: 300 }}>{formatDateFull(task.date)}</div>
         </div>
@@ -199,7 +248,7 @@ function TaskPopover({ task, anchorRect, onClose }: TaskPopoverProps) {
             { label: "To-dos",    items: task.todos,    icon: <List     size={13} color="#666" /> },
             { label: "Emails",    items: task.emails,   icon: <Mail     size={13} color="#666" /> },
             { label: "Calls",     items: task.calls,    icon: <Phone    size={13} color="#666" /> },
-            { label: "LinkedIn",  items: task.linkedin, icon: <Linkedin size={13} color="#666" /> },
+            { label: "LinkedIn",  items: task.linkedin, icon: <Share2 size={13} color="#666" /> },
           ] as { label: string; items: string[]; icon: React.ReactNode }[]
         ).map((section, si) => (
           <React.Fragment key={section.label}>
@@ -209,13 +258,13 @@ function TaskPopover({ task, anchorRect, onClose }: TaskPopoverProps) {
                 {section.icon}
                 <span style={{ fontSize: "12px", fontWeight: 700, color: PRIMARY }}>{section.label}</span>
               </div>
-              {section.items.length === 0
-                ? <div style={{ fontSize: "11px", color: "#888", paddingLeft: "19px" }}>
-                    You're all caught up on {section.label.toLowerCase()} tasks
-                  </div>
-                : section.items.map((t, i) => (
-                    <div key={i} style={{ fontSize: "11px", color: PRIMARY, paddingLeft: "19px", marginBottom: "2px" }}>{t}</div>
+              {section.items.length > 0
+                ? section.items.map((t, i) => (
+                    <div key={`${section.label}-${t}-${i}`} style={{ fontSize: "11px", color: PRIMARY, paddingLeft: "19px", marginBottom: "2px" }}>{t}</div>
                   ))
+                : <div style={{ fontSize: "11px", color: "#888", paddingLeft: "19px" }}>
+                    You&apos;re all caught up on {section.label.toLowerCase()} tasks
+                  </div>
               }
             </div>
           </React.Fragment>
@@ -231,28 +280,67 @@ const EVENT_COLORS: Record<CalendarEvent["type"], { bg: string; border: string; 
   todo:     { bg: "#EFEEFD", border: "#7D53E9", icon: <List  size={11} color={PURPLE} /> },
   email:    { bg: "#EFEEFD", border: "#7D53E9", icon: <Mail  size={11} color={PURPLE} /> },
   call:     { bg: "#EFEEFD", border: "#7D53E9", icon: <Phone size={11} color={PURPLE} /> },
-  linkedin: { bg: "#EFEEFD", border: "#7D53E9", icon: <Linkedin size={11} color={PURPLE} /> },
+  linkedin: { bg: "#EFEEFD", border: "#7D53E9", icon: <Share2 size={11} color={PURPLE} /> },
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function SchedulePage() {
+export type FetchCalendarDataFn = (start: Date, end: Date) => Promise<TasksCalendarData | null>;
+
+interface SchedulePageProps {
+  fetchCalendarData?: FetchCalendarDataFn;
+}
+
+export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePageProps> = {}) {
   const today = new Date();
   const [sidebarOpen,    setSidebarOpen]    = useState(true);
   const [weekStart,      setWeekStart]      = useState<Date>(getWeekStart(new Date()));
   const [hideWeekends,   setHideWeekends]   = useState(true);
   const [allDayExpanded, setAllDayExpanded] = useState(false); // false = collapsed (shows event counts)
   const [activePopover,  setActivePopover]  = useState<{ task: TaskDue; rect: DOMRect } | null>(null);
+  const [apiTasks,       setApiTasks]       = useState<TaskDue[] | null>(null);
+  const [apiEvents,      setApiEvents]      = useState<CalendarEvent[] | null>(null);
+  const [loading,        setLoading]        = useState(false);
+
+  const fetchRef = useRef(fetchCalendarData);
+  fetchRef.current = fetchCalendarData;
 
   const visibleDays = hideWeekends ? 5 : 7;
   const days: Date[] = Array.from({ length: visibleDays }, (_, i) => addDays(weekStart, i));
+  const weekEnd = addDays(weekStart, visibleDays - 1);
+  const weekStartKey = `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
+
+  useEffect(() => {
+    const fetch = fetchRef.current;
+    if (!fetch) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(weekStart, weekEnd)
+      .then((data) => {
+        if (cancelled || !data?.events) return;
+        setApiEvents(data.events.map(apiEventToInternal));
+        setApiTasks(apiEventsToTasks(data.events));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setApiEvents(null);
+          setApiTasks(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [weekStartKey]);
 
   const prevWeek = () => setWeekStart((w) => addDays(w, -7));
   const nextWeek = () => setWeekStart((w) => addDays(w, 7));
   const goToday  = () => setWeekStart(getWeekStart(today));
 
-  const getTaskForDay   = (day: Date) => SAMPLE_TASKS.find((t) => sameDay(t.date, day));
-  const getEventsForDay = (day: Date) => CALENDAR_EVENTS.filter((e) => sameDay(e.date, day));
+  const tasks = apiTasks ?? SAMPLE_TASKS;
+  const events = apiEvents ?? CALENDAR_EVENTS;
+  const getTaskForDay   = (day: Date) => tasks.find((t) => sameDay(t.date, day));
+  const getEventsForDay = (day: Date) => events.filter((e) => sameDay(e.date, day));
 
   const getEventCountForDay = (day: Date): number => getEventsForDay(day).length;
 
@@ -265,6 +353,23 @@ export default function SchedulePage() {
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: FONT, backgroundColor: "#f5f5f5", color: PRIMARY, position: "relative" }}>
+      {loading && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            fontSize: "14px",
+            color: PRIMARY,
+          }}
+        >
+          Loading calendar…
+        </div>
+      )}
 
       {/* Toggle button for sidebar */}
       <button
@@ -345,16 +450,20 @@ export default function SchedulePage() {
             <button style={btnBase}>Key <ChevronDown size={12} /></button>
 
             <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontFamily: FONT, fontWeight: 300, color: PRIMARY, userSelect: "none" }}>
-              <span
+              <button
+                type="button"
+                aria-pressed={hideWeekends}
+                aria-label="Hide weekends"
                 onClick={() => setHideWeekends((v) => !v)}
                 style={{
                   width: "16px", height: "16px", border: "2px solid #141414", borderRadius: "3px",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   backgroundColor: hideWeekends ? "#141414" : "#fff", flexShrink: 0, cursor: "pointer",
+                  padding: 0, margin: 0, font: "inherit",
                 }}
               >
                 {hideWeekends && <Check size={11} color="#fff" strokeWidth={3} />}
-              </span>
+              </button>
               <span style={{ fontSize: "14px" }}>Hide weekends</span>
             </label>
 
@@ -405,20 +514,23 @@ export default function SchedulePage() {
             minHeight: "38px",
           }}>
             {/* Toggle arrow */}
-            <div
+            <button
+              type="button"
               onClick={() => setAllDayExpanded((v) => !v)}
               style={{
                 borderRight: "1px solid #e5e5e5",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", color: "#888",
+                background: "none", border: "none", padding: 0, width: "100%",
               }}
               title={allDayExpanded ? "Collapse" : "Expand"}
+              aria-label={allDayExpanded ? "Collapse all-day row" : "Expand all-day row"}
             >
               {allDayExpanded
                 ? <ChevronsUp   size={15} color="#888" />
                 : <ChevronsDown size={15} color="#888" />
               }
-            </div>
+            </button>
 
             {days.map((day) => {
               const task = getTaskForDay(day);
@@ -447,7 +559,7 @@ export default function SchedulePage() {
                   )}
 
                   {/* COLLAPSED: show event count link */}
-                  {!allDayExpanded && (
+                  {allDayExpanded ? null : (
                     <button
                       style={{
                         background: "none", border: "none", cursor: "pointer",
@@ -456,7 +568,7 @@ export default function SchedulePage() {
                         textUnderlineOffset: "2px", whiteSpace: "nowrap",
                       }}
                     >
-                      {eventCount} event{eventCount !== 1 ? "s" : ""}
+                      {eventCount} event{eventCount === 1 ? "" : "s"}
                     </button>
                   )}
                 </div>
@@ -505,13 +617,13 @@ export default function SchedulePage() {
                         }} />
 
                         {/* Calendar event chips */}
-                        {eventsThisHour.map((ev, ei) => {
+                        {eventsThisHour.map((ev) => {
                           const colors = EVENT_COLORS[ev.type];
                           const topPx  = (ev.minute / 60) * CELL_H;
-                          const heightPx = (ev.durationMins / 60) * CELL_H - 2;
+                          const eventKey = `${ev.title}-${ev.hour}-${ev.minute}-${ev.date.getTime()}`;
                           return (
                             <div
-                              key={ei}
+                              key={eventKey}
                               style={{
                                 position: "absolute",
                                 top: topPx,

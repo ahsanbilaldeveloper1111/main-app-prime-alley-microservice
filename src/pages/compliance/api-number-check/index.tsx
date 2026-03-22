@@ -1,8 +1,9 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, DragEvent, ChangeEvent, useCallback, useMemo, useEffect } from "react";
+import React, { ReactElement, useState, DragEvent, ChangeEvent, KeyboardEvent, useCallback, useMemo, useEffect, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from 'react-toastify';
+import GenericTable, { TableColumn } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -21,8 +22,180 @@ interface PhoneResult {
   accountNumber?: string;
   dncrStatus?: string;
   transactionStatus?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
+
+interface NumberCheckTableRow {
+  id: string;
+  calledNumber: string;
+  status: string;
+  dncrStatus?: string;
+}
+
+interface ApiResultDetails {
+  accountNumber?: string;
+  dncrStatus?: string;
+  transactionStatus?: string | null;
+}
+
+interface ApiResultItem {
+  status?: string;
+  message?: string;
+  number?: string;
+  details?: ApiResultDetails;
+}
+
+interface BatchApiResponse {
+  results?: Record<string, ApiResultItem>;
+}
+
+const MAX_MANUAL_NUMBERS = 10;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+function normalizeDigits(value: string): string {
+  return value.replaceAll(/\D/g, "");
+}
+
+function parsePhoneNumbers(input: string): string[] {
+  return input
+    .split(/[,\n]/)
+    .map((num) => num.trim())
+    .filter((num) => num.length > 0)
+    .slice(0, MAX_MANUAL_NUMBERS);
+}
+
+function isValidPhoneNumber(phoneNumber: string): boolean {
+  const digitsOnly = normalizeDigits(phoneNumber);
+  return digitsOnly.startsWith("05") && digitsOnly.length === 10;
+}
+
+function getStatusCategory(status: string | null | undefined, dncrStatus: string | null | undefined): "invalid" | "denied" | "permitted" {
+  const normalizedStatus = status?.toUpperCase();
+  const normalizedDncrStatus = dncrStatus?.toUpperCase();
+  const isDncrStatusEmpty = !dncrStatus;
+
+  if (normalizedStatus === "INVALID" && isDncrStatusEmpty) return "invalid";
+  if (normalizedStatus === "TRUE" && normalizedDncrStatus === "TRUE") return "denied";
+  if (normalizedStatus === "FALSE" && normalizedDncrStatus === "FALSE") return "permitted";
+  if (normalizedDncrStatus === "TRUE" || dncrStatus === "Denied") return "denied";
+  if (normalizedDncrStatus === "FALSE" || dncrStatus === "Permitted") return "permitted";
+  return "permitted";
+}
+
+function getStatusLabel(status: string | null | undefined, dncrStatus: string | null | undefined): string {
+  const category = getStatusCategory(status, dncrStatus);
+  if (category === "invalid") return "Invalid";
+  if (category === "denied") return "Denied";
+  return "Permitted";
+}
+
+function createErrorResult(phoneNumber: string, notes: string): PhoneResult {
+  return {
+    input: phoneNumber,
+    normalized: phoneNumber,
+    status: "Error",
+    notes,
+  };
+}
+
+function transformCheckResult(phoneNumber: string, response: unknown): PhoneResult {
+  if (!response || response === false) {
+    return {
+      input: phoneNumber,
+      normalized: phoneNumber,
+      status: "Invalid",
+      notes: "No results found",
+    };
+  }
+
+  if (Array.isArray(response)) {
+    if (response.length > 0) return transformCheckResult(phoneNumber, response[0]);
+    return {
+      input: phoneNumber,
+      normalized: phoneNumber,
+      status: "Invalid",
+      notes: "No results found",
+    };
+  }
+
+  if (typeof response === "object") {
+    const resultObj = response as ApiResultItem;
+    const details = resultObj.details ?? {};
+    const transactionStatus =
+      details.transactionStatus !== null && details.transactionStatus !== undefined
+        ? String(details.transactionStatus)
+        : "N/A";
+    const status = resultObj.status;
+    const notes =
+      resultObj.message ||
+      (status === "TRUE" || status === "VALID" ? "Registered" : "Not Registered");
+
+    return {
+      input: phoneNumber,
+      normalized: phoneNumber,
+      status,
+      accountNumber: details.accountNumber || resultObj.number || phoneNumber,
+      dncrStatus: details.dncrStatus,
+      transactionStatus,
+      notes,
+    };
+  }
+
+  return {
+    input: phoneNumber,
+    normalized: phoneNumber,
+    status: "Invalid",
+    notes: "No results found",
+  };
+}
+
+async function runManualNumberCheck(
+  manualInput: string,
+  checkSingleNumber: (phoneNumber: string) => Promise<PhoneResult>,
+): Promise<PhoneResult[] | null> {
+  if (!manualInput.trim()) {
+    toast.error('Please enter at least one phone number');
+    return null;
+  }
+
+  const phoneNumbers = parsePhoneNumbers(manualInput);
+  if (phoneNumbers.length === 0) {
+    toast.error('Please enter valid phone numbers');
+    return null;
+  }
+
+  if (phoneNumbers.length > MAX_MANUAL_NUMBERS) {
+    toast.error('Maximum 10 numbers allowed');
+    return null;
+  }
+
+  const invalidNumbers = phoneNumbers.filter((phoneNumber) => !isValidPhoneNumber(phoneNumber));
+  if (invalidNumbers.length > 0) {
+    toast.error(`Invalid phone numbers: ${invalidNumbers.join(', ')}. Numbers must start with "05" and be exactly 10 digits.`);
+    return null;
+  }
+
+  if (phoneNumbers.length === 1) {
+    const result = await checkSingleNumber(phoneNumbers[0]);
+    return [result];
+  }
+
+  const apiResponse = await CheckNumbers(phoneNumbers);
+  if (!apiResponse || apiResponse === false) {
+    return phoneNumbers.map((phoneNumber) => createErrorResult(phoneNumber, "API request failed"));
+  }
+
+  const responseObj = apiResponse as BatchApiResponse;
+  if (!responseObj.results || typeof responseObj.results !== "object") {
+    return phoneNumbers.map((phoneNumber) => createErrorResult(phoneNumber, "Unexpected response format"));
+  }
+
+  return phoneNumbers.map((phoneNumber) => {
+    const result = responseObj.results?.[phoneNumber];
+    return result ? transformCheckResult(phoneNumber, result) : createErrorResult(phoneNumber, "No result found for this number");
+  });
+}
+
 const styles: { [key: string]: React.CSSProperties } = {
       container: {
         backgroundColor: '#f8f9fa',
@@ -364,30 +537,16 @@ const styles: { [key: string]: React.CSSProperties } = {
       }
     };
     
-const APINumberCheck = () => {
+const APINumberCheck = () => { // NOSONAR - legacy page kept readable via extracted helpers
       const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
       const [manualInput, setManualInput] = useState<string>('');
       const [csvFile, setCsvFile] = useState<File | null>(null);
       const [results, setResults] = useState<PhoneResult[]>([]);
       const [isChecking, setIsChecking] = useState<boolean>(false);
       const [isUploading, setIsUploading] = useState<boolean>(false);
-      const [bulkResults, setBulkResults] = useState<any>(null);
+      const [bulkResults, setBulkResults] = useState<Record<string, ApiResultItem> | null>(null);
       const [showFormatGuide, setShowFormatGuide] = useState<boolean>(false);
-    
-      // Parse phone numbers from manual input (comma or newline separated)
-      const parsePhoneNumbers = (input: string): string[] => {
-        return input
-          .split(/[,\n]/)
-          .map(num => num.trim())
-          .filter(num => num.length > 0)
-          .slice(0, 10); // Limit to 10 numbers
-      };
-
-      // Validate if a phone number is valid (starts with "05" and is exactly 10 digits)
-      const isValidPhoneNumber = (phoneNumber: string): boolean => {
-        const digitsOnly = phoneNumber.replace(/\D/g, '');
-        return digitsOnly.startsWith('05') && digitsOnly.length === 10;
-      };
+      const csvInputRef = useRef<HTMLInputElement | null>(null);
 
       // Check if all parsed phone numbers are valid
       const isManualInputValid = useMemo(() => {
@@ -420,52 +579,8 @@ const APINumberCheck = () => {
         return { validCount: valid, invalidCount: invalid };
       }, [manualInput]);
 
-      // Helper function to determine status category (matches badge display logic)
-      const getStatusCategory = (status: string | null | undefined, dncrStatus: string | null | undefined): 'invalid' | 'denied' | 'permitted' => {
-        // Normalize status to uppercase for comparison
-        const normalizedStatus = status?.toUpperCase();
-        const normalizedDncrStatus = dncrStatus?.toUpperCase();
-        
-        // Case 1: status === "INVALID" AND (dncrStatus === null OR dncrStatus === "" OR empty)
-        const isDncrStatusEmpty = !dncrStatus || dncrStatus === "" || dncrStatus === null || dncrStatus === undefined;
-        if (normalizedStatus === "INVALID" && isDncrStatusEmpty) {
-          return 'invalid';
-        }
-        
-        // Case 2: status === "TRUE" AND dncrStatus === "TRUE"
-        if (normalizedStatus === "TRUE" && normalizedDncrStatus === "TRUE") {
-          return 'denied';
-        }
-        
-        // Case 3: status === "FALSE" AND dncrStatus === "FALSE"
-        if (normalizedStatus === "FALSE" && normalizedDncrStatus === "FALSE") {
-          return 'permitted';
-        }
-        
-        // Fallback: Check dncrStatus alone if status doesn't match exact cases above
-        if (normalizedDncrStatus === "TRUE" || dncrStatus === "Denied") {
-          return 'denied';
-        }
-        
-        if (normalizedDncrStatus === "FALSE" || dncrStatus === "Permitted") {
-          return 'permitted';
-        }
-        
-        // Default to permitted
-        return 'permitted';
-      };
-
-      // Helper function to get status label for display/export
-      const getStatusLabel = (status: string | null | undefined, dncrStatus: string | null | undefined): string => {
-        const category = getStatusCategory(status, dncrStatus);
-        if (category === 'invalid') return 'Invalid';
-        if (category === 'denied') return 'Denied';
-        return 'Permitted';
-      };
-
       // Helper function to render status badge (reusable component)
-      const renderStatusBadge = (status: string | null | undefined, dncrStatus: string | null | undefined, fallbackStatus?: string): React.ReactElement => {
-        console.log('renderStatusBadge called with:', { status, dncrStatus, fallbackStatus });
+      const renderStatusBadge = (status: string | null | undefined, dncrStatus: string | null | undefined): React.ReactElement => {
         const category = getStatusCategory(status, dncrStatus);
         const label = getStatusLabel(status, dncrStatus);
         
@@ -525,7 +640,7 @@ const APINumberCheck = () => {
               if (index === 0) {
                 const firstValue = line.split(',')[0]?.trim() || '';
                 // If first line doesn't start with "05" or isn't 10 digits, it's likely a header
-                const digitsOnly = firstValue.replace(/\D/g, '');
+                const digitsOnly = normalizeDigits(firstValue);
                 if (!digitsOnly.startsWith('05') || digitsOnly.length !== 10) {
                   return; // Skip header
                 }
@@ -534,7 +649,7 @@ const APINumberCheck = () => {
               // Get first column value (phone number)
               const phoneNumber = line.split(',')[0]?.trim() || '';
               if (phoneNumber) {
-                const digitsOnly = phoneNumber.replace(/\D/g, '');
+                const digitsOnly = normalizeDigits(phoneNumber);
                 if (digitsOnly.startsWith('05') && digitsOnly.length === 10) {
                   valid++;
                 } else {
@@ -555,203 +670,26 @@ const APINumberCheck = () => {
         validateCSV();
       }, [csvFile]);
 
-      // Transform API response to PhoneResult
-      const transformCheckResult = (phoneNumber: string, response: any): PhoneResult => {
-        console.log('transformCheckResult called with:', { phoneNumber, response });
-        
-        // Handle null, undefined, or false response
-        if (!response || response === false) {
-          console.log('Response is null, undefined, or false');
-          return {
-            input: phoneNumber,
-            normalized: phoneNumber,
-            status: "Invalid",
-            notes: "No results found"
-          } as PhoneResult;
-        }
-        
-        // Handle array response - take first element if it's an array
-        if (Array.isArray(response)) {
-          console.log('Response is an array, using first element');
-          if (response.length > 0) {
-            return transformCheckResult(phoneNumber, response[0]);
-          }
-          return {
-            input: phoneNumber,
-            normalized: phoneNumber,
-            status: "Invalid",
-            notes: "No results found"
-          } as PhoneResult;
-        }
-        
-        // Handle single number response format (object with number, status, details, etc.)
-        if (typeof response === 'object') {
-          console.log('Response is an object, processing...');
-          const details = response.details || {};
-          
-          // Determine status: "TRUE" or "VALID" = Valid, "FALSE" or "INVALID" = Invalid
-          
-            const status = response.status;
-          
-          
-          // Determine DNCR Status: "TRUE" = Denied, "FALSE" = Permitted, null/undefined = use status
-          const dncrStatus = details.dncrStatus;
-          
-          // Transaction Status: use details.transactionStatus, or "N/A" if null/undefined
-          const transactionStatus = details.transactionStatus !== null && details.transactionStatus !== undefined 
-            ? String(details.transactionStatus) 
-            : "N/A";
-          
-          // Notes: use message, or derive from status
-          const notes = response.message || (response.status === "TRUE" || response.status === "VALID" ? "Registered" : "Not Registered");
-          
-          const result = {
-            input: phoneNumber,
-            normalized: phoneNumber,
-            status: status,
-            accountNumber: details.accountNumber || response.number || phoneNumber,
-            dncrStatus: dncrStatus,
-            transactionStatus: transactionStatus,
-            notes: notes
-          } as PhoneResult;
-          
-          console.log('Transformed result:', result);
-          return result;
-        }
-        
-        // Fallback for any other response type
-        console.log('Response format not recognized, using fallback');
-        return {
-          input: phoneNumber,
-          normalized: phoneNumber,
-          status: "Invalid",
-          notes: "No results found"
-        } as PhoneResult;
-      };
-
       // Check a single phone number
       const checkSingleNumber = async (phoneNumber: string): Promise<PhoneResult> => {
         try {
           const response = await CheckNumber(phoneNumber);
-          console.log('CheckNumber API response for', phoneNumber, ':', response);
-          console.log('Response type:', typeof response);
-          console.log('Is object?', response && typeof response === 'object');
-          console.log('Is array?', Array.isArray(response));
-          const result = transformCheckResult(phoneNumber, response);
-          console.log('Transformed result:', result);
-          return result;
+          return transformCheckResult(phoneNumber, response);
         } catch (error) {
           console.error(`Error checking ${phoneNumber}:`, error);
-          return {
-            input: phoneNumber,
-            normalized: phoneNumber,
-            status: "Error",
-            notes: "Check failed"
-          } as PhoneResult;
+          return createErrorResult(phoneNumber, "Check failed");
         }
       };
 
       // Handle manual number check
       const handleCheckNumbers = useCallback(async (): Promise<void> => {
-        if (!manualInput.trim()) {
-          toast.error('Please enter at least one phone number');
-          return;
-        }
-
-        const phoneNumbers = parsePhoneNumbers(manualInput);
-        if (phoneNumbers.length === 0) {
-          toast.error('Please enter valid phone numbers');
-          return;
-        }
-
-        if (phoneNumbers.length > 10) {
-          toast.error('Maximum 10 numbers allowed');
-          return;
-        }
-
-        // Validate phone number format: must start with "05" and be exactly 10 digits
-        const invalidNumbers: string[] = [];
-        for (const phoneNumber of phoneNumbers) {
-          // Remove any non-digit characters for validation
-          const digitsOnly = phoneNumber.replace(/\D/g, '');
-          
-          // Check if starts with "05" and is exactly 10 digits
-          if (!digitsOnly.startsWith('05') || digitsOnly.length !== 10) {
-            invalidNumbers.push(phoneNumber);
-          }
-        }
-
-        if (invalidNumbers.length > 0) {
-          toast.error(`Invalid phone numbers: ${invalidNumbers.join(', ')}. Numbers must start with "05" and be exactly 10 digits.`);
-          return;
-        }
-
         setIsChecking(true);
         setResults([]);
         setBulkResults(null);
 
         try {
-          // If single number, use checkSingleNumber
-          if (phoneNumbers.length === 1) {
-            const result = await checkSingleNumber(phoneNumbers[0]);
-            setResults([result]);
-          } else {
-            // If multiple numbers, use CheckNumbers API
-            const apiResponse = await CheckNumbers(phoneNumbers);
-            console.log('CheckNumbers API raw response:', apiResponse);
-            console.log('Response type:', typeof apiResponse);
-            console.log('Is object?', apiResponse && typeof apiResponse === 'object');
-            console.log('Has results?', apiResponse && typeof apiResponse === 'object' && 'results' in apiResponse);
-            
-            // The API function returns response.data.data, which should be the object with results
-            // Response format: { request_id, user, timestamp, results: { "phoneNumber": { status, details, ... }, ... } }
-            // Handle case where API returns false or null
-            if (!apiResponse || apiResponse === false) {
-              console.error('API returned false or null');
-              const checkResults = phoneNumbers.map((phoneNumber) => {
-                return {
-                  input: phoneNumber,
-                  normalized: phoneNumber,
-                  status: "Error",
-                  notes: "API request failed"
-                } as PhoneResult;
-              });
-              setResults(checkResults);
-            } else if (apiResponse && typeof apiResponse === 'object' && apiResponse.results && typeof apiResponse.results === 'object') {
-              // Transform batch response to PhoneResult array
-              console.log('Processing results:', apiResponse.results);
-              const checkResults = phoneNumbers.map((phoneNumber) => {
-                const result = apiResponse.results[phoneNumber];
-                console.log(`Result for ${phoneNumber}:`, result);
-                if (result && typeof result === 'object') {
-                  // Transform the result object to PhoneResult format
-                  const transformed = transformCheckResult(phoneNumber, result);
-                  console.log(`Transformed for ${phoneNumber}:`, transformed);
-                  return transformed;
-                }
-                return {
-                  input: phoneNumber,
-                  normalized: phoneNumber,
-                  status: "Error",
-                  notes: "No result found for this number"
-                } as PhoneResult;
-              });
-              setResults(checkResults);
-            } else {
-              // Fallback: if response format is different
-              console.error('Unexpected response format:', apiResponse);
-              console.error('Response keys:', apiResponse && typeof apiResponse === 'object' ? Object.keys(apiResponse) : 'not an object');
-              const checkResults = phoneNumbers.map((phoneNumber) => {
-                return {
-                  input: phoneNumber,
-                  normalized: phoneNumber,
-                  status: "Error",
-                  notes: "Unexpected response format"
-                } as PhoneResult;
-              });
-              setResults(checkResults);
-            }
-          }
+          const nextResults = await runManualNumberCheck(manualInput, checkSingleNumber);
+          if (nextResults) setResults(nextResults);
         } catch (error) {
           console.error('Error checking numbers:', error);
           toast.error('Error checking numbers');
@@ -760,50 +698,44 @@ const APINumberCheck = () => {
         }
       }, [manualInput]);
 
+      const isAcceptableCsvFile = useCallback((file: File, invalidTypeMessage: string): boolean => {
+        const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+        if (fileExtension !== '.csv') {
+          toast.error(invalidTypeMessage);
+          return false;
+        }
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          toast.error('File size must be less than 10MB');
+          return false;
+        }
+        return true;
+      }, []);
+
       // Handle CSV file upload
       const handleFileUpload = (e: ChangeEvent<HTMLInputElement>): void => {
         const file = e.target.files?.[0];
-        if (file) {
-          // Validate file
-          const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-          if (fileExtension !== '.csv') {
-            toast.error('Please select a CSV file');
-            return;
-          }
-          
-          const maxSize = 10 * 1024 * 1024; // 10MB
-          if (file.size > maxSize) {
-            toast.error('File size must be less than 10MB');
-            return;
-          }
-          
-          setCsvFile(file);
-        }
+        if (!file) return;
+        if (!isAcceptableCsvFile(file, 'Please select a CSV file')) return;
+        setCsvFile(file);
       };
     
-      const handleDragOver = (e: DragEvent<HTMLDivElement>): void => {
+      const handleDragOver = (e: DragEvent<HTMLButtonElement>): void => {
         e.preventDefault();
       };
     
-      const handleDrop = (e: DragEvent<HTMLDivElement>): void => {
+      const handleDrop = (e: DragEvent<HTMLButtonElement>): void => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
-        if (file) {
-          const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-          if (fileExtension !== '.csv') {
-            toast.error('Please drop a CSV file');
-            return;
-          }
-          
-          const maxSize = 10 * 1024 * 1024; // 10MB
-          if (file.size > maxSize) {
-            toast.error('File size must be less than 10MB');
-            return;
-          }
-          
-          setCsvFile(file);
-          toast.success(`File "${file.name}" selected successfully`);
-        }
+        if (!file) return;
+        if (!isAcceptableCsvFile(file, 'Please drop a CSV file')) return;
+        setCsvFile(file);
+        toast.success(`File "${file.name}" selected successfully`);
+      };
+
+      const handleDropzoneKeyDown = (e: KeyboardEvent<HTMLButtonElement>): void => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        csvInputRef.current?.click();
       };
 
       // Handle bulk CSV upload
@@ -824,15 +756,7 @@ const APINumberCheck = () => {
           return;
         }
 
-        const maxSize = 10 * 1024 * 1024; // 10MB
-        if (csvFile.size > maxSize) {
-          toast.error('File size must be less than 10MB');
-          return;
-        }
-
-        const fileExtension = csvFile.name.toLowerCase().substring(csvFile.name.lastIndexOf('.'));
-        if (fileExtension !== '.csv') {
-          toast.error('Invalid file type. Please use CSV format');
+        if (!isAcceptableCsvFile(csvFile, 'Invalid file type. Please use CSV format')) {
           return;
         }
 
@@ -852,19 +776,15 @@ const APINumberCheck = () => {
           } else {
             toast.error('Failed to check numbers');
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error('Bulk upload error:', error);
-          if (error.response?.data?.message) {
-            toast.error(error.response.data.message);
-          } else if (error.message) {
-            toast.error(`Upload failed: ${error.message}`);
-          } else {
-            toast.error('Error during bulk upload');
-          }
+          const err = error as { response?: { data?: { message?: string } }; message?: string };
+          const msg = err.response?.data?.message || err.message;
+          toast.error(msg ? `Upload failed: ${msg}` : 'Error during bulk upload');
         } finally {
           setIsUploading(false);
         }
-      }, [csvFile]);
+      }, [csvFile, isAcceptableCsvFile]);
     
       const clearManualInput = (): void => {
         setManualInput('');
@@ -908,7 +828,7 @@ const APINumberCheck = () => {
         if (bulkResults) {
           // Download bulk results
           csvContent = 'Called Number,DNCR Status\n';
-          Object.entries(bulkResults).forEach(([phoneNumber, data]: [string, any]) => {
+          Object.entries(bulkResults).forEach(([, data]) => {
             const statusLabel = getStatusLabel(data?.status, data?.details?.dncrStatus);
             csvContent += `${data?.details?.accountNumber},${statusLabel}\n`;
           });
@@ -944,7 +864,7 @@ const APINumberCheck = () => {
       let invalidStatusCount = 0;
       
       if (bulkResults) {
-        Object.values(bulkResults).forEach((data: any) => {
+        Object.values(bulkResults).forEach((data) => {
           const category = getStatusCategory(data?.status, data?.details?.dncrStatus);
           if (category === 'invalid') invalidStatusCount++;
           else if (category === 'denied') deniedCount++;
@@ -959,8 +879,40 @@ const APINumberCheck = () => {
         });
       }
       
-      // Count manual numbers
-      const manualNumbers = parsePhoneNumbers(manualInput).length;
+      const tableData = useMemo<NumberCheckTableRow[]>(() => {
+        if (bulkResults) {
+          return Object.entries(bulkResults).map(([phoneNumber, data], idx: number) => ({
+            id: `${phoneNumber}-${idx}`,
+            calledNumber: String(data?.details?.accountNumber || phoneNumber || ''),
+            status: String(data?.status || ''),
+            dncrStatus: data?.details?.dncrStatus,
+          }));
+        }
+
+        return results.map((result, idx) => ({
+          id: `${result.input}-${idx}`,
+          calledNumber: String(result?.accountNumber || result?.input || ''),
+          status: String(result?.status || ''),
+          dncrStatus: result?.dncrStatus,
+        }));
+      }, [bulkResults, results]);
+
+      const tableColumns: TableColumn<NumberCheckTableRow>[] = [
+        {
+          key: 'calledNumber',
+          label: 'CALLED NUMBER',
+          type: 'custom',
+          sortable: false,
+          render: (row) => <strong>{row.calledNumber || '--'}</strong>,
+        },
+        {
+          key: 'status',
+          label: 'DNCR STATUS',
+          type: 'custom',
+          sortable: false,
+          render: (row) => renderStatusBadge(row.status, row.dncrStatus),
+        },
+      ];
 
   return (
     <React.Fragment>
@@ -1049,7 +1001,8 @@ const APINumberCheck = () => {
               {/* CSV Tab */}
               {activeTab === 'csv' && (
                 <div style={styles.csvTab}>
-                  <div
+                  <button
+                    type="button"
                     style={{
                       ...styles.dropzone,
                       borderColor: csvFile ? '#28a745' : '#dee2e6',
@@ -1057,6 +1010,7 @@ const APINumberCheck = () => {
                     }}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
+                    onKeyDown={handleDropzoneKeyDown}
                   >
                     {csvFile ? (
                       <div style={{ textAlign: 'center' }}>
@@ -1088,6 +1042,7 @@ const APINumberCheck = () => {
                     <Upload size={32} color="#6c757d" style={{ marginBottom: '12px' }} />
                     <p style={styles.dropzoneText}>Drag and drop or browse to upload CSV</p>
                     <input
+                      ref={csvInputRef}
                       type="file"
                       accept=".csv"
                       onChange={handleFileUpload}
@@ -1099,7 +1054,7 @@ const APINumberCheck = () => {
                     </label>
                       </>
                     )}
-                  </div>
+                  </button>
                   <div style={styles.csvInfo}>
                     <span style={styles.link}>CSV column: PhoneNumber</span>
                     <button
@@ -1201,40 +1156,17 @@ const APINumberCheck = () => {
                 No results yet. Enter phone numbers and click "Check Numbers" to see results.
               </div>
             ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead style={styles.thead}>
-                  <tr>
-                      <th style={styles.th}>Called Number</th>
-                      <th style={styles.th}>DNCR Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                    {bulkResults ? (
-                      // Display bulk results
-                      Object.entries(bulkResults).map(([phoneNumber, data]: [string, any]) => (
-                        <tr key={phoneNumber} style={styles.tr}>
-                          <td style={styles.td}><strong>{data?.details?.accountNumber}</strong></td>
-                          <td style={styles.td}>
-                            {renderStatusBadge(data?.status, data?.details?.dncrStatus, data?.status)}
-                          </td>
-                          
-                        </tr>
-                      ))
-                    ) : (
-                      // Display manual results
-                      results.map((result: PhoneResult, idx: number) => (
-                        <tr key={`${result.input}-${idx}`} style={styles.tr}>
-                          <td style={styles.td}><strong>{result?.accountNumber}</strong></td>
-                          <td style={styles.td}>
-                            {renderStatusBadge(result?.status, result?.dncrStatus, result?.status)}
-                          </td>
-                    </tr>
-                      ))
-                    )}
-                </tbody>
-              </table>
-            </div>
+            <GenericTable<NumberCheckTableRow>
+              data={tableData}
+              columns={tableColumns}
+              uniqueKey="id"
+              showActions={false}
+              showToolbar={false}
+              showToolbarActions={false}
+              loading={isChecking || isUploading}
+              loadingMessage="Loading results..."
+              emptyMessage="No results yet. Enter phone numbers and click Check Numbers to see results."
+            />
             )}
           </div>
         </div>

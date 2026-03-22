@@ -21,10 +21,12 @@ import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { StatsCardData } from "@components/GenericStatsCards";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useRouter } from "next/router";
 import {
   getInvoice,
   downloadInvoicePdf,
+  deleteInvoice,
   InvoiceData,
   getInvoices,
 } from "@utils/accounts";
@@ -45,8 +47,10 @@ import {
   Download,
   Eye,
   FileText,
+  Pencil,
   Plus,
   Receipt,
+  Trash2,
 } from "lucide-react";
 import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
 
@@ -153,6 +157,9 @@ const InvoiceList = () => {
   // View invoice modal states
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<InvoiceData | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
 
   const toInvoiceViewData = useCallback((invoice: InvoiceData): InvoiceViewData => {
     const view = invoice as unknown as InvoiceViewData;
@@ -261,12 +268,54 @@ const InvoiceList = () => {
     }
   }, []);
 
+  const openDeleteInvoiceModal = useCallback((invoice: InvoiceData) => {
+    setDeleteTarget(invoice);
+    setDeleteModalOpen(true);
+  }, []);
+
+  const closeDeleteInvoiceModal = useCallback(() => {
+    if (deletingInvoice) return;
+    setDeleteModalOpen(false);
+    setDeleteTarget(null);
+  }, [deletingInvoice]);
+
+  const confirmDeleteInvoice = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeletingInvoice(true);
+    try {
+      await deleteInvoice(deleteTarget.id);
+      toast.success("Invoice deleted");
+      setRefreshKey((prev) => prev + 1);
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
+    } catch (error) {
+      toast.error(`Failed to delete invoice: ${getErrorMessage(error)}`);
+    } finally {
+      setDeletingInvoice(false);
+    }
+  }, [deleteTarget]);
+
   const invoiceTableActions: GenericTableAction<InvoiceData>[] = useMemo(
     () => [
       {
         label: "View",
         icon: <Eye size={16} />,
         onClick: (row: InvoiceData) => handleViewInvoice(row),
+      },
+      {
+        label: "Edit",
+        icon: <Pencil size={16} />,
+        show: (row: InvoiceData) =>
+          String(row.status ?? "").trim().toLowerCase() === STATUS_PENDING,
+        onClick: (row: InvoiceData) =>
+          router.push(`/billing/invoices/edit/${row.id}`),
+      },
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        show: (row: InvoiceData) =>
+          String(row.status ?? "").trim().toLowerCase() === STATUS_PENDING,
+        onClick: (row: InvoiceData) => openDeleteInvoiceModal(row),
       },
       {
         label: "Pay Now",
@@ -288,8 +337,15 @@ const InvoiceList = () => {
       handleViewInvoice,
       handlePayInvoice,
       handleDownloadPDF,
+      openDeleteInvoiceModal,
     ],
   );
+
+  const deleteModalItemName = useMemo(() => {
+    if (!deleteTarget) return undefined;
+    if (deleteTarget.invoice_number) return `Invoice #${String(deleteTarget.invoice_number)}`;
+    return `Invoice #${String(deleteTarget.id)}`;
+  }, [deleteTarget]);
 
   const invoiceFilterFields: FilterField[] = useMemo(
     () => [
@@ -813,6 +869,17 @@ const InvoiceList = () => {
       />
 
       {invoicePaymentModal}
+
+      <DeleteConfirmationModal
+        show={deleteModalOpen}
+        onHide={closeDeleteInvoiceModal}
+        onConfirm={() => {
+          confirmDeleteInvoice().catch(() => undefined);
+        }}
+        itemType="invoice"
+        itemName={deleteModalItemName}
+        loading={deletingInvoice}
+      />
 
       {/* View Invoice Modal */}
       <InvoiceViewModal

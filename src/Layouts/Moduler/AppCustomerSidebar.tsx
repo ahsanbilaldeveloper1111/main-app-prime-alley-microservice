@@ -662,9 +662,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       subItems: [
       
         //outbound start
+
+        {
+          id: 'voicebot-outbound-dashboard',
+          title: 'Outbound Dashboard',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
+          url: '/voicebot/outbound/dashboard'
+        },
+
         {
           id: 'voicebot-outbound-voicebots',
-          title: 'Outbound Bots',
+          title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
           url: '/voicebot/outbound/voicebots'
