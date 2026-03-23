@@ -673,6 +673,18 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         if (v == null) {
           return null;
         }
+        if (typeof v === "string") {
+          return v;
+        }
+        if (typeof v === "number") {
+          return v.toString();
+        }
+        if (typeof v === "boolean") {
+          return v ? "true" : "false";
+        }
+        if (typeof v === "bigint") {
+          return v.toString();
+        }
         if (typeof v === "object") {
           try {
             return JSON.stringify(v);
@@ -680,7 +692,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
             return null;
           }
         }
-        return String(v);
+        return null;
       })(),
       lifecycle_stage: (d.lifecycle_stage as string) ?? "",
       disposition: (d.disposition as string) ?? (item.disposition as string) ?? "",
