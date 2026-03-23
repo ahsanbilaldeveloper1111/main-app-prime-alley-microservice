@@ -3,8 +3,7 @@ import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
-import { getCalls, getCallsStats, getBots, getCall } from "@utils/voicebot/inbound";
-import { GetCompanies } from "@utils/users";
+import { getCalls, getCallsStats, getBots, getCall, getCompanies } from "@utils/voicebot/inbound";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
 import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
@@ -95,11 +94,7 @@ const CallsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      if (res === false) {
-        setCompanies([]);
-        return;
-      }
+      const res = await getCompanies();
       setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       toast.error("Failed to load companies");

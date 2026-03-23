@@ -22,6 +22,7 @@ import {
   getCustomerProductPricingList,
 } from "@utils/accounts";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
+import type { CustomerProductPricingDataItem } from "@utils/accounts";
 import { getMinifiedCompanies } from "@utils/crm";
 import moment from "moment";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
@@ -46,6 +47,59 @@ interface Product {
   created: string;
 }
 
+const normalizePricingStatus = (
+  value: unknown,
+): CustomerProductPricingDataItem["status"] => {
+  const raw =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
+  const s = raw.trim();
+  if (
+    s === "Active" ||
+    s === "Trial" ||
+    s === "In Progress" ||
+    s === "Suspended" ||
+    s === "Inactive"
+  ) {
+    return s;
+  }
+  return "Active";
+};
+
+const normalizeBillingCycle = (
+  value: unknown,
+): CustomerProductPricingDataItem["billing_cycle"] => {
+  const raw =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
+  const s = raw.trim();
+  if (s === "one time" || s === "monthly" || s === "quarterly" || s === "yearly") {
+    return s;
+  }
+  return "one time";
+};
+
+const buildEditPricingItem = (row: any): CustomerProductPricingDataItem | null => {
+  console.log(row);
+  const rawId = row?.product_id ?? row?.product?.id ?? row?.id;
+  const id = Number(rawId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  return {
+    product_id: id,
+    selling_price: Number(row?.selling_price ?? 0) || 0,
+    discount_applicability_id: row?.discount_applicability_id ?? null,
+    custom_description: String(row?.custom_description ?? ""),
+    is_active: Boolean(row?.is_active ?? row?.product?.is_active ?? true),
+    renewal_start_date: String(row?.renewal_start_date ?? today),
+    renewal_end_date: String(row?.renewal_end_date ?? today),
+    status: normalizePricingStatus(row?.status),
+    billing_cycle: normalizeBillingCycle(row?.billing_cycle),
+    subscriptions: Math.max(0, Number(row?.subscriptions ?? 0) || 0),
+    product: row?.product ?? null,
+
+  };
+};
+
 const ProductDetails = () => {
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
@@ -61,6 +115,12 @@ const ProductDetails = () => {
     productId: string | number;
     name?: string;
   } | null>(null);
+
+  const [showEditSubscriptionModal, setShowEditSubscriptionModal] = useState(false);
+  const [editSubscriptionModalKey, setEditSubscriptionModalKey] = useState(0);
+  const [editInitialPricingData, setEditInitialPricingData] = useState<
+    CustomerProductPricingDataItem[] | undefined
+  >(undefined);
 
 
   useEffect(() => {
@@ -211,6 +271,20 @@ const ProductDetails = () => {
   const handleCreateSubscriptionAndAddAnother = useCallback(() => {
     setCreateSubscriptionModalKey((k) => k + 1);
     setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleEditSubscriptionSaved = useCallback(() => {
+    setShowEditSubscriptionModal(false);
+    setEditInitialPricingData(undefined);
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const handleOpenEditModal = useCallback((row: any) => {
+    const item = buildEditPricingItem(row);
+    if (!item) return;
+    setEditInitialPricingData([item]);
+    setEditSubscriptionModalKey((k) => k + 1);
+    setShowEditSubscriptionModal(true);
   }, []);
 
   const handleDeletePricing = useCallback(
@@ -372,24 +446,39 @@ const ProductDetails = () => {
           const productId = row?.product_id ?? row?.product?.id ?? row?.id;
           const isDeleting = deletingProductId != null && deletingProductId === productId;
           return (
-            <Button
-              size="sm"
-              variant="outline-danger"
-              disabled={!productId || isDeleting}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!productId) return;
-                openDeleteConfirmation(row);
-              }}
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button
+                size="sm"
+                variant="outline-primary"
+                disabled={!productId || isDeleting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleOpenEditModal(row);
+                }}
+              >
+                Edit
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline-danger"
+                disabled={!productId || isDeleting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!productId) return;
+                  openDeleteConfirmation(row);
+                }}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
           );
         },
       },
     ],
-    [deletingProductId, handleDeletePricing]
+    [deletingProductId, handleOpenEditModal, openDeleteConfirmation]
   );
 
   const [selectedProductView, setSelectedProductView] = useState<any>(null);
@@ -850,6 +939,21 @@ const ProductDetails = () => {
           onClose={() => setShowCreateSubscriptionModal(false)}
           onCreate={handleCreateSubscription}
           onCreateAndAddAnother={handleCreateSubscriptionAndAddAnother}
+        />
+      )}
+
+      {showEditSubscriptionModal && (
+        <CreateSubscriptionModal
+          key={editSubscriptionModalKey}
+          mode="edit"
+          initialPricingData={editInitialPricingData}
+          customerId={selectedCompanyId}
+          onClose={() => {
+            setShowEditSubscriptionModal(false);
+            setEditInitialPricingData(undefined);
+          }}
+          onCreate={handleEditSubscriptionSaved}
+          onCreateAndAddAnother={handleEditSubscriptionSaved}
         />
       )}
 

@@ -121,22 +121,53 @@ const getInitials = (name: string): string => {
   return "NA";
 };
 
-// Helper function to generate a random background color based on name
+// Helper function to generate a consistent background color based on name
 const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
+  if (name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (name.codePointAt(i) ?? 0) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
+    const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
+    return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
   }
+  return "#6c757d";
+};
 
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
+// Product field accessors (shared between table columns and sidebar)
+function getProductDisplayName(row: { id?: unknown; name?: string; title?: string } | null): string {
+  const name = row?.name ?? row?.title;
+  if (name) return name;
+  if (row?.id == null) return "N/A";
+  const idDisplay =
+    typeof row.id === "string" || typeof row.id === "number"
+      ? String(row.id)
+      : "?";
+  return `Product #${idDisplay}`;
+}
+const getProductSku = (row: { sku?: string; data?: { sku?: string } } | null, emptyFallback = "--"): string =>
+  row?.sku ?? row?.data?.sku ?? emptyFallback;
+const getProductTaxCategory = (row: { tax_category?: string; data?: { tax_category?: string } } | null): string =>
+  row?.tax_category ?? row?.data?.tax_category ?? "Standard";
+const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?: unknown } } | null, emptyFallback = "--"): string => {
+  const price = row?.base_price ?? row?.data?.base_price;
+  return price == null ? emptyFallback : `AED ${Number(price).toLocaleString()}`;
+};
 
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
+const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
+  padding: "9px 13px",
+  backgroundColor: "#000000",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "4px",
+  fontSize: "12px",
+  fontWeight: 500,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
 };
 
 const BillingManagement = () => {
@@ -191,7 +222,7 @@ const BillingManagement = () => {
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [] as Array<{
       id: string;
       field_name: string;
@@ -594,8 +625,7 @@ const BillingManagement = () => {
   const openProductDeleteModal = useCallback((row: any) => {
     const id = Number(row?.id);
     if (!Number.isFinite(id) || id <= 0) return;
-    const name = String(row?.name ?? row?.title ?? `Product #${id}`);
-    setProductToDelete({ id, name });
+    setProductToDelete({ id, name: getProductDisplayName(row) });
     setShowProductDeleteModal(true);
   }, []);
 
@@ -614,6 +644,20 @@ const BillingManagement = () => {
       setDeletingProduct(false);
     }
   }, [fetchCrmData, productToDelete]);
+
+  const openProductEditModal = useCallback(
+    (rowOrId: { id?: unknown } | number, closeSidebarFirst = false) => {
+      const id =
+        typeof rowOrId === "number"
+          ? rowOrId
+          : Number((rowOrId as { id?: unknown })?.id);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (closeSidebarFirst) setShowProspectSidebar(false);
+      setEditingProductId(id);
+      setShowCreateProductModal(true);
+    },
+    [],
+  );
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -738,7 +782,7 @@ const BillingManagement = () => {
             }}
             onClick={() => handleViewData(row)}
           >
-            {row.name || row.title || `Product #${row.id}`}
+            {getProductDisplayName(row)}
           </button>
         ),
       },
@@ -750,7 +794,7 @@ const BillingManagement = () => {
         type: "custom",
         render: (row) => (
           <span style={{ color: "#6b7280", fontSize: 13, fontFamily: "monospace" }}>
-            {row.sku || row.data?.sku || "--"}
+            {getProductSku(row)}
           </span>
         ),
       },
@@ -761,7 +805,7 @@ const BillingManagement = () => {
         type: "custom",
         render: (row) => (
           <span style={{ color: "#374151", fontSize: 13 }}>
-            {row.tax_category || row.data?.tax_category || "Standard"}
+            {getProductTaxCategory(row)}
           </span>
         ),
       },
@@ -772,9 +816,7 @@ const BillingManagement = () => {
         type: "custom",
         render: (row) => (
           <span style={{ color: "#374151", fontSize: 13, fontWeight: 500 }}>
-            {row.base_price != null || row.data?.base_price != null
-              ? `AED ${Number(row.base_price ?? row.data?.base_price).toLocaleString()}`
-              : "--"}
+            {formatProductPriceAED(row)}
           </span>
         ),
       },
@@ -800,12 +842,7 @@ const BillingManagement = () => {
             <Button
               variant="outline-primary"
               size="sm"
-              onClick={() => {
-                const id = Number(row?.id);
-                if (!Number.isFinite(id) || id <= 0) return;
-                setEditingProductId(id);
-                setShowCreateProductModal(true);
-              }}
+              onClick={() => openProductEditModal(row)}
             >
               <FiEdit size={16} />
             </Button>
@@ -820,28 +857,20 @@ const BillingManagement = () => {
         },
       },
     ],
-    [handleViewData],
+    [handleViewData, openProductEditModal, openProductDeleteModal],
   );
 
   // Define table actions
   const productsActions: TableAction<any>[] = useMemo(
     () => [
-      
-          
-            {
-              label: "Edit",
-              icon: <FiEdit size={16} />,
-              onClick: (row: any) => {
-                const id = Number(row?.id);
-                if (!Number.isFinite(id) || id <= 0) return;
-                setEditingProductId(id);
-                setShowCreateProductModal(true);
-              },
-              variant: "link" as const,
-            },
-           
+      {
+        label: "Edit",
+        icon: <FiEdit size={16} />,
+        onClick: (row: any) => openProductEditModal(row),
+        variant: "link" as const,
+      },
     ],
-    [session, router, handleViewData],
+    [openProductEditModal],
   );
 
   // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
@@ -860,22 +889,8 @@ const BillingManagement = () => {
      
 
 <button
-          onClick={() => {
-            router.push('/billing/products/manage-categories')
-          }}
-          style={{
-            padding: "9px 13px",
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
+          onClick={() => router.push("/billing/products/manage-categories")}
+          style={ACTION_BUTTON_BASE_STYLE}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "#1a1a1a";
           }}
@@ -885,26 +900,10 @@ const BillingManagement = () => {
         >
           <Plus size={16} />
           Manage Categories
-      </button>
-      
-     
+        </button>
         <button
-          onClick={() => {
-            setShowCreateProductModal(true)
-          }}
-          style={{
-            padding: "9px 13px",
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
+          onClick={() => setShowCreateProductModal(true)}
+          style={ACTION_BUTTON_BASE_STYLE}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "#1a1a1a";
           }}
@@ -1278,8 +1277,8 @@ const BillingManagement = () => {
           <GenericSidebar
             isOpen={showProspectSidebar}
             onClose={handleCloseProspectSidebar}
-            title={selectedProspect?.name || selectedProspect?.title || `Product #${selectedProspect?.id}` || "Product Details"}
-            subtitle={selectedProspect?.data?.sku || selectedProspect?.sku || ""}
+            title={getProductDisplayName(selectedProspect) || "Product Details"}
+            subtitle={getProductSku(selectedProspect)}
             email={session?.user?.email || ""}
             phone={""}
             senderName={session?.user?.name || ""}
@@ -1312,15 +1311,8 @@ const BillingManagement = () => {
               items: [
                 {
                   label: "Edit Product",
-                  onClick: () => {
-                    const id = selectedProspect?.id;
-                    if (!id) return;
-                    setShowProspectSidebar(false);
-                    setEditingProductId(Number(id));
-                    setShowCreateProductModal(true);
-                  },
+                  onClick: () => openProductEditModal(selectedProspect, true),
                 },
-                
               ],
             }}
             sections={[
@@ -1333,40 +1325,32 @@ const BillingManagement = () => {
                 actions: [
                   {
                     label: "Edit all properties",
-                    onClick: () => {
-                      const id = selectedProspect?.id;
-                      if (!id) return;
-                      setShowProspectSidebar(false);
-                      setEditingProductId(Number(id));
-                      setShowCreateProductModal(true);
-                    },
+                    onClick: () => openProductEditModal(selectedProspect, true),
                   },
                 ],
                 fields: [
                   {
                     label: "Product Name",
-                    value: selectedProspect?.name || selectedProspect?.title || `Product #${selectedProspect?.id}` || "N/A",
+                    value: getProductDisplayName(selectedProspect),
                     copyable: true,
                   },
                   {
                     label: "SKU",
-                    value: selectedProspect?.sku || selectedProspect?.data?.sku || "N/A",
+                    value: getProductSku(selectedProspect, "N/A"),
                     copyable: true,
                   },
                   {
                     label: "Status",
-                    value: selectedProspect?.status || "N/A",
+                    value: selectedProspect?.status ?? "N/A",
                   },
                   {
                     label: "Price AED",
-                    value: (selectedProspect?.base_price != null || selectedProspect?.data?.base_price != null)
-                      ? `AED ${Number(selectedProspect?.base_price ?? selectedProspect?.data?.base_price).toLocaleString()}` 
-                      : "N/A",
+                    value: formatProductPriceAED(selectedProspect, "N/A"),
                     copyable: true,
                   },
                   {
                     label: "Tax Category",
-                    value: selectedProspect?.tax_category || selectedProspect?.data?.tax_category || "Standard",
+                    value: getProductTaxCategory(selectedProspect),
                   },
                  
                   {

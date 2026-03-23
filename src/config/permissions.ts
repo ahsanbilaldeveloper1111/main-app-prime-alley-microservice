@@ -265,7 +265,9 @@ export const routePermissions: RoutePermission[] = [
             { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
             { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
-            { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
+            { path: '/invoices', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            { path: '/invoices/create', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
             { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
             { path: '/create-invoice', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
             { path: '/payments', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
@@ -744,6 +746,7 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
         children: [
             { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/voicebots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
