@@ -3345,8 +3345,8 @@ const CrmDeals = () => {
                     label: "Owner",
                 value: getNameByExtension(
                   (selectedDeal as any)?.assigned_to) || "Unassigned",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
+                    hasDetails: false,
+                    onDetailsClick: () => {},
                   },
                   {
                     label: "Created Date",

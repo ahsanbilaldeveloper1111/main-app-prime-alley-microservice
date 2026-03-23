@@ -3992,8 +3992,8 @@ const CrmLeads = () => {
                     value:
                       getNameByExtension(selectedLead?.user_extension) ||                     
                       "Unassigned",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
+                    hasDetails: false,
+                    onDetailsClick: () => {},
                   },
                   {
                     label: "Lead Score",

@@ -7491,8 +7491,8 @@ const CrmProspectsManagement = () => {
                     value: selectedProspect?.data?.contact_owner
                       ? getNameByExtension(selectedProspect.data.contact_owner)
                       : "—",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
+                    hasDetails: false,
+                    onDetailsClick: () => {},
                   },
                   {
                     label: "Campaign",

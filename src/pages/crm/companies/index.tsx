@@ -2006,7 +2006,9 @@ const CrmCompanyManagement = () => {
   // Handle view data item
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
-    setShowViewModal(true);
+    setSelectedCompany(item);
+    setShowCompanySidebar(true);
+    setShowViewModal(false);
   }, []);
 
   // Fetch call recordings (not call logs) for the selected company
@@ -2665,35 +2667,65 @@ const CrmCompanyManagement = () => {
 
   // Stats cards data for metrics
   const companyStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "Companies missing Owner",
-        value: dataList.filter(
-          (p: any) => !p.user_extension || p.user_extension === "",
-        ).length,
-      },
-      {
-        title: "Companies missing Lead Status",
-        value: dataList.filter(
-          (p: any) => !p.disposition || p.disposition === "",
-        ).length,
-      },
-      {
-        title: "Companies never called",
-        value: dataList.filter((p: any) => !p.last_called_at).length,
-      },
-      {
-        title: "Companies with no recent activity",
-        value: dataList.filter((p: any) => {
-          if (!p.last_called_at) return true;
-          const daysSinceActivity = moment().diff(
-            moment(p.last_called_at),
-            "days",
-          );
-          return daysSinceActivity > 30;
-        }).length,
-      },
-    ],
+    () => {
+      const missingOwnerCount = dataList.filter(
+        (p: any) => !p.user_extension || p.user_extension === "",
+      ).length;
+      const missingLeadStatusCount = dataList.filter(
+        (p: any) => !p.disposition || p.disposition === "",
+      ).length;
+      const neverCalledCount = dataList.filter((p: any) => !p.last_called_at)
+        .length;
+      const noRecentActivityCount = dataList.filter((p: any) => {
+        if (!p.last_called_at) return true;
+        const daysSinceActivity = moment().diff(
+          moment(p.last_called_at),
+          "days",
+        );
+        return daysSinceActivity > 30;
+      }).length;
+
+      return [
+        {
+          title: "Companies missing Owner",
+          value: missingOwnerCount,
+          icon: User,
+          iconColor: "#1D4ED8",
+          iconBgColor: "#DBEAFE",
+          subtitle: "No company owner is assigned",
+        },
+        {
+          title: "Companies missing Lead Status",
+          value: missingLeadStatusCount,
+          icon: ClipboardList,
+          iconColor: "#7C3AED",
+          iconBgColor: "#EDE9FE",
+          subtitle: "Disposition/status is empty",
+        },
+        {
+          title: "Companies never called",
+          value: neverCalledCount,
+          icon: PhoneIcon,
+          iconColor: "#D97706",
+          iconBgColor: "#FEF3C7",
+          metric: {
+            text: "No call activity recorded yet",
+            dotColor: "#D97706",
+          },
+        },
+        {
+          title: "Companies with no recent activity",
+          value: noRecentActivityCount,
+          icon: ClockIcon,
+          iconColor: "#BE123C",
+          iconBgColor: "#FFE4E6",
+          metric: {
+            text: "Last activity over 30 days",
+            dotColor: "#BE123C",
+          },
+        },
+      ];
+    },
     [dataList],
   );
 
@@ -2870,6 +2902,7 @@ const CrmCompanyManagement = () => {
                       setConvertingCompanyId(row.id);
                       setShowConvertToLeadModal(true);
                     },
+                    show: () => false,
                   },
                   {
                     label: "Send Email",
@@ -5186,7 +5219,7 @@ const CrmCompanyManagement = () => {
                   ],
                   activeTab: activeFilter,
                   onTabChange: handleFilterChange,
-                  onTabAdd: () => setShowTabModal(true),
+                  onTabAdd: () => undefined,
                   onTabRemove: (tabId) => {
                     setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
                     if (activeFilter === tabId) {
@@ -5596,7 +5629,7 @@ const CrmCompanyManagement = () => {
           )}
 
           {/* View Data Modal - Redesigned */}
-          {selectedDataItem && (
+          {selectedDataItem && showViewModal && (
             <Modal
               show={showViewModal}
               onHide={() => setShowViewModal(false)}

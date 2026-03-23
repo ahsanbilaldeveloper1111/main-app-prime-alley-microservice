@@ -54,6 +54,7 @@ import {
   sendWhatsApp,
   getEmails,
   sendEmail,
+  sendSms,
   type SmsListItem,
   type SmsListMeta,
 } from "@utils/communication";
@@ -68,11 +69,13 @@ import RichNoteEditor from "@components/RichNoteEditor";
 import EmailModal from "@components/EmailModal";
 import TaskModal from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
+import LogSmsModal from "@components/LogSms";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { useSession } from "next-auth/react";
 import moment from "moment-timezone";
 import { useRouter } from "next/router";
+import { toast } from "react-toastify";
 
 // -----------------------------------------------------------------------------
 // Types
@@ -373,6 +376,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   const [smsPerPage, setSmsPerPage] = useState(15);
   const [selectedSmsId, setSelectedSmsId] = useState<number | null>(null);
   const [showSmsModal, setShowSmsModal] = useState(false);
+  const [showCreateSmsModal, setShowCreateSmsModal] = useState(false);
   const [whatsappChats, setWhatsappChats] = useState<WhatsAppChatItem[]>([]);
   const [whatsappChatsLoading, setWhatsappChatsLoading] = useState(false);
   const [whatsappChatsError, setWhatsappChatsError] = useState<string | null>(
@@ -1039,6 +1043,43 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     }
   }, [taskToDelete, fetchTasks]);
 
+  const handleSmsLog = useCallback(
+    async (smsData: {
+      message: string;
+      contacts: Array<{ id: string; name: string; email?: string }>;
+      activityDate: string;
+      createTask: boolean;
+      taskDueDate?: string;
+      attachments: File[];
+    }) => {
+      const to = (record?.data?.phone ?? "").replace(/\s/g, "").trim();
+      const body = smsData.message?.trim() ?? "";
+      if (!to) {
+        toast.error("No phone number available for this record.");
+        return;
+      }
+      if (!body) {
+        toast.error("Please enter a message.");
+        return;
+      }
+      try {
+        await sendSms({
+          to,
+          message: body,
+          tenant_id: tenantId || "default",
+          extension,
+          ...(recordType && { record_type: recordType }),
+          ...(recordId != null && { record_id: Number(recordId) }),
+        });
+        setShowCreateSmsModal(false);
+        await fetchSms();
+      } catch {
+        // sendSms shows toast on error
+      }
+    },
+    [record?.data?.phone, tenantId, extension, recordType, recordId, fetchSms],
+  );
+
   const handleWhatsAppReplySend = useCallback(async () => {
     if (
       selectedWhatsAppChatId == null ||
@@ -1470,6 +1511,37 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           >
             <Calendar size={16} />
             Create meeting
+          </button>
+        </div>
+      )}
+      {activityFilter === "sms" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: "12px",
+            marginBottom: "20px",
+          }}
+        >
+          <button
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #414141",
+              borderRadius: "4px",
+              fontSize: "12px",
+              fontWeight: "300",
+              color: "#141414",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+            onClick={() => setShowCreateSmsModal(true)}
+          >
+            <MessageSquare size={16} />
+            Create SMS
           </button>
         </div>
       )}
@@ -3283,6 +3355,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           />
         </>
       )}
+
+      <LogSmsModal
+        isOpen={showCreateSmsModal}
+        onClose={() => setShowCreateSmsModal(false)}
+        associatedRecords={recordName ? [recordName] : []}
+        onSave={handleSmsLog}
+      />
 
       {editMeetingModalOpen && (
         <MeetingModal
