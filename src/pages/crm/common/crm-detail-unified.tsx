@@ -670,7 +670,17 @@ const ProspectDetailPage: NextPageWithLayout = () => {
       campaign_id: (item.campaign_id ?? d.campaign_id ?? null) as number | null,
       contact_owner: (() => {
         const v = item.user_extension ?? d.contact_owner ?? item.contact_owner;
-        return v == null ? null : String(v);
+        if (v == null) {
+          return null;
+        }
+        if (typeof v === "object") {
+          try {
+            return JSON.stringify(v);
+          } catch {
+            return null;
+          }
+        }
+        return String(v);
       })(),
       lifecycle_stage: (d.lifecycle_stage as string) ?? "",
       disposition: (d.disposition as string) ?? (item.disposition as string) ?? "",
