@@ -31,6 +31,7 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
   onAddClick,
 }: Readonly<CrmAssociatedRecordsSectionCardProps<TItem>>) {
   const isCollapsed = collapsedSections.has(sectionId);
+  const sectionContentId = `${sectionId}-content`;
 
   return (
     <div
@@ -43,16 +44,22 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
         border: "1px solid #cccccc",
       }}
     >
-      <div
+      <button
+        type="button"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          width: "100%",
+          border: "none",
+          textAlign: "left",
           padding: "14px 20px 0",
           cursor: "pointer",
           backgroundColor: "#ffffff",
         }}
         onClick={() => toggleSection(sectionId)}
+        aria-expanded={!isCollapsed}
+        aria-controls={sectionContentId}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
           <ChevronDown
@@ -87,10 +94,10 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
             <span style={{ fontSize: "12px", fontWeight: "500" }}>Add</span>
           </button>
         )}
-      </div>
+      </button>
 
       {!isCollapsed && (
-        <div style={{ padding: "20px" }}>
+        <div id={sectionContentId} style={{ padding: "20px" }}>
           {items.length === 0 ? (
             emptyState
           ) : (

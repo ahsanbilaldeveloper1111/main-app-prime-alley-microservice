@@ -147,13 +147,14 @@ const SCROLL_STYLES = `
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 `;
 
-export function CrmDetailPageLayout({
+export function CrmDetailPageLayout( // NOSONAR
+{
   config,
   canSendWhatsApp,
-}: {
+}: Readonly<{
   config: CrmDetailPageLayoutConfig;
   canSendWhatsApp: boolean;
-}) {
+}>) {
   type DeviceSelectionDevice = {
     deviceType: string;
     deviceName: string;
@@ -201,7 +202,7 @@ export function CrmDetailPageLayout({
 
   const orderAmountStageText = useMemo(() => {
     if (config.recordType !== "order") return null;
-    const order = config.record as unknown as Record<string, unknown> | null;
+    const order = config.record as Record<string, unknown> | null;
     if (!order) return config.avatarSubtitle ?? "—";
 
     // Match existing order UI: treat 0 as "no amount" (via `||`).
@@ -395,28 +396,172 @@ export function CrmDetailPageLayout({
 
   const sidebarCtx = { collapsedSections, toggleSection };
   const activeTabCustomContent = config.renderCustomTabContent?.(activeTab, sidebarCtx);
+  let mainTabContent: ReactNode = activeTabCustomContent;
+  if (activeTabCustomContent === undefined) {
+    if (activeTab === "about") {
+      mainTabContent = (
+        <>
+          <CrmRecordSummarySection
+            isCollapsed={collapsedSections.has("breeze")}
+            onToggle={() => toggleSection("breeze")}
+            summary={config.summary}
+            metaLabel={config.summaryMetaLabel}
+            onRefreshClick={config.onRefreshSummary}
+          />
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              borderRadius: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <CrmProfileSection
+              title={config.profileSectionTitle ?? "Contact profile"}
+              fields={config.profileFields}
+            />
+          </div>
+        </>
+      );
+    } else if (activeTab === "activities") {
+      mainTabContent = (
+        <CrmActivitiesPanel
+          ref={activitiesPanelRef}
+          recordType={config.recordType}
+          recordId={config.recordId}
+          record={
+            config.activitiesRecord as Parameters<typeof CrmActivitiesPanel>[0]["record"]
+          }
+          recordLoading={config.recordLoading}
+          recordName={config.recordName}
+          canSendWhatsApp={canSendWhatsApp}
+          onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
+          onWhatsAppChatClick={config.onWhatsAppChatClick}
+          {...activityModals.crmActivitiesPanelProps}
+        />
+      );
+    } else if (activeTab === "intelligence") {
+      mainTabContent = (
+        <CrmIntelligenceTab
+          company={config.company}
+          relatedCompany={config.relatedCompany}
+          showCompanyEnrichmentUI={config.recordType === "company"}
+        />
+      );
+    } else {
+      mainTabContent = null;
+    }
+  }
+  let primarySidebarContent: ReactNode = null;
+  if (config.renderRightSidebarPrimary) {
+    primarySidebarContent = config.renderRightSidebarPrimary(sidebarCtx);
+  } else if (config.showAssociatedCompanyCard !== false) {
+    primarySidebarContent = (
+      <CrmAssociatedCompaniesCard
+        sectionId="companies"
+        collapsedSections={collapsedSections}
+        toggleSection={toggleSection}
+        companyName={config.associatedCompany.companyName}
+        primaryPhone={config.associatedCompany.primaryPhone}
+        phones={config.associatedCompany.phones}
+        companyId={config.associatedCompany.companyId}
+      />
+    );
+  }
   const rightSidebarContent = config.rightSidebarSections?.length
     ? config.rightSidebarSections.map((section) => (
         <React.Fragment key={section.id}>{section.render(sidebarCtx)}</React.Fragment>
       ))
     : (
         <>
-          {config.renderRightSidebarPrimary ? (
-            config.renderRightSidebarPrimary(sidebarCtx)
-          ) : config.showAssociatedCompanyCard !== false ? (
-            <CrmAssociatedCompaniesCard
-              sectionId="companies"
-              collapsedSections={collapsedSections}
-              toggleSection={toggleSection}
-              companyName={config.associatedCompany.companyName}
-              primaryPhone={config.associatedCompany.primaryPhone}
-              phones={config.associatedCompany.phones}
-              companyId={config.associatedCompany.companyId}
-            />
-          ) : null}
+          {primarySidebarContent}
           {config.renderRightSidebarExtra?.(sidebarCtx)}
         </>
       );
+  const headerAvatar = (() => {
+    if (config.recordType === "deal") {
+      return (
+        <div
+          className="crmLeftSidebarAvatarCircle"
+          style={{
+            width: "40px",
+            height: "37px",
+            borderRadius: "26px",
+            background: "#e3f2fd",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#141414",
+            flexShrink: 0,
+          }}
+        >
+          <Handshake size={20} />
+        </div>
+      );
+    }
+
+    if (config.recordType === "order") {
+      return (
+        <div
+          style={{
+            width: "40px",
+            height: "37px",
+            borderRadius: "26px",
+            background: "#e3f2fd",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <ShoppingBag size={20} />
+        </div>
+      );
+    }
+
+    if (config.recordType === "company") {
+      return (
+        <div
+          style={{
+            width: "40px",
+            height: "37px",
+            borderRadius: "26px",
+            background: "#e0e7f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Building2 size={20} style={{ color: "#4f46e5" }} />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          width: "40px",
+          height: "37px",
+          borderRadius: "26px",
+          background: "#efe7f0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "10px",
+          fontWeight: "400",
+          color: "#141414",
+          flexShrink: 0,
+        }}
+      >
+        {config.avatarDisplayName
+          ? (config.avatarDisplayName.match(/\b\w/g) ?? [])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()
+          : "—"}
+      </div>
+    );
+  })();
 
   if (config.recordLoading) {
     return (
@@ -586,187 +731,132 @@ export function CrmDetailPageLayout({
 
             <div style={{ paddingTop: "16px", paddingBottom: 0, paddingLeft: "24px", paddingRight: "24px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
-                {config.recordType === "deal" ? (
-                  <div
-                    className="crmLeftSidebarAvatarCircle"
-                    style={{
-                      width: "40px",
-                      height: "37px",
-                      borderRadius: "26px",
-                      background: "#e3f2fd",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#141414",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Handshake size={20} />
-                  </div>
-                ) : config.recordType === "order" ? (
-                  <div
-                    style={{
-                      width: "40px",
-                      height: "37px",
-                      borderRadius: "26px",
-                      background: "#e3f2fd",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ShoppingBag size={20} />
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      width: "40px",
-                      height: "37px",
-                      borderRadius: "26px",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {config.recordType === "company" ? (
-                      <div
-                        style={{
-                          width: "40px",
-                          height: "37px",
-                          borderRadius: "26px",
-                          background: "#e0e7f0",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Building2 size={20} style={{ color: "#4f46e5" }} />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: "40px",
-                          height: "37px",
-                          borderRadius: "26px",
-                          background: "#efe7f0",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "10px",
-                          fontWeight: "400",
-                          color: "#141414",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {config.avatarDisplayName
-                          ? (config.avatarDisplayName.match(/\b\w/g) ?? [])
-                              .slice(0, 2)
-                              .join("")
-                              .toUpperCase()
-                          : "—"}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {headerAvatar}
                 <div style={{ flex: 1 }}>
                   <h2 style={{ fontSize: "22px", fontWeight: "500", color: "#141414", margin: "0 0 4px 0", lineHeight: "1.3" }}>
                     {config.avatarDisplayName ?? "—"}
                   </h2>
-                  {config.recordType === "order" ? (
-                    <>
-                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
-                        {orderAmountStageText ?? "N/A"}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {(() => {
+                    if (config.recordType === "order") {
+                      return (
+                        <>
+                          <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                            {orderAmountStageText ?? "N/A"}
+                          </p>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "14px", color: "#718096" }}>
+                              {config.headerSecondaryText ?? "No delivery date"}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    }
+
+                    if (config.recordType === "company") {
+                      return (
+                        <>
+                          <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                            {config.avatarSubtitle ?? "—"}
+                          </p>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            {config.primaryEmail ? (
+                              <>
+                                <a
+                                  href={`mailto:${config.primaryEmail}`}
+                                  style={{
+                                    fontSize: "14px",
+                                    color: "#006162",
+                                    textDecoration: "none",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  {config.primaryEmail}
+                                </a>
+                                <button
+                                  onClick={() => copyToClipboard(config.primaryEmail)}
+                                  style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    padding: "4px",
+                                    cursor: "pointer",
+                                    color: "#718096",
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                  title="Copy email"
+                                  type="button"
+                                >
+                                  <Copy size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: "14px", color: "#718096" }}>No email</span>
+                            )}
+                          </div>
+                        </>
+                      );
+                    }
+
+                    let defaultContactContent: ReactNode = (
+                      <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
+                    );
+                    if (config.headerSecondaryText) {
+                      defaultContactContent = (
                         <span style={{ fontSize: "14px", color: "#718096" }}>
-                          {config.headerSecondaryText ?? "No delivery date"}
+                          {config.headerSecondaryText}
                         </span>
-                      </div>
-                    </>
-                  ) : config.recordType === "company" ? (
-                    <>
-                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
-                        {config.avatarSubtitle ?? "—"}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {config.primaryEmail ? (
-                          <>
-                            <a
-                              href={`mailto:${config.primaryEmail}`}
-                              style={{
-                                fontSize: "14px",
-                                color: "#006162",
-                                textDecoration: "none",
-                                fontWeight: "500",
-                              }}
-                            >
-                              {config.primaryEmail}
-                            </a>
-                            <button
-                              onClick={() => copyToClipboard(config.primaryEmail)}
-                              style={{
-                                background: "transparent",
-                                border: "none",
-                                padding: "4px",
-                                cursor: "pointer",
-                                color: "#718096",
-                                display: "flex",
-                                alignItems: "center",
-                              }}
-                              title="Copy email"
-                              type="button"
-                            >
-                              <Copy size={14} />
-                            </button>
-                          </>
-                        ) : (
-                          <span style={{ fontSize: "14px", color: "#718096" }}>No email</span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
-                        {config.avatarSubtitle ?? "—"}
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {config.headerSecondaryText ? (
-                          <span style={{ fontSize: "14px", color: "#718096" }}>
-                            {config.headerSecondaryText}
-                          </span>
-                        ) : config.primaryEmail ? (
-                          <>
-                            <a
-                              href={`mailto:${config.primaryEmail}`}
-                              style={{ fontSize: "14px", color: "#006162", textDecoration: "none", fontWeight: "500" }}
-                              onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
-                            >
-                              {config.primaryEmail}
-                            </a>
-                            <button
-                              onClick={() => copyToClipboard(config.primaryEmail)}
-                              style={{
-                                background: "transparent",
-                                border: "none",
-                                padding: "4px",
-                                cursor: "pointer",
-                                color: "#718096",
-                                display: "flex",
-                                alignItems: "center",
-                              }}
-                              title="Copy email"
-                              type="button"
-                            >
-                              <Copy size={14} />
-                            </button>
-                          </>
-                        ) : (
-                          <span style={{ fontSize: "14px", color: "#718096" }}>—</span>
-                        )}
-                      </div>
-                    </>
-                  )}
+                      );
+                    } else if (config.primaryEmail) {
+                      defaultContactContent = (
+                        <>
+                          <a
+                            href={`mailto:${config.primaryEmail}`}
+                            style={{
+                              fontSize: "14px",
+                              color: "#006162",
+                              textDecoration: "none",
+                              fontWeight: "500",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.textDecoration = "underline";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.textDecoration = "none";
+                            }}
+                          >
+                            {config.primaryEmail}
+                          </a>
+                          <button
+                            onClick={() => copyToClipboard(config.primaryEmail)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "4px",
+                              cursor: "pointer",
+                              color: "#718096",
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                            title="Copy email"
+                            type="button"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </>
+                      );
+                    }
+
+                    return (
+                      <>
+                        <p style={{ fontSize: "14px", color: "#718096", margin: "0 0 8px 0", lineHeight: "1.4" }}>
+                          {config.avatarSubtitle ?? "—"}
+                        </p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {defaultContactContent}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -834,13 +924,25 @@ export function CrmDetailPageLayout({
               style={{
                 ...sectionHeaderRowStyle,
                 padding: "14px 20px",
-                cursor: "pointer",
                 backgroundColor: "#ffffff",
                 borderBottom: collapsedSections.has("key-info") ? "none" : "1px solid #cccccc",
               }}
-              onClick={() => toggleSection("key-info")}
             >
-              <div style={chevronTitleRowStyle}>
+              <button
+                type="button"
+                onClick={() => toggleSection("key-info")}
+                aria-expanded={!collapsedSections.has("key-info")}
+                aria-controls="key-info-section-content"
+                style={{
+                  ...chevronTitleRowStyle,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  flex: 1,
+                }}
+              >
                 <ChevronDown
                   size={18}
                   style={{
@@ -850,7 +952,7 @@ export function CrmDetailPageLayout({
                   }}
                 />
                 <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0 }}>Key information</h3>
-              </div>
+              </button>
               {config.recordType !== "company" && (
                 <button
                   onClick={(e) => e.stopPropagation()}
@@ -877,7 +979,7 @@ export function CrmDetailPageLayout({
               )}
             </div>
             {!collapsedSections.has("key-info") && (
-              <div style={{ padding: "20px", maxHeight: "480px", overflowY: "auto" }}>
+              <div id="key-info-section-content" style={{ padding: "20px", maxHeight: "480px", overflowY: "auto" }}>
                 {config.keyInfoFields.map((field) => (
                   <div key={field.label} style={{ marginBottom: "16px" }}>
                     <div style={{ fontSize: "13px", fontWeight: "400", color: "#666", marginBottom: "4px" }}>{field.label}</div>
@@ -965,44 +1067,7 @@ export function CrmDetailPageLayout({
           </div>
 
           <div style={{ padding: "14px 0", flex: 1 }}>
-            {activeTabCustomContent !== undefined ? (
-              activeTabCustomContent
-            ) : activeTab === "about" ? (
-              <>
-                <CrmRecordSummarySection
-                  isCollapsed={collapsedSections.has("breeze")}
-                  onToggle={() => toggleSection("breeze")}
-                  summary={config.summary}
-                  metaLabel={config.summaryMetaLabel}
-                  onRefreshClick={config.onRefreshSummary}
-                />
-                <div style={{ backgroundColor: "#ffffff", borderRadius: "10px", marginBottom: "20px" }}>
-                  <CrmProfileSection
-                    title={config.profileSectionTitle ?? "Contact profile"}
-                    fields={config.profileFields}
-                  />
-                </div>
-              </>
-            ) : activeTab === "activities" ? (
-              <CrmActivitiesPanel
-                ref={activitiesPanelRef}
-                recordType={config.recordType}
-                recordId={config.recordId}
-                record={config.activitiesRecord as Parameters<typeof CrmActivitiesPanel>[0]["record"]}
-                recordLoading={config.recordLoading}
-                recordName={config.recordName}
-                canSendWhatsApp={canSendWhatsApp}
-                onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
-                onWhatsAppChatClick={config.onWhatsAppChatClick}
-                {...activityModals.crmActivitiesPanelProps}
-              />
-            ) : activeTab === "intelligence" ? (
-              <CrmIntelligenceTab
-                company={config.company}
-                relatedCompany={config.relatedCompany}
-                showCompanyEnrichmentUI={config.recordType === "company"}
-              />
-            ) : null}
+            {mainTabContent}
           </div>
         </div>
 

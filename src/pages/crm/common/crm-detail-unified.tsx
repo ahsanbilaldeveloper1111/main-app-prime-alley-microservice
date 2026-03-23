@@ -1467,12 +1467,28 @@ const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
         backgroundColor: "#ffffff",
         borderBottom: borderBottomStyle,
       }}
-      onClick={onToggle}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          flex: 1,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          textAlign: "left",
+          cursor: "pointer",
+          font: "inherit",
+          color: "inherit",
+        }}
+      >
         <ChevronDown size={chevronSize} style={chevronStyle} />
         {renderTitle()}
-      </div>
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -1501,19 +1517,26 @@ const CollapsibleSectionHeader: React.FC<CollapsibleSectionHeaderProps> = ({
       </button>
     </div>
   ) : (
-    <div
+    <button
+      type="button"
       style={{
         display: "flex",
         alignItems: "center",
         gap: "8px",
         marginBottom: "16px",
         cursor: "pointer",
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        textAlign: "left",
+        font: "inherit",
+        color: "inherit",
       }}
       onClick={onToggle}
     >
       <ChevronDown size={chevronSize} style={chevronStyle} />
       {renderTitle()}
-    </div>
+    </button>
   );
 };
 
@@ -1947,7 +1970,9 @@ const DealDetailPage: NextPageWithLayout = () => {
     onEdit: handleOpenEditDeal,
     onDelete: () =>
       setDealToDelete({ id: dealRecordId, name: dealRecordName }),
-    onExport: handleDealExport,
+    onExport: () => {
+      void handleDealExport();
+    },
     deleteItemName: dealToDelete?.name ?? dealRecordName,
     onDeleteSuccess: async () => {
       if (!dealToDelete) return;
@@ -2000,11 +2025,11 @@ const DealDetailPage: NextPageWithLayout = () => {
             companyId={(deal as any)?.company?.id ?? (deal as any)?.company_id ?? null}
             viewAllLabel="View all associated Companies"
             viewAllHref={
-              (deal as any)?.company?.id != null
-                ? `/crm/detailspage?type=companies&id=${encodeURIComponent(
+              (deal as any)?.company?.id == null
+                ? "/crm/companies"
+                : `/crm/detailspage?type=companies&id=${encodeURIComponent(
                     String((deal as any)?.company?.id)
                   )}`
-                : "/crm/companies"
             }
           />
         ),
@@ -2023,7 +2048,8 @@ const DealDetailPage: NextPageWithLayout = () => {
                 border: "1px solid #cccccc",
               }}
             >
-              <div
+              <button
+                type="button"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -2031,6 +2057,12 @@ const DealDetailPage: NextPageWithLayout = () => {
                   padding: "14px 20px 0",
                   cursor: "pointer",
                   backgroundColor: "#ffffff",
+                  width: "100%",
+                  border: "none",
+                  margin: 0,
+                  textAlign: "left",
+                  font: "inherit",
+                  color: "inherit",
                 }}
                 onClick={() => toggleSection("contacts")}
               >
@@ -2049,7 +2081,7 @@ const DealDetailPage: NextPageWithLayout = () => {
                     Contacts ({deal?.decision_maker_name ?? deal?.decision_maker_email ? 1 : 0})
                   </h3>
                 </div>
-              </div>
+              </button>
               {!collapsedSections.has("contacts") && (
                 <div style={{ padding: "20px" }}>
                   {(deal?.decision_maker_name ?? deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.name) ? (
@@ -2109,12 +2141,27 @@ const DealDetailPage: NextPageWithLayout = () => {
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "14px 20px 0",
-                  cursor: "pointer",
                   backgroundColor: "#ffffff",
                 }}
-                onClick={() => toggleSection("attachments")}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection("attachments")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    flex: 1,
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    margin: 0,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    font: "inherit",
+                    color: "inherit",
+                  }}
+                >
                   <ChevronDown
                     size={18}
                     style={{
@@ -2128,7 +2175,7 @@ const DealDetailPage: NextPageWithLayout = () => {
                   <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#141414", margin: 0, lineHeight: "1.2" }}>
                     Attachments ({deal?.attachments?.length ?? 0})
                   </h3>
-                </div>
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2749,9 +2796,9 @@ const OrderDetailPage: NextPageWithLayout = () => {
       : undefined,
     primaryEmail: orderRecordEmail,
     activitiesRecord:
-      orderRecord?.data != null
-        ? { data: orderRecord.data as unknown, audit_trail: orderRecord.audit_trail }
-        : null,
+      orderRecord?.data == null
+        ? null
+        : { data: orderRecord.data as unknown, audit_trail: orderRecord.audit_trail },
     associatedCompany,
     showAssociatedCompanyCard: Boolean(relatedDeal),
     renderCustomTabContent: (tabId, ctx) => {
@@ -2760,13 +2807,20 @@ const OrderDetailPage: NextPageWithLayout = () => {
       return (
         <div>
           <div style={{ marginBottom: "24px" }}>
-            <div
+            <button
+              type="button"
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
                 marginBottom: "16px",
                 cursor: "pointer",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
               }}
               onClick={() => ctx.toggleSection("quote-to-cash")}
             >
@@ -2790,7 +2844,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               >
                 Quote-to-cash
               </h2>
-            </div>
+            </button>
 
             {!ctx.collapsedSections.has("quote-to-cash") && (
               <div
@@ -2808,13 +2862,20 @@ const OrderDetailPage: NextPageWithLayout = () => {
           </div>
 
           <div style={{ marginBottom: "24px" }}>
-            <div
+            <button
+              type="button"
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
                 marginBottom: "16px",
                 cursor: "pointer",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                textAlign: "left",
+                font: "inherit",
+                color: "inherit",
               }}
               onClick={() => ctx.toggleSection("e-commerce")}
             >
@@ -2838,7 +2899,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               >
                 e-Commerce
               </h2>
-            </div>
+            </button>
 
             {!ctx.collapsedSections.has("e-commerce") && (
               <div
@@ -2878,9 +2939,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               collapsedSections,
               toggleSection,
               items: dealItems,
-              renderItem: (deal) => (
-                <CrmDealListItemCard deal={deal as Record<string, unknown>} />
-              ),
+              renderItem: (deal) => <CrmDealListItemCard deal={deal} />,
               emptyState: (
                 <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
                   No deals associated.
@@ -2888,7 +2947,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               ),
               viewAllLabel: "View all associated Deals",
               onViewAllClick: () => {
-                const href = buildCrmDealsDetailpageHref((relatedDeal as any)?.id);
+                const href = buildCrmDealsDetailpageHref(relatedDeal?.id);
                 window.open(href, "_blank", "noopener,noreferrer");
               },
             })}
@@ -2901,9 +2960,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               collapsedSections,
               toggleSection,
               items: contactItems,
-              renderItem: (lead) => (
-                <CrmTicketListItemCard lead={lead as Record<string, unknown>} />
-              ),
+              renderItem: (lead) => <CrmTicketListItemCard lead={lead} />,
               emptyState: (
                 <p style={{ fontSize: "13px", color: "#666666", margin: 0 }}>
                   No contacts associated.
@@ -2911,7 +2968,7 @@ const OrderDetailPage: NextPageWithLayout = () => {
               ),
               viewAllLabel: "View all associated Contacts",
               onViewAllClick: () => {
-                const href = buildCrmLeadsDetailpageHref((relatedLead as any)?.id);
+                const href = buildCrmLeadsDetailpageHref(relatedLead?.id);
                 window.open(href, "_blank", "noopener,noreferrer");
               },
             })}

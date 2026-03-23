@@ -1,7 +1,7 @@
 import React from "react";
 
 interface CrmIntelligenceTabProps {
-  company: any | null;
+  company: any;
   relatedCompany?: string | null;
   industryName?: string | null;
   industryDescription?: string | null;
@@ -20,17 +20,12 @@ const detectSocialPlatform = (
   return null;
 };
 
-const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
-  company,
-  relatedCompany,
-  industryName,
-  industryDescription,
-  showCompanyEnrichmentUI = false,
-}) => {
-  const enr = company?.enrichment_data ?? null;
-  const struct = enr?.structured_data ?? null;
-  const raw = enr?.raw_data ?? null;
+const extractUrl = (value: any): string | null => {
+  if (typeof value === "string") return value;
+  return value?.url ?? null;
+};
 
+const collectDedupedSocialLinks = (struct: any, raw: any): string[] => {
   const socialLinksDeduped: string[] = [];
   const seenUrl = new Set<string>();
   const addUrl = (url: string | null | undefined) => {
@@ -42,22 +37,126 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
     socialLinksDeduped.push(u);
   };
 
-  // social_links may be strings or objects with url; handle both
-  struct?.social_links?.forEach((s: any) => {
-    if (typeof s === "string") {
-      addUrl(s);
-    } else {
-      addUrl(s?.url);
+  struct?.social_links?.forEach((s: any) => addUrl(extractUrl(s)));
+  raw?.social_links?.forEach((s: any) => addUrl(extractUrl(s)));
+
+  return socialLinksDeduped;
+};
+
+const deriveCompanyDescription = (raw: any): string | null => {
+  const combined = (raw?.combined_text ?? "").trim();
+  if (combined) {
+    const lines = combined
+      .split(/\r?\n/g)
+      .map((l: string) => l.trim())
+      .filter(Boolean);
+    const firstMeaningful =
+      lines?.find((l: string) => !l.startsWith("===") && l.length > 3) ?? "";
+    if (firstMeaningful) {
+      return firstMeaningful.length > 240
+        ? `${firstMeaningful.slice(0, 237)}...`
+        : firstMeaningful;
     }
+  }
+
+  const block = (raw?.address_blocks?.[0] ?? "").trim();
+  if (!block) return null;
+
+  const cleaned = block.replaceAll(/\s+/g, " ").trim();
+  return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
+};
+
+const collectOutreachEmails = (struct: any, raw: any, company: any) => {
+  const list: { email: string; type?: string | null }[] = [];
+  const seen = new Set<string>();
+  const addEmail = (v0: string | null | undefined, type?: string | null) => {
+    const v = (v0 ?? "").trim();
+    if (!v) return;
+    const key = v.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push({ email: v, type: type ?? null });
+  };
+
+  struct?.emails?.forEach((e: any) => {
+    addEmail(e?.email, e?.type ?? null);
   });
-  raw?.social_links?.forEach((s: any) => {
-    if (typeof s === "string") {
-      addUrl(s);
-    } else {
-      addUrl(s?.url);
-    }
+  raw?.emails?.forEach((e: any) => {
+    if (typeof e === "string") addEmail(e, null);
+    else addEmail(e?.email, e?.type ?? null);
   });
-  const socialLinks = socialLinksDeduped;
+  addEmail(company?.email, null);
+
+  return list;
+};
+
+const collectAllPhones = (struct: any, raw: any, company: any): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (n: string | null | undefined) => {
+    const v = (n ?? "").trim();
+    if (!v) return;
+    const key = v.replaceAll(" ", "");
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(v);
+  };
+
+  add(company?.phone);
+  struct?.phones?.forEach((p: any) => add(p?.number));
+  raw?.phones?.forEach((p: any) => add(typeof p === "string" ? p : p?.number));
+
+  return out;
+};
+
+const renderLegacyEmails = (structData: any, rawData: any, company: any): React.ReactNode => {
+  const seen = new Set<string>();
+  const list: { email: string; type?: string }[] = [];
+
+  structData?.emails?.forEach((e: any) => {
+    const v = (e?.email ?? "").trim();
+    if (!v || seen.has(v.toLowerCase())) return;
+    seen.add(v.toLowerCase());
+    list.push({ email: v, type: e?.type ?? undefined });
+  });
+
+  rawData?.emails?.forEach((v: any) => {
+    const s = (v ?? "").trim();
+    if (!s || seen.has(s.toLowerCase())) return;
+    seen.add(s.toLowerCase());
+    list.push({ email: s });
+  });
+
+  const companyEmail = company?.email?.trim?.();
+  if (companyEmail && !seen.has(companyEmail.toLowerCase())) {
+    list.push({ email: companyEmail });
+  }
+
+  if (list.length === 0) return "--";
+
+  return list.map(({ email, type }) => (
+    <span key={email}>
+      <a href={`mailto:${email}`} style={{ color: "#006162", textDecoration: "none" }}>
+        {email}
+      </a>
+      {type ? (
+        <span style={{ color: "#666", fontSize: "12px", marginLeft: "6px" }}>({type})</span>
+      ) : null}
+    </span>
+  ));
+};
+
+const CrmIntelligenceTabContent: React.FC<CrmIntelligenceTabProps> = ({
+  company,
+  relatedCompany,
+  industryName,
+  industryDescription,
+  showCompanyEnrichmentUI = false,
+}) => { // NOSONAR
+  const enr = company?.enrichment_data ?? null;
+  const struct = enr?.structured_data ?? null;
+  const raw = enr?.raw_data ?? null;
+  const socialLinks = collectDedupedSocialLinks(struct, raw);
 
   const cityVal = struct?.headquarters?.city ?? company?.city ?? "—";
   const countryVal = struct?.headquarters?.country ?? company?.country ?? "—";
@@ -82,33 +181,9 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
     ? (enr?.company_name ?? company?.name ?? relatedCompany ?? "—")
     : company?.name ?? relatedCompany ?? "—";
   const industryNameVal = industryName ?? company?.industry ?? "—";
-  const deriveCompanyDescription = () => {
-    const combined = (raw?.combined_text ?? "").trim();
-    if (combined) {
-      const lines = combined
-        .split(/\r?\n/g)
-        .map((l: string) => l.trim())
-        .filter(Boolean);
-      const firstMeaningful =
-        lines?.find((l: string) => !l.startsWith("===") && l.length > 3) ?? "";
-      if (firstMeaningful) {
-        return firstMeaningful.length > 240
-          ? `${firstMeaningful.slice(0, 237)}...`
-          : firstMeaningful;
-      }
-    }
-
-    const block = (raw?.address_blocks?.[0] ?? "").trim();
-    if (block) {
-      const cleaned = block.replaceAll(/\s+/g, " ").trim();
-      return cleaned.length > 240 ? `${cleaned.slice(0, 237)}...` : cleaned;
-    }
-
-    return null;
-  };
   const industryDescriptionVal = showCompanyEnrichmentUI
     ? struct?.official_company_name ?? company?.name ?? "—"
-    : industryDescription ?? deriveCompanyDescription() ?? "—";
+    : industryDescription ?? deriveCompanyDescription(raw) ?? "—";
   const firstLinkedIn =
     socialLinks.find((u) => detectSocialPlatform(u) === "linkedin") ?? "—";
   const facebookUrl =
@@ -120,45 +195,8 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
   const instagramUrl =
     socialLinks.find((u) => detectSocialPlatform(u) === "instagram") ?? null;
 
-  const outreachEmails = (() => {
-    const list: { email: string; type?: string | null }[] = [];
-    const seen = new Set<string>();
-    const addEmail = (v0: string | null | undefined, type?: string | null) => {
-      const v = (v0 ?? "").trim();
-      if (!v) return;
-      const key = v.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      list.push({ email: v, type: type ?? null });
-    };
-    struct?.emails?.forEach((e: any) => {
-      addEmail(e?.email, e?.type ?? null);
-    });
-    raw?.emails?.forEach((e: any) => {
-      if (typeof e === "string") addEmail(e, null);
-      else addEmail(e?.email, e?.type ?? null);
-    });
-    addEmail(company?.email, null);
-    return list;
-  })();
-
-  const allPhones = (() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    const add = (n: string | null | undefined) => {
-      const v = (n ?? "").trim();
-      if (!v) return;
-      const key = v.replaceAll(" ", "");
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push(v);
-    };
-
-    add(company?.phone);
-    struct?.phones?.forEach((p: any) => add(p?.number));
-    raw?.phones?.forEach((p: any) => add(typeof p === "string" ? p : p?.number));
-    return out;
-  })();
+  const outreachEmails = collectOutreachEmails(struct, raw, company);
+  const allPhones = collectAllPhones(struct, raw, company);
 
   // Legacy Company Intelligence UI (the UI you shared from company-detailpage.tsx)
   if (showCompanyEnrichmentUI) {
@@ -197,9 +235,11 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
           textDecoration: "none",
         }}
         aria-label={label}
-        onMouseEnter={(e) => {
-          if (href) e.currentTarget.style.backgroundColor = "#e0e0e0";
-        }}
+        onMouseEnter={
+          href ? (e) => {
+            e.currentTarget.style.backgroundColor = "#e0e0e0";
+          } : undefined
+        }
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = "#f0f0f0";
         }}
@@ -341,43 +381,7 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
             <div style={{ marginBottom: "20px" }}>
               <div style={{ fontSize: "13px", color: "#666", marginBottom: "6px" }}>Emails</div>
               <div style={{ fontSize: "14px", color: "#141414", fontWeight: "400", display: "flex", flexDirection: "column", gap: "6px" }}>
-                {(() => {
-                  const seen = new Set<string>();
-                  const list: { email: string; type?: string }[] = [];
-
-                  structData?.emails?.forEach((e: any) => {
-                    const v = (e?.email ?? "").trim();
-                    if (v && !seen.has(v.toLowerCase())) {
-                      seen.add(v.toLowerCase());
-                      list.push({ email: v, type: e?.type ?? undefined });
-                    }
-                  });
-
-                  rawData?.emails?.forEach((v: any) => {
-                    const s = (v ?? "").trim();
-                    if (s && !seen.has(s.toLowerCase())) {
-                      seen.add(s.toLowerCase());
-                      list.push({ email: s });
-                    }
-                  });
-
-                  if (company?.email?.trim() && !seen.has(company.email.trim().toLowerCase())) {
-                    list.push({ email: company.email.trim() });
-                  }
-
-                  if (list.length === 0) return "--";
-
-                  return list.map(({ email, type }) => (
-                    <span key={email}>
-                      <a href={`mailto:${email}`} style={{ color: "#006162", textDecoration: "none" }}>
-                        {email}
-                      </a>
-                      {type ? (
-                        <span style={{ color: "#666", fontSize: "12px", marginLeft: "6px" }}>({type})</span>
-                      ) : null}
-                    </span>
-                  ));
-                })()}
+                {renderLegacyEmails(structData, rawData, company)}
               </div>
             </div>
 
@@ -1157,6 +1161,10 @@ const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = ({
       </div>
     </div>
   );
+};
+
+const CrmIntelligenceTab: React.FC<CrmIntelligenceTabProps> = (props) => {
+  return <CrmIntelligenceTabContent {...props} />;
 };
 
 export default CrmIntelligenceTab;
