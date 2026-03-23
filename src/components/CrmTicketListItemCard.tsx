@@ -4,6 +4,14 @@ type TicketCardProps = {
   lead: Record<string, unknown>;
 };
 
+function toDisplayText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "--";
+}
+
 export default function CrmTicketListItemCard({
   lead,
 }: Readonly<TicketCardProps>) {
@@ -30,15 +38,15 @@ export default function CrmTicketListItemCard({
           marginBottom: "8px",
         }}
       >
-        {String(lead.name ?? "--")}
+        {toDisplayText(lead.name)}
       </span>
 
       <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Company: {String(lead.company_name ?? "--")}
+        Company: {toDisplayText(lead.company_name)}
       </p>
 
       <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Status: {String(lead.status ?? "--")}
+        Status: {toDisplayText(lead.status)}
       </p>
 
       {dealsCount > 0 && (

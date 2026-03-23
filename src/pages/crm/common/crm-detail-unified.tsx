@@ -1971,7 +1971,7 @@ const DealDetailPage: NextPageWithLayout = () => {
     onDelete: () =>
       setDealToDelete({ id: dealRecordId, name: dealRecordName }),
     onExport: () => {
-      void handleDealExport();
+      handleDealExport().then(() => undefined);
     },
     deleteItemName: dealToDelete?.name ?? dealRecordName,
     onDeleteSuccess: async () => {

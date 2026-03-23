@@ -104,12 +104,9 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
             <>
               {items.map((item, index) => renderItem(item, index))}
               {viewAllLabel && onViewAllClick && (
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onViewAllClick();
-                  }}
+                <button
+                  type="button"
+                  onClick={onViewAllClick}
                   style={{
                     fontSize: "12px",
                     color: "#141414",
@@ -121,11 +118,13 @@ export default function CrmAssociatedRecordsSectionCard<TItem>({
                     border: "1px solid #cccccc",
                     borderRadius: "6px",
                     padding: "6px 12px",
+                    background: "transparent",
+                    cursor: "pointer",
                   }}
                 >
                   {viewAllLabel}
                   <ExternalLink size={12} />
-                </a>
+                </button>
               )}
             </>
           )}

@@ -147,6 +147,12 @@ const SCROLL_STYLES = `
   .sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
 `;
 
+const toSafeText = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+};
+
 export function CrmDetailPageLayout( // NOSONAR
 {
   config,
@@ -247,11 +253,11 @@ export function CrmDetailPageLayout( // NOSONAR
         ? userDevices.map((device: unknown) => {
             const safeDevice = (device as Record<string, unknown>) ?? {};
             return {
-              deviceType: String(safeDevice.deviceType ?? ""),
-              deviceName: String(safeDevice.deviceName ?? ""),
-              terminalState: String(safeDevice.terminalState ?? ""),
-              when: String(safeDevice.when ?? ""),
-              details: String(safeDevice.details ?? ""),
+              deviceType: toSafeText(safeDevice.deviceType),
+              deviceName: toSafeText(safeDevice.deviceName),
+              terminalState: toSafeText(safeDevice.terminalState),
+              when: toSafeText(safeDevice.when),
+              details: toSafeText(safeDevice.details),
             };
           })
         : [];

@@ -8,6 +8,22 @@ type DealCardProps = {
   deal: Record<string, unknown>;
 };
 
+const getSafeDisplayValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  return "--";
+};
+
 export default function CrmDealListItemCard({
   deal,
 }: Readonly<DealCardProps>) {
@@ -32,7 +48,7 @@ export default function CrmDealListItemCard({
           marginBottom: "8px",
         }}
       >
-        {String(deal.name ?? "--")}
+        {getSafeDisplayValue(deal.name)}
       </span>
       <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
         Amount: {formatCrmAmount(deal)}
@@ -41,7 +57,7 @@ export default function CrmDealListItemCard({
         Close Date: {formatCrmShortDate(deal.expected_close_date as string)}
       </p>
       <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Deal Stage: {String(deal.status ?? "--")}
+        Deal Stage: {getSafeDisplayValue(deal.status)}
       </p>
     </div>
   );
