@@ -51,13 +51,7 @@ export default function CrmDealListItemCard({
         {getSafeDisplayValue(deal.name)}
       </span>
       <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Amount: {formatCrmAmount(deal)}
-      </p>
-      <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Close Date: {formatCrmShortDate(deal.expected_close_date as string)}
-      </p>
-      <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Deal Stage: {getSafeDisplayValue(deal.status)}
+      Deal Value: {formatCrmAmount(deal)}
       </p>
     </div>
   );
