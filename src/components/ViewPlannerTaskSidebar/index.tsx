@@ -73,7 +73,7 @@ function formatUnknownForDisplay(value: unknown): string {
 }
 
 function priorityLabel(p: unknown): string {
-  const s = String(p ?? "normal").toLowerCase();
+  const s = formatUnknownForDisplay(p ?? "normal").toLowerCase();
   const map: Record<string, string> = {
     low: "Low",
     normal: "Normal",
@@ -81,7 +81,7 @@ function priorityLabel(p: unknown): string {
     high: "High",
     urgent: "Urgent",
   };
-  return map[s] ?? (p ? String(p) : "—");
+  return map[s] ?? formatUnknownForDisplay(p);
 }
 
 function taskTypeLabel(t: unknown): string {
