@@ -1663,7 +1663,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 const isSelected = selectedEmailId === email.id;
                 const stripped = email.content
                   ? email.content
-                      .replaceAll(/<[^>]*>/g, "")
+                      .replaceAll(/<[^<>]*>/g, "")
                       .replaceAll(/\s+/g, " ")
                       .trim()
                   : "";
