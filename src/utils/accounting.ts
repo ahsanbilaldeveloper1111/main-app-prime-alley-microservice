@@ -321,4 +321,72 @@ export const GetCurrencies = async (): Promise<any> => {
   }
 };
 
+const companyDocumentsBasePath = (companyId: string | number) =>
+  `accounting/company/${companyId}/documents`;
+
+/** GET accounting/company/{id}/documents */
+export const GetCompanyDocuments = async (
+  companyId: string | number,
+  params: Record<string, unknown> = {}
+) => {
+  try {
+    const response = await axiosInstance.get(companyDocumentsBasePath(companyId), {
+      params,
+    });
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch company documents");
+    throw error;
+  }
+};
+
+/** POST accounting/company/{id}/documents */
+export const PostCompanyDocuments = async (
+  companyId: string | number,
+  payload: FormData | Record<string, unknown>
+) => {
+  try {
+    const response = await axiosInstance.post(
+      companyDocumentsBasePath(companyId),
+      payload
+    );
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to upload company documents");
+    throw error;
+  }
+};
+
+/** DELETE accounting/company/{id}/documents/{documentId} */
+export const DeleteCompanyDocument = async (
+  companyId: string | number,
+  documentId: string | number
+) => {
+  try {
+    const response = await axiosInstance.delete(
+      `${companyDocumentsBasePath(companyId)}/${documentId}`
+    );
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete company document");
+    throw error;
+  }
+};
+
+/** GET accounting/company/{id}/documents/{documentId}/download */
+export const GetCompanyDocumentDownload = async (
+  companyId: string | number,
+  documentId: string | number
+) => {
+  try {
+    const response = await axiosInstance.get(
+      `${companyDocumentsBasePath(companyId)}/${documentId}/download`,
+      { responseType: "blob" }
+    );
+    return response?.data ?? null;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to download company document");
+    throw error;
+  }
+};
 
