@@ -2,7 +2,7 @@ import type { CrmActivitiesRecord } from "@components/CrmActivitiesPanel";
 import type {
   KeyInfoField,
   ProfileField,
-} from "@pages/crm/common/crm-detail-layout";
+} from "@utils/crm/common/crm-detail-layout";
 import { formatDateForTable } from "@utils/Helper";
 
 type AnyRecord = Record<string, any>;
