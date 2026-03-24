@@ -407,7 +407,7 @@ export default function DocumentsPage() {
       return;
     }
 
-    void loadDocuments();
+    loadDocuments().catch(() => undefined);
   }, [companyId, sessionStatus, loadDocuments]);
 
   const canUseCompanyActions =
@@ -498,16 +498,22 @@ export default function DocumentsPage() {
     setUploading(true);
     try {
       const formData = buildCompanyDocumentsFormData(pendingFiles);
-      await PostCompanyDocuments(companyId, formData);
-      toast.success("Documents uploaded successfully.");
-      setShowUploadModal(false);
-      setPendingFiles([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      const response = await PostCompanyDocuments(companyId, formData);
+      console.log("PostCompanyDocuments response:", response);
+      if ((response as any)?.success === false) {
+        toast.error((response as any)?.message ?? "Failed to upload documents.");
+      } else {
+        toast.success((response as any)?.message ?? "Documents uploaded successfully.");
+        setShowUploadModal(false);
+        setPendingFiles([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        await loadDocuments();
       }
-      await loadDocuments();
-    } catch {
-      // PostCompanyDocuments already surfaces errors via toast
+    } catch (error) {
+      console.error("DocumentsPage PostCompanyDocuments error:", error);
+      toast.error("Failed to upload documents.");
     } finally {
       setUploading(false);
     }
@@ -564,7 +570,7 @@ export default function DocumentsPage() {
             >
               <td style={s.td}>
                 {renderDocumentNameCell(doc, name, externalUrl, s.docName, s.link, () => {
-                  void handleDownloadDocument(doc);
+                  handleDownloadDocument(doc).catch(() => undefined);
                 })}
               </td>
               <td style={{ ...s.td, color: "#141414" }}>{getUpdatedAtDisplay(doc)}</td>
@@ -574,7 +580,7 @@ export default function DocumentsPage() {
                   doc,
                   s.link,
                   () => {
-                    void handleDownloadDocument(doc);
+                    handleDownloadDocument(doc).catch(() => undefined);
                   },
                   showDeleteDocumentButton
                     ? () => {
@@ -647,7 +653,9 @@ export default function DocumentsPage() {
           </Button>
           <Button
             style={{ backgroundColor: "rgb(0, 97, 98)", borderColor: "rgb(0, 97, 98)" }}
-            onClick={() => void handleUploadSubmit()}
+            onClick={() => {
+              handleUploadSubmit().catch(() => undefined);
+            }}
             disabled={uploading || pendingFiles.length === 0}
           >
             {uploading ? "Uploading…" : "Upload"}
@@ -659,7 +667,7 @@ export default function DocumentsPage() {
         show={showDeleteDocumentModal}
         onHide={closeDeleteDocumentModal}
         onConfirm={() => {
-          void confirmDeleteDocument();
+          confirmDeleteDocument().catch(() => undefined);
         }}
         itemType="document"
         itemName={
