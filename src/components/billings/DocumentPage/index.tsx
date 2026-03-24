@@ -313,13 +313,7 @@ function renderDocumentActionsCell(
   }
   return (
     <div style={s.actionRow}>
-      <button
-        type="button"
-        style={{ ...linkStyle, textDecoration: "underline" }}
-        onClick={() => {
-          onDownload();
-        }}
-      >
+      <button type="button" style={{ ...linkStyle, textDecoration: "underline" }} onClick={onDownload}>
         Download
       </button>
       {onDelete ? (
@@ -338,6 +332,51 @@ function renderDocumentActionsCell(
         </>
       ) : null}
     </div>
+  );
+}
+
+type BillingDocumentTableRowProps = Readonly<{
+  doc: Record<string, unknown>;
+  onDownloadRow: (doc: Record<string, unknown>) => void;
+  onRequestDeleteRow: (doc: Record<string, unknown>) => void;
+  showDeleteDocumentButton: boolean;
+}>;
+
+function BillingDocumentTableRow({
+  doc,
+  onDownloadRow,
+  onRequestDeleteRow,
+  showDeleteDocumentButton,
+}: BillingDocumentTableRowProps): ReactNode {
+  const externalUrl = getExternalUrl(doc);
+  const name = getDocumentName(doc);
+
+  const downloadThisDoc = () => {
+    onDownloadRow(doc);
+  };
+
+  const deleteThisDoc = () => {
+    onRequestDeleteRow(doc);
+  };
+
+  const deleteHandler = showDeleteDocumentButton ? deleteThisDoc : undefined;
+
+  return (
+    <tr
+      style={{
+        backgroundColor: "#fff",
+        borderBottom: "1px solid #e5e5e5",
+      }}
+    >
+      <td style={s.td}>
+        {renderDocumentNameCell(doc, name, externalUrl, s.docName, s.link, downloadThisDoc)}
+      </td>
+      <td style={{ ...s.td, color: "#141414" }}>{getUpdatedAtDisplay(doc)}</td>
+      <td style={{ ...s.td, color: "#141414" }}>{getDocumentType(doc)}</td>
+      <td style={s.td}>
+        {renderDocumentActionsCell(doc, s.link, downloadThisDoc, deleteHandler)}
+      </td>
+    </tr>
   );
 }
 
@@ -395,6 +434,13 @@ export default function DocumentsPage() {
       }
     },
     [companyId]
+  );
+
+  const onDownloadRow = useCallback(
+    (doc: Record<string, unknown>) => {
+      handleDownloadDocument(doc).catch(() => undefined);
+    },
+    [handleDownloadDocument]
   );
 
   useEffect(() => {
@@ -556,42 +602,15 @@ export default function DocumentsPage() {
 
     return (
       <>
-        {documents.map((doc, idx) => {
-          const externalUrl = getExternalUrl(doc);
-          const name = getDocumentName(doc);
-
-          return (
-            <tr
-              key={String(getDocumentId(doc) ?? `row-${idx}`)}
-              style={{
-                backgroundColor: "#fff",
-                borderBottom: "1px solid #e5e5e5",
-              }}
-            >
-              <td style={s.td}>
-                {renderDocumentNameCell(doc, name, externalUrl, s.docName, s.link, () => {
-                  handleDownloadDocument(doc).catch(() => undefined);
-                })}
-              </td>
-              <td style={{ ...s.td, color: "#141414" }}>{getUpdatedAtDisplay(doc)}</td>
-              <td style={{ ...s.td, color: "#141414" }}>{getDocumentType(doc)}</td>
-              <td style={s.td}>
-                {renderDocumentActionsCell(
-                  doc,
-                  s.link,
-                  () => {
-                    handleDownloadDocument(doc).catch(() => undefined);
-                  },
-                  showDeleteDocumentButton
-                    ? () => {
-                        openDeleteDocumentModal(doc);
-                      }
-                    : undefined
-                )}
-              </td>
-            </tr>
-          );
-        })}
+        {documents.map((doc, idx) => (
+          <BillingDocumentTableRow
+            key={String(getDocumentId(doc) ?? `row-${idx}`)}
+            doc={doc}
+            onDownloadRow={onDownloadRow}
+            onRequestDeleteRow={openDeleteDocumentModal}
+            showDeleteDocumentButton={showDeleteDocumentButton}
+          />
+        ))}
         <TermsOfServiceTableRow key="terms-of-service" />
       </>
     );
