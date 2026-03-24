@@ -10,12 +10,11 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import axiosInstance from "@utils/axios";
-import { convertDateTimeWithOffsetToLocal, GlobalDateTimeFormat } from "@utils/Helper";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { Row, Col, Card, Form, Button, Table, Dropdown, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
-import { TrendingUp, Shield, RefreshCw, XCircle, X, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
+import { TrendingUp, Shield, RefreshCw, XCircle, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 
@@ -100,6 +99,115 @@ interface MappedCDRRecord {
   allowLocalDNCL: string;
   allowApiDNCLCalls: string;
   allowRepetition: string;
+}
+
+const CDR_TABLE_COL_SPAN = 11;
+
+function triStateStatusBadgeStyle(
+  value: string | undefined,
+  allowedValue: string,
+  notCheckedValue: string,
+): Pick<React.CSSProperties, "color" | "backgroundColor" | "padding" | "borderRadius"> {
+  if (value === allowedValue) {
+    return { color: "#0d8a5e", backgroundColor: "#d1f4e8", padding: "4px 8px", borderRadius: "6px" };
+  }
+  if (value === notCheckedValue) {
+    return { color: "#6c757d", backgroundColor: "#e9ecef", padding: "4px 8px", borderRadius: "6px" };
+  }
+  return { color: "#dc3545", backgroundColor: "#f8d7da", padding: "4px 8px", borderRadius: "6px" };
+}
+
+function dncrApiBadgeStyle(
+  dncrApi: string,
+): Pick<React.CSSProperties, "color" | "backgroundColor" | "padding" | "borderRadius"> {
+  if (dncrApi === "TRUE") {
+    return { color: "#dc3545", backgroundColor: "#f8d7da", padding: "4px 8px", borderRadius: "6px" };
+  }
+  if (dncrApi === "FALSE") {
+    return { color: "#0d8a5e", backgroundColor: "#d1f4e8", padding: "4px 8px", borderRadius: "6px" };
+  }
+  return { color: "#6c757d", backgroundColor: "#e9ecef", padding: "4px 8px", borderRadius: "6px" };
+}
+
+interface CdrRecordTableRowProps {
+  row: MappedCDRRecord;
+}
+
+function CdrRecordTableRow({ row }: Readonly<CdrRecordTableRowProps>) {
+  const localDndBadge = triStateStatusBadgeStyle(row.localDND, "Allowed", "Not Checked");
+  const repetitionBadge = triStateStatusBadgeStyle(row.repetition, "Allowed", "Not Checked");
+  const dncrBadge = dncrApiBadgeStyle(row.dncrApi);
+  const emptyCellSpan: React.CSSProperties = { padding: "4px 8px", borderRadius: "6px" };
+
+  return (
+    <tr style={{ borderBottom: "1px solid #dee2e6" }}>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>{row.id}</td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>{row.dateTime}</td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <PhoneContainer phone={row.calling} />
+      </td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <PhoneContainer phone={row.called} />
+      </td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>{row.userId}</td>
+      <td style={{ fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={localDndBadge}>{row.localDND}</span>
+      </td>
+      <td style={{ fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={repetitionBadge}>{row.repetition}</span>
+      </td>
+      <td style={{ fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={dncrBadge}>{row.dncrApi}</span>
+      </td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>{row.time}</td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={emptyCellSpan}>{row.allowLocalDNCL}</span>
+      </td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={emptyCellSpan}>{row.allowApiDNCLCalls}</span>
+      </td>
+      <td style={{ color: "#212529", fontSize: "0.875rem", padding: "12px", border: "none" }}>
+        <span style={emptyCellSpan}>{row.allowRepetition}</span>
+      </td>
+    </tr>
+  );
+}
+
+interface CdrRecordsTableBodyProps {
+  loading: boolean;
+  error: string | null;
+  records: MappedCDRRecord[];
+}
+
+function CdrRecordsTableBody({ loading, error, records }: Readonly<CdrRecordsTableBodyProps>) {
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={CDR_TABLE_COL_SPAN} style={{ textAlign: "center", padding: "24px", color: "#6c757d" }}>
+          Loading...
+        </td>
+      </tr>
+    );
+  }
+  if (error) {
+    return (
+      <tr>
+        <td colSpan={CDR_TABLE_COL_SPAN} style={{ textAlign: "center", padding: "24px", color: "#dc3545" }}>
+          {error}
+        </td>
+      </tr>
+    );
+  }
+  if (records.length > 0) {
+    return records.map((row) => <CdrRecordTableRow key={row.id} row={row} />);
+  }
+  return (
+    <tr>
+      <td colSpan={CDR_TABLE_COL_SPAN} style={{ textAlign: "center", padding: "24px", color: "#6c757d" }}>
+        No records found matching your filters
+      </td>
+    </tr>
+  );
 }
 
 // Phone Container Component
@@ -326,7 +434,7 @@ const CDRRecords = () => {
       const params: any = {
         page: currentPage,
         per_page: recordsPerPage,
-        include_statistics: true,
+        include_statistics: false,
       };
 
       console.log('appliedFilters', appliedFilters);
@@ -556,12 +664,6 @@ const CDRRecords = () => {
     { name: 'Blocked', value: stats.repetitionNotAllowed || 0, color: '#ef4444' },
     { name: 'Allowed', value: stats.repetitionAllowed || 0, color: '#10b981' },
     { name: 'Not Checked', value: stats.repetitionNotChecked || 0, color: '#6c757d' }
-  ];
-
-  const allowLocalDNCLData = [
-    { name: 'FALSE', value: stats.allowLocalDNCLFalse, color: '#ec4899' },
-    { name: 'TRUE', value: stats.allowLocalDNCLTrue, color: '#10b981' },
-    { name: 'Other', value: Math.max(0, stats.totalRecords - stats.allowLocalDNCLTrue - stats.allowLocalDNCLFalse), color: '#8b5cf6' }
   ];
 
   // Map API data to UI format
@@ -1178,104 +1280,7 @@ const CDRRecords = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    if (loading) {
-                      return (
-                        <tr>
-                          <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                            Loading...
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (error) {
-                      return (
-                        <tr>
-                          <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#dc3545' }}>
-                            {error}
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (currentRecords.length > 0) {
-                      return currentRecords.map((row) => (
-                        <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.id}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          {row?.dateTime}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <PhoneContainer phone={row.calling} />
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <PhoneContainer phone={row.called} />
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.userId}</td>
-                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                        <span style={{ 
-                            color: row?.localDND === 'Allowed' ? '#0d8a5e' : row?.localDND === 'Not Checked' ? '#6c757d' : '#dc3545',
-                            backgroundColor: row?.localDND === 'Allowed' ? '#d1f4e8' : row?.localDND === 'Not Checked' ? '#e9ecef' : '#f8d7da',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.localDND}</span>
-                        </td>
-                        <td style={{ fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            color: row?.repetition === 'Allowed' ? '#0d8a5e' : row?.repetition === 'Not Checked' ? '#6c757d' : '#dc3545',
-                            backgroundColor: row?.repetition === 'Allowed' ? '#d1f4e8' : row?.repetition === 'Not Checked' ? '#e9ecef' : '#f8d7da',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row?.repetition}
-                          </span>
-                        </td>
-                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            color: row.dncrApi === 'TRUE' ? '#dc3545' : row.dncrApi === 'FALSE' ? '#0d8a5e' : '#6c757d',
-                            backgroundColor: row.dncrApi === 'TRUE' ? '#f8d7da' : row.dncrApi === 'FALSE' ? '#d1f4e8' : '#e9ecef',
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.dncrApi}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.time}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                             
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.allowLocalDNCL}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row?.allowApiDNCLCalls}
-                          </span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            padding: '4px 8px', 
-                            borderRadius: '6px' 
-                          }}>
-                            {row.allowRepetition}
-                          </span>
-                        </td>
-                      </tr>
-                      ));
-                    }
-                    return (
-                      <tr>
-                        <td colSpan={11} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                          No records found matching your filters
-                        </td>
-                      </tr>
-                    );
-                  })()}
+                  <CdrRecordsTableBody loading={loading} error={error} records={currentRecords} />
                 </tbody>
               </Table>
             </div>
