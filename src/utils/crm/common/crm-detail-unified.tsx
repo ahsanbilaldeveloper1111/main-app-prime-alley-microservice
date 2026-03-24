@@ -54,14 +54,14 @@ import {
   type KeyInfoField,
   type ProfileField,
   type CrmDetailPageLayoutConfig,
-} from "@pages/crm/common/crm-detail-layout";
+} from "@utils/crm/common/crm-detail-layout";
 import {
   formatCrmAmount,
   formatCrmShortDate,
   formatCrmSummaryUpdatedLabel,
   getCrmExtensionDisplayName,
-} from "@pages/crm/common/crm-detail-formatters";
-import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
+} from "@utils/crm/common/crm-detail-formatters";
+import { getCrmDetailStaticConfig } from "@utils/crm/common/crm-detail-config";
 import ProspectEditSidebar, {
   type ProspectFormState as ProspectSidebarFormState,
 } from "@components/ProspectEditSidebar";
@@ -75,11 +75,11 @@ import {
   buildOrderKeyInfoFields,
   buildOrderProfileFields,
   buildOrderRecordForActivities,
-} from "@pages/crm/common/crm-order-detail-builders";
+} from "@utils/crm/common/crm-order-detail-builders";
 import {
   buildCrmDealsDetailpageHref,
   buildCrmLeadsDetailpageHref,
-} from "@pages/crm/common/crm-detail-navigation";
+} from "@utils/crm/common/crm-detail-navigation";
 
 import { CreateCompanySidebar, type CompanyFormPayload } from "@components/renderCreateCompany";
 import CreateLeadModal from "@components/CreateLeadModal";
