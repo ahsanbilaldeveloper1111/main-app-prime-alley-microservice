@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { X, Settings, Info, ChevronDown, Trash2, Check, CheckCheck, Loader } from 'lucide-react';
 import { useNotifications, type NotificationItem } from '../../contexts/NotificationContext';
 import { ListNotifications, MarkNotificationAsRead, DeleteNotification } from '../../utils/notifications';
+import { GetHierarchyData } from '@utils/users';
 import router from 'next/router';
 import { ModuleSlug } from '@utils/Helper';
 import { usePermissions } from '@utils/permissionUtils';
@@ -90,6 +91,7 @@ interface Notification {
   id: string;
   title: string;
   description?: string;
+  actorName?: string;
   time: string;
   read: boolean;
   trashed: boolean;
@@ -103,6 +105,17 @@ interface Notification {
   extension_id?: number | string | null;
   triggered_by_extension_id?: number | string | null;
 }
+
+type UserSummary = {
+  id?: string | number;
+  extension_id?: string | number;
+  extension_number?: string | number;
+  extension?: string | number;
+  name?: string;
+  user?: {
+    name?: string;
+  };
+};
 
 // ── Helpers: real-time from context ───────────────────────────────────────────
 
@@ -205,6 +218,31 @@ function mapApiRowToNotification(row: ApiNotificationRow): Notification {
   };
 }
 
+function getUserDisplayName(user: UserSummary): string {
+  const nestedName = user.user?.name?.trim();
+  if (nestedName) return nestedName;
+  const name = user.name?.trim();
+  if (name) return name;
+  return '';
+}
+
+function buildExtensionNameMap(users: unknown): Record<string, string> {
+  if (!Array.isArray(users)) return {};
+  return users.reduce<Record<string, string>>((acc, rawUser) => {
+    if (!rawUser || typeof rawUser !== 'object') return acc;
+    const user = rawUser as UserSummary;
+    const displayName = getUserDisplayName(user);
+    if (!displayName) return acc;
+    const keys = [user.extension_id, user.extension_number, user.extension, user.id]
+      .filter((value) => value != null)
+      .map(String);
+    keys.forEach((key) => {
+      acc[key] = displayName;
+    });
+    return acc;
+  }, {});
+}
+
 const TYPE_LABELS: Record<NotificationType, string> = {
   all: 'All',
   data: 'Data',
@@ -253,6 +291,10 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
   const [loadingMoreAll, setLoadingMoreAll] = useState(false);
   const [loadingMoreUnread, setLoadingMoreUnread] = useState(false);
   const [loadingMoreTrash, setLoadingMoreTrash] = useState(false);
+  const [hasMoreAll, setHasMoreAll] = useState(true);
+  const [hasMoreUnread, setHasMoreUnread] = useState(true);
+  const [hasMoreTrash, setHasMoreTrash] = useState(true);
+  const [extensionNameLookup, setExtensionNameLookup] = useState<Record<string, string>>({});
 
   // Row/bulk action loading and refs
   const [actionLoading, setActionLoading] = useState<ActionLoading>(null);
@@ -315,6 +357,35 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     }
   }, [visibleTargetTypes, targetFilter]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
+        setExtensionNameLookup(buildExtensionNameMap(hierarchyData?.extensions ?? []));
+      } catch {
+        setExtensionNameLookup({});
+      }
+    };
+    fetchExtensions();
+  }, [isOpen]);
+
+  const extensionNameByNumber = useMemo(() => {
+    const map = new Map<string, string>();
+    Object.entries(extensionNameLookup).forEach(([extNumber, name]) => {
+      const key = String(extNumber || '').trim();
+      const userName = String(name || '').trim();
+      if (key && userName) map.set(key, userName);
+    });
+    return map;
+  }, [extensionNameLookup]);
+
+  const getUserNameFromExtension = useCallback((extensionNumber: number | string | null | undefined): string => {
+    const key = String(extensionNumber || '').trim();
+    if (!key) return '';
+    return extensionNameByNumber.get(key) || key;
+  }, [extensionNameByNumber]);
+
   // Fetch all three tabs when sidebar opens or target filter changes (page 1)
   useEffect(() => {
     if (!isOpen) return;
@@ -327,6 +398,9 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     setPageAll(1);
     setPageUnread(1);
     setPageTrash(1);
+    setHasMoreAll(true);
+    setHasMoreUnread(true);
+    setHasMoreTrash(true);
     setApiLoadingAllTab(true);
     setApiLoadingUnreadTab(true);
     setApiLoadingTrashTab(true);
@@ -367,6 +441,9 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     setPageAll(1);
     setPageUnread(1);
     setPageTrash(1);
+    setHasMoreAll(true);
+    setHasMoreUnread(true);
+    setHasMoreTrash(true);
     return Promise.all([
       ListNotifications({ ...params, ...filtersAll }).then(parseNotificationResponse),
       ListNotifications({ ...params, ...filtersUnread }).then(parseNotificationResponse),
@@ -391,43 +468,59 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
 
   const loadMore = useCallback(() => {
     const filtersAll = Object.keys(baseFiltersAll).length ? baseFiltersAll : undefined;
-    const filtersUnread = { ...baseFiltersUnread, status: 'unread' };
+    const filtersUnread = { ...baseFiltersUnread };
     const filtersTrash = { ...baseFiltersTrash };
 
     if (activeTab === 'all') {
-      if (loadingMoreAll || apiLoadingAllTab || apiListAllTab.length >= countAll) return;
+      if (loadingMoreAll || apiLoadingAllTab || !hasMoreAll) return;
       setLoadingMoreAll(true);
       const nextPage = pageAll + 1;
-      ListNotifications({ perPage: PER_PAGE, page: nextPage, ...(filtersAll ? { filters: filtersAll } : {}) })
+      ListNotifications({ perPage: PER_PAGE, page: nextPage, draw: nextPage, ...(filtersAll ? { filters: filtersAll } : {}) })
         .then(parseNotificationResponse)
         .then(({ list }) => {
-          setApiListAllTab((prev) => appendDedupe(prev, list));
+          setApiListAllTab((prev) => {
+            const next = appendDedupe(prev, list);
+            // If API repeats rows or returns none, stop requesting more pages for this tab.
+            if (next.length === prev.length) setHasMoreAll(false);
+            return next;
+          });
+          if (list.length < PER_PAGE) setHasMoreAll(false);
           setPageAll(nextPage);
         })
         .finally(() => setLoadingMoreAll(false));
       return;
     }
     if (activeTab === 'unread') {
-      if (loadingMoreUnread || apiLoadingUnreadTab || apiListUnreadTab.length >= countUnread) return;
+      if (loadingMoreUnread || apiLoadingUnreadTab || !hasMoreUnread) return;
       setLoadingMoreUnread(true);
       const nextPage = pageUnread + 1;
-      ListNotifications({ perPage: PER_PAGE, page: nextPage, filters: filtersUnread })
+      ListNotifications({ perPage: PER_PAGE, page: nextPage, draw: nextPage, filters: filtersUnread })
         .then(parseNotificationResponse)
         .then(({ list }) => {
-          setApiListUnreadTab((prev) => appendDedupe(prev, list));
+          setApiListUnreadTab((prev) => {
+            const next = appendDedupe(prev, list);
+            if (next.length === prev.length) setHasMoreUnread(false);
+            return next;
+          });
+          if (list.length < PER_PAGE) setHasMoreUnread(false);
           setPageUnread(nextPage);
         })
         .finally(() => setLoadingMoreUnread(false));
       return;
     }
     if (activeTab === 'trash') {
-      if (loadingMoreTrash || apiLoadingTrashTab || apiListTrashTab.length >= countTrash) return;
+      if (loadingMoreTrash || apiLoadingTrashTab || !hasMoreTrash) return;
       setLoadingMoreTrash(true);
       const nextPage = pageTrash + 1;
-      ListNotifications({ perPage: PER_PAGE, page: nextPage, filters: filtersTrash })
+      ListNotifications({ perPage: PER_PAGE, page: nextPage, draw: nextPage, filters: filtersTrash })
         .then(parseNotificationResponse)
         .then(({ list }) => {
-          setApiListTrashTab((prev) => appendDedupe(prev, list));
+          setApiListTrashTab((prev) => {
+            const next = appendDedupe(prev, list);
+            if (next.length === prev.length) setHasMoreTrash(false);
+            return next;
+          });
+          if (list.length < PER_PAGE) setHasMoreTrash(false);
           setPageTrash(nextPage);
         })
         .finally(() => setLoadingMoreTrash(false));
@@ -439,15 +532,15 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     pageAll,
     pageUnread,
     pageTrash,
-    countAll,
-    countUnread,
-    countTrash,
     apiListAllTab.length,
     apiListUnreadTab.length,
     apiListTrashTab.length,
     loadingMoreAll,
     loadingMoreUnread,
     loadingMoreTrash,
+    hasMoreAll,
+    hasMoreUnread,
+    hasMoreTrash,
     apiLoadingAllTab,
     apiLoadingUnreadTab,
     apiLoadingTrashTab,
@@ -473,6 +566,13 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
   const visible = typeFilter === 'all'
     ? visibleForTab
     : visibleForTab.filter((n) => n.type === typeFilter);
+
+  const visibleWithActor = visible.map((notif) => {
+    if (notif.actorName) return notif;
+    const actorByExtId = getUserNameFromExtension(notif.triggered_by_extension_id);
+    if (!actorByExtId) return notif;
+    return { ...notif, actorName: actorByExtId };
+  });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -578,9 +678,10 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     markAsRead(notif.id);
     MarkNotificationAsRead(notif.id).catch(() => {});
 
-    const { target_id, target_type, module } = notif;
+    const { target_id, target_type } = notif;
+    const normalizedModule = (notif.module ?? '').replaceAll('_', '-').toLowerCase();
 
-    switch (module) {
+    switch (normalizedModule) {
 
 
       case 'staff-management':
@@ -1042,7 +1143,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             </div>
           ) : (
             <>
-            {visible.map((notif) => {
+            {visibleWithActor.map((notif) => {
               const isSelected = selected.has(notif.id);
               return (
                 <div
@@ -1067,7 +1168,10 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
                 >
                   {/* Checkbox */}
                   <div
-                    onClick={() => toggleSelect(notif.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(notif.id);
+                    }}
                     style={{
                       width: '16px',
                       height: '16px',
@@ -1088,30 +1192,50 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
 
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
+                    <button
                       onClick={() => handleNotificationClick(notif)}
                       style={{
-                        fontSize: '14px',
-                        fontWeight: notif.read ? '400' : '700',
-                        color: '#141414',
-                        marginBottom: notif.description ? '4px' : 0,
-                        lineHeight: '1.4',
+                        width: '100%',
+                        border: 'none',
+                        background: 'transparent',
+                        padding: 0,
+                        textAlign: 'left',
                         cursor: 'pointer',
                       }}
                     >
-                      {notif.title}
-                    </div>
-                    {notif.description && (
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          color: '#666666',
-                          lineHeight: '1.5',
-                        }}
-                      >
-                        {notif.description}
+                      <div style={{
+                          fontSize: '14px',
+                          fontWeight: notif.read ? '400' : '700',
+                          color: '#141414',
+                          marginBottom: notif.description ? '4px' : 0,
+                          lineHeight: '1.4',
+                        }}>
+                        {notif.title}
                       </div>
-                    )}
+                      {notif.actorName && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#4a5568',
+                            marginBottom: notif.description ? '2px' : 0,
+                            lineHeight: '1.4',
+                          }}
+                        >
+                          by {notif.actorName}
+                        </div>
+                      )}
+                      {notif.description && (
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            color: '#666666',
+                            lineHeight: '1.5',
+                          }}
+                        >
+                          {notif.description}
+                        </div>
+                      )}
+                    </button>
                   </div>
 
                   {/* Time + actions */}
@@ -1136,7 +1260,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
                         </span>
                       ) : (
                         <button
-                          onClick={() => markOneRead(notif.id)}
+                          onClick={(e) => { e.stopPropagation(); markOneRead(notif.id); }}
                           disabled={!!actionLoading}
                           title="Mark as read"
                           style={{
@@ -1156,7 +1280,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
                       ))}
                       {activeTab !== 'trash' && (
                         <button
-                          onClick={() => trashOne(notif.id)}
+                          onClick={(e) => { e.stopPropagation(); trashOne(notif.id); }}
                           disabled={!!actionLoading}
                           title="Delete"
                           style={{

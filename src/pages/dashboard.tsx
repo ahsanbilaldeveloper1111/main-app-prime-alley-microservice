@@ -31,6 +31,7 @@ import UserActivityByCategory from "@components/UserActivityByCategory";
 import TwoCharts from "@components/TwoCharts";
 import SchedulePage from "@components/SchedulePage";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -479,6 +480,7 @@ type NextPageWithLayout = React.FC & {
 
 const SalesDashboard: NextPageWithLayout = () => {
   const { data: session, status } = useSession();
+  const router = useRouter();
 
   const navTabs = React.useMemo(() => {
     const perms = session?.user?.permissions ?? [];
@@ -736,7 +738,9 @@ const SalesDashboard: NextPageWithLayout = () => {
       </div>
 
       {/* ── Got feedback button ── */}
-      <div
+      <button
+        type="button"
+        onClick={() => router.push("/crm/tickets")}
         style={{
           position: "fixed",
           bottom: "16px",
@@ -750,10 +754,11 @@ const SalesDashboard: NextPageWithLayout = () => {
           cursor: "pointer",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
           fontFamily: FONT,
+          outline: "none",
         }}
       >
         Got feedback?
-      </div>
+      </button>
       <AssociateTaskModal
   isOpen={isModalOpen}
   onClose={() => setIsModalOpen(false)}

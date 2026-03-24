@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -550,6 +551,11 @@ const CrmDeals = () => {
   const [dealsMetrics, setDealsMetrics] = useState<Record<string, number> | null>(
     null,
   );
+  const [tabTotals, setTabTotals] = useState<Record<string, number>>({
+    all: 0,
+    lost: 0,
+    deleted: 0,
+  });
 
   const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
   const [dealToConvert, setDealToConvert] = useState<number | null>(null);
@@ -877,96 +883,103 @@ const CrmDeals = () => {
     }
   }, [exportFileName, exportFilters, fetchDealsForExport]);
 
+  const buildDealsParams = useCallback(
+    (
+      filters: Record<string, any>,
+      page = 1,
+      perPage = 15,
+      includeTableSorting = true,
+    ) => {
+      const params: Record<string, any> = {
+        page,
+        per_page: perPage,
+      };
+
+      if (filters.search) {
+        params.search = filters.search;
+      }
+      if (filters.include_converted !== undefined) {
+        params.include_converted = filters.include_converted;
+      }
+      if (filters.include_lost !== undefined) {
+        params.include_lost = filters.include_lost;
+      }
+      if (filters.include_archived !== undefined) {
+        params.include_archived = filters.include_archived;
+      }
+      if (filters.user_extensions?.length) {
+        params.user_extensions = filters.user_extensions;
+      } else if (filters.assigned_to) {
+        params.user_extensions = [filters.assigned_to];
+      }
+      if (filters.stage_id) {
+        params.stage_id = filters.stage_id;
+      }
+      if (filters.probability_min != null && filters.probability_min !== "") {
+        params.probability_min = Number(filters.probability_min);
+      }
+      if (filters.probability_max != null && filters.probability_max !== "") {
+        params.probability_max = Number(filters.probability_max);
+      }
+      if (filters.deal_type) {
+        params.deal_type = filters.deal_type;
+      }
+      if (filters.industry) {
+        params.industry = filters.industry;
+      }
+      if (filters.expected_close_date_from) {
+        params.expected_close_date_from = filters.expected_close_date_from;
+      }
+      if (filters.expected_close_date_to) {
+        params.expected_close_date_to = filters.expected_close_date_to;
+      }
+      if (filters.follow_up_date_from) {
+        params.follow_up_date_from = filters.follow_up_date_from;
+      }
+      if (filters.follow_up_date_to) {
+        params.follow_up_date_to = filters.follow_up_date_to;
+      }
+      if (filters.created_at_from) {
+        params.created_at_from = filters.created_at_from;
+      }
+      if (filters.created_at_to) {
+        params.created_at_to = filters.created_at_to;
+      }
+      if (filters.created_at_month) {
+        params.created_at_month = filters.created_at_month;
+      }
+      if (filters.ticket_id != null && filters.ticket_id !== "") {
+        params.ticket_id = filters.ticket_id;
+      }
+      if (filters.has_meetings !== undefined) {
+        params.has_meetings = filters.has_meetings;
+      }
+      if (filters.approval_status) {
+        params.approval_status = filters.approval_status;
+      }
+      if (filters.sort_by) {
+        params.sort_by = filters.sort_by;
+      }
+      if (filters.sort_order) {
+        params.sort_order = filters.sort_order;
+      }
+
+      if (includeTableSorting && dealsPagination.sortColumn) {
+        params.sort_column = dealsPagination.sortColumn;
+        params.sort_direction = dealsPagination.sortDirection;
+      }
+
+      return params;
+    },
+    [dealsPagination.sortColumn, dealsPagination.sortDirection],
+  );
+
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
-          page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        }
-
-        // Add filter parameters per API: include_converted, include_lost, include_archived,
-        // user_extensions, assigned_to, probability_min/max, stage_id, deal_type, industry,
-        // expected_close_date_from/to, follow_up_date_from/to, created_at_from/to, created_at_month,
-        // ticket_id, has_meetings, search, approval_status, sort_by, sort_order
-        if (currentFilters.include_converted !== undefined) {
-          params.include_converted = currentFilters.include_converted;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-        if (currentFilters.user_extensions?.length) {
-          params.user_extensions = currentFilters.user_extensions;
-        } else if (currentFilters.assigned_to) {
-          params.user_extensions = [currentFilters.assigned_to];
-        }
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.probability_min != null && currentFilters.probability_min !== "") {
-          params.probability_min = Number(currentFilters.probability_min);
-        }
-        if (currentFilters.probability_max != null && currentFilters.probability_max !== "") {
-          params.probability_max = Number(currentFilters.probability_max);
-        }
-        if (currentFilters.deal_type) {
-          params.deal_type = currentFilters.deal_type;
-        }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
-        }
-        if (currentFilters.expected_close_date_from) {
-          params.expected_close_date_from =
-            currentFilters.expected_close_date_from;
-        }
-        if (currentFilters.expected_close_date_to) {
-          params.expected_close_date_to = currentFilters.expected_close_date_to;
-        }
-        if (currentFilters.follow_up_date_from) {
-          params.follow_up_date_from = currentFilters.follow_up_date_from;
-        }
-        if (currentFilters.follow_up_date_to) {
-          params.follow_up_date_to = currentFilters.follow_up_date_to;
-        }
-        if (currentFilters.created_at_from) {
-          params.created_at_from = currentFilters.created_at_from;
-        }
-        if (currentFilters.created_at_to) {
-          params.created_at_to = currentFilters.created_at_to;
-        }
-        if (currentFilters.created_at_month) {
-          params.created_at_month = currentFilters.created_at_month;
-        }
-        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") {
-          params.ticket_id = currentFilters.ticket_id;
-        }
-        if (currentFilters.has_meetings !== undefined) {
-          params.has_meetings = currentFilters.has_meetings;
-        }
-        if (currentFilters.approval_status) {
-          params.approval_status = currentFilters.approval_status;
-        }
-        if (currentFilters.sort_by) {
-          params.sort_by = currentFilters.sort_by;
-        }
-        if (currentFilters.sort_order) {
-          params.sort_order = currentFilters.sort_order;
-        }
-
-        if (dealsPagination.sortColumn) {
-          params.sort_column = dealsPagination.sortColumn;
-          params.sort_direction = dealsPagination.sortDirection;
-        }
+        const params = buildDealsParams(currentFilters, page, perPage, true);
 
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
@@ -1003,8 +1016,53 @@ const CrmDeals = () => {
         setLoading(false);
       }
     },
-    [currentFilters, dealsPagination.sortColumn, dealsPagination.sortDirection],
+    [buildDealsParams, currentFilters],
   );
+
+  const tabTotalsBaseFilters = useMemo(() => {
+    const baseFilters = { ...currentFilters };
+    delete baseFilters.stage_id;
+    delete baseFilters.include_lost;
+    delete baseFilters.include_archived;
+    return baseFilters;
+  }, [currentFilters]);
+
+  const tabTotalsRequestKey = useMemo(
+    () =>
+      JSON.stringify({
+        filters: tabTotalsBaseFilters,
+        stageIds: stages.map((stage: any) => stage.id),
+      }),
+    [stages, tabTotalsBaseFilters],
+  );
+  const lastTabTotalsRequestKeyRef = useRef<string>("");
+
+  const fetchTabTotals = useCallback(async (baseFilters: Record<string, any>) => {
+    try {
+      const [allResp, lostResp, deletedResp, ...stageResponses] = await Promise.all([
+        getDeals(buildDealsParams(baseFilters, 1, 1, false)),
+        getDeals(buildDealsParams({ ...baseFilters, include_lost: true }, 1, 1, false)),
+        getDeals(buildDealsParams({ ...baseFilters, include_archived: true }, 1, 1, false)),
+        ...stages.map((stage: any) =>
+          getDeals(buildDealsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, false)),
+        ),
+      ]);
+
+      const nextTotals: Record<string, number> = {
+        all: allResp?.meta?.total ?? 0,
+        lost: lostResp?.meta?.total ?? 0,
+        deleted: deletedResp?.meta?.total ?? 0,
+      };
+
+      stages.forEach((stage: any, index) => {
+        nextTotals[stage.id] = stageResponses[index]?.meta?.total ?? 0;
+      });
+
+      setTabTotals(nextTotals);
+    } catch (error) {
+      console.error("Failed to fetch tab totals:", error);
+    }
+  }, [buildDealsParams, stages]);
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
@@ -1081,11 +1139,11 @@ const CrmDeals = () => {
         tabFromUrl === "deleted" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
+      if (isValidFilter) {
+        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  }, [router.isReady, router.query.tab, stages]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -1115,6 +1173,14 @@ const CrmDeals = () => {
     dealsPagination.rowsPerPage,
     fetchDeals,
   ]);
+
+  useEffect(() => {
+    if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
+      return;
+    }
+    lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
+    fetchTabTotals(tabTotalsBaseFilters);
+  }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Fetch attachments when modal opens
   useEffect(() => {
@@ -2419,22 +2485,25 @@ const CrmDeals = () => {
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
     const counts: Record<string, number> = {
-      all: summaryTiles?.total_deals || totalDeals || transformed.length,
+      all:
+        tabTotals.all ??
+        summaryTiles?.total_deals ??
+        totalDeals ??
+        transformed.length,
       lost:
-        summaryTiles?.lost_deals || transformed.filter((d) => d.isLost).length,
-      deleted: summaryTiles?.deleted_deals || 0,
+        tabTotals.lost ??
+        summaryTiles?.lost_deals ??
+        transformed.filter((d) => d.isLost).length,
+      deleted: tabTotals.deleted ?? summaryTiles?.deleted_deals ?? 0,
     };
 
     // Add counts for all stages (not just first 5, for custom tabs)
     stages.forEach((stage: any) => {
-      const stageDeals = transformed.filter(
-        (d) => d.stage === stage.name || d.rawData?.stage_id === stage.id,
-      );
-      counts[stage.id] = stageDeals.length;
+      counts[stage.id] = tabTotals[stage.id] ?? 0;
     });
 
     return counts;
-  }, [dealsData, extensions, stages, summaryTiles, totalDeals]);
+  }, [dealsData, extensions, stages, summaryTiles, tabTotals, totalDeals]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {

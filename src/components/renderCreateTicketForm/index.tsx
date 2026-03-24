@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { X, Plus, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { Dropdown, Form } from "react-bootstrap";
 import { APP_FONT } from "../../styles/fonts";
+import { getAllUsers } from "../../utils/users";
 
 const FF = APP_FONT;
 
@@ -45,7 +46,7 @@ const initialTicketForm: TicketFormData = {
   ticketStatus: "New",
   ticketDescription: "",
   source: "",
-  ticketOwner: "Rizwan Haider",
+  ticketOwner: "",
   priority: "",
   createDate: "",
   contactAssociateRecord: "",
@@ -60,7 +61,6 @@ const initialTicketForm: TicketFormData = {
 const PIPELINE_OPTIONS = ["Support Pipeline", "Technical Pipeline", "Billing Pipeline"];
 const TICKET_STATUS_OPTIONS = ["New", "Waiting on contact", "Waiting on us", "Closed"];
 const SOURCE_OPTIONS = ["Email", "Phone", "Chat", "Web form", "Social media"];
-const TICKET_OWNER_OPTIONS = ["Rizwan Haider", "John Doe", "Jane Smith"];
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"];
 const ASSOCIATION_LABEL_OPTIONS = ["No label", "Decision Maker", "Primary", "Billing"];
 
@@ -174,7 +174,13 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
     >
       {value || placeholder || "Select..."}
     </Dropdown.Toggle>
-    <Dropdown.Menu style={{ width: "100%" }}>
+    <Dropdown.Menu
+      style={{
+        width: "100%",
+        maxHeight: "220px",
+        overflowY: "auto",
+      }}
+    >
       {options.map((opt) => (
         <Dropdown.Item key={opt} onClick={() => onChange(opt)}>
           {opt}
@@ -202,6 +208,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 }) => {
   const [ticketForm, setTicketForm] = useState<TicketFormData>(initialTicketForm);
   const [loading, setLoading] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState<string[]>([]);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
 
@@ -219,6 +226,68 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
     ticketForm.ticketName.trim() !== "" &&
     ticketForm.pipeline !== "" &&
     ticketForm.ticketStatus !== "";
+
+  const todayDate = useMemo(() => {
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return localDate.toISOString().split("T")[0];
+  }, []);
+
+  const handleCreateDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    const safeDate = selectedDate && selectedDate > todayDate ? todayDate : selectedDate;
+    setTicketForm((prev) => ({ ...prev, createDate: safeDate }));
+  };
+
+  useEffect(() => {
+    const getDisplayValue = (item: unknown, keys: string[]): string => {
+      const record = (item ?? {}) as Record<string, unknown>;
+      for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+      }
+      return "";
+    };
+
+    const loadFormDropdowns = async () => {
+      try {
+        const [usersResponse] = await Promise.all([
+          getAllUsers({ page: 1, perPage: 500 }),
+          
+        ]);
+
+        const userList = Array.isArray(usersResponse?.dataList)
+          ? usersResponse.dataList
+          : [];
+        const owners = userList
+          .map((user: unknown) =>
+            getDisplayValue(user, [
+              "name",
+              "display_name",
+              "full_name",
+              "first_name",
+              "email",
+              "user_extension",
+            ]),
+          )
+          .filter(Boolean);
+        setOwnerOptions(Array.from(new Set(owners)));
+
+       
+        
+      } catch (error) {
+        console.error("Failed to load create ticket dropdown options:", error);
+      }
+    };
+
+    loadFormDropdowns();
+  }, []);
+
+  useEffect(() => {
+    if (!ticketForm.ticketOwner && ownerOptions.length > 0) {
+      setTicketForm((prev) => ({ ...prev, ticketOwner: ownerOptions[0] }));
+    }
+  }, [ownerOptions, ticketForm.ticketOwner]);
 
   const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     (e.currentTarget.style.borderColor = "#0091ae");
@@ -394,7 +463,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
             <SimpleDropdown
               id="create-ticket-owner"
               value={ticketForm.ticketOwner}
-              options={TICKET_OWNER_OPTIONS}
+              options={ownerOptions}
               onChange={set("ticketOwner")}
               placeholder="Select owner"
               testId="ticketowner-input"
@@ -421,7 +490,8 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
               type="date"
               data-test-id="createdate-input"
               value={ticketForm.createDate}
-              onChange={setE("createDate")}
+              onChange={handleCreateDateChange}
+              max={todayDate}
               style={inputStyle}
               onFocus={focusStyle}
               onBlur={blurStyle}

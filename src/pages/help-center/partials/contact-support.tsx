@@ -51,9 +51,9 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
   const mainOptions = [
     {
       icon: MessageCircle,
-      title: 'Live Chat',
-      description: 'Chat with a live agent for immediate assistance.',
-      buttonText: 'Online',
+      title: 'AI Assistance',
+      description: 'Get instant help from the in-app AI assistant.',
+      buttonText: 'Open',
       buttonAction: onStartChat,
       color: '#5babf6',
       disabled: false

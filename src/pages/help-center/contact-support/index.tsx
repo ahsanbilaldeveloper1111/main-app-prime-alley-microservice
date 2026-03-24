@@ -13,10 +13,9 @@ const ContactSupportPage = () => {
   };
 
   const handleStartChat = () => {
-    // Dispatch custom event to open chatbot
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('open-chatbot'));
-    }
+    globalThis.window?.dispatchEvent(
+      new CustomEvent('breeze-assistant:open'),
+    );
   };
 
   const handleRequestCall = () => {
