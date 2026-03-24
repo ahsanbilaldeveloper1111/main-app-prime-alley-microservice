@@ -514,6 +514,9 @@ MENU_COLORS: {
     VIEW_PAYMENT_METHODS_BILLING: 'payment-methods-billing',
     VIEW_QUOTES_BILLING: 'view-quotes-billing',
 
+    ADD_DOCUMENT_BILLING: 'accounts-services',
+    DELETE_DOCUMENT_BILLING: 'accounts-services',
+
     VIEW_CRM_DASHBOARD: 'dashboard-crm',
     VIEW_CRM_QUOTES: 'view-crm-quotes',
     VIEW_CRM_CAMPAIGNS: 'view-crm-campaigns',
