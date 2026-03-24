@@ -509,7 +509,7 @@ export default function DocumentsPage() {
     }
     } catch (error) {
       console.error("DocumentsPage DeleteCompanyDocument error:", error);
-      toast.error("Failed to delete document.");
+     
     } finally {
       setDeletingDocument(false);
     }

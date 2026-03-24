@@ -366,7 +366,7 @@ export const DeleteCompanyDocument = async (
     const response = await axiosInstance.delete(
       `${companyDocumentsBasePath(companyId)}/${documentId}`
     );
-    return extractData(response.data);
+    return response?.data?.data;
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete company document");
     throw error;
