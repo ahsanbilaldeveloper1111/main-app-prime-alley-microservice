@@ -1,7 +1,6 @@
 import React from "react";
 import {
-  formatCrmAmount,
-  formatCrmShortDate,
+  formatCrmAmount
 } from "@pages/crm/common/crm-detail-formatters";
 
 type DealCardProps = {

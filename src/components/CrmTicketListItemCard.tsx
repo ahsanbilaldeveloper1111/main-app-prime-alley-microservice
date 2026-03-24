@@ -17,8 +17,6 @@ export default function CrmTicketListItemCard({
 }: Readonly<TicketCardProps>) {
   const leadRecordId = lead?.id;
 
-  const dealsCount = (lead?.deals as unknown[] | undefined)?.length ?? 0;
-
   return (
     <div
       key={String(leadRecordId)}

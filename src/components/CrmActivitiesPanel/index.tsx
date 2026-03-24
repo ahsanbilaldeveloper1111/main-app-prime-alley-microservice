@@ -561,10 +561,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       .then((res: unknown) => {
         const data = (res as { data?: WhatsAppChatItem[] })?.data;
         const list = Array.isArray(data) ? data : [];
-        const recordPhone = (record?.data?.phone ?? "").replace(/\s/g, "");
+        const recordPhone = (record?.data?.phone ?? "").replaceAll(/\s/g, "");
         const filtered = recordPhone
           ? list.filter(
-              (c) => (c.phone_number ?? "").replace(/\s/g, "") === recordPhone,
+              (c) => (c.phone_number ?? "").replaceAll(/\s/g, "") === recordPhone,
             )
           : list;
         setWhatsappChats(filtered);
@@ -626,7 +626,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   );
 
   const fetchCallRecordings = useCallback(async (phoneNumber: string) => {
-    const normalizedPhone = (phoneNumber || "").replace(/\s/g, "");
+    const normalizedPhone = (phoneNumber || "").replaceAll(/\s/g, "");
     if (!normalizedPhone) {
       setCallRecordings([]);
       setCallRecordingsTotal(0);
@@ -1052,7 +1052,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       taskDueDate?: string;
       attachments: File[];
     }) => {
-      const to = (record?.data?.phone ?? "").replace(/\s/g, "").trim();
+      const to = (record?.data?.phone ?? "").replaceAll(/\s/g, "").trim();
       const body = smsData.message?.trim() ?? "";
       if (!to) {
         toast.error("No phone number available for this record.");
@@ -1090,7 +1090,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     setWhatsappReplySendLoading(true);
     try {
       await sendWhatsApp({
-        number: (selectedWhatsAppChat?.phone_number ?? "").replace(/\s/g, ""),
+        number: (selectedWhatsAppChat?.phone_number ?? "").replaceAll(/\s/g, ""),
         message: whatsappReplyMessage.trim(),
       });
       setWhatsappReplyMessage("");
@@ -1663,8 +1663,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 const isSelected = selectedEmailId === email.id;
                 const stripped = email.content
                   ? email.content
-                      .replace(/<[^>]*>/g, "")
-                      .replace(/\s+/g, " ")
+                      .replaceAll(/<[^>]*>/g, "")
+                      .replaceAll(/\s+/g, " ")
                       .trim()
                   : "";
                 const contentPreview = stripped

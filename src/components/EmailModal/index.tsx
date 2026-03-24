@@ -1881,13 +1881,13 @@ const EmailModal: React.FC<EmailModalProps> = ({
               disabled={sendLoading}
               style={{
                 padding: "8px 16px",
-                backgroundColor: !sendLoading ? "#cbd5e0" : "#e2e8f0",
+                backgroundColor: sendLoading ? "#e2e8f0" : "#cbd5e0",
                 color: "#141414",
                 border: "none",
                 borderRadius: "4px",
                 fontSize: "14px",
                 fontWeight: "500",
-                cursor: !sendLoading ? "pointer" : "not-allowed",
+                cursor: sendLoading ? "not-allowed" : "pointer",
                 transition: "background-color 0.2s",
                 display: "flex",
                 alignItems: "center",
