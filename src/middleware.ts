@@ -69,7 +69,7 @@ function isPublicRoute(path: string): boolean {
         '/access-denied',
         '/dashboard'  // assuming dashboard is the default landing page
     ];
-    return publicRoutes.some(route => path === route);
+    return publicRoutes.includes(path);
 }
 
 export const config = {

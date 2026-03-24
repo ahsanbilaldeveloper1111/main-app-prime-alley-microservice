@@ -1430,7 +1430,7 @@ const CrmLeads = () => {
   const handleFirstColumnClick = useCallback(
     (lead: LeadData) => {
       const leadId = lead?.rawData?.id ?? lead?.id ?? "";
-      router.push(`/crm/leads/leads-detailpage?id=${leadId}`);
+      router.push(`/crm/detailspage?type=lead&id=${leadId}`);
     },
     [router],
   );
@@ -3833,7 +3833,7 @@ const CrmLeads = () => {
                 const leadId = selectedLead?.id || selectedLead?.rawData?.id;
                 if (leadId) {
                   setShowLeadSidebar(false);
-                  router.push(`/crm/leads/leads-detailpage?id=${leadId}`);
+                  router.push(`/crm/detailspage?type=lead&id=${leadId}`);
                 }
               },
             }}

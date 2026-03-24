@@ -679,7 +679,7 @@ const CrmQuotesManagement = () => {
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id: number }>,
     note: "",
-    source: "",
+    source_file: "",
     custom_fields: [] as Array<{
       id: string;
       field_name: string;
@@ -849,7 +849,8 @@ const CrmQuotesManagement = () => {
           ),
           tags: tagsArray as Array<{ value: string; label: string; id: number }>,
           note: item.note ?? d.note ?? "",
-          source: (item as any).source_file ?? d.source ?? (item as any).source ?? "",
+        source_file:
+          (item as any).source_file ?? d.source ?? (item as any).source ?? "",
           custom_fields: customFieldsArray,
         });
         if (!cancelled) setContactFormLoading(false);
@@ -3307,7 +3308,7 @@ const CrmQuotesManagement = () => {
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
       router.push(
-        `/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`,
+        `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
       );
     },
     [router],
@@ -4050,7 +4051,7 @@ const CrmQuotesManagement = () => {
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source?.trim() || undefined,
+          source: contactForm.source_file?.trim() || undefined,
           tag_ids: contactForm.tags?.length
           ? contactForm.tags.map((t) => t.id)
           : [],
@@ -4072,7 +4073,7 @@ const CrmQuotesManagement = () => {
           scheduled_call_at: "",
           tags: [],
           note: "",
-          source: "",
+        source_file: "",
           custom_fields: [],
         });
         if (!addAnother) {
@@ -4135,7 +4136,7 @@ const CrmQuotesManagement = () => {
         phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source?.trim() || undefined,
+        source: contactForm.source_file?.trim() || undefined,
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: contactForm.tags?.length

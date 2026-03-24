@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Button } from 'react-bootstrap';
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { Button } from "react-bootstrap";
 import {
   Bold,
   Italic,
@@ -13,8 +13,8 @@ import {
   Strikethrough,
   Link,
   Undo,
-  Redo
-} from 'lucide-react';
+  Redo,
+} from "lucide-react";
 
 interface RichTextEditorProps {
   value: string;
@@ -24,613 +24,549 @@ interface RichTextEditorProps {
   maxHeight?: string;
   maxLength?: number;
   /** 'sm' reduces toolbar button padding and icon size */
-  buttonSize?: 'sm' | 'md';
+  buttonSize?: "sm" | "md";
+}
+
+type AlignSide = "left" | "center" | "right";
+
+type ActiveFormatsState = Record<string, boolean | string>;
+
+const BLOCK_TAGS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6", "div"]);
+
+function mapTextAlignToSide(textAlign: string): AlignSide | null {
+  if (textAlign === "center") return "center";
+  if (textAlign === "right" || textAlign === "end") return "right";
+  if (textAlign === "left" || textAlign === "start") return "left";
+  return null;
+}
+
+function readAlignmentFromElement(element: Element): AlignSide | null {
+  return mapTextAlignToSide(globalThis.getComputedStyle(element).textAlign);
+}
+
+function alignmentFromSelectionWithinEditor(editor: HTMLElement): AlignSide | null {
+  const selection = globalThis.getSelection();
+  if (!selection?.rangeCount) return null;
+  const range = selection.getRangeAt(0);
+  let node: Node | null = range.commonAncestorContainer;
+  if (node?.nodeType === Node.TEXT_NODE) {
+    node = node.parentElement;
+  }
+  if (!(node instanceof Element)) return null;
+  let current: Element | null = node;
+  while (current && current !== editor) {
+    const side = readAlignmentFromElement(current);
+    if (side) return side;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function getCurrentAlignmentFromEditor(editor: HTMLElement): AlignSide {
+  const fromSelection = alignmentFromSelectionWithinEditor(editor);
+  if (fromSelection) return fromSelection;
+  return readAlignmentFromElement(editor) ?? "left";
+}
+
+function queryCommandStateSafe(command: string): boolean {
+  try {
+    return document.queryCommandState(command); // NOSONAR — legacy contenteditable formatting API
+  } catch (err: unknown) {
+    console.warn("RichTextEditor: queryCommandState failed", command, err);
+    return false;
+  }
+}
+
+/**
+ * Uses the deprecated document.execCommand API; replacing it would require adopting a full rich-text toolkit (e.g. TipTap/ProseMirror).
+ */
+function execRichTextCommand(command: string, showUi: boolean, value?: string): void {
+  try {
+    document.execCommand(command, showUi, value); // NOSONAR — legacy contenteditable formatting API
+  } catch (err: unknown) {
+    console.warn("RichTextEditor: execCommand failed", command, err);
+  }
+}
+
+function isHeadingActiveAtSelection(editor: HTMLElement, level: 1 | 2): boolean {
+  const selection = globalThis.getSelection();
+  if (!selection?.rangeCount) return false;
+  const node = selection.anchorNode;
+  if (!node) return false;
+  let element: Element | null =
+    node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+  while (element && element !== editor) {
+    if (element.tagName?.toLowerCase() === `h${level}`) return true;
+    element = element.parentElement;
+  }
+  return false;
+}
+
+function getCurrentBlockTagAtSelection(editor: HTMLElement): string {
+  const selection = globalThis.getSelection();
+  if (!selection?.rangeCount) return "p";
+  const node = selection.anchorNode;
+  if (!node) return "p";
+  let element: Element | null =
+    node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+  while (element && element !== editor) {
+    const tagName = element.tagName?.toLowerCase();
+    if (tagName && BLOCK_TAGS.has(tagName)) {
+      return tagName === "div" ? "p" : tagName;
+    }
+    element = element.parentElement;
+  }
+  return "p";
+}
+
+function buildActiveFormatsSnapshot(editor: HTMLElement): ActiveFormatsState {
+  const currentAlignment = getCurrentAlignmentFromEditor(editor);
+  const currentBlock = getCurrentBlockTagAtSelection(editor);
+  return {
+    bold: queryCommandStateSafe("bold"),
+    italic: queryCommandStateSafe("italic"),
+    underline: queryCommandStateSafe("underline"),
+    strikeThrough: queryCommandStateSafe("strikeThrough"),
+    justifyLeft: currentAlignment === "left",
+    justifyCenter: currentAlignment === "center",
+    justifyRight: currentAlignment === "right",
+    formatBlockH1: isHeadingActiveAtSelection(editor, 1),
+    formatBlockH2: isHeadingActiveAtSelection(editor, 2),
+    insertUnorderedList: queryCommandStateSafe("insertUnorderedList"),
+    insertOrderedList: queryCommandStateSafe("insertOrderedList"),
+    currentBlockTag: currentBlock,
+  };
+}
+
+interface ToolbarFormatButtonProps {
+  active: boolean;
+  title: string;
+  buttonPadding: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}
+
+function ToolbarFormatButton({
+  active,
+  title,
+  buttonPadding,
+  onPress,
+  children,
+}: Readonly<ToolbarFormatButtonProps>) {
+  return (
+    <Button
+      variant="link"
+      type="button"
+      onClick={onPress}
+      onMouseDown={(e) => e.preventDefault()}
+      style={{
+        padding: buttonPadding,
+        color: active ? "#0d6efd" : "#495057",
+        backgroundColor: active ? "#e7f1ff" : "transparent",
+        minWidth: "auto",
+        border: "none",
+        borderRadius: "4px",
+      }}
+      title={title}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function ToolbarDivider({ height }: Readonly<{ height: string }>) {
+  return (
+    <div
+      style={{
+        width: "1px",
+        height,
+        background: "#dee2e6",
+        margin: "0 4px",
+      }}
+    />
+  );
+}
+
+interface RichTextFormatToolbarProps {
+  activeFormats: ActiveFormatsState;
+  applyFormat: (command: string, value?: string) => void;
+  insertLink: () => void;
+  handleColorChange: (color: string) => void;
+  colorPickerRef: React.RefObject<HTMLInputElement | null>;
+  toolbarPadding: string;
+  buttonPadding: string;
+  iconSize: number;
+  dividerHeight: string;
+}
+
+function RichTextFormatToolbar({
+  activeFormats,
+  applyFormat,
+  insertLink,
+  handleColorChange,
+  colorPickerRef,
+  toolbarPadding,
+  buttonPadding,
+  iconSize,
+  dividerHeight,
+}: Readonly<RichTextFormatToolbarProps>) {
+  const onBlockFormatChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const v = e.target.value;
+    const tag = v === "p" ? "<p>" : `<${v}>`;
+    applyFormat("formatBlock", tag);
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "2px",
+        padding: toolbarPadding,
+        background: "#f8f9fa",
+        borderBottom: "1px solid #dee2e6",
+        borderRadius: "6px 6px 0 0",
+      }}
+    >
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.bold)}
+        title="Bold (Ctrl+B)"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("bold")}
+      >
+        <Bold size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.italic)}
+        title="Italic (Ctrl+I)"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("italic")}
+      >
+        <Italic size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.underline)}
+        title="Underline (Ctrl+U)"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("underline")}
+      >
+        <Underline size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.strikeThrough)}
+        title="Strikethrough"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("strikeThrough")}
+      >
+        <Strikethrough size={iconSize} />
+      </ToolbarFormatButton>
+
+      <ToolbarDivider height={dividerHeight} />
+
+      <select
+        value={String(activeFormats.currentBlockTag || "p")}
+        onChange={onBlockFormatChange}
+        title="Block format"
+        aria-label="Block format"
+        style={{
+          padding: buttonPadding,
+          fontSize: iconSize,
+          minHeight: iconSize + 12,
+          border: "1px solid #dee2e6",
+          borderRadius: "4px",
+          background: "#fff",
+          color: "#495057",
+          cursor: "pointer",
+          marginRight: "2px",
+        }}
+      >
+        <option value="h1">Title</option>
+        <option value="p">Paragraph</option>
+        <option value="h1">H1</option>
+        <option value="h2">H2</option>
+        <option value="h3">H3</option>
+        <option value="h4">H4</option>
+        <option value="h5">H5</option>
+        <option value="h6">H6</option>
+      </select>
+
+      <ToolbarDivider height={dividerHeight} />
+
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.insertUnorderedList)}
+        title="Bullet List"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("insertUnorderedList")}
+      >
+        <List size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.insertOrderedList)}
+        title="Numbered List"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("insertOrderedList")}
+      >
+        <ListOrdered size={iconSize} />
+      </ToolbarFormatButton>
+
+      <ToolbarDivider height={dividerHeight} />
+
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.justifyLeft)}
+        title="Align Left"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("justifyLeft")}
+      >
+        <AlignLeft size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.justifyCenter)}
+        title="Align Center"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("justifyCenter")}
+      >
+        <AlignCenter size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={Boolean(activeFormats.justifyRight)}
+        title="Align Right"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("justifyRight")}
+      >
+        <AlignRight size={iconSize} />
+      </ToolbarFormatButton>
+
+      <ToolbarDivider height={dividerHeight} />
+
+      <div style={{ position: "relative" }}>
+        <Button
+          variant="link"
+          type="button"
+          onClick={() => colorPickerRef.current?.click()}
+          onMouseDown={(e) => e.preventDefault()}
+          style={{
+            padding: buttonPadding,
+            color: "#495057",
+            minWidth: "auto",
+            border: "none",
+            borderRadius: "4px",
+          }}
+          title="Text Color"
+          aria-label="Text color"
+        >
+          <Palette size={iconSize} />
+        </Button>
+        <input
+          ref={colorPickerRef}
+          type="color"
+          aria-hidden
+          tabIndex={-1}
+          onChange={(e) => handleColorChange(e.target.value)}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            width: 0,
+            height: 0,
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+
+      <ToolbarFormatButton
+        active={false}
+        title="Insert Link"
+        buttonPadding={buttonPadding}
+        onPress={insertLink}
+      >
+        <Link size={iconSize} />
+      </ToolbarFormatButton>
+
+      <ToolbarDivider height={dividerHeight} />
+
+      <ToolbarFormatButton
+        active={false}
+        title="Undo (Ctrl+Z)"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("undo")}
+      >
+        <Undo size={iconSize} />
+      </ToolbarFormatButton>
+      <ToolbarFormatButton
+        active={false}
+        title="Redo (Ctrl+Y)"
+        buttonPadding={buttonPadding}
+        onPress={() => applyFormat("redo")}
+      >
+        <Redo size={iconSize} />
+      </ToolbarFormatButton>
+    </div>
+  );
 }
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
   placeholder = "Describe your issue in detail...",
-  minHeight = '150px',
-  maxHeight = '300px',
+  minHeight = "150px",
+  maxHeight = "300px",
   maxLength = 500,
-  buttonSize = 'md'
+  buttonSize = "md",
 }) => {
-  const isSm = buttonSize === 'sm';
-  const toolbarPadding = isSm ? '6px 8px' : '8px 12px';
-  const buttonPadding = isSm ? '4px 6px' : '6px 8px';
+  const isSm = buttonSize === "sm";
+  const toolbarPadding = isSm ? "6px 8px" : "8px 12px";
+  const buttonPadding = isSm ? "4px 6px" : "6px 8px";
   const iconSize = isSm ? 14 : 16;
-  const dividerHeight = isSm ? '20px' : '24px';
+  const dividerHeight = isSm ? "20px" : "24px";
   const editorRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLInputElement>(null);
-  const [activeFormats, setActiveFormats] = useState<Record<string, boolean | string>>({});
+  const [activeFormats, setActiveFormats] = useState<ActiveFormatsState>({});
 
-  // Check if a format command is currently active
-  const isFormatActive = (command: string): boolean => {
-    if (!editorRef.current) return false;
-    
-    try {
-      return document.queryCommandState(command);
-    } catch (e) {
-      return false;
-    }
-  };
+  const updateActiveFormats = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    setActiveFormats(buildActiveFormatsSnapshot(el));
+  }, []);
 
-  // Check alignment by inspecting computed styles
-  const getCurrentAlignment = (): 'left' | 'center' | 'right' => {
-    if (!editorRef.current) return 'left';
-    
-    const selection = window.getSelection();
-    
-    // If there's a selection, check the alignment of the selected element
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      let element: Node | Element | null = range.commonAncestorContainer;
-      
-      // Get the element (not text node)
-      if (element && element.nodeType === Node.TEXT_NODE) {
-        const parent = element.parentElement;
-        if (parent) {
-          element = parent;
-        }
-      }
-      
-      if (element && element instanceof Element) {
-        // Walk up the DOM tree to find the element with text-align style
-        let current: Element | null = element;
-        while (current && current !== editorRef.current) {
-          const computedStyle = window.getComputedStyle(current);
-          const textAlign = computedStyle.textAlign;
-          
-          if (textAlign === 'center') {
-            return 'center';
-          } else if (textAlign === 'right' || textAlign === 'end') {
-            return 'right';
-          } else if (textAlign === 'left' || textAlign === 'start') {
-            return 'left';
-          }
-          
-          current = current.parentElement;
-        }
-      }
-    }
-    
-    // If no selection or no explicit alignment found, check the editor's default alignment
-    const editorStyle = window.getComputedStyle(editorRef.current);
-    const editorAlign = editorStyle.textAlign;
-    
-    if (editorAlign === 'center') {
-      return 'center';
-    } else if (editorAlign === 'right' || editorAlign === 'end') {
-      return 'right';
-    }
-    
-    // Default to left (either explicitly set or as fallback)
-    return 'left';
-  };
-
-  // Check if current selection is in a heading
-  const isHeadingActive = (level: 1 | 2): boolean => {
-    if (!editorRef.current) return false;
-    
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const node = selection.anchorNode;
-      if (node) {
-        let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
-        while (element && element !== editorRef.current) {
-          const tagName = element.tagName?.toLowerCase();
-          if (tagName === `h${level}`) {
-            return true;
-          }
-          element = element.parentElement as Element;
-        }
-      }
-    }
-    return false;
-  };
-
-  // Get the block-level tag containing the current selection (p, h1, h2, ...)
-  const getCurrentBlockTag = (): string => {
-    if (!editorRef.current) return 'p';
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const node = selection.anchorNode;
-      if (node) {
-        let element: Element | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
-        while (element && element !== editorRef.current) {
-          const tagName = element.tagName?.toLowerCase();
-          if (['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div'].includes(tagName)) {
-            return tagName === 'div' ? 'p' : tagName;
-          }
-          element = element.parentElement;
-        }
-      }
-    }
-    return 'p';
-  };
-
-  // Update active formats based on current selection
-  const updateActiveFormats = () => {
-    if (!editorRef.current) return;
-    
-    // Get current alignment from computed styles
-    const currentAlignment = getCurrentAlignment();
-    
-    const currentBlock = getCurrentBlockTag();
-    const formats: Record<string, boolean | string> = {
-      bold: isFormatActive('bold'),
-      italic: isFormatActive('italic'),
-      underline: isFormatActive('underline'),
-      strikeThrough: isFormatActive('strikeThrough'),
-      justifyLeft: currentAlignment === 'left',
-      justifyCenter: currentAlignment === 'center',
-      justifyRight: currentAlignment === 'right',
-      formatBlockH1: isHeadingActive(1),
-      formatBlockH2: isHeadingActive(2),
-      insertUnorderedList: isFormatActive('insertUnorderedList'),
-      insertOrderedList: isFormatActive('insertOrderedList'),
-      currentBlockTag: currentBlock,
-    };
-
-    setActiveFormats(formats);
-  };
-
-  // Initialize editor content
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value;
     }
-    // Update active formats after content is initialized
-    setTimeout(updateActiveFormats, 100);
-  }, [value]);
+    const t = globalThis.setTimeout(updateActiveFormats, 100);
+    return () => globalThis.clearTimeout(t);
+  }, [value, updateActiveFormats]);
 
-  // Add event listeners to track selection changes
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
+
+    const scheduleUpdate = () => {
+      globalThis.setTimeout(updateActiveFormats, 0);
+    };
 
     const handleSelectionChange = () => {
       updateActiveFormats();
     };
 
-    const handleMouseUp = () => {
-      setTimeout(updateActiveFormats, 0);
-    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    editor.addEventListener("mouseup", scheduleUpdate);
+    editor.addEventListener("keyup", scheduleUpdate);
+    editor.addEventListener("click", scheduleUpdate);
 
-    const handleKeyUp = () => {
-      setTimeout(updateActiveFormats, 0);
-    };
-
-    const handleClick = () => {
-      setTimeout(updateActiveFormats, 0);
-    };
-
-    // Initial update when editor is ready
-    setTimeout(updateActiveFormats, 100);
-
-    document.addEventListener('selectionchange', handleSelectionChange);
-    editor.addEventListener('mouseup', handleMouseUp);
-    editor.addEventListener('keyup', handleKeyUp);
-    editor.addEventListener('click', handleClick);
+    const initialT = globalThis.setTimeout(updateActiveFormats, 100);
 
     return () => {
-      document.removeEventListener('selectionchange', handleSelectionChange);
-      editor.removeEventListener('mouseup', handleMouseUp);
-      editor.removeEventListener('keyup', handleKeyUp);
-      editor.removeEventListener('click', handleClick);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+      editor.removeEventListener("mouseup", scheduleUpdate);
+      editor.removeEventListener("keyup", scheduleUpdate);
+      editor.removeEventListener("click", scheduleUpdate);
+      globalThis.clearTimeout(initialT);
     };
-  }, []); // updateActiveFormats is stable and doesn't need to be in deps
+  }, [updateActiveFormats]);
 
-  // Rich text formatting functions
-  const applyFormat = (command: string, value?: string) => {
-    if (!editorRef.current) return;
-    
-    editorRef.current.focus();
-    document.execCommand(command, false, value);
-    updateEditorContent();
-    // Update active formats after applying
-    setTimeout(updateActiveFormats, 0);
-  };
-
-  const updateEditorContent = () => {
-    if (!editorRef.current) return;
-    
-    const html = editorRef.current.innerHTML;
-    const text = editorRef.current.innerText || editorRef.current.textContent || '';
-    
-    // Check max length
-    // if (text.length > maxLength) {
-    //   // Revert if exceeds max length
-    //   if (editorRef.current) {
-    //     editorRef.current.innerHTML = value;
-    //   }
-    //   return;
-    // }
-    
+  const updateEditorContent = useCallback(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const html = el.innerHTML;
+    const text = el.innerText || el.textContent || "";
     onChange(html, text);
-  };
+  }, [onChange]);
 
-  const handleEditorInput = () => {
+  const applyFormat = useCallback(
+    (command: string, cmdValue?: string) => {
+      const el = editorRef.current;
+      if (!el) return;
+      el.focus();
+      execRichTextCommand(command, false, cmdValue);
+      updateEditorContent();
+      globalThis.setTimeout(updateActiveFormats, 0);
+    },
+    [updateActiveFormats, updateEditorContent],
+  );
+
+  const handleEditorInput = useCallback(() => {
     updateEditorContent();
-  };
+  }, [updateEditorContent]);
 
-  const handleEditorPaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
-    document.execCommand('insertText', false, text);
-    updateEditorContent();
-  };
+  const handleEditorPaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      e.preventDefault();
+      const text = e.clipboardData.getData("text/plain");
+      execRichTextCommand("insertText", false, text);
+      updateEditorContent();
+    },
+    [updateEditorContent],
+  );
 
-  const handleColorChange = (color: string) => {
-    applyFormat('foreColor', color);
-  };
+  const handleColorChange = useCallback(
+    (color: string) => {
+      applyFormat("foreColor", color);
+    },
+    [applyFormat],
+  );
 
-  const insertLink = () => {
-    const url = prompt('Enter URL:');
+  const insertLink = useCallback(() => {
+    const url = globalThis.prompt("Enter URL:");
     if (url) {
-      applyFormat('createLink', url);
+      applyFormat("createLink", url);
     }
-  };
-
-  const getTextLength = (): number => {
-    if (!editorRef.current) return 0;
-    return (editorRef.current.innerText || editorRef.current.textContent || '').length;
-  };
+  }, [applyFormat]);
 
   return (
     <>
-      {/* Rich Text Editor Container */}
-      <div style={{
-        border: '1px solid #dee2e6',
-        borderRadius: '6px',
-        background: '#fff'
-      }}>
-        {/* Rich Text Toolbar */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '2px',
-          padding: toolbarPadding,
-          background: '#f8f9fa',
-          borderBottom: '1px solid #dee2e6',
-          borderRadius: '6px 6px 0 0'
-        }}>
-          {/* Text Formatting */}
-          <Button
-            variant="link"
-            onClick={() => applyFormat('bold')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.bold ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.bold ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Bold (Ctrl+B)"
-          >
-            <Bold size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('italic')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.italic ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.italic ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Italic (Ctrl+I)"
-          >
-            <Italic size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('underline')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.underline ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.underline ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Underline (Ctrl+U)"
-          >
-            <Underline size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('strikeThrough')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.strikeThrough ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.strikeThrough ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Strikethrough"
-          >
-            <Strikethrough size={iconSize} />
-          </Button>
-          
-          <div style={{
-            width: '1px',
-            height: dividerHeight,
-            background: '#dee2e6',
-            margin: '0 4px'
-          }} />
+      <div
+        style={{
+          border: "1px solid #dee2e6",
+          borderRadius: "6px",
+          background: "#fff",
+        }}
+      >
+        <RichTextFormatToolbar
+          activeFormats={activeFormats}
+          applyFormat={applyFormat}
+          insertLink={insertLink}
+          handleColorChange={handleColorChange}
+          colorPickerRef={colorPickerRef}
+          toolbarPadding={toolbarPadding}
+          buttonPadding={buttonPadding}
+          iconSize={iconSize}
+          dividerHeight={dividerHeight}
+        />
 
-          {/* Block format dropdown: Title, Paragraph, H1–H6 */}
-          <select
-            value={String(activeFormats.currentBlockTag || 'p')}
-            onChange={(e) => {
-              const value = e.target.value;
-              const tag = value === 'paragraph' ? '<p>' : `<${value}>`;
-              applyFormat('formatBlock', tag);
-            }}
-            title="Block format"
-            style={{
-              padding: buttonPadding,
-              fontSize: iconSize,
-              minHeight: iconSize + 12,
-              border: '1px solid #dee2e6',
-              borderRadius: '4px',
-              background: '#fff',
-              color: '#495057',
-              cursor: 'pointer',
-              marginRight: '2px'
-            }}
-          >
-            <option value="h1">Title</option>
-            <option value="p">Paragraph</option>
-            <option value="h1">H1</option>
-            <option value="h2">H2</option>
-            <option value="h3">H3</option>
-            <option value="h4">H4</option>
-            <option value="h5">H5</option>
-            <option value="h6">H6</option>
-          </select>
-          
-          <div style={{
-            width: '1px',
-            height: dividerHeight,
-            background: '#dee2e6',
-            margin: '0 4px'
-          }} />
-
-          {/* Lists */}
-          <Button
-            variant="link"
-            onClick={() => applyFormat('insertUnorderedList')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.insertUnorderedList ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.insertUnorderedList ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Bullet List"
-          >
-            <List size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('insertOrderedList')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.insertOrderedList ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.insertOrderedList ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Numbered List"
-          >
-            <ListOrdered size={iconSize} />
-          </Button>
-          
-          <div style={{
-            width: '1px',
-            height: dividerHeight,
-            background: '#dee2e6',
-            margin: '0 4px'
-          }} />
-
-          {/* Alignment */}
-          <Button
-            variant="link"
-            onClick={() => applyFormat('justifyLeft')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.justifyLeft ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.justifyLeft ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Align Left"
-          >
-            <AlignLeft size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('justifyCenter')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.justifyCenter ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.justifyCenter ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Align Center"
-          >
-            <AlignCenter size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('justifyRight')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: activeFormats.justifyRight ? '#0d6efd' : '#495057',
-              backgroundColor: activeFormats.justifyRight ? '#e7f1ff' : 'transparent',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Align Right"
-          >
-            <AlignRight size={iconSize} />
-          </Button>
-          
-          <div style={{
-            width: '1px',
-            height: dividerHeight,
-            background: '#dee2e6',
-            margin: '0 4px'
-          }} />
-
-          {/* Color Picker */}
-          <div style={{ position: 'relative' }}>
-            <Button
-              variant="link"
-              onClick={() => {
-                if (colorPickerRef.current) {
-                  colorPickerRef.current.click();
-                }
-              }}
-              onMouseDown={(e) => e.preventDefault()}
-              style={{
-                padding: buttonPadding,
-                color: '#495057',
-                minWidth: 'auto',
-                border: 'none',
-                borderRadius: '4px'
-              }}
-              title="Text Color"
-            >
-              <Palette size={iconSize} />
-            </Button>
-            <input
-              ref={colorPickerRef}
-              type="color"
-              onChange={(e) => handleColorChange(e.target.value)}
-              style={{
-                position: 'absolute',
-                opacity: 0,
-                width: 0,
-                height: 0,
-                pointerEvents: 'none'
-              }}
-            />
-          </div>
-
-          {/* Link */}
-          <Button
-            variant="link"
-            onClick={insertLink}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: '#495057',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Insert Link"
-          >
-            <Link size={iconSize} />
-          </Button>
-
-          <div style={{
-            width: '1px',
-            height: dividerHeight,
-            background: '#dee2e6',
-            margin: '0 4px'
-          }} />
-
-          {/* Undo/Redo */}
-          <Button
-            variant="link"
-            onClick={() => applyFormat('undo')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: '#495057',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo size={iconSize} />
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => applyFormat('redo')}
-            onMouseDown={(e) => e.preventDefault()}
-            style={{
-              padding: buttonPadding,
-              color: '#495057',
-              minWidth: 'auto',
-              border: 'none',
-              borderRadius: '4px'
-            }}
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo size={iconSize} />
-          </Button>
-
-          {/* Character Count */}
-          {/* <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d' }}>
-            {getTextLength()}/{maxLength}
-          </div> */}
-        </div>
-
-        {/* Rich Text Editor */}
-        <div
-          ref={editorRef}
-          contentEditable
-          onInput={handleEditorInput}
-          onPaste={handleEditorPaste}
-          onFocus={() => {
-            // Update active formats when editor is focused
-            setTimeout(updateActiveFormats, 0);
-          }}
-          suppressContentEditableWarning
-          style={{
-            minHeight,
-            maxHeight,
-            padding: '12px 14px',
-            fontSize: '14px',
-            lineHeight: '1.5',
-            color: '#495057',
-            overflowY: 'auto',
-            outline: 'none',
-            borderRadius: '0 0 6px 6px',
-            textAlign: 'left' // Ensure default alignment is left
-          }}
-          data-placeholder={placeholder}
+        <div /* NOSONAR: rich text editor requires non-native contentEditable textbox */
+        ref={editorRef}
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Rich text editor"
+        aria-placeholder={placeholder}
+        tabIndex={0}
+        contentEditable
+        onKeyDown={() => {
+          globalThis.setTimeout(updateActiveFormats, 0);
+        }}
+        onInput={handleEditorInput}
+        onPaste={handleEditorPaste}
+        onFocus={() => {
+          globalThis.setTimeout(updateActiveFormats, 0);
+        }}
+        suppressContentEditableWarning
+        style={{
+          minHeight,
+          maxHeight,
+          padding: "12px 14px",
+          fontSize: "14px",
+          lineHeight: "1.5",
+          color: "#495057",
+          overflowY: "auto",
+          outline: "none",
+          borderRadius: "0 0 6px 6px",
+          textAlign: "left",
+        }}
+        data-placeholder={placeholder}
+        data-max-length={maxLength}
         />
       </div>
 
-      {/* Placeholder styling */}
       <style>{`
         [contenteditable][data-placeholder]:empty:before {
           content: attr(data-placeholder);

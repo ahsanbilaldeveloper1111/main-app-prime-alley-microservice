@@ -508,7 +508,7 @@ function renderCallsSection(
             <button
               onClick={() =>
                 router.push(
-                  `/crm/prospects/prospects-detailpage?id=${recordId}&section=activities`,
+                  `/crm/detailspage?type=prospect&id=${recordId}&section=activities`,
                 )
               }
               style={{
@@ -6411,14 +6411,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
     switch (effectiveType) {
       case "prospect":
-        return `/crm/prospects/prospects-detailpage?id=${effectiveId}&section=activities`;
+        return `/crm/detailspage?type=prospect&id=${effectiveId}&section=activities`;
       case "lead":
-        return `/crm/leads/leads-detailpage?id=${effectiveId}&section=activities`;
+        return `/crm/detailspage?type=lead&id=${effectiveId}&section=activities`;
       case "deal":
-        return `/crm/deals/deals-detailpage?id=${effectiveId}&section=activities`;
+        return `/crm/detailspage?type=deal&id=${effectiveId}&section=activities`;
       case "order":
       default:
-        return `/crm/orders/${effectiveId}/order-detailpage?section=activities`;
+        return `/crm/detailspage?type=order&id=${effectiveId}&section=activities`;
     }
   };
 
@@ -6788,28 +6788,28 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           loading: prospectLoading,
           data: prospectData as Record<string, unknown> | null,
           detailPath: (id: number) =>
-            `/crm/prospects/prospects-detailpage?id=${id}&section=activities`,
+            `/crm/detailspage?type=prospect&id=${id}&section=activities`,
         };
       case "lead":
         return {
           loading: leadLoading,
           data: leadData as Record<string, unknown> | null,
           detailPath: (id: number) =>
-            `/crm/leads/leads-detailpage?id=${id}&section=activities`,
+            `/crm/detailspage?type=lead&id=${id}&section=activities`,
         };
       case "deal":
         return {
           loading: dealLoading,
           data: dealData as Record<string, unknown> | null,
           detailPath: (id: number) =>
-            `/crm/deals/deals-detailpage?id=${id}&section=activities`,
+            `/crm/detailspage?type=deal&id=${id}&section=activities`,
         };
       case "order":
         return {
           loading: orderLoading,
           data: orderData as Record<string, unknown> | null,
           detailPath: (id: number) =>
-            `/crm/orders/${id}/order-detailpage?section=activities`,
+            `/crm/detailspage?type=order&id=${id}&section=activities`,
         };
       case "activity":
         return {
@@ -6825,13 +6825,13 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             const entityType = activityEntityType ?? "lead";
             switch (entityType) {
               case "prospect":
-                return `/crm/prospects/prospects-detailpage?id=${id}&section=activities`;
+                return `/crm/detailspage?type=prospect&id=${id}&section=activities`;
               case "lead":
-                return `/crm/leads/leads-detailpage?id=${id}&section=activities`;
+                return `/crm/detailspage?type=lead&id=${id}&section=activities`;
               case "deal":
-                return `/crm/deals/deals-detailpage?id=${id}&section=activities`;
+                return `/crm/detailspage?type=deal&id=${id}&section=activities`;
               default:
-                return `/crm/orders/${id}/order-detailpage?section=activities`;
+                return `/crm/detailspage?type=order&id=${id}&section=activities`;
             }
           },
         };
