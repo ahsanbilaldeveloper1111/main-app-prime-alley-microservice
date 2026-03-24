@@ -49,13 +49,27 @@ const VALUE_BOX: React.CSSProperties = {
 
 function formatDisplayDate(value: unknown): string {
   if (value == null || value === "") return "—";
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return String(value);
+  const displayValue = formatUnknownForDisplay(value);
+  const d = new Date(displayValue);
+  if (Number.isNaN(d.getTime())) return displayValue;
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatUnknownForDisplay(value: unknown): string {
+  if (value == null || value === "") return "—";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized ?? "—";
+  } catch {
+    return "—";
+  }
 }
 
 function priorityLabel(p: unknown): string {
@@ -150,6 +164,13 @@ function personFromExtension(
   return { name, initials };
 }
 
+function extensionNumberToString(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  return "";
+}
+
 function renderPlannerHistoryBody(
   loadingActivities: boolean,
   activities: Record<string, unknown>[],
@@ -170,13 +191,17 @@ function renderPlannerHistoryBody(
   return (
     <div>
       {activities.map((activity, idx) => {
-        const extNumber = String(activity.extension_number ?? "");
+        const extNumber = extensionNumberToString(activity.extension_number);
         const { name: extensionName, initials } = personFromExtension(extNumber, extensions);
-        const activityDate = formatActivityDateTime(String(activity.created_at ?? ""));
-        const actionText = String(activity.description ?? activity.action ?? "Activity");
+        const activityDate = formatActivityDateTime(
+          formatUnknownForDisplay(activity.created_at),
+        );
+        const actionText = formatUnknownForDisplay(
+          activity.description ?? activity.action ?? "Activity",
+        );
         return (
           <div
-            key={String(activity.id ?? idx)}
+            key={formatUnknownForDisplay(activity.id ?? idx)}
             style={{
               marginBottom: 12,
               display: "flex",
@@ -232,17 +257,18 @@ function renderPlannerCommentList(
   return (
     <div>
       {comments.map((comment, idx) => {
-        const extNumber = String(
+        const extNumber = extensionNumberToString(
           comment.extension_number ??
-            (comment.user as { extension_number?: string } | undefined)?.extension_number ??
-            "",
+            (comment.user as { extension_number?: string } | undefined)?.extension_number,
         );
         const { name: extensionName, initials } = personFromExtension(extNumber, extensions);
-        const commentDate = formatActivityDateTime(String(comment.created_at ?? ""));
-        const body = String(comment.comment ?? "");
+        const commentDate = formatActivityDateTime(
+          formatUnknownForDisplay(comment.created_at),
+        );
+        const body = formatUnknownForDisplay(comment.comment);
         return (
           <div
-            key={String(comment.id ?? idx)}
+            key={formatUnknownForDisplay(comment.id ?? idx)}
             style={{
               marginBottom: 12,
               padding: 12,
@@ -771,9 +797,11 @@ const ViewPlannerTaskSidebar: React.FC<ViewPlannerTaskSidebarProps> = ({
               <Col xs={12}>
                 <FieldRow label="Recurrence" icon={<Calendar size={16} />}>
                   <div style={{ ...VALUE_BOX, flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-                    <span>Frequency: {String(t.frequency ?? "—")}</span>
-                    <span>Interval: {String(t.repeat_interval ?? "—")}</span>
-                    {t.repeat_on != null && <span>Repeat on: {String(t.repeat_on)}</span>}
+                    <span>Frequency: {formatUnknownForDisplay(t.frequency)}</span>
+                    <span>Interval: {formatUnknownForDisplay(t.repeat_interval)}</span>
+                    {t.repeat_on != null && (
+                      <span>Repeat on: {formatUnknownForDisplay(t.repeat_on)}</span>
+                    )}
                   </div>
                 </FieldRow>
               </Col>
