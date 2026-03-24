@@ -4,11 +4,17 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from 'react-toastify';
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import GenericTable, {
+  TableAction,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import {
   fetchLocalDNDBlocks,
   addLocalDNDBlock,
@@ -20,20 +26,44 @@ import {
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { Row, Col, Card, Form, Button, Table } from 'react-bootstrap';
-import { Upload, RefreshCw, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Download } from 'lucide-react';
+import { Row, Col, Card, Form, Button } from 'react-bootstrap';
+import { Upload, RefreshCw, Trash2, Download } from 'lucide-react';
 
+type FetchParams = {
+  limit: number;
+  offset: number;
+  search?: string;
+};
+
+type CsvRecordPayload = {
+  called_number: string;
+  comments: string;
+};
+
+const CALLED_NUMBER_REGEX = /^05\d{8}$/;
+
+function isValidCalledNumber(value: string): boolean {
+  return CALLED_NUMBER_REGEX.test(value.trim());
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "object" && err !== null && "response" in err) {
+    const response = (err as { response?: { data?: { message?: string } } }).response;
+    if (response?.data?.message) return response.data.message;
+  }
+  return fallback;
+}
 
 const AddRecords = () => {
     const [calledNumber, setCalledNumber] = useState('');
     const [comments, setComments] = useState('');
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
     const [searchNumber, setSearchNumber] = useState('');
-    const [filterCompany, setFilterCompany] = useState('');
     const [itemsPerPage, setItemsPerPage] = useState(100);
     const [currentPage, setCurrentPage] = useState(1);
     const [csvFile, setCsvFile] = useState<File | null>(null);
     const [csvPreview, setCsvPreview] = useState<string>('');
+    const csvInputRef = useRef<HTMLInputElement | null>(null);
 
     // API state
     const [loading, setLoading] = useState(false);
@@ -53,8 +83,7 @@ const AddRecords = () => {
 
     // Applied filters
     const [appliedFilters, setAppliedFilters] = useState({
-      search: '',
-      company: ''
+      search: ''
     });
 
     // Fetch Local DND Blocks data from API
@@ -63,7 +92,7 @@ const AddRecords = () => {
       setError(null);
       try {
         const offset = (currentPage - 1) * itemsPerPage;
-        const params: any = {
+        const params: FetchParams = {
           limit: itemsPerPage,
           offset: offset,
         };
@@ -71,9 +100,6 @@ const AddRecords = () => {
         // Add filter parameters
         if (appliedFilters.search) {
           params.search = appliedFilters.search;
-        }
-        if (appliedFilters.company) {
-          params.company = appliedFilters.company;
         }
 
         const response = await fetchLocalDNDBlocks(params);
@@ -84,11 +110,13 @@ const AddRecords = () => {
         } else {
           setError('Failed to fetch records');
           setApiData([]);
+          setTotalRecords(0);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching records:', err);
-        setError(err.response?.data?.message || 'Failed to fetch records');
+        setError(getErrorMessage(err, 'Failed to fetch records'));
         setApiData([]);
+        setTotalRecords(0);
       } finally {
         setLoading(false);
       }
@@ -96,12 +124,19 @@ const AddRecords = () => {
 
     // Fetch data on mount and when pagination/filters change
     useEffect(() => {
-      fetchData();
+      fetchData().catch((err: unknown) => {
+        console.error('Failed to fetch DND records:', err);
+      });
     }, [fetchData]);
 
-    // Calculate total pages
-    const totalPages = Math.ceil(totalRecords / itemsPerPage);
-  
+    const resetCsvSelection = useCallback(() => {
+      setCsvFile(null);
+      setCsvPreview('');
+      if (csvInputRef.current) {
+        csvInputRef.current.value = '';
+      }
+    }, []);
+
     // Add single record
     const handleAddBlock = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -111,12 +146,7 @@ const AddRecords = () => {
       }
 
       const trimmedNumber = calledNumber.trim();
-      if (!trimmedNumber.startsWith('05')) {
-        toast.error('Called number must start with 05');
-        return;
-      }
-      
-      if (trimmedNumber.length !== 10) {
+      if (!isValidCalledNumber(trimmedNumber)) {
         toast.error('Called number must be exactly 10 digits');
         return;
       }
@@ -133,16 +163,16 @@ const AddRecords = () => {
         setCalledNumber('');
         setComments('');
           // Refresh the data
-          fetchData();
+          await fetchData();
         }else if (response?.status === 'error') {
           toast.error(response?.error || 'Failed to add record');
         }
          else {
           toast.error('Failed to add record');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error adding record:', err);
-        toast.error(err.response?.data?.message || 'Failed to add record');
+        toast.error(getErrorMessage(err, 'Failed to add record'));
       } finally {
         setSubmitting(false);
       }
@@ -154,8 +184,9 @@ const AddRecords = () => {
       if (!file) return;
 
       // Validate file type
-      if (!file.name.endsWith('.csv')) {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
         toast.error('Please select a CSV file');
+        resetCsvSelection();
         return;
       }
 
@@ -168,6 +199,7 @@ const AddRecords = () => {
       } catch (err) {
         console.error('Error reading file:', err);
         toast.error('Failed to read CSV file');
+        resetCsvSelection();
       }
     };
 
@@ -204,58 +236,30 @@ const AddRecords = () => {
         const lines = csvPreview.trim().split('\n');
         if (lines.length < 2) {
           toast.error('CSV file must contain at least a header row and one data row');
-          setBulkSubmitting(false);
-          setCsvFile(null);
-          setCsvPreview('');
-          // Reset file input
-          const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
+          resetCsvSelection();
           return;
         }
 
         // Skip header row (first line)
         const dataLines = lines.slice(1);
-        const records = dataLines
-          .map((line) => {
-            // Handle CSV parsing (simple comma split, can be enhanced for quoted values)
-            const values = line.split(',').map(v => v.trim());
-            if (values.length >= 2 && values[0]) {
-              console.log(values);
-              const trimmedNumber = values[0].trim();
-              if (!trimmedNumber.startsWith('05')) {
-                toast.error('Called number must start with 05');
-                setBulkSubmitting(false);
-                setCsvFile(null);
-                setCsvPreview('');
-                // Reset file input
-                const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-                if (fileInput) fileInput.value = '';
-                return;
-              }
-              
-              if (trimmedNumber.length !== 10) {
-                toast.error('Called number must be exactly 10 digits');
-                setBulkSubmitting(false);
-                setCsvFile(null);
-                setCsvPreview('');
-                // Reset file input
-                const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-                if (fileInput) fileInput.value = '';
-                return;
-              }
-              return {
-                called_number: trimmedNumber,
-                comments: values[1] || ''
-              };
-            }
-            return null;
-          })
-          .filter((record): record is { called_number: string; comments: string } => 
-            record !== null && !!record?.called_number
-          );
+        const records: CsvRecordPayload[] = [];
+        for (const line of dataLines) {
+          const values = line.split(',').map((v) => v.trim());
+          const calledNum = values[0];
+          if (!calledNum) continue;
+          if (!isValidCalledNumber(calledNum)) {
+            toast.error(`Invalid called number in CSV: ${calledNum}`);
+            resetCsvSelection();
+            return;
+          }
+          records.push({
+            called_number: calledNum,
+            comments: values[1] || '',
+          });
+        }
 
         if (records.length === 0) {
-          //toast.error('No valid records found in CSV file');
+          toast.error('No valid records found in CSV file');
           setBulkSubmitting(false);
           return;
         }
@@ -269,19 +273,15 @@ const AddRecords = () => {
         
         if (response?.status === 'success') {
           toast.success(response.message || `Successfully added ${response.records_added || 0} record(s)`);
-          setCsvFile(null);
-          setCsvPreview('');
-          // Reset file input
-          const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
+          resetCsvSelection();
           // Refresh the data
-          fetchData();
+          await fetchData();
         } else {
           toast.error('Failed to add records');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error bulk adding records:', err);
-        toast.error(err.response?.data?.message || 'Failed to add records');
+        toast.error(getErrorMessage(err, 'Failed to add records'));
       } finally {
         setBulkSubmitting(false);
       }
@@ -305,13 +305,13 @@ const AddRecords = () => {
           setShowDeleteModal(false);
           setRecordToDelete(null);
           // Refresh the data
-          fetchData();
+          await fetchData();
         } else {
           toast.error('Failed to delete record');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error deleting record:', err);
-        toast.error(err.response?.data?.message || 'Failed to delete record');
+        toast.error(getErrorMessage(err, 'Failed to delete record'));
       } finally {
         setDeleting(false);
       }
@@ -320,7 +320,7 @@ const AddRecords = () => {
     // Handle bulk delete
     const handleBulkDeleteClick = () => {
       if (selectedItems.length === 0) {
-        toast.warning('Please select at least one record to delete');
+        toast.warn('Please select at least one record to delete');
         return;
       }
       setShowBulkDeleteModal(true);
@@ -338,33 +338,15 @@ const AddRecords = () => {
           setShowBulkDeleteModal(false);
           setSelectedItems([]);
           // Refresh the data
-          fetchData();
+          await fetchData();
       } else {
           toast.error('Failed to delete records');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error bulk deleting records:', err);
-        toast.error(err.response?.data?.message || 'Failed to delete records');
+        toast.error(getErrorMessage(err, 'Failed to delete records'));
       } finally {
         setDeleting(false);
-      }
-    };
-  
-    // Handle checkbox selection
-    const handleSelectRecord = (recordId: number) => {
-      setSelectedItems(prev => 
-        prev.includes(recordId) 
-          ? prev.filter(id => id !== recordId)
-          : [...prev, recordId]
-      );
-    };
-
-    // Handle select all
-    const handleSelectAll = () => {
-      if (selectedItems.length === apiData.length) {
-        setSelectedItems([]);
-      } else {
-        setSelectedItems(apiData.map(record => record.id));
       }
     };
   
@@ -388,8 +370,7 @@ const AddRecords = () => {
     // Apply filters handler
     const handleApplyFilters = () => {
       setAppliedFilters({
-        search: searchNumber,
-        company: filterCompany
+        search: searchNumber
       });
       setCurrentPage(1); // Reset to first page when filters change
       setSelectedItems([]); // Clear selections when filters change
@@ -398,10 +379,8 @@ const AddRecords = () => {
     // Reset filters
     const handleResetFilters = () => {
       setSearchNumber('');
-      setFilterCompany('');
       setAppliedFilters({
-        search: '',
-        company: ''
+        search: ''
       });
       setCurrentPage(1);
       setSelectedItems([]); // Clear selections when filters reset
@@ -410,19 +389,111 @@ const AddRecords = () => {
     // Refresh data
     const handleRefresh = () => {
       handleResetFilters();
-      fetchData();
+      fetchData().catch((err: unknown) => {
+        console.error('Failed to refresh DND records:', err);
+      });
     };
 
-    // Pagination handlers
-    const handleFirstPage = () => setCurrentPage(1);
-    const handleLastPage = () => setCurrentPage(totalPages);
-    const handleNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-    const handlePrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
     const handleItemsPerPageChange = (value: number) => {
       setItemsPerPage(value);
       setCurrentPage(1);
       setSelectedItems([]); // Clear selections when page size changes
     };
+
+    const selectedRows = apiData.filter((record) => selectedItems.includes(record.id));
+
+    const toolbarConfig: ToolbarConfig = {
+      showSearch: true,
+      searchValue: searchNumber,
+      searchPlaceholder: 'Search by number...',
+      onSearchChange: setSearchNumber,
+      onSearch: handleApplyFilters,
+      showFilterPills: false,
+      showMoreFiltersButton: false,
+      customActions: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {selectedItems.length > 0 && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleBulkDeleteClick}
+              style={{ border: 'none', borderRadius: '8px', fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
+            >
+              <Trash2 size={14} style={{ marginRight: '4px' }} />
+              Delete Selected ({selectedItems.length})
+            </Button>
+          )}
+          <Button
+            variant="light"
+            size="sm"
+            onClick={handleRefresh}
+            style={{
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #dee2e6',
+              borderRadius: '8px',
+              color: '#212529',
+              fontSize: '0.875rem',
+              padding: '0.375rem 0.75rem',
+            }}
+          >
+            <RefreshCw size={14} style={{ marginRight: '4px' }} />
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleApplyFilters}
+            style={{ backgroundColor: '#4f46e5', border: 'none', borderRadius: '8px' }}
+          >
+            Apply
+          </Button>
+          <Button
+            variant="light"
+            size="sm"
+            onClick={handleResetFilters}
+            style={{ border: '1px solid #dee2e6', borderRadius: '8px' }}
+          >
+            Reset
+          </Button>
+        </div>
+      ),
+    };
+
+    const columns: TableColumn<LocalDNDBlockRecord>[] = [
+      { key: 'id', label: 'ID', type: 'text', sortable: false },
+      { key: 'called_number', label: 'CALLED NUMBER', type: 'text', sortable: false },
+      {
+        key: 'company_name',
+        label: 'COMPANY NAME',
+        type: 'text',
+        sortable: false,
+        emptyValue: '-',
+      },
+      {
+        key: 'date_time',
+        label: 'DATE/TIME',
+        type: 'custom',
+        sortable: false,
+        render: (row) => formatDateTime(row.date_time),
+      },
+      {
+        key: 'comments',
+        label: 'COMMENTS',
+        type: 'custom',
+        sortable: false,
+        render: (row) => <span style={{ color: '#6c757d' }}>{row.comments || '-'}</span>,
+      },
+    ];
+
+    const actions: TableAction<LocalDNDBlockRecord>[] = [
+      {
+        label: 'Delete',
+        icon: <Trash2 size={16} />,
+        onClick: (row) => handleDeleteClick(row),
+        variant: 'link',
+        className: 'text-danger',
+      },
+    ];
 
   return (
     <React.Fragment>
@@ -558,6 +629,7 @@ const AddRecords = () => {
                     Choose CSV File
                   </Form.Label>
                   <Form.Control
+                    ref={csvInputRef}
                     id="csvFileInput"
                     type="file"
                     accept=".csv"
@@ -598,258 +670,40 @@ const AddRecords = () => {
           </Col>
         </Row>
 
-        {/* Blocked Numbers List */}
-        <Card className="border" style={{ backgroundColor: '#ffffff', borderRadius: '12px', borderColor: '#dee2e6' }}>
-          <Card.Body className="p-0">
-            <div className="d-flex justify-content-between align-items-center p-3 border-bottom" style={{ borderColor: '#dee2e6 !important' }}>
-              <h6 className="mb-0" style={{ color: '#212529', fontWeight: '600' }}>
-                Blocked Numbers List
-              </h6>
-              <div className="d-flex align-items-center gap-2">
-                {selectedItems.length > 0 && (
-                <Button
-                    variant="danger"
-                  size="sm"
-                    onClick={handleBulkDeleteClick}
-                  style={{ 
-                      border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    padding: '0.375rem 0.75rem'
-                  }}
-                >
-                  <Trash2 size={14} style={{ marginRight: '4px' }} />
-                    Delete Selected ({selectedItems.length})
-                </Button>
-                )}
-                <Button
-                  variant="light"
-                  size="sm"
-                  onClick={handleRefresh}
-                  style={{ 
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    color: '#212529',
-                    fontSize: '0.875rem',
-                    padding: '0.375rem 0.75rem'
-                  }}
-                >
-                  <RefreshCw size={14} style={{ marginRight: '4px' }} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
+        <div className="mb-2" style={{ color: '#212529', fontWeight: '600' }}>
+          Blocked Numbers List
+        </div>
 
-            {/* Search and Filter */}
-            <div className="p-3">
-            <Row className="g-2 mb-3">
-              <Col md={3}>
-                <Form.Control
-                  type="text"
-                  placeholder="Search by number..."
-                  value={searchNumber}
-                  onChange={(e) => setSearchNumber(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
-                  style={{ 
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px'
-                  }}
-                />
-              </Col>
-              
-              <Col md={3}>
-                <div className="d-flex gap-2">
-                <Form.Select
-                  value={itemsPerPage}
-                    onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                  style={{ 
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px'
-                  }}
-                >
-                  <option value={10}>10 per page</option>
-                  <option value={25}>25 per page</option>
-                  <option value={50}>50 per page</option>
-                  <option value={100}>100 per page</option>
-                </Form.Select>
-                </div>
-              </Col>
-              <Col md={3}>
-              <div className="d-flex gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleApplyFilters}
-                    style={{
-                      backgroundColor: '#4f46e5',
-                      border: 'none',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    Apply
-                  </Button>
-                  <Button
-                    variant="light"
-                    size="sm"
-                    onClick={handleResetFilters}
-                    style={{
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    Reset
-                  </Button>
-                </div>
-                </Col>
-            </Row>
-            </div>
-
-            {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
-              <Table className="mb-0" style={{ minWidth: '1400px' }}>
-                <thead style={{ backgroundColor: '#f8f9fa' }}>
-                  <tr>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none', width: '50px' }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={apiData.length > 0 && selectedItems.length === apiData.length}
-                        onChange={handleSelectAll}
-                        disabled={loading || apiData.length === 0}
-                      />
-                    </th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>ID</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>CALLED NUMBER</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>COMPANY NAME</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>DATE/TIME</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none' }}>COMMENTS</th>
-                    <th style={{ color: '#6c757d', fontWeight: '500', fontSize: '0.75rem', padding: '12px', border: 'none', width: '80px' }}>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    if (loading) {
-                      return (
-                        <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                            Loading...
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (error) {
-                      return (
-                        <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#dc3545' }}>
-                            {error}
-                          </td>
-                        </tr>
-                      );
-                    }
-                    if (apiData.length > 0) {
-                      return apiData.map((record) => (
-                        <tr key={record.id} style={{ borderBottom: '1px solid #dee2e6' }}>
-                          <td style={{ padding: '12px', border: 'none' }}>
-                          <Form.Check
-                            type="checkbox"
-                              checked={selectedItems.includes(record.id)}
-                              onChange={() => handleSelectRecord(record.id)}
-                          />
-                        </td>
-                          <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.id}</td>
-                          <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.called_number}</td>
-                          <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.company_name || '-'}</td>
-                          <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{formatDateTime(record.date_time)}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                            <span style={{ color: '#6c757d' }}>{record.comments || '-'}</span>
-                          </td>
-                          <td style={{ padding: '12px', border: 'none' }}>
-                          <Button
-                              variant="link"
-                            size="sm"
-                              onClick={() => handleDeleteClick(record)}
-                            style={{ 
-                              color: '#dc3545',
-                                padding: '4px 8px',
-                                textDecoration: 'none'
-                            }}
-                              title="Delete record"
-                          >
-                              <Trash2 size={16} />
-                          </Button>
-                          </td>
-                        </tr>
-                      ));
-                    }
-                    return (
-                      <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#6c757d' }}>
-                          No records found matching your filters
-                        </td>
-                      </tr>
-                    );
-                  })()}
-                </tbody>
-              </Table>
-            </div>
-
-            {/* Pagination */}
-              <div className="d-flex justify-content-between align-items-center p-3 border-top" style={{ borderColor: '#dee2e6 !important' }}>
-                <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>
-                {totalRecords} Records | Page {currentPage} of {totalPages || 1}
-                </span>
-                <div className="d-flex align-items-center gap-2">
-                  <Button
-                    variant="light"
-                    size="sm"
-                  onClick={handleFirstPage}
-                    disabled={currentPage === 1}
-                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                  >
-                  <ChevronsLeft size={16} />
-                  </Button>
-                  <Button
-                    variant="light"
-                    size="sm"
-                  onClick={handlePrevPage}
-                    disabled={currentPage === 1}
-                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                  >
-                  <ChevronLeft size={16} />
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    style={{ backgroundColor: '#4f46e5', border: 'none', minWidth: '32px' }}
-                  >
-                    {currentPage}
-                  </Button>
-                  <Button
-                    variant="light"
-                    size="sm"
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                  >
-                  <ChevronRight size={16} />
-                  </Button>
-                  <Button
-                    variant="light"
-                    size="sm"
-                  onClick={handleLastPage}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                  >
-                  <ChevronsRight size={16} />
-                  </Button>
-                </div>
-              </div>
-          </Card.Body>
-        </Card>
+        <GenericTable<LocalDNDBlockRecord>
+          data={apiData}
+          columns={columns}
+          actions={actions}
+          showActions={true}
+          actionsLabel="ACTIONS"
+          loading={loading}
+          loadingMessage="Loading..."
+          emptyMessage={error || 'No records found matching your filters'}
+          uniqueKey="id"
+          selectable={true}
+          selectedRows={selectedRows}
+          onSelectionChange={(rows) => setSelectedItems(rows.map((row) => row.id))}
+          showToolbar={true}
+          toolbar={toolbarConfig}
+          showToolbarActions={false}
+          pagination={{
+            currentPage,
+            rowsPerPage: itemsPerPage,
+            totalRows: totalRecords,
+            pageSizeOptions: [10, 25, 50, 100],
+          }}
+          onPaginationChange={(page, rowsPerPageValue) => {
+            if (rowsPerPageValue !== itemsPerPage) {
+              handleItemsPerPageChange(rowsPerPageValue);
+              return;
+            }
+            setCurrentPage(page);
+          }}
+        />
 
       {/* Delete Confirmation Modal */}
       {recordToDelete && (
