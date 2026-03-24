@@ -2209,7 +2209,7 @@ import React, {
                                 const firstDeal = allDeals[0];
                                 const id = firstDeal?.id;
                                 const href = id
-                                  ? `/crm/deals/deals-detailpage?id=${encodeURIComponent(
+                                  ? `/crm/detailspage?type=deal&id=${encodeURIComponent(
                                       String(id),
                                     )}`
                                   : "/crm/deals";
@@ -2384,7 +2384,7 @@ import React, {
                                 const firstLead = leads[0];
                                 const id = firstLead?.id;
                                 const href = id
-                                  ? `/crm/leads/leads-detailpage?id=${encodeURIComponent(
+                                  ? `/crm/detailspage?type=lead&id=${encodeURIComponent(
                                       String(id),
                                     )}`
                                   : "/crm/leads";
