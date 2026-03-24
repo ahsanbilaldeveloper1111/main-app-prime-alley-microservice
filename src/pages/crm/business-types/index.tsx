@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect, ReactElement } from "react";
+import React, { useState, useEffect, useMemo, ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -12,12 +12,14 @@ import {
   UpdateBusinessTypePayload,
 } from "@utils/crm";
 import { formatDateTimeToLocal, GlobalDateFormat } from "@utils/Helper";
+import GenericTable, {
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import {
   Button,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Spinner,
 } from "react-bootstrap";
@@ -25,11 +27,6 @@ import {
   PlusCircle,
   Edit,
   Trash2,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -85,12 +82,6 @@ const BusinessTypes = () => {
   useEffect(() => {
     fetchBusinessTypes();
   }, [pagination.currentPage, pagination.perPage, search]);
-
-  // Handle search
-  const handleSearch = () => {
-    setPagination({ ...pagination, currentPage: 1 });
-    fetchBusinessTypes();
-  };
 
   // Handle open modal
   const handleOpenModal = (businessType?: BusinessTypeData) => {
@@ -151,191 +142,132 @@ const BusinessTypes = () => {
     }
   };
 
-  // Pagination helpers
-  const totalPages = Math.ceil(totalBusinessTypes / pagination.perPage);
-  const startIndex = (pagination.currentPage - 1) * pagination.perPage;
-  const endIndex = startIndex + businessTypes.length;
+  const businessTableColumns = useMemo<TableColumn<BusinessTypeData>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        type: "custom",
+        render: (bt) => <div className="fw-semibold">{bt.name}</div>,
+      },
+      {
+        key: "description",
+        label: "Description",
+        sortable: false,
+        type: "custom",
+        render: (bt) => (
+          <div className="text-muted small">{bt.description || "—"}</div>
+        ),
+      },
+      {
+        key: "created_at",
+        label: "Created At",
+        sortable: true,
+        type: "custom",
+        render: (bt) => (
+          <div className="text-muted small">
+            {bt.created_at
+              ? formatDateTimeToLocal(bt.created_at, GlobalDateFormat)
+              : "—"}
+          </div>
+        ),
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        align: "right",
+        type: "custom",
+        render: (bt) => (
+          <div className="d-flex justify-content-end gap-2">
+            {session?.user?.permissions?.includes(
+              "edit-crm-business-types",
+            ) && (
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleOpenModal(bt)}
+              >
+                <Edit size={14} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes(
+              "delete-crm-business-types",
+            ) && (
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => {
+                  setDeletingBusinessType(bt);
+                  setShowDeleteModal(true);
+                }}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [session?.user?.permissions],
+  );
 
-  const handlePageChange = (page: number) => {
-    setPagination({ ...pagination, currentPage: page });
-  };
+  const businessToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: search,
+      searchPlaceholder: "Search business types by name or description...",
+      onSearchChange: setSearch,
+      onSearch: () => {
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      },
+      rightActions: (
+        <div className="d-flex gap-2">
+          {session?.user?.permissions?.includes("add-crm-business-types") && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleOpenModal()}
+              className="d-flex align-items-center gap-2"
+            >
+              <PlusCircle size={16} />
+              Add Business Type
+            </Button>
+          )}
+        </div>
+      ),
+    }),
+    [search, session?.user?.permissions],
+  );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Business Types" />
       <div>
-        {/* Header */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                {/* <h5 className="mb-0 fw-bold">Business Types</h5>
-                <p className="text-muted mb-0 small">
-                  Manage business type categories for your CRM
-                </p> */}
-              </div>
-              {session?.user?.permissions?.includes('add-crm-business-types') && (
-              <Button
-                variant="primary"
-                onClick={() => handleOpenModal()}
-                className="d-flex align-items-center gap-2"
-              >
-                <PlusCircle size={18} />
-                Add Business Type
-              </Button>
-              )}
+        <GenericTable<BusinessTypeData>
+          data={businessTypes}
+          columns={businessTableColumns}
+          showToolbar
+          toolbar={businessToolbarConfig}
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.perPage,
+            totalRows: totalBusinessTypes,
+            pageSizeOptions: [10, 15, 25, 50],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({ currentPage: page, perPage: rowsPerPage });
+          }}
+          loading={loading}
+          emptyMessage={
+            <div className="text-center p-5">
+              <p className="text-muted">No business types found</p>
             </div>
-          </Card.Body>
-        </Card>
-
-        {/* Search Bar */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <Form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSearch();
-              }}
-            >
-              <InputGroup>
-                <Form.Control
-                  type="text"
-                  placeholder="Search business types by name or description..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <Button variant="outline-secondary" type="submit">
-                  <Search size={16} />
-                </Button>
-              </InputGroup>
-            </Form>
-          </Card.Body>
-        </Card>
-
-        {/* Business Types Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
-            {loading ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Loading business types...</p>
-              </div>
-            ) : businessTypes.length === 0 ? (
-              <div className="text-center p-5">
-                <p className="text-muted">No business types found</p>
-              </div>
-            ) : (
-              <>
-                <div className="table-responsive">
-                  <Table hover className="mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Created At</th>
-                        <th className="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {businessTypes && businessTypes.length > 0 && businessTypes.map((businessType) => (
-                        <tr key={businessType?.id}>
-                          <td>
-                            <div className="small text-muted">
-                              {businessType?.name}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="small text-muted">
-                              {businessType?.description || "—"}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="small text-muted">
-                              {businessType?.created_at ? formatDateTimeToLocal(businessType.created_at, GlobalDateFormat) : "—"}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="d-flex justify-content-end gap-2">
-                              {session?.user?.permissions?.includes('edit-crm-business-types') && (
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                onClick={() => handleOpenModal(businessType)}
-                              >
-                                <Edit size={14} />
-                              </Button>
-                              )}
-                              {session?.user?.permissions?.includes('delete-crm-business-types') && (
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => {
-                                  setDeletingBusinessType(businessType);
-                                  setShowDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="d-flex justify-content-between align-items-center p-3 border-top">
-                    <div className="text-muted small">
-                      Showing {startIndex + 1} to {endIndex} of {totalBusinessTypes} business types
-                    </div>
-                    <div className="d-flex gap-1">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(1)}
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronsLeft size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.currentPage - 1)}
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronLeft size={16} />
-                      </Button>
-                      <div className="d-flex align-items-center px-3">
-                        <span className="small">
-                          Page {pagination.currentPage} of {totalPages}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.currentPage + 1)}
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronRight size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronsRight size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </Card.Body>
-        </Card>
+          }
+          uniqueKey="id"
+          showToolbarActions={false}
+        />
 
         {/* Create/Edit Modal */}
         <Modal show={showModal} onHide={() => setShowModal(false)} centered>

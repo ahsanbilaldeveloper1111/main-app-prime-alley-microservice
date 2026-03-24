@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import {
   getStages,
   createStage,
@@ -25,7 +25,6 @@ import {
   Badge,
   Form,
   Card,
-  InputGroup,
 } from "react-bootstrap";
 import { FiEdit2 } from "react-icons/fi";
 import {
@@ -41,8 +40,6 @@ import {
   Eye,
   ArrowUp,
   ArrowDown,
-  XCircle,
-  Search,
   RotateCcw,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -53,8 +50,89 @@ import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
+
+const PERMISSION_LIST_STAGES = "list-crm-stages";
+const PERMISSION_ADD_STAGES = "add-crm-stages";
+const PERMISSION_EDIT_STAGES = "edit-crm-stages";
+const PERMISSION_DELETE_STAGES = "delete-crm-stages";
+
+const TYPE_DISPLAY_NAMES: Record<StageType, string> = {
+  lead: "Lead",
+  deal: "Deal",
+  order: "Order",
+  lost_reason: "Lost Reason",
+};
+
+const TYPE_BADGE_COLORS: Record<StageType, string> = {
+  lead: "primary",
+  deal: "warning",
+  order: "success",
+  lost_reason: "danger",
+};
+
+function getTypeDisplayName(type: string): string {
+  return TYPE_DISPLAY_NAMES[type as StageType] ?? type;
+}
+
+function getTypeBadgeColor(type: string): string {
+  return TYPE_BADGE_COLORS[type as StageType] ?? "secondary";
+}
+
+function consumeHandledApiError(error: unknown, source: string): void {
+  reportApiErrorFromCatch(error, source, { scope: "StagesManagement" });
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((x) => typeof x === "string");
+}
+
+function parseSavedStageColumns(raw: string | null): string[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isStringArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+type StageFormState = {
+  name: string;
+  sequence: number;
+  is_won: boolean;
+  fold: boolean;
+  color: string;
+  description: string;
+  is_default: boolean;
+  active: boolean;
+  type: StageType;
+  probability: number;
+};
+
+const INITIAL_STAGE_FORM: StageFormState = {
+  name: "",
+  sequence: 1,
+  is_won: false,
+  fold: false,
+  color: "#6c757d",
+  description: "",
+  is_default: false,
+  active: true,
+  type: "lead",
+  probability: 50,
+};
+
+function scaffoldFormEvent(): React.FormEvent {
+  return { preventDefault() {} } as React.FormEvent;
+}
+
+function parseSequenceInput(raw: string, fallback: number): number {
+  const n = Number.parseInt(raw, 10);
+  return Number.isNaN(n) || n < 1 ? fallback : n;
+}
 
 interface Stage {
   id: number;
@@ -99,12 +177,21 @@ const KPICard: React.FC<KPICardData> = ({
   return (
     <Card
       className={onClick ? "h-100" : ""}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={{
         cursor: onClick ? "pointer" : "default",
         transition: "all 0.2s ease",
         border: "1px solid #e9ecef",
       }}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       onMouseEnter={(e) => {
         if (onClick) {
           e.currentTarget.style.transform = "translateY(-4px)";
@@ -140,115 +227,6 @@ const KPICard: React.FC<KPICardData> = ({
   );
 };
 
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter: string;
-  onFilterChange: (filterId: string) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearch: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters: _showAdvancedFilters,
-  onToggleAdvancedFilters: _onToggleAdvancedFilters,
-  advancedFilterCount: _advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = Boolean(filter.color);
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor && filter.color) {
-                const bgColor = filter.color;
-                if (isActive) {
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              let bootstrapVariant: string | undefined;
-              if (!hasCustomColor) {
-                bootstrapVariant = isActive
-                  ? filter.variant ?? "primary"
-                  : "outline-secondary";
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={bootstrapVariant}
-                  onClick={() => onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup
-              style={{ width: "300px", minWidth: "200px" }}
-              className="flex-shrink-0"
-            >
-              <Form.Control
-                style={{ height: "41px" }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={onSearch}>
-                <Search size={16} />
-              </Button>
-            </InputGroup>
-          </div>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
 const StagesManagement = () => {
   const { data: session } = useSession();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -262,18 +240,9 @@ const StagesManagement = () => {
   const [stageToUpdate, setStageToUpdate] = useState<Stage | null>(null);
   const [viewingStage, setViewingStage] = useState<Stage | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [formData, setFormData] = useState({
-    name: "",
-    sequence: 1,
-    is_won: false,
-    fold: false,
-    color: "#6c757d",
-    description: "",
-    is_default: false,
-    active: true,
-    type: "lead" as StageType,
-    probability: 50,
-  });
+  const [formData, setFormData] = useState<StageFormState>(() => ({
+    ...INITIAL_STAGE_FORM,
+  }));
 
   const [currentFilters, setCurrentFilters] = useState<StageFilterState>({
     search: "",
@@ -281,7 +250,6 @@ const StagesManagement = () => {
   });
   const [stagesSearch, setStagesSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
 
   const normalizeSelectedStageColumns = (
@@ -312,14 +280,10 @@ const StagesManagement = () => {
       : ["sequence", "name", "type", "description", "color", "actions"];
   };
 
-  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(
-    () => {
-      const saved = localStorage.getItem("stagesSelectedColumns");
-      return normalizeSelectedStageColumns(
-        saved ? (JSON.parse(saved) as string[]) : undefined,
-      );
-    },
-  );
+  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("stagesSelectedColumns");
+    return normalizeSelectedStageColumns(parseSavedStageColumns(saved));
+  });
   const [stagesPagination, setStagesPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -327,14 +291,14 @@ const StagesManagement = () => {
     sortDirection: "asc" as "asc" | "desc",
   });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
+  const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [stageToRestore, setStageToRestore] = useState<Stage | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
   const handleCloseSuccessfulModal = () => {
     setShowSuccessfulModal(false);
-  };
-
-  const handleFiltersChange = (filters: StageFilterState) => {
-    setCurrentFilters(filters);
   };
 
   const fetchStages = useCallback(
@@ -343,9 +307,10 @@ const StagesManagement = () => {
       try {
         const stageType = type ? (type as StageType) : undefined;
         const params = includeArchived ? { include_archived: true } : undefined;
-        const allStages = await getStages(stageType, params);
-        setStagesData(allStages);
-      } catch {
+        const stages = await getStages(stageType, params);
+        setStagesData(stages);
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "StagesManagement.fetchStages");
         setStagesData([]);
       } finally {
         setLoadingStages(false);
@@ -353,6 +318,16 @@ const StagesManagement = () => {
     },
     [],
   );
+
+  const fetchAllStagesForCounts = useCallback(async () => {
+    try {
+      const all = await getStages();
+      setAllStagesData(all);
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "StagesManagement.fetchAllStagesForCounts");
+      setAllStagesData([]);
+    }
+  }, []);
 
   useEffect(() => {
     const includeArchived = activeFilter === "deleted";
@@ -366,6 +341,10 @@ const StagesManagement = () => {
     );
   }, [fetchStages, refreshKey, activeFilter]);
 
+  useEffect(() => {
+    fetchAllStagesForCounts();
+  }, [fetchAllStagesForCounts, refreshKey]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -373,23 +352,13 @@ const StagesManagement = () => {
       await createStage(formData);
       toast.success("Stage created successfully!");
       setShowCreateModal(false);
-      setFormData({
-        name: "",
-        sequence: 1,
-        is_won: false,
-        fold: false,
-        color: "#6c757d",
-        description: "",
-        is_default: false,
-        active: true,
-        type: "lead" as StageType,
-        probability: 50,
-      });
+      setFormData({ ...INITIAL_STAGE_FORM });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Created");
       setSuccessModalDescription("Stage created successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "StagesManagement.handleSubmit");
       toast.error("Failed to create stage");
     }
   };
@@ -397,18 +366,7 @@ const StagesManagement = () => {
   const handleCloseUpdateModal = () => {
     setShowUpdateModal(false);
     setStageToUpdate(null);
-    setFormData({
-      name: "",
-      sequence: 1,
-      is_won: false,
-      fold: false,
-      color: "#6c757d",
-      description: "",
-      is_default: false,
-      active: true,
-      type: "lead" as StageType,
-      probability: 50,
-    });
+    setFormData({ ...INITIAL_STAGE_FORM });
   };
 
   const handleUpdateStage = async (e: React.FormEvent) => {
@@ -420,23 +378,13 @@ const StagesManagement = () => {
       toast.success("Stage updated successfully!");
       setShowUpdateModal(false);
       setStageToUpdate(null);
-      setFormData({
-        name: "",
-        sequence: 1,
-        is_won: false,
-        fold: false,
-        color: "#6c757d",
-        description: "",
-        is_default: false,
-        active: true,
-        type: "lead" as StageType,
-        probability: 50,
-      });
+      setFormData({ ...INITIAL_STAGE_FORM });
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Updated");
       setSuccessModalDescription("Stage updated successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "StagesManagement.handleUpdateStage");
       toast.error("Failed to update stage");
     }
   };
@@ -453,40 +401,70 @@ const StagesManagement = () => {
       setSuccessModalTitle("Stage Deleted");
       setSuccessModalDescription("Stage deleted successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "StagesManagement.handleDeleteStage");
       toast.error("Failed to delete stage");
     }
   };
 
-  // Restore Stage Handler
-  const handleRestoreStage = useCallback(async (stageId: number) => {
-    if (!globalThis.confirm("Are you sure you want to restore this stage?")) return;
+  const openRestoreModal = useCallback((stage: Stage) => {
+    setStageToRestore(stage);
+    setShowRestoreModal(true);
+  }, []);
 
+  const handleConfirmRestore = useCallback(async () => {
+    if (!stageToRestore) return;
+    setRestoring(true);
     try {
-      await restoreStage(stageId);
+      await restoreStage(stageToRestore.id);
       toast.success("Stage restored successfully!");
+      setShowRestoreModal(false);
+      setStageToRestore(null);
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Stage Restored");
       setSuccessModalDescription("Stage has been restored successfully");
       setRefreshKey((oldKey) => oldKey + 1);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "StagesManagement.handleConfirmRestore");
       toast.error("Failed to restore stage");
+    } finally {
+      setRestoring(false);
     }
+  }, [stageToRestore]);
+
+  const openStageView = useCallback((stage: Stage) => {
+    setViewingStage(stage);
+    setShowViewModal(true);
   }, []);
 
-  const handleInputChange = (field: string, value: string | number | boolean) => {
+  const openStageEdit = useCallback((stage: Stage) => {
+    setStageToUpdate(stage);
+    setFormData({
+      name: stage.name,
+      sequence: stage.sequence,
+      is_won: stage.is_won,
+      fold: stage.fold,
+      color: stage.color,
+      description: stage.description || "",
+      is_default: stage.is_default,
+      active: stage.active,
+      type: stage.type,
+      probability: stage.probability,
+    });
+    setShowUpdateModal(true);
+  }, []);
+
+  const openStageDelete = useCallback((stage: Stage) => {
+    setStageToDelete(stage);
+    setShowDeleteModal(true);
+  }, []);
+
+  const handleInputChange = <K extends keyof StageFormState>(field: K, value: StageFormState[K]) => {
     setFormData((prev) => {
-      const newData = {
-        ...prev,
-        [field]: value,
-      };
-
-      // If type changes to lost_reason, disable and set probability to 0
       if (field === "type" && value === "lost_reason") {
-        newData.probability = 0;
+        return { ...prev, type: "lost_reason", probability: 0 };
       }
-
-      return newData;
+      return { ...prev, [field]: value };
     });
   };
 
@@ -594,21 +572,20 @@ const StagesManagement = () => {
                 size="sm"
                 className="p-1"
                 title="View"
-                onClick={() => {
-                  setViewingStage(stage);
-                  setShowViewModal(true);
-                }}
+                onClick={() => openStageView(stage)}
+                aria-label={"View stage " + stage.name}
               >
-                <Eye size={16} />
+                <Eye size={16} aria-hidden />
               </Button>
               <Button
                 variant="link"
                 size="sm"
                 className="p-1 text-success"
                 title="Restore"
-                onClick={() => handleRestoreStage(stage.id)}
+                onClick={() => openRestoreModal(stage)}
+                aria-label={"Restore stage " + stage.name}
               >
-                <RotateCcw size={16} />
+                <RotateCcw size={16} aria-hidden />
               </Button>
             </>
           ) : (
@@ -618,51 +595,33 @@ const StagesManagement = () => {
                 size="sm"
                 className="p-1"
                 title="View"
-                onClick={() => {
-                  setViewingStage(stage);
-                  setShowViewModal(true);
-                }}
+                onClick={() => openStageView(stage)}
+                aria-label={"View stage " + stage.name}
               >
-                <Eye size={16} />
+                <Eye size={16} aria-hidden />
               </Button>
-              {session?.user?.permissions?.includes("edit-crm-stages") && (
+              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
                   className="p-1"
                   title="Edit Stage"
-                  onClick={() => {
-                    setStageToUpdate(stage);
-                    setFormData({
-                      name: stage.name,
-                      sequence: stage.sequence,
-                      is_won: stage.is_won,
-                      fold: stage.fold,
-                      color: stage.color,
-                      description: stage.description || "",
-                      is_default: stage.is_default,
-                      active: stage.active,
-                      type: stage.type,
-                      probability: stage.probability,
-                    });
-                    setShowUpdateModal(true);
-                  }}
+                  onClick={() => openStageEdit(stage)}
+                  aria-label={"Edit stage " + stage.name}
                 >
-                  <Edit size={16} />
+                  <Edit size={16} aria-hidden />
                 </Button>
               )}
-              {session?.user?.permissions?.includes("delete-crm-stages") && (
+              {session?.user?.permissions?.includes(PERMISSION_DELETE_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
                   className="p-1 text-danger"
                   title="Delete Stage"
-                  onClick={() => {
-                    setStageToDelete(stage);
-                    setShowDeleteModal(true);
-                  }}
+                  onClick={() => openStageDelete(stage)}
+                  aria-label={"Delete stage " + stage.name}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden />
                 </Button>
               )}
             </>
@@ -672,7 +631,15 @@ const StagesManagement = () => {
     });
 
     return cols;
-  }, [selectedStagesColumns, activeFilter, session?.user?.permissions, handleRestoreStage]);
+  }, [
+    selectedStagesColumns,
+    activeFilter,
+    session?.user?.permissions,
+    openStageView,
+    openRestoreModal,
+    openStageEdit,
+    openStageDelete,
+  ]);
 
   const sortData = <T,>(
     data: T[],
@@ -786,41 +753,117 @@ const StagesManagement = () => {
     return { total, byType, stagesByType };
   }, [filteredStages]);
 
-  const getTypeDisplayName = (type: string) => {
-    const typeMap: Record<string, string> = {
-      lead: "Lead",
-      deal: "Deal",
-      order: "Order",
-      lost_reason: "Lost Reason",
-    };
-    return typeMap[type] || type;
-  };
-
-  const getTypeBadgeColor = (type: string) => {
-    const colorMap: Record<string, string> = {
-      lead: "primary",
-      deal: "warning",
-      order: "success",
-      lost_reason: "danger",
-    };
-    return colorMap[type] || "secondary";
-  };
-
-  // Calculate filter counts
+  // Calculate filter counts — always from the full unfiltered dataset
   const filterCounts = useMemo(() => {
-    const allStages = stagesData;
     const counts: Record<string, number> = {
-      all: allStages.length,
-      lead: allStages.filter((s) => s.type === "lead").length,
-      deal: allStages.filter((s) => s.type === "deal").length,
-      order: allStages.filter((s) => s.type === "order").length,
-      lost_reason: allStages.filter((s) => s.type === "lost_reason").length,
-      deleted: 0, // Will be calculated when include_archived is true
+      all: allStagesData.length,
+      lead: allStagesData.filter((s) => s.type === "lead").length,
+      deal: allStagesData.filter((s) => s.type === "deal").length,
+      order: allStagesData.filter((s) => s.type === "order").length,
+      lost_reason: allStagesData.filter((s) => s.type === "lost_reason").length,
+      deleted: 0,
     };
     return counts;
-  }, [stagesData]);
+  }, [allStagesData]);
 
-  if (!session?.user?.permissions?.includes("list-crm-stages")) {
+  const handleToolbarSearchChange = useCallback((value: string) => {
+    setStagesSearch(value);
+    setCurrentFilters((prev) => ({ ...prev, search: value }));
+    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleToolbarSearchSubmit = useCallback(() => {
+    setCurrentFilters((prev) => ({ ...prev, search: stagesSearch }));
+    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [stagesSearch]);
+
+  const handleToolbarTabChange = useCallback((tabId: string) => {
+    setActiveFilter(tabId);
+    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const toggleStagesAnalytics = useCallback(() => {
+    setShowStagesAnalytics((open) => !open);
+  }, []);
+
+  const openCreateStageModal = useCallback(() => setShowCreateModal(true), []);
+
+  const toolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: stagesSearch,
+      searchPlaceholder: "Search stages...",
+      onSearchChange: handleToolbarSearchChange,
+      onSearch: handleToolbarSearchSubmit,
+      showTabs: true,
+      tabs: [
+        { id: "all", label: "All Types", count: filterCounts.all, removable: false },
+        { id: "lead", label: "Lead", count: filterCounts.lead, removable: false },
+        { id: "deal", label: "Deal", count: filterCounts.deal, removable: false },
+        { id: "order", label: "Order", count: filterCounts.order, removable: false },
+        { id: "lost_reason", label: "Lost Reason", count: filterCounts.lost_reason, removable: false },
+        { id: "deleted", label: "Deleted", removable: false },
+      ],
+      activeTab: activeFilter,
+      onTabChange: handleToolbarTabChange,
+      rightActions: (
+        <div className="d-flex gap-2">
+          <Button
+            variant={showStagesAnalytics ? "primary" : "light"}
+            onClick={toggleStagesAnalytics}
+            style={{
+              border: "1px solid #dee2e6",
+              borderRadius: "8px",
+              color: showStagesAnalytics ? undefined : "#212529",
+              height: "33px",
+              fontSize: "0.875rem",
+              padding: "0 12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <BarChart3 size={15} aria-hidden />
+            Analytics
+          </Button>
+          {session?.user?.permissions?.includes(PERMISSION_ADD_STAGES) && (
+            <Button
+              onClick={openCreateStageModal}
+              style={{
+                backgroundColor: "#4f46e5",
+                border: "none",
+                borderRadius: "8px",
+                color: "#ffffff",
+                height: "33px",
+                fontSize: "0.875rem",
+                padding: "0 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <Plus size={15} aria-hidden />
+              Add Custom Stage
+            </Button>
+          )}
+        </div>
+      ),
+    }),
+    [
+      stagesSearch,
+      activeFilter,
+      filterCounts,
+      showStagesAnalytics,
+      session?.user?.permissions,
+      handleToolbarSearchChange,
+      handleToolbarSearchSubmit,
+      handleToolbarTabChange,
+      toggleStagesAnalytics,
+      openCreateStageModal,
+    ],
+  );
+
+  if (!session?.user?.permissions?.includes(PERMISSION_LIST_STAGES)) {
     return null;
   }
 
@@ -867,34 +910,6 @@ const StagesManagement = () => {
       />
 
       <div>
-        {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-          <div className="mb-3 mb-md-0">
-            {/* <h2 className="mb-1 fw-bold">Stages Management</h2>
-            <p className="text-muted mb-0">
-              Configure and manage your sales pipeline stages
-            </p> */}
-          </div>
-          <div className="d-flex flex-wrap gap-2">
-            <Button
-              variant={showStagesAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowStagesAnalytics((open) => !open)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showStagesAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button>
-            {session?.user?.permissions?.includes("add-crm-stages") && (
-              <Button
-                variant="primary"
-                onClick={() => setShowCreateModal(true)}
-              >
-                <Plus size={16} className="me-2" />
-                Add Custom Stage
-              </Button>
-            )}
-          </div>
-        </div>
-
         {/* Analytics Section - Collapsible */}
         {showStagesAnalytics && (
           <>
@@ -978,79 +993,6 @@ const StagesManagement = () => {
           </>
         )}
 
-        {/* Filter Bar */}
-        <FilterBar
-          quickFilters={[
-            {
-              id: "all",
-              label: "All Types",
-              count: filterCounts.all,
-              color: "#6c757d",
-              icon: <Layers size={16} />,
-            },
-            {
-              id: "lead",
-              label: "Lead",
-              count: filterCounts.lead,
-              color: "#0d6efd",
-              icon: <Target size={16} />,
-            },
-            {
-              id: "deal",
-              label: "Deal",
-              count: filterCounts.deal,
-              color: "#ffc107",
-              icon: <TrendingUp size={16} />,
-            },
-            {
-              id: "order",
-              label: "Order",
-              count: filterCounts.order,
-              color: "#20c997",
-              icon: <Layers size={16} />,
-            },
-            {
-              id: "lost_reason",
-              label: "Lost Reason",
-              count: filterCounts.lost_reason,
-              color: "#dc3545",
-              icon: <XCircle size={16} />,
-            },
-            {
-              id: "deleted",
-              label: "Deleted",
-              count: filterCounts.deleted || 0,
-              color: "#dc3545",
-              icon: <Trash2 size={16} />,
-            },
-          ]}
-          activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setStagesPagination({ ...stagesPagination, currentPage: 1 });
-          }}
-          searchValue={stagesSearch}
-          onSearchChange={(value) => setStagesSearch(value)}
-          onSearch={() => {
-            if (stagesSearch.trim()) {
-              handleFiltersChange({
-                ...currentFilters,
-                search: stagesSearch.trim(),
-              });
-            } else {
-              handleFiltersChange({ ...currentFilters, search: "" });
-            }
-            setStagesPagination({ ...stagesPagination, currentPage: 1 });
-            setRefreshKey((prev) => prev + 1);
-          }}
-          searchPlaceholder="Search stages..."
-          showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() =>
-            setShowAdvancedFilters(!showAdvancedFilters)
-          }
-          advancedFilterCount={0}
-        />
-
         {/* Stages Table */}
         <div className="stages-table-wrapper mb-4">
           <GenericTable<Stage>
@@ -1090,7 +1032,8 @@ const StagesManagement = () => {
               );
             }}
             columnStorageKey="stagesSelectedColumns"
-            showToolbar={false}
+            showToolbar={true}
+            toolbar={toolbarConfig}
             showToolbarActions={false}
             uniqueKey="id"
           />
@@ -1129,7 +1072,7 @@ const StagesManagement = () => {
                       onChange={(e) =>
                         handleInputChange(
                           "sequence",
-                          Number.parseInt(e.target.value, 10),
+                          parseSequenceInput(e.target.value, formData.sequence),
                         )
                       }
                       min="1"
@@ -1206,12 +1149,13 @@ const StagesManagement = () => {
                     <Form.Control
                       type="number"
                       value={formData.probability}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const n = Number.parseInt(e.target.value, 10);
                         handleInputChange(
                           "probability",
-                          Number.parseInt(e.target.value, 10) || 0,
-                        )
-                      }
+                          Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)),
+                        );
+                      }}
                       min="0"
                       max="100"
                       disabled={formData.type === "lost_reason"}
@@ -1237,8 +1181,7 @@ const StagesManagement = () => {
         submitButtonText="Create Stage"
         cancelButtonText="Cancel"
         onSubmit={() => {
-          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
-          handleSubmit(mockEvent);
+          void handleSubmit(scaffoldFormEvent());
         }}
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
@@ -1278,7 +1221,7 @@ const StagesManagement = () => {
                       onChange={(e) =>
                         handleInputChange(
                           "sequence",
-                          Number.parseInt(e.target.value, 10),
+                          parseSequenceInput(e.target.value, formData.sequence),
                         )
                       }
                       min="1"
@@ -1330,12 +1273,13 @@ const StagesManagement = () => {
                     <Form.Control
                       type="number"
                       value={formData.probability}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const n = Number.parseInt(e.target.value, 10);
                         handleInputChange(
                           "probability",
-                          Number.parseInt(e.target.value, 10) || 0,
-                        )
-                      }
+                          Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)),
+                        );
+                      }}
                       min="0"
                       max="100"
                       disabled={formData.type === "lost_reason"}
@@ -1361,8 +1305,7 @@ const StagesManagement = () => {
         submitButtonText="Update Stage"
         cancelButtonText="Cancel"
         onSubmit={() => {
-          const mockEvent = { preventDefault: () => {} } as React.FormEvent;
-          handleUpdateStage(mockEvent);
+          void handleUpdateStage(scaffoldFormEvent());
         }}
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
@@ -1380,6 +1323,42 @@ const StagesManagement = () => {
         itemName={stageToDelete?.name}
         itemType="stage"
       />
+
+      <Modal
+        show={showRestoreModal}
+        onHide={() => {
+          if (restoring) return;
+          setShowRestoreModal(false);
+          setStageToRestore(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Restore stage</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {stageToRestore && (
+            <p className="mb-0">
+              Restore <strong>{stageToRestore.name}</strong>? It will be available again in the pipeline.
+            </p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowRestoreModal(false);
+              setStageToRestore(null);
+            }}
+            disabled={restoring}
+          >
+            Cancel
+          </Button>
+          <Button variant="success" onClick={() => void handleConfirmRestore()} disabled={restoring}>
+            {restoring ? "Restoring…" : "Restore"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Stage View Modal */}
       {viewingStage && (
@@ -1437,7 +1416,7 @@ const StagesManagement = () => {
                 e.currentTarget.style.transform = "rotate(0deg)";
               }}
             >
-              <X size={20} />
+              <X size={20} aria-hidden />
             </button>
             <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
               {viewingStage.name}
@@ -1707,7 +1686,7 @@ const StagesManagement = () => {
                 borderTop: "1px solid #e5e7eb",
               }}
             >
-              {session?.user?.permissions?.includes("edit-crm-stages") && (
+              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
                 <Button
                   variant="primary"
                   style={{
@@ -1723,23 +1702,10 @@ const StagesManagement = () => {
                   }}
                   onClick={() => {
                     setShowViewModal(false);
-                    setStageToUpdate(viewingStage);
-                    setFormData({
-                      name: viewingStage.name,
-                      sequence: viewingStage.sequence,
-                      is_won: viewingStage.is_won,
-                      fold: viewingStage.fold,
-                      color: viewingStage.color,
-                      description: viewingStage.description || "",
-                      is_default: viewingStage.is_default,
-                      active: viewingStage.active,
-                      type: viewingStage.type,
-                      probability: viewingStage.probability,
-                    });
-                    setShowUpdateModal(true);
+                    openStageEdit(viewingStage);
                   }}
                 >
-                  <FiEdit2 size={16} />
+                  <FiEdit2 size={16} aria-hidden />
                   Edit Stage
                 </Button>
               )}

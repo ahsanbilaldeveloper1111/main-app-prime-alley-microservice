@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -17,28 +17,26 @@ import {
   CrmProduct,
 } from "@utils/crm";
 import { formatDateTimeToLocal, GlobalDateFormat } from "@utils/Helper";
+import GenericTable, {
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import {
   Button,
   Form,
   Card,
-  Table,
-  InputGroup,
   Modal,
   Badge,
   Spinner,
   Row,
   Col,
+  Table,
 } from "react-bootstrap";
 import {
   PlusCircle,
   Eye,
   Edit,
   Trash2,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   X,
   Package,
   Tag,
@@ -306,197 +304,127 @@ const IndustriesPage = () => {
     }
   };
 
-  // Pagination helpers
-  const totalPages = Math.ceil(totalIndustries / pagination.perPage);
-  const startIndex = (pagination.currentPage - 1) * pagination.perPage;
-  const endIndex = startIndex + industries.length;
+  const industriesTableColumns = useMemo<TableColumn<IndustryData>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        type: "custom",
+        render: (ind) => <div className="fw-semibold">{ind.name}</div>,
+      },
+      {
+        key: "description",
+        label: "Description",
+        sortable: false,
+        type: "custom",
+        render: (ind) => <div className="text-muted small">{ind.description || "—"}</div>,
+      },
+      {
+        key: "created_at",
+        label: "Created At",
+        sortable: true,
+        type: "custom",
+        render: (ind) => (
+          <div className="text-muted small">
+            {formatDateTimeToLocal(ind.created_at, GlobalDateFormat)}
+          </div>
+        ),
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        align: "right",
+        type: "custom",
+        render: (ind) => (
+          <div className="d-flex justify-content-end gap-2">
+            <Button
+              variant="outline-info"
+              size="sm"
+              onClick={() => handleView(ind)}
+            >
+              <Eye size={14} />
+            </Button>
+            {session?.user?.permissions?.includes("edit-crm-industry") && (
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleOpenModal(ind)}
+              >
+                <Edit size={14} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes("delete-crm-industry") && (
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={() => {
+                  setDeletingIndustry(ind);
+                  setShowDeleteModal(true);
+                }}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [session?.user?.permissions],
+  );
 
-  const handlePageChange = (page: number) => {
-    setPagination({ ...pagination, currentPage: page });
-  };
+  const industriesToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: search,
+      searchPlaceholder: "Search industries by name or description...",
+      onSearchChange: setSearch,
+      onSearch: () => {
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      },
+      rightActions: (
+        <div className="d-flex gap-2">
+          {session?.user?.permissions?.includes("add-crm-industry") && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleOpenModal()}
+              className="d-flex align-items-center gap-2"
+            >
+              <PlusCircle size={16} />
+              Add Product Group
+            </Button>
+          )}
+        </div>
+      ),
+    }),
+    [search, session?.user?.permissions],
+  );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Industries" />
       <div>
-        {/* Header */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                {/* <h5 className="mb-0 fw-bold">Product Groups</h5>
-                <p className="text-muted mb-0 small">
-                  Manage product groups for your CRM
-                </p> */}
-              </div>
-              {session?.user?.permissions?.includes('add-crm-industry') && (
-              <Button
-                variant="primary"
-                onClick={() => handleOpenModal()}
-                className="d-flex align-items-center gap-2"
-              >
-                <PlusCircle size={18} />
-                Add Product Group
-              </Button>
-              )}
-            </div>
-          </Card.Body>
-        </Card>
-
-        {/* Search Bar */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <Form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSearch();
-              }}
-            >
-              <InputGroup>
-                <Form.Control
-                  type="text"
-                  placeholder="Search industries by name or description..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <Button variant="outline-secondary" type="submit">
-                  <Search size={16} />
-                </Button>
-              </InputGroup>
-            </Form>
-          </Card.Body>
-        </Card>
-
-        {/* Industries Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
-            {loading ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Loading industries...</p>
-              </div>
-            ) : industries.length === 0 ? (
-              <></>
-            ) : (
-              <>
-                <div className="table-responsive">
-                  <Table hover className="mb-0">
-                    <thead className="table-light">
-                      <tr>
-                       
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Created At</th>
-                        <th className="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {industries && industries.length > 0 && industries.map((industry) => (
-                        <tr key={industry?.id}>
-                          <td>
-                            <div className="small text-muted">
-                              {industry?.name}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="small text-muted">
-                              {industry?.description}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="small text-muted">
-                              {formatDateTimeToLocal(industry?.created_at, GlobalDateFormat)}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="d-flex justify-content-end gap-2">
-                              <Button
-                                variant="outline-info"
-                                size="sm"
-                                onClick={() => handleView(industry)}
-                              >
-                                <Eye size={14} />
-                              </Button>
-                              {session?.user?.permissions?.includes('edit-crm-industry') && (
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                onClick={() => handleOpenModal(industry)}
-                              >
-                                <Edit size={14} />
-                              </Button>
-                              )}
-                              {session?.user?.permissions?.includes('delete-crm-industry') && (
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                onClick={() => {
-                                  setDeletingIndustry(industry);
-                                  setShowDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="d-flex justify-content-between align-items-center p-3 border-top">
-                    <div className="text-muted small">
-                      Showing {startIndex + 1} to {endIndex} of {totalIndustries} industries
-                    </div>
-                    <div className="d-flex gap-1">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(1)}
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronsLeft size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.currentPage - 1)}
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronLeft size={16} />
-                      </Button>
-                      <div className="d-flex align-items-center px-3">
-                        <span className="small">
-                          Page {pagination.currentPage} of {totalPages}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(pagination.currentPage + 1)}
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronRight size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronsRight size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </Card.Body>
-        </Card>
+        <GenericTable<IndustryData>
+          data={industries}
+          columns={industriesTableColumns}
+          showToolbar
+          toolbar={industriesToolbarConfig}
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.perPage,
+            totalRows: totalIndustries,
+            pageSizeOptions: [10, 15, 25, 50],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({ currentPage: page, perPage: rowsPerPage });
+          }}
+          loading={loading}
+          emptyMessage="No product groups found"
+          uniqueKey="id"
+          showToolbarActions={false}
+        />
 
         {/* Create/Edit Modal */}
         <Modal show={showModal} onHide={() => setShowModal(false)} centered>

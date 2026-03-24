@@ -21,13 +21,22 @@ import {
   type UserRequestCategoryField,
   type UserRequestCategoryFieldPayload,
   type UserRequestCategoryFieldType,
+  type UserRequestCategoryFieldConfig,
+  type FieldConfigValidation,
   type FieldsReorderItem,
   type WorkflowLevelPayload,
   type WorkflowLevelAssignee,
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical, FolderTree } from "lucide-react";
+import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, GripVertical, FolderTree } from "lucide-react";
 import Select from "@components/AppSelect";
+import GenericTable from "@components/GenericTable";
+import { reportApiErrorFromCatch } from "@utils/sentryLogger";
+
+/** Permission key duplicated in UI checks — single source avoids typos (Sonar S1192). */
+const MANAGE_REQUEST_CATEGORIES_PERMISSION = "manage-request-categories-staff-management";
+
+type FieldConditionOp = "eq" | "neq" | "in" | "contains";
 
 const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -43,21 +52,96 @@ const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
   { value: "file", label: "File" },
 ];
 
-const CONDITION_OPS: { value: "eq" | "neq" | "in" | "contains"; label: string }[] = [
+const CONDITION_OPS: { value: FieldConditionOp; label: string }[] = [
   { value: "eq", label: "equals" },
   { value: "neq", label: "not equals" },
   { value: "in", label: "in (comma list)" },
   { value: "contains", label: "contains" },
 ];
 
-const OPTION_TYPES: UserRequestCategoryFieldType[] = ["select", "multiselect", "radio", "checkbox"];
+const OPTION_TYPES = new Set<UserRequestCategoryFieldType>(["select", "multiselect", "radio", "checkbox"]);
+
+function formatTrackingLabel(row: UserRequestCategory): string {
+  return row.tracking_enabled === true ? "Enabled" : "Disabled";
+}
+
+function formatDescriptionPreview(description: unknown): string {
+  if (description == null || description === "") return "—";
+  const s = String(description);
+  return s.length > 50 ? s.slice(0, 50) + "…" : s;
+}
+
+function categoryModalTitle(editingCategory: UserRequestCategory | null, parentId: number | null | undefined): string {
+  const isSub = parentId != null && parentId !== 0;
+  if (isSub) {
+    return editingCategory ? "Edit Sub Category" : "Create Sub Category";
+  }
+  return editingCategory ? "Edit Category" : "Create Category";
+}
+
+function categorySaveButtonLabel(savingCategory: boolean, editingCategory: UserRequestCategory | null): string {
+  if (savingCategory) return "Saving…";
+  return editingCategory ? "Update" : "Create";
+}
+
+function fieldModalTitle(editingField: UserRequestCategoryField | null): string {
+  return editingField ? "Edit Field" : "Add Field";
+}
+
+function fieldModalPrimaryButtonLabel(savingField: boolean, editingField: UserRequestCategoryField | null): string {
+  if (savingField) return "Saving…";
+  return editingField ? "Update" : "Add";
+}
+
+function patchFieldFormConfig(
+  f: UserRequestCategoryFieldPayload,
+  patch: Partial<UserRequestCategoryFieldConfig>
+): UserRequestCategoryFieldPayload {
+  const cfg = f.config;
+  return {
+    ...f,
+    config: cfg ? { ...cfg, ...patch } : ({ ...patch } as UserRequestCategoryFieldConfig),
+  };
+}
+
+function patchFieldFormValidation(
+  f: UserRequestCategoryFieldPayload,
+  patch: Partial<FieldConfigValidation>
+): UserRequestCategoryFieldPayload {
+  const cfg = f.config;
+  const val = cfg?.validation ?? {};
+  const nextValidation = { ...val, ...patch };
+  if (cfg) {
+    return { ...f, config: { ...cfg, validation: nextValidation } };
+  }
+  return { ...f, config: { validation: nextValidation } };
+}
+
+function normalizeWorkflowLevelsForPayload(
+  levels: WorkflowLevelPayload[] | undefined | null
+): WorkflowLevelPayload[] | undefined {
+  if (!levels?.length) return undefined;
+  return levels.map((lvl) => ({
+    ...lvl,
+    assignees: (lvl.assignees ?? [])
+      .filter((a) => (a.user_id ?? "").trim() !== "")
+      .map((a, i) => ({ ...a, sort_order: i })),
+  }));
+}
+
+/**
+ * UI catch blocks reset local state after API helpers toast/rethrow. Report for observability (Sentry dedupes similar events).
+ */
+function consumeHandledApiError(error: unknown, source: string): void {
+  reportApiErrorFromCatch(error, source, { scope: "RequestCategories" });
+}
 
 function slugifyForKey(label: string): string {
   const s = String(label ?? "")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
+    .replaceAll(/\s+/g, "_")
+    .replaceAll(/[^a-z0-9_]/g, "");
   if (!s) return "";
   return /^[a-z]/.test(s) ? s : `field_${s}`;
 }
@@ -75,19 +159,15 @@ const defaultCategoryForm: UserRequestCategoryPayload & { workflow_levels?: Work
 
 type CategoryFormState = UserRequestCategoryPayload & { workflow_levels?: WorkflowLevelPayload[] };
 
-function AssigneesList({
-  assignees,
-  mainAppUsers,
-  levelIndex,
-  categoryForm,
-  setCategoryForm,
-}: {
+type AssigneesListProps = Readonly<{
   assignees: WorkflowLevelAssignee[];
   mainAppUsers: { id: number; name: string }[];
   levelIndex: number;
   categoryForm: CategoryFormState;
   setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-}) {
+}>;
+
+function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setCategoryForm }: AssigneesListProps) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const updateAssignees = (newAssignees: WorkflowLevelAssignee[]) => {
@@ -112,10 +192,11 @@ function AssigneesList({
     e.preventDefault();
     setDraggedIndex(null);
     const fromStr = e.dataTransfer.getData("text/plain");
-    const fromIndex = fromStr === "" ? -1 : parseInt(fromStr, 10);
-    if (fromIndex < 0 || fromIndex === toIndex) return;
+    const fromIndex = fromStr === "" ? -1 : Number.parseInt(fromStr, 10);
+    if (fromIndex < 0 || Number.isNaN(fromIndex) || fromIndex === toIndex || fromIndex >= assignees.length) return;
     const reordered = [...assignees];
     const [removed] = reordered.splice(fromIndex, 1);
+    if (removed === undefined) return;
     reordered.splice(toIndex, 0, removed);
     updateAssignees(reordered.map((a, i) => ({ ...a, sort_order: i })));
   };
@@ -127,11 +208,15 @@ function AssigneesList({
   const userOptions = mainAppUsers.map((u) => ({ value: String(u.id), label: u.name ?? String(u.id) }));
 
   return (
-    <div className="d-flex flex-column gap-2">
-      {assignees.map((assignee, assigneeIdx) => (
-        <div
-          key={assigneeIdx}
+    <ul className="list-unstyled d-flex flex-column gap-2 mb-0" aria-label="Workflow assignees">
+      {assignees.map((assignee, assigneeIdx) => {
+        const uid = (assignee.user_id ?? "").trim();
+        const rowKey = uid.length > 0 ? "wl-" + String(levelIndex) + "-u-" + uid : "wl-" + String(levelIndex) + "-slot-" + String(assigneeIdx);
+        return (
+        <li
+          key={rowKey}
           draggable
+          aria-label={"Assignee position " + String(assigneeIdx + 1)}
           onDragStart={(e) => handleDragStart(e, assigneeIdx)}
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, assigneeIdx)}
@@ -180,15 +265,195 @@ function AssigneesList({
           >
             <Trash2 size={18} />
           </Button>
+        </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+type WorkflowLevelRowProps = Readonly<{
+  lvl: WorkflowLevelPayload;
+  idx: number;
+  categoryForm: CategoryFormState;
+  setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
+  mainAppUsers: { id: number; name: string }[];
+}>;
+
+function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUsers }: WorkflowLevelRowProps) {
+  const removeLevel = () => {
+    const levels = categoryForm.workflow_levels ?? [];
+    setCategoryForm((f) => ({
+      ...f,
+      workflow_levels: levels.filter((_, i) => i !== idx).map((l, i) => ({ ...l, level: i + 1 })),
+    }));
+  };
+
+  const updateLevelName = (name: string) => {
+    const levels = [...(categoryForm.workflow_levels ?? [])];
+    levels[idx] = { ...levels[idx], name: name || undefined };
+    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+  };
+
+  const updateApprovalRule = (value: string) => {
+    const levels = [...(categoryForm.workflow_levels ?? [])];
+    levels[idx] = { ...levels[idx], approval_rule: (value as "any" | "all") || undefined };
+    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+  };
+
+  const updateApproveInOrder = (checked: boolean) => {
+    const levels = [...(categoryForm.workflow_levels ?? [])];
+    levels[idx] = { ...levels[idx], approve_in_order: checked };
+    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+  };
+
+  const addAssignee = () => {
+    const levels = [...(categoryForm.workflow_levels ?? [])];
+    const current = levels[idx].assignees ?? [];
+    levels[idx] = {
+      ...levels[idx],
+      assignees: [...current, { user_id: "", sort_order: current.length }],
+    };
+    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+  };
+
+  return (
+    <div className="mb-3 pb-3 border-bottom border-secondary border-opacity-25">
+      <div className="d-flex align-items-center justify-content-between mb-2">
+        <strong>Level {lvl.level}</strong>
+        <Button type="button" variant="outline-danger" size="sm" onClick={removeLevel}>
+          Remove
+        </Button>
+      </div>
+      <Form.Group className="mb-2">
+        <Form.Label className="small">Level name (optional)</Form.Label>
+        <Form.Control
+          size="sm"
+          type="text"
+          value={lvl.name ?? ""}
+          onChange={(e) => updateLevelName(e.target.value)}
+          placeholder="e.g. Manager approval"
+        />
+      </Form.Group>
+      <div className="row g-2 mb-2">
+        <div className="col-md-6">
+          <Form.Select value={lvl.approval_rule ?? "any"} onChange={(e) => updateApprovalRule(e.target.value)}>
+            <option value="any">Any one can approve</option>
+            <option value="all">All must approve</option>
+          </Form.Select>
         </div>
-      ))}
+        <div className="col-md-6 d-flex align-items-center">
+          <Form.Check
+            type="checkbox"
+            id={"wl-order-" + String(idx)}
+            label="Approve in order"
+            disabled={lvl.approval_rule !== "all"}
+            checked={lvl.approve_in_order === true}
+            onChange={(e) => updateApproveInOrder(e.target.checked)}
+            title={lvl.approval_rule === "all" ? undefined : "Only available when 'All must approve' is selected"}
+          />
+          <span className="ms-1 small text-muted" title="Only when All must approve">
+            ⓘ
+          </span>
+        </div>
+      </div>
+      <Form.Group>
+        <div className="d-flex align-items-center justify-content-between mb-2">
+          <Form.Label className="small mb-0">Assignees (who can approve this level)</Form.Label>
+          <Button type="button" variant="outline-primary" size="sm" onClick={addAssignee}>
+            <Plus size={14} className="me-1" />
+            Add
+          </Button>
+        </div>
+        {(lvl.assignees ?? []).length === 0 ? (
+          <div className="text-muted small py-2">No assignees. Click Add to assign approvers for this level.</div>
+        ) : (
+          <AssigneesList
+            assignees={lvl.assignees ?? []}
+            mainAppUsers={mainAppUsers}
+            levelIndex={idx}
+            categoryForm={categoryForm}
+            setCategoryForm={setCategoryForm}
+          />
+        )}
+      </Form.Group>
+    </div>
+  );
+}
+
+type SubCategoryWorkflowFormProps = Readonly<{
+  categoryForm: CategoryFormState;
+  setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
+  mainAppUsers: { id: number; name: string }[];
+}>;
+
+function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }: SubCategoryWorkflowFormProps) {
+  const workflowLevels = categoryForm.workflow_levels ?? [];
+
+  return (
+    <div className="col-12">
+      <div className="d-flex align-items-center justify-content-between mb-2">
+        <Form.Label className="mb-0 fw-semibold">Approval workflow (level & order) *</Form.Label>
+
+        {workflowLevels.length > 0 && (
+          <Button
+            type="button"
+            variant="outline-primary"
+            size="sm"
+            onClick={() => {
+              const levels = categoryForm.workflow_levels ?? [];
+              const nextLevel = levels.length + 1;
+              setCategoryForm((f) => ({
+                ...f,
+                workflow_levels: [...levels, { level: nextLevel, name: "Level " + String(nextLevel), assignees: [] }],
+              }));
+            }}
+          >
+            <Plus size={14} className="me-1" />
+            Add level
+          </Button>
+        )}
+      </div>
+
+      {workflowLevels.length === 0 ? (
+        <div className="border rounded p-3 bg-light text-center text-muted">
+          <p className="mb-2 small">At least one approval level with an assignee is required for sub-categories.</p>
+          <Button
+            type="button"
+            variant="outline-primary"
+            size="sm"
+            onClick={() => {
+              setCategoryForm((f) => ({
+                ...f,
+                workflow_levels: [{ level: 1, name: "Level 1", assignees: [] }],
+              }));
+            }}
+          >
+            <Plus size={14} className="me-1" />
+            Add level (required)
+          </Button>
+        </div>
+      ) : (
+        <div className="border rounded p-3 bg-light">
+          {workflowLevels.map((lvl, idx) => (
+            <WorkflowLevelRow
+              key={"workflow-level-" + String(lvl.level) + "-" + String(idx)}
+              lvl={lvl}
+              idx={idx}
+              categoryForm={categoryForm}
+              setCategoryForm={setCategoryForm}
+              mainAppUsers={mainAppUsers}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 const RequestCategories = () => {
   const { data: session } = useSession();
-  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppUsers } = useMainAppLookups();
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; last_page: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -224,15 +489,19 @@ const RequestCategories = () => {
   const [categoryForChildren, setCategoryForChildren] = useState<UserRequestCategory | null>(null);
   const [childrenList, setChildrenList] = useState<UserRequestCategory[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(false);
+  const [showDeleteFieldModal, setShowDeleteFieldModal] = useState(false);
+  const [fieldPendingDelete, setFieldPendingDelete] = useState<UserRequestCategoryField | null>(null);
+  const [deletingField, setDeletingField] = useState(false);
 
   const loadCategories = useCallback(async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null,children: false });
+      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null, children: false });
       setCategories(data);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
       else setPagination(null);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.loadCategories");
       setCategories([]);
       setPagination(null);
     } finally {
@@ -249,7 +518,8 @@ const RequestCategories = () => {
     try {
       const { data } = await getUserRequestCategories({ parent_id: parentId, limit: 500 });
       setChildrenList(data ?? []);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.loadChildren");
       setChildrenList([]);
     } finally {
       setLoadingChildren(false);
@@ -277,17 +547,16 @@ const RequestCategories = () => {
 
   const openEditCategory = (cat: UserRequestCategory) => {
     setEditingCategory(cat);
-    const raw = cat as UserRequestCategory & { parent_id?: number | null; sort_order?: number; tracking_enabled?: boolean; tracking_code_prefix?: string; workflow_levels?: WorkflowLevelPayload[] };
     setCategoryForm({
       name: cat.name ?? "",
       code: cat.code ?? "",
       description: cat.description ?? "",
       is_active: cat.is_active !== false,
-      parent_id: raw.parent_id ?? undefined,
-      sort_order: raw.sort_order ?? 0,
-      tracking_enabled: raw.tracking_enabled ?? false,
-      tracking_code_prefix: raw.tracking_code_prefix ?? "",
-      workflow_levels: Array.isArray(raw.workflow_levels) ? raw.workflow_levels : [],
+      parent_id: cat.parent_id ?? undefined,
+      sort_order: cat.sort_order ?? 0,
+      tracking_enabled: cat.tracking_enabled ?? false,
+      tracking_code_prefix: cat.tracking_code_prefix ?? "",
+      workflow_levels: Array.isArray(cat.workflow_levels) ? cat.workflow_levels : [],
     });
     setShowCategoryModal(true);
   };
@@ -295,7 +564,7 @@ const RequestCategories = () => {
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     const isSubCategory = categoryForm.parent_id != null && categoryForm.parent_id !== 0;
-    const workflowLevels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
+    const workflowLevels = categoryForm.workflow_levels ?? [];
     if (isSubCategory && (!workflowLevels.length || workflowLevels.every((lvl) => !(lvl.assignees ?? []).filter((a) => (a.user_id ?? "").trim()).length))) {
       toast.error("Sub-categories require at least one approval workflow level with at least one assignee.");
       return;
@@ -309,16 +578,7 @@ const RequestCategories = () => {
       sort_order: categoryForm.sort_order ?? 0,
       tracking_enabled: categoryForm.tracking_enabled ?? false,
       tracking_code_prefix: (categoryForm.tracking_code_prefix ?? "").slice(0, 50) || undefined,
-      workflow_levels: (() => {
-        const levels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels;
-        if (!levels?.length) return undefined;
-        return levels.map((lvl) => ({
-          ...lvl,
-          assignees: (lvl.assignees ?? [])
-            .filter((a) => (a.user_id ?? "").trim() !== "")
-            .map((a, i) => ({ ...a, sort_order: i })),
-        }));
-      })(),
+      workflow_levels: normalizeWorkflowLevelsForPayload(categoryForm.workflow_levels),
     };
     setSavingCategory(true);
     try {
@@ -332,8 +592,8 @@ const RequestCategories = () => {
       setShowCategoryModal(false);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
       if (categoryForChildren) loadChildren(categoryForChildren.id);
-    } catch {
-      // toast in API
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.handleSaveCategory");
     } finally {
       setSavingCategory(false);
     }
@@ -346,18 +606,17 @@ const RequestCategories = () => {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    const parentId = (categoryToDelete as UserRequestCategory & { parent_id?: number }).parent_id;
+    const parentId = categoryToDelete.parent_id;
     const wasChildOfOpenParent = categoryForChildren && parentId === categoryForChildren.id;
     setDeleting(true);
     try {
       await deleteUserRequestCategory(categoryToDelete.id);
-      
       setShowDeleteModal(false);
       setCategoryToDelete(null);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
       if (wasChildOfOpenParent && categoryForChildren) loadChildren(categoryForChildren.id);
-    } catch {
-      // toast in API
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.handleDeleteCategory");
     } finally {
       setDeleting(false);
     }
@@ -371,7 +630,8 @@ const RequestCategories = () => {
     try {
       const list = await getUserRequestCategoryFields(cat.id);
       setFields(list ?? []);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.openFieldsModal");
       setFields([]);
     } finally {
       setLoadingFields(false);
@@ -384,6 +644,8 @@ const RequestCategories = () => {
     setFieldsCategoryName("");
     setFields([]);
     setShowFieldModal(false);
+    setShowDeleteFieldModal(false);
+    setFieldPendingDelete(null);
   };
 
   const openAddField = () => {
@@ -454,22 +716,32 @@ const RequestCategories = () => {
       setShowFieldModal(false);
       const list = await getUserRequestCategoryFields(fieldsCategoryId);
       setFields(list ?? []);
-    } catch {
-      // toast in API
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.handleSaveField");
     } finally {
       setSavingField(false);
     }
   };
 
-  const handleDeleteField = async (fieldId: number) => {
-    if (!fieldsCategoryId || !globalThis.confirm("Delete this field?")) return;
+  const openDeleteFieldModal = (f: UserRequestCategoryField) => {
+    setFieldPendingDelete(f);
+    setShowDeleteFieldModal(true);
+  };
+
+  const handleConfirmDeleteField = async () => {
+    if (!fieldsCategoryId || !fieldPendingDelete) return;
+    setDeletingField(true);
     try {
-      await deleteUserRequestCategoryField(fieldsCategoryId, fieldId);
+      await deleteUserRequestCategoryField(fieldsCategoryId, fieldPendingDelete.id);
       toast.success("Field deleted");
+      setShowDeleteFieldModal(false);
+      setFieldPendingDelete(null);
       const list = await getUserRequestCategoryFields(fieldsCategoryId);
       setFields(list ?? []);
-    } catch {
-      // toast in API
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.handleConfirmDeleteField");
+    } finally {
+      setDeletingField(false);
     }
   };
 
@@ -485,22 +757,181 @@ const RequestCategories = () => {
       await reorderUserRequestCategoryFields(fieldsCategoryId, order);
       setFields(newFields);
       toast.success("Order updated");
-    } catch {
-      // toast in API
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "RequestCategories.moveField");
     } finally {
       setReordering(false);
     }
   };
 
+  let childrenModalMain: React.ReactNode;
+  if (loadingChildren) {
+    childrenModalMain = <p className="text-muted mb-0">Loading children…</p>;
+  } else if (childrenList.length === 0) {
+    childrenModalMain = (
+      <p className="text-muted mb-0">No child categories yet. Click &quot;Add child&quot; to create one.</p>
+    );
+  } else {
+    childrenModalMain = (
+      <GenericTable<UserRequestCategory>
+        data={childrenList}
+        columns={[
+          {
+            key: "name",
+            label: "Name",
+            type: "text",
+            emptyValue: "—",
+          },
+          {
+            key: "code",
+            label: "Code",
+            type: "text",
+            emptyValue: "—",
+          },
+          {
+            key: "tracking_enabled",
+            label: "Tracking",
+            render: (row) => <span>{formatTrackingLabel(row)}</span>,
+          },
+          {
+            key: "is_active",
+            label: "Active",
+            render: (row) => (
+              <span className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}>
+                {row.is_active === false ? "Inactive" : "Active"}
+              </span>
+            ),
+          },
+        ]}
+        actions={[
+          {
+            label: "Edit",
+            icon: <Pencil size={14} />,
+            onClick: (child) => {
+              setShowChildrenModal(false);
+              openEditCategory(child);
+            },
+            variant: "outline-secondary",
+          },
+          {
+            label: "Manage fields",
+            icon: <List size={14} />,
+            onClick: (child) => {
+              setShowChildrenModal(false);
+              openFieldsModal(child);
+            },
+            variant: "outline-secondary",
+          },
+          {
+            label: "Delete",
+            icon: <Trash2 size={14} />,
+            onClick: openDeleteCategory,
+            variant: "outline-danger",
+          },
+        ]}
+        showActions
+        uniqueKey="id"
+        showToolbarActions={false}
+        noBorder
+      />
+    );
+  }
+
+  let fieldsModalMain: React.ReactNode;
+  if (loadingFields) {
+    fieldsModalMain = <p className="text-muted mb-0">Loading fields…</p>;
+  } else if (fields.length === 0) {
+    fieldsModalMain = <p className="text-muted mb-0">No fields yet. Add one to define the request form.</p>;
+  } else {
+    fieldsModalMain = (
+      <GenericTable<UserRequestCategoryField>
+        data={fields}
+        columns={[
+          {
+            key: "_order",
+            label: "",
+            sortable: false,
+            render: (_row, index) => (
+              <div className="d-flex align-items-center gap-1">
+                <button
+                  type="button"
+                  style={{
+                    cursor: reordering ? "not-allowed" : "pointer",
+                    opacity: reordering ? 0.5 : 1,
+                    padding: "4px",
+                    border: "none",
+                    background: "none",
+                  }}
+                  onClick={() => moveField(index, "up")}
+                  disabled={reordering}
+                  aria-label="Move up"
+                >
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    cursor: reordering ? "not-allowed" : "pointer",
+                    opacity: reordering ? 0.5 : 1,
+                    padding: "4px",
+                    border: "none",
+                    background: "none",
+                  }}
+                  onClick={() => moveField(index, "down")}
+                  disabled={reordering}
+                  aria-label="Move down"
+                >
+                  <ChevronDown size={16} />
+                </button>
+              </div>
+            ),
+          },
+          { key: "key", label: "Key", type: "text" },
+          { key: "label", label: "Label", type: "text" },
+          { key: "type", label: "Type", type: "text" },
+          {
+            key: "required",
+            label: "Required",
+            render: (row) => <span>{row.required ? "Yes" : "No"}</span>,
+          },
+          {
+            key: "is_active",
+            label: "Active",
+            render: (row) => <span>{row.is_active === false ? "No" : "Yes"}</span>,
+          },
+        ]}
+        actions={[
+          {
+            label: "Edit",
+            icon: <Pencil size={14} />,
+            onClick: openEditField,
+            variant: "outline-secondary",
+          },
+          {
+            label: "Delete",
+            icon: <Trash2 size={14} />,
+            onClick: openDeleteFieldModal,
+            variant: "outline-danger",
+          },
+        ]}
+        showActions
+        uniqueKey="id"
+        showToolbarActions={false}
+        noBorder
+      />
+    );
+  }
+
   return (
     <React.Fragment>
+      <style>{`.generic-table-responsive { padding-top: 0 !important; }`}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
       <PageHeader
         title=""
         showSearch={false}
         buttons={
           <>
-          {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+          {session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) && (
           <Button variant="primary" onClick={openCreateCategory}>
             <Plus size={18} className="me-1" />
             Add Category
@@ -510,306 +941,86 @@ const RequestCategories = () => {
         }
       />
 
-      <div style={{ backgroundColor: "#F9FAFB", fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif" }}>
-        {/* Table */}
-        <div
-          style={{
-            backgroundColor: "white",
-            borderRadius: "12px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            overflow: "hidden",
-            marginBottom: "24px",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Description</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Tracking</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                  <th style={{ padding: "16px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      Loading…
-                    </td>
-                  </tr>
-                ) : categories.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      No request categories yet. Create one to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  categories.map((cat, index) => (
-                    <tr
-                      key={cat.id}
-                      style={{
-                        borderBottom: index < categories.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f9fafb";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "white";
-                      }}
-                    >
-                      <td style={{ padding: "16px" }}>
-                        <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
-                          {cat.name ?? "—"}
-                        </div>
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {cat.code ?? "—"}
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {cat.description
-                          ? String(cat.description).slice(0, 50) + (String(cat.description).length > 50 ? "…" : "")
-                          : "—"}
-                      </td>
-                      <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {cat.tracking_enabled ? "Enabled" : "Disabled"}
-                      </td>
-                      <td style={{ padding: "16px" }}>
-                        <span
-                          style={{
-                            padding: "4px 12px",
-                            borderRadius: "16px",
-                            fontSize: "13px",
-                            fontWeight: "500",
-                            backgroundColor: cat.is_active !== false ? "#d1fae5" : "#e5e7eb",
-                            color: cat.is_active !== false ? "#065f46" : "#6b7280",
-                          }}
-                        >
-                          {cat.is_active !== false ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "16px" }}>
-                        {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
-                       <>
-                       <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditCategory(cat);
-                          }}
-                          title="Edit"
-                          style={{
-                            padding: "6px 10px",
-                            marginRight: "6px",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Pencil size={14} />
-                            </button>
-                            
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openChildrenModal(cat);
-                          }}
-                          title="See children / Add or update"
-                          style={{
-                            padding: "6px 10px",
-                            marginRight: "6px",
-                            border: "1px solid #0d9488",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            color: "#0d9488",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <FolderTree size={14} />
-                            </button>
-                            {/* no need to show fields for parent , it will be in sub-categories */}
-                        {/* <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openFieldsModal(cat);
-                          }}
-                          title="Manage fields"
-                          style={{
-                            padding: "6px 10px",
-                            marginRight: "6px",
-                            border: "1px solid #6366f1",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            color: "#6366f1",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <List size={14} />
-                        </button> */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteCategory(cat);
-                          }}
-                          title="Delete"
-                          style={{
-                            padding: "6px 10px",
-                            border: "1px solid #fecaca",
-                            borderRadius: "6px",
-                            backgroundColor: "#fef2f2",
-                            color: "#b91c1c",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                        </>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+      <GenericTable<UserRequestCategory>
+        data={categories}
+        columns={[
+          {
+            key: "name",
+            label: "Name",
+            type: "text",
+            emptyValue: "—",
+          },
+          {
+            key: "code",
+            label: "Code",
+            type: "text",
+            emptyValue: "—",
+          },
+          {
+            key: "description",
+            label: "Description",
+            render: (row) => <span>{formatDescriptionPreview(row.description)}</span>,
+          },
+          {
+            key: "tracking_enabled",
+            label: "Tracking",
+            render: (row) => <span>{formatTrackingLabel(row)}</span>,
+          },
+          {
+            key: "is_active",
+            label: "Active",
+            render: (row) => (
+              <span className={`gt-badge gt-badge-${row.is_active === false ? "secondary" : "success"}`}>
+                {row.is_active === false ? "Inactive" : "Active"}
+              </span>
+            ),
+          },
+        ]}
+        actions={[
+          {
+            label: "Edit",
+            icon: <Pencil size={14} />,
+            onClick: openEditCategory,
+            variant: "outline-secondary",
+            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+          },
+          {
+            label: "Sub-categories",
+            icon: <FolderTree size={14} />,
+            onClick: openChildrenModal,
+            variant: "outline-secondary",
+            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+          },
+          {
+            label: "Delete",
+            icon: <Trash2 size={14} />,
+            onClick: openDeleteCategory,
+            variant: "outline-danger",
+            show: () => session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) ?? false,
+          },
+        ]}
+        showActions
+        loading={loading}
+        emptyMessage="No request categories yet. Create one to get started."
+        pagination={
+          pagination
+            ? {
+                currentPage: pagination.page,
+                rowsPerPage: pagination.limit,
+                totalRows: pagination.total,
+              }
+            : undefined
+        }
+        onPaginationChange={(page, rowsPerPage) => loadCategories(page, rowsPerPage)}
+        uniqueKey="id"
+        showToolbarActions={false}
+      />
 
-          {/* Footer / Pagination */}
-          <div
-            style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #e5e7eb",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "16px",
-            }}
-          >
-            <div style={{ fontSize: "14px", color: "#6b7280" }}>
-              {pagination
-                ? `Showing ${((pagination.page - 1) * pagination.limit) + 1}-${Math.min(pagination.page * pagination.limit, pagination.total)} of ${pagination.total} categories`
-                : categories.length > 0
-                  ? `Showing ${categories.length} categories`
-                  : "No categories"}
-            </div>
-            {pagination && pagination.last_page > 1 && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  type="button"
-                  onClick={() => loadCategories(1, pagination.limit)}
-                  disabled={pagination.page <= 1}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    backgroundColor: pagination.page <= 1 ? "#f9fafb" : "white",
-                    cursor: pagination.page <= 1 ? "not-allowed" : "pointer",
-                    opacity: pagination.page <= 1 ? 0.5 : 1,
-                  }}
-                >
-                  <ChevronsLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => loadCategories(pagination.page - 1, pagination.limit)}
-                  disabled={pagination.page <= 1}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    backgroundColor: pagination.page <= 1 ? "#f9fafb" : "white",
-                    cursor: pagination.page <= 1 ? "not-allowed" : "pointer",
-                    opacity: pagination.page <= 1 ? 0.5 : 1,
-                  }}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {[...new Array(pagination.last_page)].map((_, idx) => {
-                  const pageNum = idx + 1;
-                  if (
-                    pageNum === 1 ||
-                    pageNum === pagination.last_page ||
-                    (pageNum >= pagination.page - 1 && pageNum <= pagination.page + 1)
-                  ) {
-                    return (
-                      <button
-                        key={pageNum}
-                        type="button"
-                        onClick={() => loadCategories(pageNum, pagination.limit)}
-                        style={{
-                          padding: "8px 14px",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "6px",
-                          backgroundColor: pagination.page === pageNum ? "#6366f1" : "white",
-                          color: pagination.page === pageNum ? "white" : "#1f2937",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: pagination.page === pageNum ? "600" : "400",
-                        }}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  }
-                  if (pageNum === pagination.page - 2 || pageNum === pagination.page + 2) {
-                    return (
-                      <span key={pageNum} style={{ padding: "8px 4px", color: "#6b7280" }}>
-                        …
-                      </span>
-                    );
-                  }
-                  return null;
-                })}
-                <button
-                  type="button"
-                  onClick={() => loadCategories(pagination.page + 1, pagination.limit)}
-                  disabled={pagination.page >= pagination.last_page}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    backgroundColor: pagination.page >= pagination.last_page ? "#f9fafb" : "white",
-                    cursor: pagination.page >= pagination.last_page ? "not-allowed" : "pointer",
-                    opacity: pagination.page >= pagination.last_page ? 0.5 : 1,
-                  }}
-                >
-                  <ChevronRight size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => loadCategories(pagination.last_page, pagination.limit)}
-                  disabled={pagination.page >= pagination.last_page}
-                  style={{
-                    padding: "8px 12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
-                    backgroundColor: pagination.page >= pagination.last_page ? "#f9fafb" : "white",
-                    cursor: pagination.page >= pagination.last_page ? "not-allowed" : "pointer",
-                    opacity: pagination.page >= pagination.last_page ? 0.5 : 1,
-                  }}
-                >
-                  <ChevronsRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Create/Edit Category Modal */}
       <Modal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} centered size="lg">
         <Modal.Header closeButton>
-          <Modal.Title>
-            {categoryForm.parent_id != null && categoryForm.parent_id !== 0
-              ? (editingCategory ? "Edit Sub Category" : "Create Sub Category")
-              : (editingCategory ? "Edit Category" : "Create Category")}
-          </Modal.Title>
+          <Modal.Title>{categoryModalTitle(editingCategory, categoryForm.parent_id)}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSaveCategory}>
           <Modal.Body>
@@ -842,7 +1053,7 @@ const RequestCategories = () => {
                 <Form.Group>
                   <Form.Label>Status</Form.Label>
                   <Form.Select
-                    value={categoryForm.is_active !== false ? "true" : "false"}
+                    value={categoryForm.is_active === false ? "false" : "true"}
                     onChange={(e) => setCategoryForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
                   >
                     <option value="true">Active</option>
@@ -857,164 +1068,18 @@ const RequestCategories = () => {
                     type="number"
                     min={0}
                     value={categoryForm.sort_order ?? 0}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, sort_order: parseInt(String(e.target.value), 10) || 0 }))}
+                    onChange={(e) => setCategoryForm((f) => ({ ...f, sort_order: Number.parseInt(String(e.target.value), 10) || 0 }))}
                   />
                 </Form.Group>
               </div>
              
              
               {categoryForm.parent_id != null && categoryForm.parent_id !== 0 && (
-              <div className="col-12">
-                <div className="d-flex align-items-center justify-content-between mb-2">
-                  <Form.Label className="mb-0 fw-semibold">
-                    Approval workflow (level & order) *
-                  </Form.Label>
-
-                    {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels?.length ?? 0) > 0
-                      && (
-                        <Button
-                          type="button"
-                          variant="outline-primary"
-                          size="sm"
-                          onClick={() => {
-                            const levels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
-                            const nextLevel = levels.length + 1;
-                            setCategoryForm((f) => ({
-                              ...f,
-                              workflow_levels: [...levels, { level: nextLevel, name: `Level ${nextLevel}`, assignees: [] }],
-                            }));
-                          }}
-                        >
-                          <Plus size={14} className="me-1" />
-                          Add level
-                        </Button>
-                      )}
-                </div>
-               
-                {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels?.length ?? 0) === 0 ? (
-                  <div className="border rounded p-3 bg-light text-center text-muted">
-                    <p className="mb-2 small">
-                      At least one approval level with an assignee is required for sub-categories.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => {
-                        setCategoryForm((f) => ({
-                          ...f,
-                          workflow_levels: [{ level: 1, name: "Level 1", assignees: [] }],
-                        }));
-                      }}
-                    >
-                      <Plus size={14} className="me-1" />
-                      Add level (required)
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="border rounded p-3 bg-light">
-                    {((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? []).map((lvl, idx) => (
-                      <div key={idx} className="mb-3 pb-3 border-bottom border-secondary border-opacity-25">
-                        <div className="d-flex align-items-center justify-content-between mb-2">
-                          <strong>Level {lvl.level}</strong>
-                          <Button
-                            type="button"
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={() => {
-                              const levels = (categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [];
-                              setCategoryForm((f) => ({
-                                ...f,
-                                workflow_levels: levels.filter((_, i) => i !== idx).map((l, i) => ({ ...l, level: i + 1 })),
-                              }));
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                        <Form.Group className="mb-2">
-                          <Form.Label className="small">Level name (optional)</Form.Label>
-                          <Form.Control
-                            size="sm"
-                            type="text"
-                            value={lvl.name ?? ""}
-                            onChange={(e) => {
-                              const levels = [...((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [])];
-                              levels[idx] = { ...levels[idx], name: e.target.value || undefined };
-                              setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
-                            }}
-                            placeholder="e.g. Manager approval"
-                          />
-                        </Form.Group>
-                        <div className="row g-2 mb-2">
-                          <div className="col-md-6">
-                            <Form.Select
-                              value={lvl.approval_rule ?? "any"}
-                              onChange={(e) => {
-                                const levels = [...((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [])];
-                                levels[idx] = { ...levels[idx], approval_rule: (e.target.value as "any" | "all") || undefined };
-                                setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
-                              }}
-                            >
-                              <option value="any">Any one can approve</option>
-                              <option value="all">All must approve</option>
-                            </Form.Select>
-                          </div>
-                          <div className="col-md-6 d-flex align-items-center">
-                            <Form.Check
-                              type="checkbox"
-                              id={`wl-order-${idx}`}
-                              label="Approve in order"
-                              disabled={lvl.approval_rule !== "all"}
-                              checked={lvl.approve_in_order === true}
-                              onChange={(e) => {
-                                const levels = [...((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [])];
-                                levels[idx] = { ...levels[idx], approve_in_order: e.target.checked };
-                                setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
-                              }}
-                              title={lvl.approval_rule !== "all" ? "Only available when 'All must approve' is selected" : undefined}
-                            />
-                            <span className="ms-1 small text-muted" title="Only when All must approve">ⓘ</span>
-                          </div>
-                        </div>
-                        <Form.Group>
-                          <div className="d-flex align-items-center justify-content-between mb-2">
-                            <Form.Label className="small mb-0">Assignees (who can approve this level)</Form.Label>
-                            <Button
-                              type="button"
-                              variant="outline-primary"
-                              size="sm"
-                              onClick={() => {
-                                const levels = [...((categoryForm as { workflow_levels?: WorkflowLevelPayload[] }).workflow_levels ?? [])];
-                                const current = levels[idx].assignees ?? [];
-                                levels[idx] = {
-                                  ...levels[idx],
-                                  assignees: [...current, { user_id: "", sort_order: current.length }],
-                                };
-                                setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
-                              }}
-                            >
-                              <Plus size={14} className="me-1" />
-                              Add
-                            </Button>
-                          </div>
-                          {(lvl.assignees ?? []).length === 0 ? (
-                            <div className="text-muted small py-2">No assignees. Click Add to assign approvers for this level.</div>
-                          ) : (
-                            <AssigneesList
-                              assignees={lvl.assignees ?? []}
-                              mainAppUsers={mainAppUsers}
-                              levelIndex={idx}
-                              categoryForm={categoryForm}
-                              setCategoryForm={setCategoryForm}
-                            />
-                          )}
-                        </Form.Group>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                <SubCategoryWorkflowForm
+                  categoryForm={categoryForm}
+                  setCategoryForm={setCategoryForm}
+                  mainAppUsers={mainAppUsers}
+                />
               )}
 
               <div className="col-md-6">
@@ -1060,7 +1125,7 @@ const RequestCategories = () => {
                 Cancel
               </Button>
               <Button variant="primary" type="submit" disabled={savingCategory}>
-                {savingCategory ? "Saving…" : editingCategory ? "Update" : "Create"}
+                {categorySaveButtonLabel(savingCategory, editingCategory)}
               </Button>
             </div>
           </Modal.Body>
@@ -1089,6 +1154,33 @@ const RequestCategories = () => {
         </Modal.Footer>
       </Modal>
 
+      {/* Delete field confirmation (avoids window/globalThis.confirm) */}
+      <Modal
+        show={showDeleteFieldModal}
+        onHide={() => !deletingField && setShowDeleteFieldModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Delete field</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {fieldPendingDelete && (
+            <p className="mb-0">
+              Are you sure you want to delete the field <strong>{fieldPendingDelete.label ?? fieldPendingDelete.key}</strong>? This
+              action cannot be undone.
+            </p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteFieldModal(false)} disabled={deletingField}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleConfirmDeleteField} disabled={deletingField}>
+            {deletingField ? "Deleting…" : "Delete"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       {/* Children Modal */}
       <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
         <Modal.Header closeButton>
@@ -1104,111 +1196,7 @@ const RequestCategories = () => {
               </Button>
             )}
           </div>
-          {loadingChildren ? (
-            <p className="text-muted mb-0">Loading children…</p>
-          ) : childrenList.length === 0 ? (
-            <p className="text-muted mb-0">No child categories yet. Click &quot;Add child&quot; to create one.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Name</th>
-                        <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Code</th>
-                        <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Tracking</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280"}}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {childrenList.map((child, index) => (
-                    <tr
-                      key={child.id}
-                      style={{
-                        borderBottom: index < childrenList.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                    >
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.name ?? "—"}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.code ?? "—"}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{child.tracking_enabled ? "Enabled" : "Disabled"}</td>
-                      <td style={{ padding: "12px" }}>
-                        <span
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            backgroundColor: child.is_active !== false ? "#d1fae5" : "#e5e7eb",
-                            color: child.is_active !== false ? "#065f46" : "#6b7280",
-                          }}
-                        >
-                          {child.is_active !== false ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px" }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowChildrenModal(false);
-                            openEditCategory(child);
-                          }}
-                          title="Edit"
-                          style={{
-                            padding: "4px 8px",
-                            marginRight: "6px",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowChildrenModal(false);
-                            openFieldsModal(child);
-                          }}
-                          title="Manage fields"
-                          style={{
-                            padding: "4px 8px",
-                            marginRight: "6px",
-                            border: "1px solid #6366f1",
-                            borderRadius: "6px",
-                            backgroundColor: "white",
-                            color: "#6366f1",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <List size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteCategory(child);
-                          }}
-                          title="Delete"
-                          style={{
-                            padding: "4px 8px",
-                            border: "1px solid #fecaca",
-                            borderRadius: "6px",
-                            backgroundColor: "#fef2f2",
-                            color: "#b91c1c",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {childrenModalMain}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowChildrenModal(false)}>
@@ -1230,65 +1218,7 @@ const RequestCategories = () => {
               Add Field
             </Button>
           </div>
-          {loadingFields ? (
-            <p className="text-muted mb-0">Loading fields…</p>
-          ) : fields.length === 0 ? (
-            <p className="text-muted mb-0">No fields yet. Add one to define the request form.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280", width: 50 }} />
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Key</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Label</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Type</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Required</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280" }}>Active</th>
-                    <th style={{ padding: "12px", textAlign: "left", fontSize: "13px", fontWeight: "600", color: "#6b7280", width: 140 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fields.map((f, index) => (
-                    <tr
-                      key={f.id}
-                      style={{
-                        borderBottom: index < fields.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f9fafb";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "white";
-                      }}
-                    >
-                      <td style={{ padding: "12px", color: "#6b7280" }}>
-                        <button type="button" style={{ cursor: reordering ? "not-allowed" : "pointer", opacity: reordering ? 0.5 : 1, padding: "4px", marginRight: "4px", border: "none", background: "none" }} onClick={() => moveField(index, "up")} disabled={reordering} aria-label="Move up">
-                          <ChevronUp size={16} />
-                        </button>
-                        <button type="button" style={{ cursor: reordering ? "not-allowed" : "pointer", opacity: reordering ? 0.5 : 1, padding: "4px", border: "none", background: "none" }} onClick={() => moveField(index, "down")} disabled={reordering} aria-label="Move down">
-                          <ChevronDown size={16} />
-                        </button>
-                      </td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{f.key}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{f.label}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{f.type}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{f.required ? "Yes" : "No"}</td>
-                      <td style={{ padding: "12px", fontSize: "14px", color: "#1f2937" }}>{f.is_active !== false ? "Yes" : "No"}</td>
-                      <td style={{ padding: "12px" }}>
-                        <button type="button" onClick={() => openEditField(f)} style={{ padding: "6px 10px", marginRight: "6px", border: "1px solid #e5e7eb", borderRadius: "6px", backgroundColor: "white", cursor: "pointer", fontSize: "13px" }}>
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => handleDeleteField(f.id)} style={{ padding: "6px 10px", border: "1px solid #fecaca", borderRadius: "6px", backgroundColor: "#fef2f2", color: "#b91c1c", cursor: "pointer", fontSize: "13px" }}>
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {fieldsModalMain}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={closeFieldsModal}>
@@ -1300,7 +1230,7 @@ const RequestCategories = () => {
       {/* Add/Edit Field Modal */}
       <Modal show={showFieldModal} onHide={() => setShowFieldModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>{editingField ? "Edit Field" : "Add Field"}</Modal.Title>
+          <Modal.Title>{fieldModalTitle(editingField)}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSaveField}>
           <Modal.Body>
@@ -1397,7 +1327,7 @@ const RequestCategories = () => {
                 <Form.Group>
                   <Form.Label>Active</Form.Label>
                   <Form.Select
-                    value={fieldForm.is_active !== false ? "true" : "false"}
+                    value={fieldForm.is_active === false ? "false" : "true"}
                     onChange={(e) => setFieldForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
                   >
                     <option value="true">Yes</option>
@@ -1425,15 +1355,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="Shown inside the input (text/textarea/number)"
                             value={fieldForm.config?.placeholder ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  placeholder: e.target.value || null,
-                                },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormConfig(f, { placeholder: e.target.value || null }))}
                           />
                         </Form.Group>
                       </div>
@@ -1443,12 +1365,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="Small helper under the field"
                             value={fieldForm.config?.help_text ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: { ...(f.config ?? {}), help_text: e.target.value || null },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormConfig(f, { help_text: e.target.value || null }))}
                           />
                         </Form.Group>
                       </div>
@@ -1458,15 +1375,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="e.g. 0"
                             value={fieldForm.config?.validation?.min ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  validation: { ...(f.config?.validation ?? {}), min: e.target.value || null },
-                                },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { min: e.target.value || null }))}
                           />
                         </Form.Group>
                       </div>
@@ -1476,15 +1385,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="e.g. 100"
                             value={fieldForm.config?.validation?.max ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  validation: { ...(f.config?.validation ?? {}), max: e.target.value || null },
-                                },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { max: e.target.value || null }))}
                           />
                         </Form.Group>
                       </div>
@@ -1494,18 +1395,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="e.g. ^[0-9]{3}$"
                             value={fieldForm.config?.validation?.pattern ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  validation: {
-                                    ...(f.config?.validation ?? {}),
-                                    pattern: e.target.value || null,
-                                  },
-                                },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { pattern: e.target.value || null }))}
                           />
                           <Form.Text className="text-muted small">Applied for text/textarea only.</Form.Text>
                         </Form.Group>
@@ -1516,18 +1406,7 @@ const RequestCategories = () => {
                           <Form.Control
                             placeholder="e.g. pdf,jpg,jpeg,png"
                             value={fieldForm.config?.validation?.mimes ?? ""}
-                            onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  validation: {
-                                    ...(f.config?.validation ?? {}),
-                                    mimes: e.target.value || null,
-                                  },
-                                },
-                              }))
-                            }
+                            onChange={(e) => setFieldForm((f) => patchFieldFormValidation(f, { mimes: e.target.value || null }))}
                           />
                           <Form.Text className="text-muted small">
                             Applied for file fields (comma-separated extensions).
@@ -1543,20 +1422,18 @@ const RequestCategories = () => {
                           <Form.Select
                             value={fieldForm.config?.required_if?.key ?? ""}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
                                   required_if:
                                     e.target.value === ""
                                       ? null
                                       : {
                                           key: e.target.value,
-                                          op: (f.config?.required_if?.op ?? "eq") as "eq" | "neq" | "in" | "contains",
+                                          op: (f.config?.required_if?.op ?? "eq") as FieldConditionOp,
                                           value: f.config?.required_if?.value ?? "",
                                         },
-                                },
-                              }))
+                                })
+                              )
                             }
                           >
                             <option value="">(none)</option>
@@ -1576,18 +1453,13 @@ const RequestCategories = () => {
                           <Form.Select
                             value={fieldForm.config?.required_if?.op ?? "eq"}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
                                   required_if: f.config?.required_if
-                                    ? {
-                                        ...f.config.required_if,
-                                        op: e.target.value as "eq" | "neq" | "in" | "contains",
-                                      }
+                                    ? { ...f.config.required_if, op: e.target.value as FieldConditionOp }
                                     : null,
-                                },
-                              }))
+                                })
+                              )
                             }
                           >
                             {CONDITION_OPS.map((o) => (
@@ -1605,15 +1477,11 @@ const RequestCategories = () => {
                             placeholder="value"
                             value={fieldForm.config?.required_if?.value ?? ""}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  required_if: f.config?.required_if
-                                    ? { ...f.config.required_if, value: e.target.value }
-                                    : null,
-                                },
-                              }))
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
+                                  required_if: f.config?.required_if ? { ...f.config.required_if, value: e.target.value } : null,
+                                })
+                              )
                             }
                           />
                         </Form.Group>
@@ -1630,20 +1498,18 @@ const RequestCategories = () => {
                           <Form.Select
                             value={fieldForm.config?.show_if?.key ?? ""}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
                                   show_if:
                                     e.target.value === ""
                                       ? null
                                       : {
                                           key: e.target.value,
-                                          op: (f.config?.show_if?.op ?? "eq") as "eq" | "neq" | "in" | "contains",
+                                          op: (f.config?.show_if?.op ?? "eq") as FieldConditionOp,
                                           value: f.config?.show_if?.value ?? "",
                                         },
-                                },
-                              }))
+                                })
+                              )
                             }
                           >
                             <option value="">(none)</option>
@@ -1663,15 +1529,11 @@ const RequestCategories = () => {
                           <Form.Select
                             value={fieldForm.config?.show_if?.op ?? "eq"}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  show_if: f.config?.show_if
-                                    ? { ...f.config.show_if, op: e.target.value as "eq" | "neq" | "in" | "contains" }
-                                    : null,
-                                },
-                              }))
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
+                                  show_if: f.config?.show_if ? { ...f.config.show_if, op: e.target.value as FieldConditionOp } : null,
+                                })
+                              )
                             }
                           >
                             {CONDITION_OPS.map((o) => (
@@ -1689,15 +1551,11 @@ const RequestCategories = () => {
                             placeholder="value"
                             value={fieldForm.config?.show_if?.value ?? ""}
                             onChange={(e) =>
-                              setFieldForm((f) => ({
-                                ...f,
-                                config: {
-                                  ...(f.config ?? {}),
-                                  show_if: f.config?.show_if
-                                    ? { ...f.config.show_if, value: e.target.value }
-                                    : null,
-                                },
-                              }))
+                              setFieldForm((f) =>
+                                patchFieldFormConfig(f, {
+                                  show_if: f.config?.show_if ? { ...f.config.show_if, value: e.target.value } : null,
+                                })
+                              )
                             }
                           />
                         </Form.Group>
@@ -1712,12 +1570,12 @@ const RequestCategories = () => {
                   <strong>Radio buttons</strong>, and <strong>Checkbox</strong> (as a checkbox list).
                 </Form.Text>
               </div>
-              {OPTION_TYPES.includes(fieldForm.type) && (
+              {OPTION_TYPES.has(fieldForm.type) && (
                 <div className="col-12">
                   <div className="fw-semibold mb-2">Options</div>
                   <div className="border rounded p-3 bg-light">
                     {(fieldForm.options ?? []).map((opt, idx) => (
-                      <div key={idx} className="row g-2 align-items-center mb-2">
+                      <div key={`field-opt-${editingField?.id ?? "new"}-${idx}`} className="row g-2 align-items-center mb-2">
                         <div className="col-md-5">
                           <Form.Control
                             placeholder="Label"
@@ -1778,7 +1636,7 @@ const RequestCategories = () => {
               Cancel
             </Button>
             <Button variant="primary" type="submit" disabled={savingField}>
-              {savingField ? "Saving…" : editingField ? "Update" : "Add"}
+              {fieldModalPrimaryButtonLabel(savingField, editingField)}
             </Button>
           </Modal.Footer>
         </Form>

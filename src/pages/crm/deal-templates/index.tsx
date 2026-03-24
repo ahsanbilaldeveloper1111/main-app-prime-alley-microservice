@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -10,9 +10,12 @@ import {
   DealTemplateData,
   CreateDealTemplatePayload,
   UpdateDealTemplatePayload,
-  getIndustries,
-  IndustryData,
 } from "@utils/crm";
+import { reportApiErrorFromCatch } from "@utils/sentryLogger";
+import GenericTable, {
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import FormModal from "@pages/partial/FormModal";
 import { useSession } from "next-auth/react";
 import {
@@ -21,25 +24,17 @@ import {
   Col,
   Form,
   Card,
-  Table,
   InputGroup,
   Modal,
   Badge,
-  Spinner,
 } from "react-bootstrap";
-import Select from "react-select";
 import {
   PlusCircle,
   Eye,
   Edit,
   Trash2,
-  Search,
   X,
   FileText,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Plus,
   GripVertical,
 } from "lucide-react";
@@ -47,22 +42,51 @@ import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
+const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
+
+type DealTemplateFieldForm = {
+  id: string;
+  field_name: string;
+  field_type: "text" | "dropdown";
+  options: string[];
+  is_required: boolean;
+  require_approval: boolean;
+  sort_order: number;
+};
+
+type DealTemplateWithDefault = DealTemplateData & { is_default?: unknown };
+
+function templateIsDefault(template: DealTemplateData): boolean {
+  const v = (template as DealTemplateWithDefault).is_default;
+  if (typeof v === "string") return v === "true" || v === "1";
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  return false;
+}
+
+function newLocalFieldId(): string {
+  const c = globalThis.crypto;
+  if (c !== undefined && "randomUUID" in c) {
+    return c.randomUUID();
+  }
+  return "field-" + String(Date.now()) + "-" + Math.random().toString(36).slice(2, 11);
+}
+
+function consumeHandledApiError(error: unknown, source: string): void {
+  reportApiErrorFromCatch(error, source, { scope: "DealTemplates" });
+}
+
 const DealTemplatesPage = () => {
   const { data: session } = useSession();
   // State
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
-  const [industries, setIndustries] = useState<IndustryData[]>([]);
   const [totalTemplates, setTotalTemplates] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [loadingIndustries, setLoadingIndustries] = useState(true);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     perPage: 15,
   });
   const [search, setSearch] = useState("");
-  const [selectedIndustryFilter, setSelectedIndustryFilter] = useState<
-    number | null
-  >(null);
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] =
     useState<DealTemplateData | null>(null);
@@ -78,102 +102,53 @@ const DealTemplatesPage = () => {
     description: "",
     is_default: false,
   });
-  const [fields, setFields] = useState<
-    Array<{
-      id: string;
-      field_name: string;
-      field_type: "text" | "dropdown";
-      options: string[];
-      is_required: boolean;
-      require_approval: boolean;
-      sort_order: number;
-    }>
-  >([]);
+  const [fields, setFields] = useState<DealTemplateFieldForm[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch industries
-  const fetchIndustries = async () => {
-    setLoadingIndustries(true);
-    try {
-      const response = await getIndustries({ per_page: 1000 });
-      setIndustries(response.data || []);
-    } catch (error: any) {
-      console.error("Failed to fetch industries:", error);
-      // Error toast is handled in the API function
-    } finally {
-      setLoadingIndustries(false);
-    }
-  };
-
-  // Fetch templates
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = {
+      const params: { page: number; per_page: number; search?: string } = {
         page: pagination.currentPage,
         per_page: pagination.perPage,
       };
-      if (search) {
-        params.search = search;
-      }
-      if (selectedIndustryFilter) {
-        params.industry_id = selectedIndustryFilter;
+      const trimmed = search.trim();
+      if (trimmed) {
+        params.search = trimmed;
       }
       const response = await getDealTemplates(params);
       setTemplates(response.data || []);
       setTotalTemplates(response.total || 0);
-    } catch (error: any) {
-      console.error("Failed to fetch deal templates:", error);
-      // Error toast is handled in the API function
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "DealTemplates.fetchTemplates");
+      setTemplates([]);
+      setTotalTemplates(0);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.currentPage, pagination.perPage, search]);
 
   useEffect(() => {
-    fetchIndustries();
-  }, []);
+    void fetchTemplates();
+  }, [fetchTemplates]);
 
-  useEffect(() => {
-    fetchTemplates();
-  }, [
-    pagination.currentPage,
-    pagination.perPage,
-    search,
-    selectedIndustryFilter,
-  ]);
-
-  // Handle search
-  const handleSearch = () => {
-    setPagination({ ...pagination, currentPage: 1 });
-    fetchTemplates();
-  };
-
-  // Handle open modal
-  const handleOpenModal = async (template?: DealTemplateData) => {
+  const handleOpenModal = useCallback((template?: DealTemplateData) => {
     if (template) {
       setEditingTemplate(template);
-      const isDefaultValue = (template as any).is_default;
-      // Handle both string and boolean values
-      const isDefault =
-        typeof isDefaultValue === "string"
-          ? isDefaultValue === "true"
-          : Boolean(isDefaultValue);
-
       setFormData({
         industry_id: template.industry_id,
         name: template.name || "",
         description: template.description || "",
-        is_default: isDefault,
+        is_default: templateIsDefault(template),
       });
       setFields(
         (template.fields || []).map((field) => ({
-          id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          id: newLocalFieldId(),
           field_name: field.field_name,
           field_type: field.field_type,
           options: field.options || [],
           is_required: field.is_required,
-          require_approval: field?.require_approval || false,
+          require_approval: field.require_approval ?? false,
           sort_order: field.sort_order,
         })),
       );
@@ -188,28 +163,28 @@ const DealTemplatesPage = () => {
       setFields([]);
     }
     setShowModal(true);
-  };
+  }, []);
 
   // Handle add field
   const handleAddField = () => {
-    setFields([
-      ...fields,
+    setFields((prev) => [
+      ...prev,
       {
-        id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        id: newLocalFieldId(),
         field_name: "",
         field_type: "text",
         options: [],
         is_required: false,
         require_approval: false,
-        sort_order: fields.length,
+        sort_order: prev.length,
       },
     ]);
   };
 
   // Handle remove field
   const handleRemoveField = (index: number) => {
-    setFields(
-      fields
+    setFields((prev) =>
+      prev
         .filter((_, i) => i !== index)
         .map((f, i) => ({ ...f, sort_order: i })),
     );
@@ -226,41 +201,48 @@ const DealTemplatesPage = () => {
       require_approval: boolean;
     }>,
   ) => {
-    const newFields = [...fields];
-    newFields[index] = { ...newFields[index], ...field };
-    setFields(newFields);
+    setFields((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...field };
+      return next;
+    });
   };
 
   // Handle add option to dropdown
   const handleAddOption = (fieldIndex: number, option: string) => {
-    if (!option.trim()) return;
-    const newFields = [...fields];
-    if (!newFields[fieldIndex].options) {
-      newFields[fieldIndex].options = [];
-    }
-    if (!newFields[fieldIndex].options.includes(option.trim())) {
-      newFields[fieldIndex].options.push(option.trim());
-    }
-    setFields(newFields);
+    const trimmed = option.trim();
+    if (!trimmed) return;
+    setFields((prev) => {
+      const next = [...prev];
+      const row = next[fieldIndex];
+      if (!row) return prev;
+      const opts = row.options ?? [];
+      if (opts.includes(trimmed)) return prev;
+      next[fieldIndex] = { ...row, options: [...opts, trimmed] };
+      return next;
+    });
   };
 
   // Handle remove option from dropdown
   const handleRemoveOption = (fieldIndex: number, optionIndex: number) => {
-    const newFields = [...fields];
-    newFields[fieldIndex].options = newFields[fieldIndex].options.filter(
-      (_, i) => i !== optionIndex,
-    );
-    setFields(newFields);
+    setFields((prev) => {
+      const next = [...prev];
+      const row = next[fieldIndex];
+      if (!row) return prev;
+      next[fieldIndex] = {
+        ...row,
+        options: row.options.filter((_, i) => i !== optionIndex),
+      };
+      return next;
+    });
   };
 
-  // Handle submit
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!formData.name.trim()) {
       toast.error("Please enter a template name");
       return;
     }
 
-    // Validate fields
     for (let i = 0; i < fields.length; i++) {
       const field = fields[i];
       if (!field.field_name.trim()) {
@@ -291,10 +273,7 @@ const DealTemplatesPage = () => {
       }));
 
       if (editingTemplate) {
-        // Update payload doesn't require industry_id
-        const updatePayload: UpdateDealTemplatePayload & {
-          is_default?: string;
-        } = {
+        const updatePayload: UpdateDealTemplatePayload & { is_default?: string } = {
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
@@ -302,11 +281,7 @@ const DealTemplatesPage = () => {
         };
         await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
-        // Create payload requires industry_id
-
-        const createPayload: CreateDealTemplatePayload & {
-          is_default?: string;
-        } = {
+        const createPayload: CreateDealTemplatePayload & { is_default?: string } = {
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
@@ -317,46 +292,134 @@ const DealTemplatesPage = () => {
       setShowModal(false);
       setEditingTemplate(null);
       await fetchTemplates();
-    } catch (error: any) {
-      // Error toast is handled in the API function
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "DealTemplates.handleSubmit");
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [editingTemplate, fields, formData, fetchTemplates]);
 
-  // Handle delete
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!deletingTemplate) return;
     try {
       await deleteDealTemplate(deletingTemplate.id);
       setShowDeleteModal(false);
       setDeletingTemplate(null);
       await fetchTemplates();
-    } catch (error: any) {
-      // Error toast is handled in the API function
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "DealTemplates.handleDelete");
     }
-  };
+  }, [deletingTemplate, fetchTemplates]);
 
-  // Handle view
-  const handleView = (template: DealTemplateData) => {
+  const handleView = useCallback((template: DealTemplateData) => {
     setViewingTemplate(template);
     setShowViewModal(true);
-  };
+  }, []);
 
-  // Pagination helpers
-  const totalPages = Math.ceil(totalTemplates / pagination.perPage);
-  const startIndex = (pagination.currentPage - 1) * pagination.perPage;
-  const endIndex = startIndex + templates.length;
+  const handlePromptDelete = useCallback((template: DealTemplateData) => {
+    setDeletingTemplate(template);
+    setShowDeleteModal(true);
+  }, []);
 
-  const handlePageChange = (page: number) => {
-    setPagination({ ...pagination, currentPage: page });
-  };
+  const templatesTableColumns = useMemo<TableColumn<DealTemplateData>[]>(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        type: "custom",
+        render: (template) => (
+          <div className="fw-semibold">{template.name}</div>
+        ),
+      },
+      {
+        key: "description",
+        label: "Description",
+        sortable: false,
+        type: "custom",
+        render: (template) => (
+          <div className="text-muted small">
+            {template.description || (
+              <span className="fst-italic">No description</span>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "fields",
+        label: "Fields",
+        sortable: false,
+        type: "custom",
+        render: (template) => (
+          <Badge bg="secondary">{template.fields?.length || 0} field(s)</Badge>
+        ),
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        align: "right",
+        type: "custom",
+        render: (template) => (
+          <div className="d-flex justify-content-end gap-2">
+            <Button
+              variant="outline-info"
+              size="sm"
+              onClick={() => handleView(template)}
+              aria-label={"View deal template " + (template.name ?? "")}
+            >
+              <Eye size={14} />
+            </Button>
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={() => handleOpenModal(template)}
+              aria-label={"Edit deal template " + (template.name ?? "")}
+            >
+              <Edit size={14} />
+            </Button>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={() => handlePromptDelete(template)}
+              aria-label={"Delete deal template " + (template.name ?? "")}
+            >
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [handleView, handleOpenModal, handlePromptDelete],
+  );
 
-  // Industry options for select
-  const industryOptions = industries.map((ind) => ({
-    value: ind.id,
-    label: ind.name,
-  }));
+  const templatesToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: search,
+      searchPlaceholder: "Search templates by name or description...",
+      onSearchChange: setSearch,
+      onSearch: () => {
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      },
+      rightActions: (
+        <div className="d-flex gap-2">
+          {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleOpenModal()}
+              className="d-flex align-items-center gap-2"
+            >
+              <PlusCircle size={16} />
+              Add Template
+            </Button>
+          )}
+        </div>
+      ),
+    }),
+    [search, session?.user?.permissions, handleOpenModal],
+  );
 
   return (
     <React.Fragment>
@@ -366,202 +429,36 @@ const DealTemplatesPage = () => {
         subTitle="Deal Templates"
       />
       <div>
-        {/* Header */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                {/* <h5 className="mb-0 fw-bold">Deal Templates</h5>
-                <p className="text-muted mb-0 small">
-                  Manage deal templates with custom fields for different
-                  Business Types
-                </p> */}
-              </div>
-              {session?.user?.permissions?.includes(
-                "add-crm-deal-templates",
-              ) && (
-                <Button
-                  variant="primary"
-                  onClick={() => handleOpenModal()}
-                  className="d-flex align-items-center gap-2"
-                >
-                  <PlusCircle size={18} />
-                  Add Template
-                </Button>
-              )}
-            </div>
-          </Card.Body>
-        </Card>
-
-        {/* Search and Filter Bar */}
-        <Card className="border-0 shadow-sm mb-3">
-          <Card.Body className="p-3">
-            <Row className="g-3">
-              <Col md={12}>
-                <InputGroup>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search templates by name or description..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleSearch();
-                      }
-                    }}
-                  />
-                  <Button variant="outline-secondary" onClick={handleSearch}>
-                    <Search size={16} />
-                  </Button>
-                </InputGroup>
-              </Col>
-            </Row>
-          </Card.Body>
-        </Card>
-
-        {/* Templates Table */}
-        <Card className="border-0 shadow-sm">
-          <Card.Body className="p-0">
-            {loading ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Loading templates...</p>
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="text-center p-5">
-                <FileText size={48} className="text-muted mb-3" />
-                <p className="text-muted">No deal templates found</p>
+        <GenericTable<DealTemplateData>
+          data={templates}
+          columns={templatesTableColumns}
+          showToolbar
+          toolbar={templatesToolbarConfig}
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.perPage,
+            totalRows: totalTemplates,
+            pageSizeOptions: [10, 15, 25, 50],
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({ currentPage: page, perPage: rowsPerPage });
+          }}
+          loading={loading}
+          emptyMessage={
+            <div className="text-center p-5">
+              <FileText size={48} className="text-muted mb-3" />
+              <p className="text-muted">No deal templates found</p>
+              {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
                 <Button variant="primary" onClick={() => handleOpenModal()}>
                   <PlusCircle size={18} className="me-2" />
                   Add First Template
                 </Button>
-              </div>
-            ) : (
-              <>
-                <div className="table-responsive">
-                  <Table hover className="mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Name</th>
-
-                        <th>Description</th>
-                        <th>Fields</th>
-                        <th className="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {templates &&
-                        templates.length > 0 &&
-                        templates.map((template) => (
-                          <tr key={template.id}>
-                            <td>
-                              <div className="fw-semibold">{template.name}</div>
-                            </td>
-
-                            <td>
-                              <div className="text-muted small">
-                                {template.description || (
-                                  <span className="fst-italic">
-                                    No description
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td>
-                              <Badge bg="secondary">
-                                {template.fields?.length || 0} field(s)
-                              </Badge>
-                            </td>
-                            <td>
-                              <div className="d-flex justify-content-end gap-2">
-                                <Button
-                                  variant="outline-info"
-                                  size="sm"
-                                  onClick={() => handleView(template)}
-                                >
-                                  <Eye size={14} />
-                                </Button>
-                                <Button
-                                  variant="outline-primary"
-                                  size="sm"
-                                  onClick={() => handleOpenModal(template)}
-                                >
-                                  <Edit size={14} />
-                                </Button>
-                                <Button
-                                  variant="outline-danger"
-                                  size="sm"
-                                  onClick={() => {
-                                    setDeletingTemplate(template);
-                                    setShowDeleteModal(true);
-                                  }}
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </Table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="d-flex justify-content-between align-items-center p-3 border-top">
-                    <div className="text-muted small">
-                      Showing {startIndex + 1} to {endIndex} of {totalTemplates}{" "}
-                      templates
-                    </div>
-                    <div className="d-flex gap-1">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(1)}
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronsLeft size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() =>
-                          handlePageChange(pagination.currentPage - 1)
-                        }
-                        disabled={pagination.currentPage === 1}
-                      >
-                        <ChevronLeft size={16} />
-                      </Button>
-                      <div className="d-flex align-items-center px-3">
-                        <span className="small">
-                          Page {pagination.currentPage} of {totalPages}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() =>
-                          handlePageChange(pagination.currentPage + 1)
-                        }
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronRight size={16} />
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={pagination.currentPage === totalPages}
-                      >
-                        <ChevronsRight size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </Card.Body>
-        </Card>
+              )}
+            </div>
+          }
+          uniqueKey="id"
+          showToolbarActions={false}
+        />
 
         {/* Create/Edit Modal */}
         <FormModal
@@ -581,9 +478,7 @@ const DealTemplatesPage = () => {
                 <Form.Control
                   type="text"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Enter template name"
                   required
                 />
@@ -594,9 +489,7 @@ const DealTemplatesPage = () => {
                   as="textarea"
                   rows={3}
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                   placeholder="Enter template description"
                 />
               </Form.Group>
@@ -607,9 +500,7 @@ const DealTemplatesPage = () => {
                   id="is-default-switch"
                   label="Default"
                   checked={formData.is_default}
-                  onChange={(e) =>
-                    setFormData({ ...formData, is_default: e.target.checked })
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, is_default: e.target.checked }))}
                 />
                 <Form.Text className="text-muted">
                   Mark this template as the default template
@@ -656,8 +547,9 @@ const DealTemplatesPage = () => {
                               size="sm"
                               type="button"
                               onClick={() => handleRemoveField(index)}
+                              aria-label={"Remove field " + String(index + 1)}
                             >
-                              <X size={14} />
+                              <X size={14} aria-hidden />
                             </Button>
                           </div>
                           <Row className="g-3">
@@ -688,15 +580,13 @@ const DealTemplatesPage = () => {
                                 </Form.Label>
                                 <Form.Select
                                   value={field.field_type}
-                                  onChange={(e) =>
+                                  onChange={(e) => {
+                                    const ft = e.target.value as "text" | "dropdown";
                                     handleFieldChange(index, {
-                                      field_type: e.target.value as
-                                        | "text"
-                                        | "dropdown",
-                                      options:
-                                        e.target.value === "dropdown" ? [] : [],
-                                    })
-                                  }
+                                      field_type: ft,
+                                      options: ft === "text" ? [] : field.options,
+                                    });
+                                  }}
                                 >
                                   <option value="text">Text</option>
                                   <option value="dropdown">Dropdown</option>
@@ -718,14 +608,15 @@ const DealTemplatesPage = () => {
                                       padding: "0.5rem",
                                     }}
                                   >
-                                    {option}
-                                    <X
-                                      size={12}
-                                      style={{ cursor: "pointer" }}
-                                      onClick={() =>
-                                        handleRemoveOption(index, optIndex)
-                                      }
-                                    />
+                                    <span>{option}</span>
+                                    <button
+                                      type="button"
+                                      className="btn btn-link text-white p-0 border-0 lh-1 ms-1"
+                                      aria-label={"Remove option " + option}
+                                      onClick={() => handleRemoveOption(index, optIndex)}
+                                    >
+                                      <X size={12} aria-hidden />
+                                    </button>
                                   </Badge>
                                 ))}
                               </div>
@@ -746,14 +637,14 @@ const DealTemplatesPage = () => {
                                 <Button
                                   variant="outline-secondary"
                                   type="button"
+                                  aria-label="Add dropdown option"
                                   onClick={(e) => {
-                                    const input = e.currentTarget
-                                      .previousElementSibling as HTMLInputElement;
+                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                                     handleAddOption(index, input.value);
                                     input.value = "";
                                   }}
                                 >
-                                  <Plus size={14} />
+                                  <Plus size={14} aria-hidden />
                                 </Button>
                               </InputGroup>
                               <Form.Text className="text-muted">
@@ -867,7 +758,7 @@ const DealTemplatesPage = () => {
               <div className="mb-3">
                 <Form.Label className="text-muted small">Default</Form.Label>
                 <div>
-                  {(viewingTemplate as any).is_default ? (
+                  {templateIsDefault(viewingTemplate) ? (
                     <Badge bg="success">Yes</Badge>
                   ) : (
                     <Badge bg="secondary">No</Badge>

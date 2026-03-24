@@ -1114,7 +1114,7 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={{ maxHeight: "280px", overflowY: "auto" }}
+                        style={{ maxHeight: "280px" }}
                       >
                         {pill.dropdownContent ? (
                           <div
