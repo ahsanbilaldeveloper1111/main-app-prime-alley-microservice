@@ -9,9 +9,9 @@ interface CallTimerData {
 
 class GlobalCallTimerManager {
   private static instance: GlobalCallTimerManager
-  private timers: Map<string, CallTimerData> = new Map()
+  private readonly timers: Map<string, CallTimerData> = new Map()
   private interval: NodeJS.Timeout | null = null
-  private callbacks: Map<string, (time: string) => void> = new Map()
+  private readonly callbacks: Map<string, (time: string) => void> = new Map()
 
   static getInstance(): GlobalCallTimerManager {
     if (!GlobalCallTimerManager.instance) {
@@ -21,7 +21,6 @@ class GlobalCallTimerManager {
   }
 
   startTimer(dn: string, callback: (time: string) => void, providedStartTime?: Date | string | null, forceNew?: boolean) {
-    // Use provided startTime if available, otherwise use current time
     let startTime: Date
     const existingTimer = this.timers.get(dn)
     
@@ -56,9 +55,8 @@ class GlobalCallTimerManager {
       // This handles re-renders of the same active call
       startTime = existingTimer.startTime
     } else {
-      // For new calls, when forcing new, or when timer is inactive, start from current time
-      // (will be updated when API provides actual startTime)
-      startTime = new Date()
+      // No API start time — do not run from wall clock (avoids fake ticking when startTime is null)
+      return
     }
     
     // Update or create timer with the calculated startTime
@@ -160,6 +158,24 @@ class GlobalCallTimerManager {
   }
 }
 
+export function hasUsableCallTimerStart(startTime?: Date | string | null): boolean {
+  if (startTime == null) {
+    return false
+  }
+  if (typeof startTime === 'string' && startTime.trim() === '') {
+    return false
+  }
+  if (startTime instanceof Date) {
+    return !Number.isNaN(startTime.getTime())
+  }
+  let parsedMoment = moment.utc(startTime)
+  if (parsedMoment.isValid()) {
+    return true
+  }
+  parsedMoment = moment(startTime)
+  return parsedMoment.isValid()
+}
+
 export const useGlobalCallTimer = (dn: string, isActive: boolean, startTime?: Date | string | null) => {
   const [elapsedTime, setElapsedTime] = useState('00:00:00')
   const [isRunning, setIsRunning] = useState(false)
@@ -168,61 +184,58 @@ export const useGlobalCallTimer = (dn: string, isActive: boolean, startTime?: Da
   const prevIsActiveRef = useRef<boolean>(false)
 
   useEffect(() => {
-    if (isActive) {
-      setIsRunning(true)
-      
-      // Check if this is a new call (was inactive, now active)
-      const isNewCall = !prevIsActiveRef.current
-      
-      // Check if timer exists first
-      const timerExists = timerManager.isTimerActive(dn)
-      
-      // Determine if we should force a new timer:
-      // 1. If it's a new call (was inactive, now active) - ALWAYS start fresh
-      // 2. If startTime is null/undefined and there's no previous startTime (new call without API data)
-      // 3. If startTime changed from a value to null (call ended and new one started)
-      const shouldForceNew: boolean = isNewCall || 
-                                     (!startTime && !prevStartTimeRef.current) ||
-                                     (!!prevStartTimeRef.current && !startTime)
-      
-      // For new calls, always start fresh to avoid inheriting old timer values
-      if (isNewCall) {
-        // New call - always start from provided startTime (converted to local) or current time
-        // Force new to ensure we don't reuse an old timer's startTime
-        timerManager.startTimer(dn, (time) => {
-          setElapsedTime(time)
-        }, startTime, true)
-      } else if (startTime && timerExists && startTime !== prevStartTimeRef.current) {
-        // Existing call but startTime changed - update it immediately
-        // This handles the case when ANSWERED/CONNECTED event provides the actual startTime
-        timerManager.updateStartTime(dn, startTime)
-        // Also refresh the timer to ensure it's running
-        timerManager.startTimer(dn, (time) => {
-          setElapsedTime(time)
-        }, startTime, false)
-      } else {
-        // Existing call with same startTime - just refresh to ensure it's running
-        timerManager.startTimer(dn, (time) => {
-          setElapsedTime(time)
-        }, startTime, shouldForceNew)
-      }
-      
-      prevStartTimeRef.current = startTime
-      prevIsActiveRef.current = true
-    } else {
+    if (!isActive) {
       setIsRunning(false)
       setElapsedTime('00:00:00')
-      // Always stop timer when call becomes inactive to ensure clean state for next call
       timerManager.stopTimer(dn)
       prevStartTimeRef.current = undefined
       prevIsActiveRef.current = false
-    }
-
-    // Cleanup function - only stop timer if component unmounts or becomes inactive
-    return () => {
-      if (!isActive) {
+      return () => {
         timerManager.stopTimer(dn)
       }
+    }
+
+    const usableStart = hasUsableCallTimerStart(startTime)
+    if (!usableStart) {
+      setIsRunning(false)
+      setElapsedTime('00:00:00')
+      timerManager.stopTimer(dn)
+      prevStartTimeRef.current = startTime
+      prevIsActiveRef.current = true
+      return () => {
+        timerManager.stopTimer(dn)
+      }
+    }
+
+    const resolvedStart: Date | string = startTime as Date | string
+
+    setIsRunning(true)
+
+    const isNewCall = !prevIsActiveRef.current
+    const timerExists = timerManager.isTimerActive(dn)
+    const prevUsable = hasUsableCallTimerStart(prevStartTimeRef.current)
+    const shouldForceNew = isNewCall || (usableStart && !prevUsable)
+
+    if (isNewCall) {
+      timerManager.startTimer(dn, (time) => {
+        setElapsedTime(time)
+      }, resolvedStart, true)
+    } else if (timerExists && resolvedStart !== prevStartTimeRef.current) {
+      timerManager.updateStartTime(dn, resolvedStart)
+      timerManager.startTimer(dn, (time) => {
+        setElapsedTime(time)
+      }, resolvedStart, false)
+    } else {
+      timerManager.startTimer(dn, (time) => {
+        setElapsedTime(time)
+      }, resolvedStart, shouldForceNew)
+    }
+
+    prevStartTimeRef.current = resolvedStart
+    prevIsActiveRef.current = true
+
+    return () => {
+      timerManager.stopTimer(dn)
     }
   }, [dn, isActive, startTime, timerManager])
 

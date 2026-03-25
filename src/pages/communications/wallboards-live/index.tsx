@@ -1,4 +1,12 @@
-import React, { ReactElement, useState, useRef, useMemo, useCallback, useEffect } from 'react'
+import React, {
+  ReactElement,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+  useEffect,
+  type SetStateAction,
+} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
@@ -10,22 +18,27 @@ import { useCti } from '@hooks/useCti'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import SummaryCards from './partials/SummaryCards'
 import FilterBar from './partials/FilterBar'
-import MonitoringModal from './partials/MonitoringModal'
 import PageHeader from './partials/PageHeader'
 import SectionsRenderer from './partials/SectionsRenderer'
-import { 
-  categorizeDns as categorizeDnsHelper, 
+import {
+  buildMonitoringPayloadFromEvent,
+  computeNextIdleSinceMap,
+  devicePayloadFromDnsStateEvent,
+  devicesArrayFromCompleteStateEvent,
+  isCompleteStateLikeEvent,
+  monitoringPayloadDiffersFromActive,
+  registeredEntriesFromDevices,
+  type RegisteredDeviceEntry,
+} from './wallboardEventParsing'
+import {
+  categorizeDns as categorizeDnsHelper,
   isDnInActiveCall as isDnInActiveCallHelper,
-  getLocalStorageCallStatesInfo
 } from '@components/live-calls/utils/helpers'
 import { CUSTOM_STYLES } from '@components/live-calls/utils/constants'
 import { useMonitoring } from '@components/live-calls/utils/useMonitoring'
-import { 
-  handleMonitorSelect as handleMonitorSelectHelper,
-  handleBargeInSelect as handleBargeInSelectHelper,
-  resetMonitorSelection as resetMonitorSelectionHelper,
+import {
   handleDeviceSelect as handleDeviceSelectHelper,
-  handleDeviceSelectionCancel as handleDeviceSelectionCancelHelper
+  handleDeviceSelectionCancel as handleDeviceSelectionCancelHelper,
 } from '@components/live-calls/utils/handlers'
 import { animateCardMove as animateCardMoveHelper } from '@components/live-calls/utils/animationHelpers'
 
@@ -56,8 +69,6 @@ const LiveCallDashboard = () => {
     getCallStatesForDn,
     eventLog,
     userAddress,
-    getActiveCallIdsFromLocalStorage,
-    getAllCallIds,
     getUserTeams,
     getUserDataExtensions
   } = useCti()
@@ -84,9 +95,31 @@ const LiveCallDashboard = () => {
 
   const [loading, setLoading] = useState(true)
   const [openMenuDn, setOpenMenuDn] = useState<string | null>(null)
-  const [selectedMonitor, setSelectedMonitor] = useState<Record<string, string>>({})
+  const [wallboardChrome, setWallboardChrome] = useState<{
+    selectedMonitor: Record<string, string>
+    tempMonitorSelection: Record<string, string | null>
+    cardAnimations: { [dn: string]: 'adding' | null }
+  }>({
+    selectedMonitor: {},
+    tempMonitorSelection: {},
+    cardAnimations: {},
+  })
+
+  const setSelectedMonitor = useCallback((action: SetStateAction<Record<string, string>>) => {
+    setWallboardChrome((prev) => ({
+      ...prev,
+      selectedMonitor: typeof action === 'function' ? action(prev.selectedMonitor) : action,
+    }))
+  }, [])
+
+  const setTempMonitorSelection = useCallback((action: SetStateAction<Record<string, string | null>>) => {
+    setWallboardChrome((prev) => ({
+      ...prev,
+      tempMonitorSelection: typeof action === 'function' ? action(prev.tempMonitorSelection) : action,
+    }))
+  }, [])
+
   const [selectedTone, setSelectedTone] = useState<Record<string, string>>({})
-  const [tempMonitorSelection, setTempMonitorSelection] = useState<Record<string, string | null>>({})
   const [notification, setNotification] = useState<{ type: string; message: string } | null>(null)
   const [activeMonitoring, setActiveMonitoring] = useState<{ dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }>({
     dn: null,
@@ -94,21 +127,12 @@ const LiveCallDashboard = () => {
   })
   const [monitoringStartTime, setMonitoringStartTime] = useState<{ [dn: string]: Date }>({})
   const [showPopup, setShowPopup] = useState<{ dn: string; deviceName: string } | null>(null)
-  const [restoredCallStates, setRestoredCallStates] = useState<number>(0)
-  
+
   // Refs
-  const hasCalledGetCallLegsRef = useRef(false)
-  const hasCalledOnAllLoadedRef = useRef(false)
-  const getActiveCallIdsFromLocalStorageRef = useRef(getActiveCallIdsFromLocalStorage)
-  const [cardAnimations, setCardAnimations] = useState<{ [dn: string]: 'adding' | null }>({})
+  const { cardAnimations } = wallboardChrome
   const [animatingCards, setAnimatingCards] = useState<Set<string>>(new Set())
   const cardPositionsRef = useRef<{ [dn: string]: { x: number; y: number; width: number; height: number } }>({})
   const previousSectionsRef = useRef<{ [dn: string]: string }>({})
-  
-  // Update ref when function changes
-  useEffect(() => {
-    getActiveCallIdsFromLocalStorageRef.current = getActiveCallIdsFromLocalStorage
-  }, [getActiveCallIdsFromLocalStorage])
   
   // Monitoring hook
   const {
@@ -135,18 +159,21 @@ const LiveCallDashboard = () => {
   )
   
   // Helper function to categorize DNs into sections (wrapper for imported helper)
-  const categorizeDns = (dn: string, devices: CtiDevice[], call: any, active: boolean) => {
-    return categorizeDnsHelper(
-      dn,
-      devices,
-      call,
-      active,
-      activeMonitoring,
-      getCallStateForDevice,
-      getCallStatesForDn,
-      userAddress
-    )
-  }
+  const categorizeDns = useCallback(
+    (dn: string, devices: CtiDevice[], call: unknown, active: boolean) => {
+      return categorizeDnsHelper({
+        dn,
+        devices,
+        call,
+        active,
+        activeMonitoring,
+        getCallStateForDevice,
+        getCallStatesForDn,
+        userAddress,
+      })
+    },
+    [activeMonitoring, getCallStateForDevice, getCallStatesForDn, userAddress]
+  )
   
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -190,8 +217,8 @@ const LiveCallDashboard = () => {
       const dnsList = Object.values(dnsMap)
       const initialSections: { [dn: string]: string } = {}
       
-      dnsList.forEach(({ dn, devices }: any) => {
-        const deviceList = Object.values(devices || {}) as CtiDevice[]
+      dnsList.forEach(({ dn, devices }: { dn: string; devices?: Record<string, CtiDevice> }) => {
+        const deviceList = Object.values(devices ?? {})
         const call = getDnCallState(dn)
         const active = hasActiveCalls(dn)
         const section = categorizeDns(dn, deviceList, call, active)
@@ -209,21 +236,19 @@ const LiveCallDashboard = () => {
 
   // Fullscreen functionality
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      // Enter fullscreen
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true)
-      }).catch((err) => {
-       // console.error('Error attempting to enable fullscreen:', err)
-      })
-    } else {
-      // Exit fullscreen
+    if (document.fullscreenElement) {
       document.exitFullscreen().then(() => {
         setIsFullscreen(false)
-      }).catch((err) => {
-       // console.error('Error attempting to exit fullscreen:', err)
+      }).catch(() => {
+        /* ignore */
       })
+      return
     }
+    document.documentElement.requestFullscreen().then(() => {
+      setIsFullscreen(true)
+    }).catch(() => {
+      /* ignore */
+    })
   }
 
   // Listen for fullscreen changes
@@ -248,14 +273,6 @@ const LiveCallDashboard = () => {
 
 
 
-  // Check for restored call states on component mount
-  useEffect(() => {
-    const info = getLocalStorageCallStatesInfo()
-    if (info.count > 0) {
-      setRestoredCallStates(info.count)
-    }
-  }, [setRestoredCallStates])
-
   // Memoize the expensive calculations to prevent unnecessary re-renders
   const categorizedDns = useMemo(() => {
     if (!isInitialized || !dnsMap) return {}
@@ -263,8 +280,8 @@ const LiveCallDashboard = () => {
     const dnsList = Object.values(dnsMap)
     const result: { [dn: string]: string } = {}
     
-      dnsList.forEach(({ dn, devices }: any) => {
-        const deviceList = Object.values(devices || {}) as CtiDevice[]
+      dnsList.forEach(({ dn, devices }: { dn: string; devices?: Record<string, CtiDevice> }) => {
+        const deviceList = Object.values(devices ?? {})
         const call = getDnCallState(dn)
         const active = hasActiveCalls(dn)
         result[dn] = categorizeDns(dn, deviceList, call, active)
@@ -291,7 +308,7 @@ const LiveCallDashboard = () => {
   }, [categorizedDns]);
 
   // Track registered DNs with their timestamps for oldest idle calculation (when = online, lastCallEndTime = last call ended)
-  const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, { deviceName: string; when: string; lastCallEndTime?: string }>>({})
+  const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, RegisteredDeviceEntry>>({})
 
   // Idle tracking (Available & Idle only) - keyed by DN
   // - initialized only for REGISTERED extensions
@@ -337,104 +354,66 @@ const LiveCallDashboard = () => {
 
   // Process complete_state events to track registered devices
   useEffect(() => {
-    if (!eventLog || eventLog.length === 0) return
+    if (!eventLog?.length) return
 
-    // Process the latest complete_state event (find from end to get most recent)
-    const completeStateEvents = eventLog.filter((e: any) => 
-      e.type === 'initial-state' || 
-      (e.data?.type === 'complete_state') ||
-      (e.type === 'complete_state')
+    const completeStateEvents = eventLog.filter(isCompleteStateLikeEvent)
+    const completeStateEvent = completeStateEvents.at(-1)
+    if (!completeStateEvent) return
+
+    const devices = devicesArrayFromCompleteStateEvent(completeStateEvent)
+    const registered = registeredEntriesFromDevices(
+      devices as ReadonlyArray<{
+        terminalState?: string
+        dn?: string
+        deviceName?: string
+        when?: string
+        lastCallEndTime?: string
+      }>
     )
-    
-    if (completeStateEvents.length > 0) {
-      // Get the most recent complete_state event
-      const completeStateEvent = completeStateEvents[completeStateEvents.length - 1]
-      
-      if (completeStateEvent) {
-        let devices: any[] = []
-        
-        // Handle different event structures
-        if (completeStateEvent.data) {
-          if (Array.isArray(completeStateEvent.data)) {
-            devices = completeStateEvent.data
-          } else if (completeStateEvent.data.data && Array.isArray(completeStateEvent.data.data)) {
-            devices = completeStateEvent.data.data
-          } else if (typeof completeStateEvent.data === 'object') {
-            // It's a dnsMap structure
-            devices = Object.values(completeStateEvent.data).flatMap((dnData: any) => 
-              Object.values(dnData.devices || {})
-            )
-          }
-        }
 
-        const registered: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
-        devices.forEach((device: any) => {
-          if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName && device.when) {
-            const key = `${device.dn}_${device.deviceName}`
-            registered[key] = {
-              deviceName: device.deviceName,
-              when: device.when,
-              ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime })
-            }
-          }
-        })
-        
-        if (Object.keys(registered).length > 0) {
-          setRegisteredDnsStore(prev => ({ ...prev, ...registered }))
-        }
-      }
+    if (Object.keys(registered).length > 0) {
+      setRegisteredDnsStore((prev) => ({ ...prev, ...registered }))
     }
   }, [eventLog])
 
   // Process dns_states events to update registered devices
   useEffect(() => {
-    if (!eventLog || eventLog.length === 0) return
+    if (!eventLog?.length) return
 
-    // Get the most recent dns_states events (process all to handle state changes)
-    const dnsStateEvents = eventLog
-      .filter((e: any) => 
-        e.type === 'dns_states' || 
-        (e.data?.type === 'dns_states') ||
-        (e.type === 'dns_states' && e.data)
-      )
+    const dnsStateEvents = eventLog.filter(
+      (e: { type?: string; data?: { type?: string } }) =>
+        e.type === 'dns_states' || e.data?.type === 'dns_states' || (e.type === 'dns_states' && e.data)
+    )
 
-    // Process events in order (oldest to newest) to handle state transitions correctly
-    dnsStateEvents.forEach((event: any) => {
-      let device = null
-      
-      // Handle different event structures
-      if (event.data) {
-        if (event.data.data) {
-          device = event.data.data
-        } else if (event.data.dn) {
-          device = event.data
-        }
-      } else if (event.dn) {
-        device = event
+    dnsStateEvents.forEach((event) => {
+      const device = devicePayloadFromDnsStateEvent(event)
+      const dn = device?.dn
+      const deviceName = device?.deviceName
+      if (!dn || !deviceName) return
+
+      const key = `${dn}_${deviceName}`
+
+      if (device.terminalState === 'REGISTERED' && device.when) {
+        const when = device.when
+        setRegisteredDnsStore((prev) => ({
+          ...prev,
+          [key]: {
+            deviceName,
+            when,
+            ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime }),
+            ...(prev[key]?.lastCallEndTime &&
+              !device.lastCallEndTime && { lastCallEndTime: prev[key].lastCallEndTime }),
+          },
+        }))
+        return
       }
-      
-      if (device && device.dn && device.deviceName) {
-        const key = `${device.dn}_${device.deviceName}`
-        
-        if (device.terminalState === 'REGISTERED' && device.when) {
-          // Add or update registered device (preserve lastCallEndTime if dns_states doesn't send it)
-          setRegisteredDnsStore(prev => ({
-            ...prev,
-            [key]: {
-              deviceName: device.deviceName,
-              when: device.when,
-              ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime }),
-              ...(prev[key]?.lastCallEndTime && !device.lastCallEndTime && { lastCallEndTime: prev[key].lastCallEndTime })
-            }
-          }))
-        } else if (device.terminalState === 'UNREGISTERED' || device.terminalState === 'STALE') {
-          // Remove unregistered device
-          setRegisteredDnsStore(prev => {
-            const updated = { ...prev }
-            delete updated[key]
-            return updated
-          })
-        }
+
+      if (device.terminalState === 'UNREGISTERED' || device.terminalState === 'STALE') {
+        setRegisteredDnsStore((prev) => {
+          const updated = { ...prev }
+          delete updated[key]
+          return updated
+        })
       }
     })
   }, [eventLog])
@@ -443,7 +422,7 @@ const LiveCallDashboard = () => {
   useEffect(() => {
     if (!dnsMap) return
 
-    const registered: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
+    const registered: Record<string, RegisteredDeviceEntry> = {}
     Object.values(dnsMap).forEach((dnData: any) => {
       Object.values(dnData.devices || {}).forEach((device: any) => {
         if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName) {
@@ -462,7 +441,7 @@ const LiveCallDashboard = () => {
     // Remove devices that are no longer in dnsMap
     const currentKeys = new Set(Object.keys(registered))
     setRegisteredDnsStore(prev => {
-      const updated: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
+      const updated: Record<string, RegisteredDeviceEntry> = {}
       Object.entries(prev).forEach(([key, value]) => {
         if (currentKeys.has(key)) {
           updated[key] = value
@@ -506,106 +485,26 @@ const LiveCallDashboard = () => {
   useEffect(() => {
     if (!isInitialized || !dnsMap) return
 
-    const dnsList = Object.values(dnsMap) as any[]
+    const dnsList = Object.values(dnsMap) as Array<{ dn: unknown; devices?: Record<string, CtiDevice> }>
     const nowIso = new Date().toISOString()
 
-    // Idle since from complete_state: when = registered/online, lastCallEndTime = last call ended.
-    // Per device: idle since = max(when, lastCallEndTime). Per DN: latest across devices.
-    const getIdleSinceIsoFromCompleteState = (dn: string): string | undefined => {
-      const dnEntry = dnsList.find((d: any) => String(d.dn) === dn)
-      const deviceList = dnEntry ? (Object.values(dnEntry.devices || {}) as any[]) : []
-      let latestMs: number | undefined
-      deviceList.forEach((device: any) => {
-        if (device.terminalState !== 'REGISTERED') return
-        const whenMs = parseServerTime(device.when)
-        const lastCallEndMs = parseServerTime(device.lastCallEndTime)
-        const idleSinceMs = whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : (whenMs || lastCallEndMs)
-        if (!idleSinceMs) return
-        if (latestMs === undefined || idleSinceMs > latestMs) latestMs = idleSinceMs
+    setIdleSinceByDn((prev) =>
+      computeNextIdleSinceMap({
+        prev,
+        dnsList,
+        currentSectionByDn: categorizedDns,
+        registeredDnsStore,
+        prevSectionByDnRef,
+        prevIsRegisteredByDnRef,
+        nowIso,
+        parseServerTimeFn: parseServerTime,
       })
-      return latestMs !== undefined ? new Date(latestMs).toISOString() : undefined
-    }
-
-    // Idle since from registered store: max(when, lastCallEndTime) per device, then latest across devices
-    const getLatestRegisteredWhenIso = (dn: string): string | undefined => {
-      let latestMs: number | undefined
-      Object.entries(registeredDnsStore).forEach(([key, value]) => {
-        const [storeDn] = key.split('_')
-        if (storeDn !== String(dn) || !value?.when) return
-        const whenMs = parseServerTime(value.when)
-        const lastCallEndMs = parseServerTime(value.lastCallEndTime)
-        const idleSinceMs = whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : whenMs
-        if (!idleSinceMs) return
-        if (latestMs === undefined || idleSinceMs > latestMs) latestMs = idleSinceMs
-      })
-      return latestMs !== undefined ? new Date(latestMs).toISOString() : undefined
-    }
-
-    const currentSectionByDn = categorizedDns as Record<string, string>
-
-    setIdleSinceByDn(prev => {
-      let next = prev
-
-      const seenDns = new Set<string>()
-
-      dnsList.forEach(({ dn, devices }: any) => {
-        const dnKey = String(dn)
-        seenDns.add(dnKey)
-
-        const deviceList = Object.values(devices || {}) as CtiDevice[]
-        const isRegistered = deviceList.some(d => d.terminalState === 'REGISTERED')
-        const currentSection = currentSectionByDn[dnKey]
-        const prevSection = prevSectionByDnRef.current[dnKey]
-        const prevIsRegistered = prevIsRegisteredByDnRef.current[dnKey] || false
-
-        const shouldClear = !isRegistered || currentSection === 'downOffline'
-        if (shouldClear) {
-          if (next[dnKey] !== undefined) {
-            if (next === prev) next = { ...prev }
-            delete next[dnKey]
-          }
-          prevIsRegisteredByDnRef.current[dnKey] = isRegistered
-          prevSectionByDnRef.current[dnKey] = currentSection
-          return
-        }
-
-        if (currentSection === 'activeIdle') {
-          const transitionedIntoIdle = !!prevSection && prevSection !== 'activeIdle'
-
-          if (transitionedIntoIdle) {
-            if (next === prev) next = { ...prev }
-            next[dnKey] = nowIso
-          } else {
-            // Prefer idle since from complete_state (when + lastCallEndTime), then registered store, then keep previous or now
-            const fromCompleteState = getIdleSinceIsoFromCompleteState(dnKey)
-            const idleIso = fromCompleteState || getLatestRegisteredWhenIso(dnKey) || next[dnKey] || nowIso
-            if (next === prev) next = { ...prev }
-            next[dnKey] = idleIso
-          }
-        }
-
-        prevIsRegisteredByDnRef.current[dnKey] = isRegistered
-        prevSectionByDnRef.current[dnKey] = currentSection
-      })
-
-      // Drop stale keys for DNs no longer present
-      Object.keys(next).forEach(dnKey => {
-        if (!seenDns.has(dnKey)) {
-          if (next === prev) next = { ...prev }
-          delete next[dnKey]
-        }
-      })
-
-      // Return prev if unchanged to avoid re-render loop (deps like categorizedDns can be new refs each render)
-      const prevKeys = Object.keys(prev)
-      if (Object.keys(next).length === prevKeys.length && prevKeys.every(k => next[k] === prev[k])) return prev
-      return next
-    })
+    )
   }, [categorizedDns, dnsMap, isInitialized, registeredDnsStore])
 
   // Helper function to clear monitoring state
   const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
-    console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason, currentState: activeMonitoring })
+    console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason })
     setActiveMonitoring({ dn: null, type: null, deviceName: null, monitor: undefined })
     setMonitoringStartTime(prev => {
       const newState = { ...prev }
@@ -631,20 +530,18 @@ const LiveCallDashboard = () => {
       type: 'info',
       message: `Monitoring automatically stopped for ${monitoredDn} - ${reason}`
     })
-  }, [setActiveMonitoring, setMonitoringStartTime, setSelectedMonitor, setSelectedTone, setTempMonitorSelection, setNotification, activeMonitoring])
+  }, [setActiveMonitoring, setMonitoringStartTime, setSelectedMonitor, setSelectedTone, setTempMonitorSelection, setNotification])
 
   // Listen for DROPPED/DISCONNECTED events to clear monitoring state immediately
   useEffect(() => {
-    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !eventLog || eventLog.length === 0) return
+    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !eventLog?.length) return
 
     const monitoredDn = activeMonitoring.dn
     const monitoredDeviceName = activeMonitoring.deviceName
     const supervisorDn = activeMonitoring.monitor // Supervisor's DN (e.g., 107)
 
-    // Check the most recent events for DROPPED/DISCONNECTED events related to monitoring
-    // Only check the LAST event to avoid processing old events repeatedly
-    const lastEvent = eventLog[eventLog.length - 1]
-    if (!lastEvent || !lastEvent.parties || lastEvent.parties.length === 0) return
+    const lastEvent = eventLog.at(-1)
+    if (!lastEvent?.parties?.length) return
 
     // Case 1: Check for CallObservationEndedEvImpl event - this always means monitoring ended
     // IMPORTANT: Only clear if this is a DISCONNECTED event, not if monitoring is being established
@@ -726,148 +623,61 @@ const LiveCallDashboard = () => {
   const lastProcessedEventSequenceRef = useRef<number | null>(null)
   
   useEffect(() => {
-    if (!eventLog || eventLog.length === 0 || !dnsMap || !isInitialized || !userAddress) return
+    if (!eventLog?.length || !dnsMap || !isInitialized || !userAddress) return
 
-    // Only process the most recent event to avoid infinite loops
-    const lastEvent = eventLog[eventLog.length - 1]
-    if (!lastEvent || !lastEvent.parties || lastEvent.parties.length === 0) return
-    
-    // Skip if we've already processed this event
-    if (lastProcessedEventSequenceRef.current !== null && 
-        lastEvent.sequence !== undefined && 
-        lastEvent.sequence <= lastProcessedEventSequenceRef.current) {
+    const lastEvent = eventLog.at(-1)
+    if (!lastEvent?.parties?.length) return
+
+    if (
+      lastProcessedEventSequenceRef.current !== null &&
+      lastEvent.sequence !== undefined &&
+      lastEvent.sequence <= lastProcessedEventSequenceRef.current
+    ) {
       return
     }
 
-    // Case 1: Event has explicit monitoring info (isMonitoring: true) - HIGHEST PRIORITY
-    if (lastEvent.isMonitoring && lastEvent.monitoring && lastEvent.parties && lastEvent.parties.length > 0) {
-      const monitoring = lastEvent.monitoring as any
-      const monitorDn = monitoring.monitorDn // Supervisor DN (e.g., 107)
-      const monitoredDn = monitoring.monitoredDn // Agent DN (e.g., 103)
-      const monitoringType = monitoring.monitoringType // e.g., "SILENT", "WHISPER", "BARGE_IN"
+    if (!lastEvent.isMonitoring || !lastEvent.monitoring) return
 
-      // Only set if this is for the current user (supervisor)
-      if (monitorDn === userAddress && monitoredDn && monitoringType) {
-        // Find the monitored device name from the event parties
-        // Check all parties to find the one involving the monitored DN
-        // The monitored DN could be either callingAddress or calledAddress
-        let monitoredDeviceName: string | null = null
-        
-        // First, try to find party where monitoredDn is the calledAddress (supervisor calling agent)
-        let monitoredParty = lastEvent.parties.find((p: any) => 
-          p.calledAddress === monitoredDn && p.callingAddress === monitorDn
-        )
-        if (monitoredParty) {
-          monitoredDeviceName = monitoredParty.calledDeviceName || monitoredParty.callingDeviceName || null
-        }
-        
-        // If not found, try where monitoredDn is the callingAddress (agent calling supervisor)
-        if (!monitoredDeviceName) {
-          monitoredParty = lastEvent.parties.find((p: any) => 
-            p.callingAddress === monitoredDn && p.calledAddress === monitorDn
-          )
-          if (monitoredParty) {
-            monitoredDeviceName = monitoredParty.callingDeviceName || monitoredParty.calledDeviceName || null
-          }
-        }
-        
-        // If still not found, try any party involving monitoredDn
-        if (!monitoredDeviceName) {
-          monitoredParty = lastEvent.parties.find((p: any) => 
-            p.calledAddress === monitoredDn || p.callingAddress === monitoredDn
-          )
-          if (monitoredParty) {
-            // If monitoredDn is calledAddress, use calledDeviceName; if callingAddress, use callingDeviceName
-            monitoredDeviceName = monitoredDn === monitoredParty.calledAddress 
-              ? monitoredParty.calledDeviceName 
-              : monitoredParty.callingDeviceName || null
-          }
-        }
-        
-        // If not found in parties, try to get from dnsMap (get first registered device or first available)
-        if (!monitoredDeviceName && dnsMap[monitoredDn]) {
-          const devices = Object.values(dnsMap[monitoredDn].devices || {}) as any[]
-          if (devices.length > 0) {
-            // Prefer registered device, otherwise use first available
-            monitoredDeviceName = devices.find((d: any) => d.terminalState === 'REGISTERED')?.deviceName || devices[0]?.deviceName || null
-          }
-        }
+    const payload = buildMonitoringPayloadFromEvent(
+      lastEvent.parties,
+      lastEvent.monitoring as { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
+      dnsMap as Parameters<typeof buildMonitoringPayloadFromEvent>[2],
+      userAddress
+    )
+    if (!payload) return
 
-        // Set monitoring state - always update if monitoring info is present in event
-        // This ensures monitoring is recognized immediately, even if deviceName is not found yet
-        const shouldUpdate = !activeMonitoring.dn || 
-                             activeMonitoring.dn !== monitoredDn || 
-                             (monitoredDeviceName && activeMonitoring.deviceName !== monitoredDeviceName) ||
-                             activeMonitoring.monitor !== monitorDn ||
-                             activeMonitoring.type !== monitoringType
+    if (!monitoringPayloadDiffersFromActive(activeMonitoring, payload)) return
 
-        if (shouldUpdate) {
-          // Get monitor device information from the event or dnsMap
-          // The supervisor's device is in the event parties (callingDeviceName when supervisor is calling)
-          let monitorDeviceName: string | undefined = undefined
-          let monitorDeviceType: string | undefined = undefined
-          
-          // Try to get from event parties (supervisor is the calling party)
-          const supervisorParty = lastEvent.parties.find((p: any) => 
-            p.callingAddress === monitorDn || p.calledAddress === monitorDn
-          )
-          if (supervisorParty) {
-            monitorDeviceName = supervisorParty.callingDeviceName || supervisorParty.calledDeviceName || undefined
-            // Try to get device type from dnsMap
-            if (monitorDeviceName && dnsMap[monitorDn]) {
-              const devices = Object.values(dnsMap[monitorDn].devices || {}) as any[]
-              const device = devices.find((d: any) => d.deviceName === monitorDeviceName)
-              if (device) {
-                monitorDeviceType = device.deviceType || undefined
-              }
-            }
-          }
-          
-          // Fallback: get from dnsMap if not found in event
-          if (!monitorDeviceName && dnsMap[monitorDn]) {
-            const devices = Object.values(dnsMap[monitorDn].devices || {}) as any[]
-            if (devices.length > 0) {
-              // Prefer registered device, otherwise use first available
-              const device = devices.find((d: any) => d.terminalState === 'REGISTERED') || devices[0]
-              monitorDeviceName = device?.deviceName || undefined
-              monitorDeviceType = device?.deviceType || undefined
-            }
-          }
-          
-          console.log('[Monitoring] Setting monitoring state from event (Case 1 - isMonitoring: true)', {
-            monitorDn,
-            monitoredDn,
-            monitoringType,
-            monitoredDeviceName: monitoredDeviceName || 'pending',
-            monitorDeviceName: monitorDeviceName || 'pending',
-            monitorDeviceType: monitorDeviceType || 'pending',
-            eventName: lastEvent.eventName,
-            eventType: lastEvent.eventType,
-            callId: lastEvent.callId,
-            sequence: lastEvent.sequence,
-            currentState: activeMonitoring,
-            partyInfo: monitoredParty,
-            allParties: lastEvent.parties
-          })
-          setActiveMonitoring({
-            dn: monitoredDn,
-            type: monitoringType,
-            monitor: monitorDn,
-            deviceName: monitoredDeviceName || undefined,
-            monitorDeviceName: monitorDeviceName,
-            monitorDeviceType: monitorDeviceType
-          })
-          if (!monitoringStartTime[monitoredDn]) {
-            setMonitoringStartTime(prev => ({ ...prev, [monitoredDn]: new Date() }))
-          }
-          // Mark this event as processed
-          if (lastEvent.sequence !== undefined) {
-            lastProcessedEventSequenceRef.current = lastEvent.sequence
-          }
-        }
-      }
+    console.log('[Monitoring] Setting monitoring state from event (Case 1 - isMonitoring: true)', {
+      ...payload,
+      eventName: lastEvent.eventName,
+      eventType: lastEvent.eventType,
+      callId: lastEvent.callId,
+      sequence: lastEvent.sequence,
+    })
+    setActiveMonitoring({
+      dn: payload.monitoredDn,
+      type: payload.monitoringType,
+      monitor: payload.monitorDn,
+      deviceName: payload.monitoredDeviceName,
+      monitorDeviceName: payload.monitorDeviceName,
+      monitorDeviceType: payload.monitorDeviceType,
+    })
+    setMonitoringStartTime((prev) =>
+      prev[payload.monitoredDn] ? prev : { ...prev, [payload.monitoredDn]: new Date() }
+    )
+    if (lastEvent.sequence !== undefined) {
+      lastProcessedEventSequenceRef.current = lastEvent.sequence
     }
-  }, [eventLog, dnsMap, isInitialized, userAddress, activeMonitoring, setActiveMonitoring, setMonitoringStartTime, monitoringStartTime])
+  }, [
+    eventLog,
+    dnsMap,
+    isInitialized,
+    userAddress,
+    activeMonitoring,
+    setActiveMonitoring,
+    setMonitoringStartTime,
+  ])
 
   // Auto-clear monitoring state when call ends
   useEffect(() => {
@@ -883,20 +693,20 @@ const LiveCallDashboard = () => {
     }
 
     const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
-    const isDeviceActiveCall = deviceCall && 
+    const isDeviceActiveCall =
+      deviceCall &&
       !deviceCall.isTerminating &&
-      deviceCall.parties &&
-      deviceCall.parties.length > 0 &&
-      deviceCall.parties.some((p: any) => 
-        p.callStatus !== 'DROPPED' && 
-        p.callStatus !== 'DISCONNECTED' &&
-        ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(p.callStatus)
+      deviceCall.parties?.some(
+        (p: { callStatus?: string }) =>
+          p.callStatus !== 'DROPPED' &&
+          p.callStatus !== 'DISCONNECTED' &&
+          ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(p.callStatus ?? '')
       )
 
     if (!isDeviceActiveCall) {
       clearMonitoringState(monitoredDn, 'call ended')
     }
-  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, categorizedDns, hasActiveCalls, clearMonitoringState])
+  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, clearMonitoringState])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -908,23 +718,23 @@ const LiveCallDashboard = () => {
       const previousSection = previousSectionsRef.current[dn]
       
       if (previousSection && previousSection !== currentSection) {
-        const card = document.querySelector(`[data-dn="${dn}"]`) as HTMLElement
-        if (card) {
-          const rect = card.getBoundingClientRect()
+        const el = document.querySelector(`[data-dn="${dn}"]`)
+        if (el instanceof HTMLElement) {
+          const rect = el.getBoundingClientRect()
           cardPositionsRef.current[dn] = {
             x: rect.left,
             y: rect.top,
             width: rect.width,
-            height: rect.height
+            height: rect.height,
           }
         }
-        
-        animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection as string })
+
+        animationsToTrigger.push({ dn, fromSection: previousSection, toSection: currentSection })
       }
     })
     
     Object.entries(categorizedDns).forEach(([dn, currentSection]) => {
-      previousSectionsRef.current[dn] = currentSection as string
+      previousSectionsRef.current[dn] = currentSection
     })
     
     if (animationsToTrigger.length > 0) {
@@ -947,48 +757,15 @@ const LiveCallDashboard = () => {
     }
   }, [isInitialized, dnsMap])
 
-  // Execute on all loaded
-  const dnsMapKeys = useMemo(() => Object.keys(dnsMap || {}).sort().join(','), [dnsMap])
-  
-  useEffect(() => {
-    if (!loading && isInitialized && dnsMapKeys.length > 0 && !hasCalledOnAllLoadedRef.current) {
-      hasCalledOnAllLoadedRef.current = true
-      
-      const executeOnAllLoaded = async () => {
-        const { GetCallLegs } = await import('@utils/dialer')
-        const activeCallIds = getActiveCallIdsFromLocalStorageRef.current()
-        
-        // if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
-        //   hasCalledGetCallLegsRef.current = true
-        //   try {
-        //     const params = {
-        //       callIds: activeCallIds
-        //     }
-            
-        //     const response = await GetCallLegs(params)
-        //     console.log('GetCallLegs response:', response)
-        //   } catch (error) {
-        //     console.error('Error calling GetCallLegs:', error)
-        //     hasCalledGetCallLegsRef.current = false
-        //   }
-        // }
-      }
-      
-      executeOnAllLoaded()
-    }
-  }, [loading, isInitialized, dnsMapKeys])
-
   // Click outside handler
   useEffect(() => {
-    const handleClickOutside = (event: any) => {
-      if (
-        openMenuDn &&
-        !event.target.closest('.card') &&
-        !event.target.closest('.dropdown-menu')
-      ) {
-        setTempMonitorSelection((prev) => ({ ...prev, [openMenuDn!]: null }))
-        setOpenMenuDn(null)
-      }
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const menuDn = openMenuDn
+      if (!menuDn || target.closest('.card') || target.closest('.dropdown-menu')) return
+      setTempMonitorSelection((prev) => ({ ...prev, [menuDn]: null }))
+      setOpenMenuDn(null)
     }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
@@ -1009,24 +786,11 @@ const LiveCallDashboard = () => {
     document.head.appendChild(styleElement)
 
     return () => {
-      document.head.removeChild(styleElement)
+      styleElement.remove()
     }
   }, [])
 
-  // Handler functions
-  const handleMonitorSelect = (dn: string, monitorType: string) => {
-    handleMonitorSelectHelper(dn, monitorType, setSelectedMonitor, setTempMonitorSelection, setSelectedTone)
-  }
-
-  const handleBargeInSelect = (dn: string) => {
-    handleBargeInSelectHelper(dn, setSelectedMonitor, setTempMonitorSelection, setSelectedTone)
-  }
-
-  const resetMonitorSelection = () => {
-    resetMonitorSelectionHelper(showPopup, setSelectedMonitor, setTempMonitorSelection, setSelectedTone)
-  }
-
-  const handleDeviceSelect = (device: any) => {
+  const handleDeviceSelect = (device: Parameters<typeof handleDeviceSelectHelper>[0]) => {
     handleDeviceSelectHelper(
       device,
       pendingMonitoringData,
@@ -1085,17 +849,6 @@ const LiveCallDashboard = () => {
 
   return (
     <div className="live-calls-wrapper">
-      {/* {isReconnecting && (
-        <div
-          className="alert alert-warning mb-0 rounded-0 d-flex align-items-center justify-content-center gap-2"
-          style={{ fontSize: '0.875rem' }}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
-          Reconnecting to server...
-        </div>
-      )} */}
       <style dangerouslySetInnerHTML={{ __html: CUSTOM_STYLES }} />
       <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader && !isReconnecting} />
 
@@ -1140,24 +893,6 @@ const LiveCallDashboard = () => {
             />
           )}
 
-            
-
-      {/* Notification */}
-      {/* {notification && (
-        <div className="notification-container">
-          <div
-            className={`alert alert-${notification.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`}
-          >
-            {notification.message}
-            <button
-              type="button"
-              className="btn-close"
-              onClick={() => setNotification(null)}
-            />
-          </div>
-        </div>
-      )} */}
-
       {/* CTI Table */}
       <SectionsRenderer
         dnsMap={dnsMap}
@@ -1192,28 +927,6 @@ const LiveCallDashboard = () => {
         collapsedSections={collapsedSections}
         toggleSection={toggleSection}
       />
-
-      {/* Device Options Popup Modal */}
-      {/* <MonitoringModal
-        show={!!showPopup}
-        showPopup={showPopup}
-        activeMonitoring={activeMonitoring}
-        selectedMonitor={selectedMonitor}
-        tempMonitorSelection={tempMonitorSelection}
-        selectedTone={selectedTone}
-        session={session}
-        dnsMap={dnsMap}
-        onHide={() => setShowPopup(null)}
-        onReset={resetMonitorSelection}
-        onStartMonitoring={(dn: string, monitorType: string, toneType: string) => {
-          startMonitoringLocal(dn, monitorType as 'SILENT' | 'WHISPER' | 'BARGE_IN', toneType, showPopup)
-          setShowPopup(null)
-        }}
-        onMonitorSelect={handleMonitorSelect}
-        onBargeInSelect={handleBargeInSelect}
-        onStopMonitoring={stopMonitoring}
-        isDnInActiveCallFn={isDnInActiveCall}
-      /> */}
 
       {/* Device Selection Modal for Monitoring */}
       <DeviceSelectionModal

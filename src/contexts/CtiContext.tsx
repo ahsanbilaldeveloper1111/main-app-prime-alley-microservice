@@ -16,6 +16,7 @@ import {
 } from '../utils/dialer';
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
 import moment from 'moment';
+import { parseCallAnswerStartTimeUtc } from '@components/live-calls/utils/helpers';
 
 // Local storage keys (matching useCtiStomp.ts)
 const CALL_STATES_STORAGE_KEY = "cti_call_states";
@@ -253,18 +254,14 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         // Use callId as the key for consistency
         const callKey = callId || `call_${Date.now()}`;
         
-        // Calculate startTime from eventTime if available, otherwise use current time
-        let startTime = new Date();
-        if (callState.eventTime) {
-          startTime = new Date(callState.eventTime);
-        }
+        // Prefer API answer/connected start; never use eventTime for duration
+        const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
+        let startTime = parsedApiStart ?? new Date();
         
-        // Calculate duration if call is connected
         let duration = 0;
-        if (localStatus === 'connected' && callState.eventTime) {
+        if (localStatus === 'connected' && parsedApiStart) {
           const now = new Date();
-          const eventTime = moment.utc(callState.eventTime).toDate();
-          duration = Math.max(0, Math.round((now.getTime() - eventTime.getTime()) / 1000));
+          duration = Math.max(0, Math.round((now.getTime() - parsedApiStart.getTime()) / 1000));
         }
         
         // Check if we already have this call in prev (to preserve any updates from eventLog)
