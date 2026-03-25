@@ -143,7 +143,7 @@ function buildCdrQueryParams(
   const params: Record<string, string | number | boolean> = {
     page: currentPage,
     per_page: recordsPerPage,
-    include_statistics: true,
+    include_statistics: false,
   };
 
   if (filters.search) params.search = filters.search;

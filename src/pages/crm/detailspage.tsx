@@ -2,11 +2,11 @@ import React, { useMemo } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Layout from "@layout/index";
-import { getCrmDetailStaticConfig } from "@pages/crm/common/crm-detail-config";
+import { getCrmDetailStaticConfig } from "@utils/crm/common/crm-detail-config";
 import type {
   SupportedCrmDetailType,
-} from "@pages/crm/common/crm-detail-unified";
-import { getCrmDetailPageForType } from "@pages/crm/common/crm-detail-unified";
+} from "@utils/crm/common/crm-detail-unified";
+import { getCrmDetailPageForType } from "@utils/crm/common/crm-detail-unified";
 
 const getSingleQueryValue = (
   value: unknown
