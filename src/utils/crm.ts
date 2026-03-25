@@ -139,6 +139,7 @@ export interface LeadData {
   campaign_id: number | null;
   campaign_field_values: Record<string, any> | null;
   crm_data_id: number | null;
+  follow_up_date?: string | null;
 }
 
 export interface OpportunityData extends LeadData {

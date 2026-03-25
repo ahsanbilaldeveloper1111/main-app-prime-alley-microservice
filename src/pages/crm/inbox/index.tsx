@@ -694,7 +694,7 @@ const MessageThread = ({
     try {
       await sendWhatsApp({ number: selectedChat.phone_number, message: text });
       setMessage("");
-      // Optimistic append; socket may deliver the real message later (we dedupe in onMessageReceived)
+      // Optimistic append only after successful API call (socket may deliver the real message later; we dedupe in onMessageReceived)
       setMessages((prev) => [
         ...prev,
         {

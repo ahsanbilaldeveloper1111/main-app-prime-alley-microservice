@@ -3014,7 +3014,7 @@ const CrmProspectsManagement = () => {
         icon: Users,
         iconColor: "#6366F1",
         iconBgColor: "#EEF2FF",
-        subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`,
+        subtitle: `${metrics.assigned_records || 0} Assigned / ${metrics.unassigned_records || 0 } Unassigned`,
       },
       {
         title: "Scheduled",
@@ -7822,6 +7822,7 @@ const CrmProspectsManagement = () => {
           setRefreshKey((prev) => prev + 1);
           toast.success("Prospect converted to lead successfully!");
         }}
+        showSuccessToast={false}
         type="lead"
         crmDataId={convertingProspectId ?? undefined}
       />

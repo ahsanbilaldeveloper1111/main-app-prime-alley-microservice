@@ -320,19 +320,33 @@ export const sendEmail = async (
 export const sendWhatsApp = async (
   data: SendWhatsAppPayload,
 ): Promise<SendWhatsAppSuccessResponse> => {
-  const response = await axiosInstance.post<SendWhatsAppSuccessResponse>(
+  const response = await axiosInstance.post<
+    SendWhatsAppSuccessResponse | SendWhatsAppErrorResponse
+  >(
     `${prefix}/send-whatsapp`,
     data,
   );
-  if (response?.status === 200) {
+  if (response?.status === 200 && response?.data?.status === "success") {
     toast.success(
       response.data.message || "WhatsApp message sent successfully",
     );
     return response.data;
-  } else {
-    toast.error(response.data.message || "Failed to send WhatsApp message");
-    throw new Error(response.data.message || "Failed to send WhatsApp message");
   }
+
+  if (response?.status === 200 && response?.data?.status === "error") {
+    const errorMessage =
+      response.data.message || "Failed to send WhatsApp message";
+    toast.error(errorMessage);
+    // Important: callers rely on throwing to avoid optimistic UI updates.
+    throw new Error(errorMessage);
+  }
+
+  toast.error(
+    response?.data?.message || "Failed to send WhatsApp message",
+  );
+  throw new Error(
+    response?.data?.message || "Failed to send WhatsApp message",
+  );
 };
 
 /**

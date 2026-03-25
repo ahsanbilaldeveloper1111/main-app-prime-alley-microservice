@@ -1107,6 +1107,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       };
       setWhatsappMessages(Array.isArray(data?.messages) ? data.messages : []);
       setWhatsappChatWindowInfo(data?.chat ?? null);
+    } catch {
+      // sendWhatsApp already shows toast on error; keep existing UI/message.
     } finally {
       setWhatsappReplySendLoading(false);
     }
@@ -1332,7 +1334,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   }}
                 >
                   {activity.auditEvent === "created" && (
-                    <>{activity.auditDescription ?? activity.description}</>
+                    <>{activity.auditDescription ?? activity.description} </>
                   )}
                   {activity.auditEvent === "updated" && (
                     <>
