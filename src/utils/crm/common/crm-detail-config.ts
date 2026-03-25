@@ -1,4 +1,4 @@
-import type { CrmDetailPageLayoutConfig } from "@pages/crm/common/crm-detail-layout";
+import type { CrmDetailPageLayoutConfig } from "@utils/crm/common/crm-detail-layout";
 
 type SupportedCrmDetailType = Extract<
   CrmDetailPageLayoutConfig["recordType"],
@@ -6,7 +6,7 @@ type SupportedCrmDetailType = Extract<
 >;
 
 type CrmDetailStaticConfig = Pick<
-  CrmDetailPageLayoutConfig,
+  CrmDetailPageLayoutConfig,  
   | "breadcrumbLabel"
   | "listPath"
   | "loadingMessage"
