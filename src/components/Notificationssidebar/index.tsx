@@ -161,7 +161,7 @@ function mapContextToNotification(item: NotificationItem, trashedIds: Set<string
     trashed: trashedIds.has(item.id),
     type: deriveType(item),
     action: data?.action,
-    target_id: data?.target_id != null ? String(data.target_id) : undefined,
+    target_id: data?.target_id == null ? undefined : String(data.target_id),
     target_type: data?.target_type,
     module: data?.module ?? item.module,
     source_service: data?.source_service,
@@ -208,7 +208,7 @@ function mapApiRowToNotification(row: ApiNotificationRow): Notification {
     trashed: false,
     type: deriveTypeFromApiRow(row),
     action: row.action,
-    target_id: row.target_id != null ? String(row.target_id) : undefined,
+    target_id: row.target_id == null ? undefined : String(row.target_id),
     target_type: row.target_type,
     module: row.module,
     source_service: row.source_service,
@@ -374,7 +374,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     const map = new Map<string, string>();
     Object.entries(extensionNameLookup).forEach(([extNumber, name]) => {
       const key = String(extNumber || '').trim();
-      const userName = String(name || '').trim();
+      const userName = typeof name === 'string' ? name.trim() : '';
       if (key && userName) map.set(key, userName);
     });
     return map;
@@ -828,8 +828,9 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     const markBusy = isRowActionLoading('mark-read', notif.id);
     const deleteBusy = isRowActionLoading('delete', notif.id);
 
-    const markHoverProps = !isBusy
-      ? {
+    const markHoverProps = isBusy
+      ? {}
+      : {
           onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = '#f0f0f0';
             e.currentTarget.style.color = '#141414';
@@ -838,11 +839,11 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = '#718096';
           },
-        }
-      : {};
+        };
 
-    const deleteHoverProps = !isBusy
-      ? {
+    const deleteHoverProps = isBusy
+      ? {}
+      : {
           onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
             e.currentTarget.style.backgroundColor = '#fff0f0';
             e.currentTarget.style.color = '#e53e3e';
@@ -851,8 +852,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             e.currentTarget.style.backgroundColor = 'transparent';
             e.currentTarget.style.color = '#718096';
           },
-        }
-      : {};
+        };
 
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -924,18 +924,18 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
         position: 'relative',
       }}
       onMouseEnter={
-        !isSelected
-          ? (e) => {
+        isSelected
+          ? undefined
+          : (e) => {
               e.currentTarget.style.backgroundColor = '#fafafa';
             }
-          : undefined
       }
       onMouseLeave={
-        !isSelected
-          ? (e) => {
+        isSelected
+          ? undefined
+          : (e) => {
               e.currentTarget.style.backgroundColor = '#ffffff';
             }
-          : undefined
       }
     >
       {/* Checkbox */}
@@ -1295,14 +1295,14 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
                   onClick={() => { setTargetFilter(''); setShowTargetMenu(false); }}
                   style={{
                     ...DROPDOWN_OPTION_BASE_STYLE,
-                    fontWeight: !targetFilter ? '600' : '400',
-                    backgroundColor: !targetFilter ? '#f5f8fa' : 'transparent',
+                    fontWeight: targetFilter ? '400' : '600',
+                    backgroundColor: targetFilter ? 'transparent' : '#f5f8fa',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = !targetFilter ? '#f5f8fa' : 'transparent')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = targetFilter ? 'transparent' : '#f5f8fa')}
                 >
                   All
-                  {!targetFilter && <Check size={13} strokeWidth={2.5} />}
+                  {targetFilter ? null : <Check size={13} strokeWidth={2.5} />}
                 </button>
                 {visibleTargetTypes.map((t) => {
                   const isSelected = targetFilter === t.slug;
