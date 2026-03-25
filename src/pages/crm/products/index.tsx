@@ -22,7 +22,6 @@ import {
   Col,
   Badge,
   Form,
-  Card,
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -63,6 +62,45 @@ interface ProductDisplayData {
 
 const ProductsPage = () => {
   const { data: session } = useSession();
+
+  const getErrorMessageFromUnknown = (error: unknown, fallback: string): string => {
+    if (error && typeof error === "object") {
+      const ax = error as { response?: { data?: { message?: string } }; message?: string };
+      const msg = ax.response?.data?.message;
+      if (typeof msg === "string" && msg.length > 0) return msg;
+      if (typeof ax.message === "string" && ax.message.length > 0) return ax.message;
+    }
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
+  };
+
+  const handleHoverEnter = (
+    e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
+  ) => {
+    e.currentTarget.style.background = "#e5e7eb";
+    e.currentTarget.style.transform = "translateY(-2px)";
+  };
+
+  const handleHoverLeave = (
+    e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
+  ) => {
+    e.currentTarget.style.background = "#f8f9fa";
+    e.currentTarget.style.transform = "translateY(0)";
+  };
+
+  const handleCloseButtonEnter = (
+    e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+  ) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.3)";
+    e.currentTarget.style.transform = "rotate(90deg)";
+  };
+
+  const handleCloseButtonLeave = (
+    e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+  ) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+    e.currentTarget.style.transform = "rotate(0deg)";
+  };
 
   // State
   const [products, setProducts] = useState<CrmProduct[]>([]);
@@ -156,7 +194,7 @@ const ProductsPage = () => {
       const response = await getIndustries({ per_page: 1000 });
       setIndustries(response.data);
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to load industries"));
     } finally {
       setLoadingIndustries(false);
     }
@@ -171,12 +209,15 @@ const ProductsPage = () => {
     // Normalize industry_id: convert string to number if needed
     const rawIndustryId =
       (product as any).industry_id || (product as any).industry?.id || null;
-    const normalizedIndustryId =
-      rawIndustryId !== null
-        ? typeof rawIndustryId === "string"
-          ? Number.parseInt(rawIndustryId, 10)
-          : rawIndustryId
-        : null;
+    let normalizedIndustryId: number | null = null;
+    if (rawIndustryId !== null) {
+      if (typeof rawIndustryId === "string") {
+        const parsed = Number.parseInt(rawIndustryId, 10);
+        normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
+      } else {
+        normalizedIndustryId = rawIndustryId;
+      }
+    }
 
     return {
       id: product.id,
@@ -269,17 +310,17 @@ const ProductsPage = () => {
     return Array.from(categories).sort((a, b) => a.localeCompare(b));
   }, [products]);
 
-  const uniqueBrands = useMemo(() => {
-    const brands = new Set<string>();
-    products.forEach((p) => {
-      if (p.brand) brands.add(p.brand);
-    });
-    return Array.from(brands).sort((a, b) => a.localeCompare(b));
-  }, [products]);
-
   const industryFilterDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "240px" }} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{ minWidth: "240px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+        }}
+      >
         <Select
           options={industries.map((ind) => ({
             value: ind.id,
@@ -316,7 +357,15 @@ const ProductsPage = () => {
 
   const categoryFilterDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "240px" }} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{ minWidth: "240px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+        }}
+      >
         <CreatableSelect
           options={uniqueCategories.map((cat) => ({
             value: cat,
@@ -348,7 +397,15 @@ const ProductsPage = () => {
 
   const statusFilterDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "220px" }} onClick={(e) => e.stopPropagation()}>
+      <div
+        style={{ minWidth: "220px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+        }}
+      >
         <Select
           options={[
             { value: "Active", label: "Active" },
@@ -394,17 +451,17 @@ const ProductsPage = () => {
         showDropdown: true,
         active: Boolean(productsFilters.industry_id),
         activeLabel:
-          productsFilters.industry_id != null
-            ? industries.find((ind) => ind.id === productsFilters.industry_id)?.name ||
-              String(productsFilters.industry_id)
-            : undefined,
+          productsFilters.industry_id === null
+            ? undefined
+            : industries.find((ind) => ind.id === productsFilters.industry_id)?.name ||
+              String(productsFilters.industry_id),
         onClear:
-          productsFilters.industry_id != null
-            ? () => {
+          productsFilters.industry_id === null
+            ? undefined
+            : () => {
                 setProductsFilters((prev) => ({ ...prev, industry_id: null }));
                 setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
-              }
-            : undefined,
+              },
         dropdownContent: industryFilterDropdownContent,
       },
       {
@@ -695,12 +752,15 @@ const ProductsPage = () => {
       setEditingProduct(product);
       // Convert industry_id to number if it's a string (API sometimes returns string)
       const industryId = product.industry_id || product.industry?.id || null;
-      const normalizedIndustryId =
-        industryId !== null
-          ? typeof industryId === "string"
-            ? Number.parseInt(industryId, 10)
-            : industryId
-          : null;
+      let normalizedIndustryId: number | null = null;
+      if (industryId !== null) {
+        if (typeof industryId === "string") {
+          const parsed = Number.parseInt(industryId, 10);
+          normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
+        } else {
+          normalizedIndustryId = industryId;
+        }
+      }
 
       setProductFormData({
         productName: product.productName,
@@ -774,7 +834,7 @@ const ProductsPage = () => {
       // Refresh products after create/update
       await fetchProducts();
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to save product"));
     }
   };
 
@@ -787,7 +847,7 @@ const ProductsPage = () => {
       // Refresh products after delete
       await fetchProducts();
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to delete product"));
     }
   };
 
@@ -972,9 +1032,18 @@ const ProductsPage = () => {
                         setProductFormData({
                           ...productFormData,
                           industry_id: selected
-                            ? typeof selected.value === "string"
-                              ? Number.parseInt(selected.value, 10)
-                              : selected.value
+                            ? (() => {
+                                if (typeof selected.value === "string") {
+                                  const parsed = Number.parseInt(
+                                    selected.value,
+                                    10,
+                                  );
+                                  return Number.isNaN(parsed)
+                                    ? null
+                                    : parsed;
+                                }
+                                return selected.value;
+                              })()
                             : null,
                         })
                       }
@@ -1144,14 +1213,10 @@ const ProductsPage = () => {
                   alignItems: "center",
                   justifyContent: "center",
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.3)";
-                  e.currentTarget.style.transform = "rotate(90deg)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                  e.currentTarget.style.transform = "rotate(0deg)";
-                }}
+                onMouseOver={handleCloseButtonEnter}
+                onMouseOut={handleCloseButtonLeave}
+                onFocus={handleCloseButtonEnter}
+                onBlur={handleCloseButtonLeave}
               >
                 <X size={20} />
               </button>
@@ -1198,13 +1263,14 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
                   }}
                 >
                   <div
@@ -1237,14 +1303,15 @@ const ProductsPage = () => {
                       borderRadius: "10px",
                       transition: "all 0.3s",
                     }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
+                    onMouseOver={handleHoverEnter}
+                    onMouseOut={handleHoverLeave}
+                    onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
+                  }}
                   >
                     <div
                       style={{
@@ -1287,13 +1354,14 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
                   }}
                 >
                   <div
@@ -1332,14 +1400,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1370,14 +1434,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1408,14 +1468,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1460,14 +1516,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1529,14 +1581,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1573,14 +1621,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1709,8 +1753,8 @@ const ProductsPage = () => {
               "actions",
             ]}
             onColumnChange={(cols) => {
-              const allowed = availableColumns.map((c) => c.key);
-              const filtered = cols.filter((c) => allowed.includes(c));
+              const allowed = new Set(availableColumns.map((c) => c.key));
+              const filtered = cols.filter((c) => allowed.has(c));
               setSelectedProductsColumns(filtered);
               localStorage.setItem("productsSelectedColumns", JSON.stringify(filtered));
             }}

@@ -19,13 +19,13 @@ import {
   uploadCrmDataCsv,
   getCrmDataTags,
   getCrmDataCounts,
-  assignCrmDataAdvanced,
   downloadExampleCsv,
   getIndustries,
   getDealTemplates,
   IndustryData,
   DealTemplateData,
 } from "@utils/crm";
+import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import {
   Button,
   Modal,
@@ -35,51 +35,29 @@ import {
   Form,
   Card,
   Alert,
-  Table,
-  Dropdown,
-  InputGroup,
 } from "react-bootstrap";
-import {
-  FiEdit,
-  FiTrash2,
-  FiEye,
-  FiPlus,
-  FiCalendar,
-  FiFilter,
-  FiDatabase,
-  FiUsers,
-} from "react-icons/fi";
+import { FiTrash2 } from "react-icons/fi";
 import {
   X,
   FileText,
   Megaphone,
   Users,
-  Search,
   Filter,
   BarChart3,
   TrendingUp,
   AlertCircle,
   Target,
-  Layers,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown,
   Edit,
   Eye,
   Trash2,
   Calendar,
-  User,
   Download,
   AlertCircle as AlertCircleIcon,
   Hash,
   Briefcase,
-  RefreshCw,
   UserPlus,
-  Building2,
   Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -89,26 +67,721 @@ import { GetHierarchyData } from "@utils/users";
 import axiosInstance from "@utils/axios";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-} from "recharts";
 
-import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import moment from "moment";
+
+function consumeHandledApiError(error: unknown, source: string): void {
+  reportApiErrorFromCatch(error, source, { scope: "CrmCampaigns" });
+}
+
+/** Strict-safe match when API returns string | number for extension ids */
+function sameExtensionId(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  return String(a) === String(b);
+}
+
+function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
+  if (error && typeof error === "object") {
+    const ax = error as { response?: { data?: { message?: string } }; message?: string };
+    const msg = ax.response?.data?.message;
+    if (typeof msg === "string" && msg.length > 0) return msg;
+    if (typeof ax.message === "string" && ax.message.length > 0) return ax.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+function laterCalendarIsoDate(isoDayA: string, isoDayB: string): string {
+  const msA = new Date(`${isoDayA}T12:00:00`).getTime();
+  const msB = new Date(`${isoDayB}T12:00:00`).getTime();
+  return new Date(Math.max(msA, msB)).toISOString().split("T")[0];
+}
+
+function toastCrmCsvUploadOutcome(processedCount: number, validationFailureCount: number): void {
+  const recordLabel = processedCount === 1 ? "record" : "records";
+  const failureLabel = validationFailureCount === 1 ? "failure" : "failures";
+
+  if (processedCount > 0) {
+    let msg = `Successfully processed ${processedCount} ${recordLabel}`;
+    if (validationFailureCount > 0) {
+      msg += ` with ${validationFailureCount} validation ${failureLabel}`;
+    }
+    if (validationFailureCount > 0) {
+      toast.warn(msg);
+    } else {
+      toast.success(msg);
+    }
+    return;
+  }
+
+  if (validationFailureCount > 0) {
+    const allLabel = validationFailureCount === 1 ? "record" : "records";
+    toast.error(`Upload failed: All ${validationFailureCount} ${allLabel} failed validation`);
+    return;
+  }
+
+  toast.error("Upload completed but no records were processed");
+}
+
+type AssignmentTagOption = { value: string; label: string; id: number };
+
+type AssignmentBuildResult =
+  | { ok: true; payload: Record<string, unknown> }
+  | { ok: false; message: string };
+
+function buildCrmDataAssignmentPayload(args: {
+  assignmentTargetType: "campaigns" | "users";
+  recordsToAssign: number;
+  includeAssignedRecords: boolean;
+  assignmentFilterCampaigns: string[];
+  assignmentFilterTags: readonly any[];
+  availableTags: AssignmentTagOption[];
+  assignToCampaigns: string[];
+  availableCampaignsForUpload: Array<{ value: string; label: string; id: number }>;
+  distributionMode: string;
+  customDistribution: Record<string, number>;
+  selectedUserExtensions: readonly any[];
+}): AssignmentBuildResult {
+  const {
+    assignmentTargetType,
+    recordsToAssign,
+    includeAssignedRecords,
+    assignmentFilterCampaigns,
+    assignmentFilterTags,
+    availableTags,
+    assignToCampaigns,
+    availableCampaignsForUpload,
+    distributionMode,
+    customDistribution,
+    selectedUserExtensions,
+  } = args;
+
+  const campaignFilterIds = assignmentFilterCampaigns
+    .map((c) => Number.parseInt(c, 10))
+    .filter((id) => !Number.isNaN(id) && id > 0);
+
+  const tagIds = assignmentFilterTags
+    .map((tag) => {
+      const t = availableTags.find((at) => at.value === (tag.value || tag));
+      return t ? t.id : 0;
+    })
+    .filter((id) => id > 0);
+
+  const payload: Record<string, unknown> = {
+    count: recordsToAssign,
+    include_assigned: includeAssignedRecords,
+  };
+
+  if (campaignFilterIds.length > 0) payload.campaign_filter_ids = campaignFilterIds;
+  if (tagIds.length > 0) payload.tag_ids = tagIds;
+
+  if (assignmentTargetType === "campaigns") {
+    const targetCampaignIds = assignToCampaigns
+      .map((c) => {
+        const camp = availableCampaignsForUpload.find((ac) => ac.label === c);
+        return camp ? Number.parseInt(camp.value, 10) : 0;
+      })
+      .filter((id) => id > 0);
+
+    if (targetCampaignIds.length === 0) {
+      return { ok: false, message: "Please select valid campaigns" };
+    }
+
+    payload.campaign_ids = targetCampaignIds;
+    payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
+
+    if (distributionMode === "custom") {
+      const dist: Record<number, number> = {};
+      Object.entries(customDistribution).forEach(([v, count]) => {
+        const id = Number.parseInt(v, 10);
+        if (id > 0 && count > 0) dist[id] = count;
+      });
+      payload.campaign_distribution = dist;
+    }
+
+    return { ok: true, payload };
+  }
+
+  const extensionArray = selectedUserExtensions
+    .map(
+      (ext) =>
+        ext.value ||
+        ext.extension?.id?.toString() ||
+        ext.extension?.extension?.toString() ||
+        "",
+    )
+    .filter((e) => e.length > 0);
+
+  if (extensionArray.length === 0) {
+    return { ok: false, message: "Please select valid users" };
+  }
+
+  payload.custom_extensions = extensionArray;
+  return { ok: true, payload };
+}
+
+function campaignFieldRowKey(
+  field: { id?: unknown; field_name?: string; field_type?: string; sort_order?: number },
+  index: number,
+): string {
+  if (field.id != null && field.id !== "") {
+    return `campaign-field-${String(field.id)}`;
+  }
+  return `campaign-field-new-${field.field_name ?? "unnamed"}-${field.field_type ?? "na"}-${field.sort_order ?? index}-${index}`;
+}
+
+function campaignFieldOptionKey(fieldName: string, option: string, optionIndex: number): string {
+  return `opt-${fieldName}-${optionIndex}-${option.length}-${option.slice(0, 48)}`;
+}
+
+function viewModalDateRangeText(selected: { start_date?: string; end_date?: string }): string {
+  if (selected.start_date && selected.end_date) {
+    return `${new Date(selected.start_date).toLocaleDateString()} - ${new Date(selected.end_date).toLocaleDateString()}`;
+  }
+  if (selected.start_date) {
+    return `Starts: ${new Date(selected.start_date).toLocaleDateString()}`;
+  }
+  return "Not set";
+}
+
+function campaignFormSubmitButtonLabel(loading: boolean, isEdit: boolean): string {
+  if (loading) return "Saving...";
+  if (isEdit) return "Update Campaign";
+  return "Create Campaign";
+}
+
+function deriveEditorStateFromCampaignApi(
+  campaignData: any,
+  extensions: any[],
+  industries: IndustryData[],
+  dealTemplates: DealTemplateData[],
+): {
+  formData: {
+    name: string;
+    description: string;
+    start_date: string;
+    end_date: string;
+    status: string;
+    options: Record<string, any>;
+  };
+  campaignFields: any[];
+  campaignUsers: readonly any[];
+  selectedIndustries: readonly any[];
+  selectedDealTemplate: any;
+} {
+  const formData = {
+    name: campaignData.name || "",
+    description: campaignData.description || "",
+    start_date: campaignData.start_date ? campaignData.start_date.split("T")[0] : "",
+    end_date: campaignData.end_date ? campaignData.end_date.split("T")[0] : "",
+    status: campaignData.status || "active",
+    options: campaignData.options || {},
+  };
+  const campaignFields = campaignData.fields || [];
+
+  const campaignUsers: readonly any[] = campaignData.user_extensions?.length
+    ? campaignData.user_extensions.map((ue: { user_extension: unknown }) => {
+        const extension = extensions.find((ext) => sameExtensionId(ext.id, ue.user_extension));
+        return {
+          value: ue.user_extension,
+          label: extension?.display_name || extension?.name || String(ue.user_extension),
+        };
+      })
+    : [];
+
+  const industriesData = campaignData.industries;
+  const industryIds = campaignData.industry_ids;
+  let selectedIndustries: readonly any[] = [];
+  if (industriesData?.length) {
+    selectedIndustries = industriesData.map((ind: any) => ({
+      value: ind.id.toString(),
+      label: ind.name || `Industry ${ind.id}`,
+      id: ind.id,
+    }));
+  } else if (industryIds?.length) {
+    selectedIndustries = industryIds.map((id: number) => {
+      const industry = industries.find((ind) => ind.id === id);
+      return { value: id.toString(), label: industry?.name || `Industry ${id}`, id };
+    });
+  }
+
+  const dealTemplateData = campaignData.deal_template;
+  const dealTemplateId = campaignData.deal_template_id;
+  let selectedDealTemplate: any = null;
+  if (dealTemplateData?.id) {
+    selectedDealTemplate = {
+      value: dealTemplateData.id.toString(),
+      label: dealTemplateData.name || `Deal Template ${dealTemplateData.id}`,
+      id: dealTemplateData.id,
+    };
+  } else if (dealTemplateId) {
+    const dt = dealTemplates.find((d) => d.id === Number.parseInt(dealTemplateId.toString(), 10));
+    selectedDealTemplate = {
+      value: dealTemplateId.toString(),
+      label: dt?.name || `Deal Template ${dealTemplateId}`,
+      id: Number.parseInt(dealTemplateId.toString(), 10),
+    };
+  }
+
+  return {
+    formData,
+    campaignFields,
+    campaignUsers,
+    selectedIndustries,
+    selectedDealTemplate,
+  };
+}
+
+function buildCrmCampaignListFilters(
+  activeFilter: string,
+  campaignFilters: {
+    status: string[];
+    dateFrom: string | null;
+    dateTo: string | null;
+    userExtensions: string[] | null;
+    hasUnassignedProspects: boolean | null;
+    tags: string[] | null;
+  },
+  memoizedFilters: Record<string, any>,
+): Record<string, any> {
+  let statusFilter: string[] = [];
+  if (activeFilter === "active") statusFilter = ["active"];
+  else if (activeFilter === "inactive") statusFilter = ["inactive"];
+  const combinedStatus = campaignFilters.status.length > 0 ? campaignFilters.status : statusFilter;
+  const filters: Record<string, any> = { ...memoizedFilters };
+  if (combinedStatus.length > 0) filters.status = combinedStatus.length === 1 ? combinedStatus[0] : combinedStatus;
+  if (campaignFilters.dateFrom) filters.date_from = campaignFilters.dateFrom;
+  if (campaignFilters.dateTo) filters.date_to = campaignFilters.dateTo;
+  if (campaignFilters.userExtensions?.length) filters.user_extensions = campaignFilters.userExtensions;
+  if (campaignFilters.hasUnassignedProspects !== null) {
+    filters.has_unassigned_prospects = campaignFilters.hasUnassignedProspects;
+  }
+  if (campaignFilters.tags?.length) filters.tags = campaignFilters.tags;
+  return filters;
+}
+
+function createCustomDistributionAmountChangeHandler(
+  campaignValueKey: string,
+  recordsToAssign: number,
+  handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void,
+  setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+): (value: string) => void {
+  return (value: string) => {
+    handleNumberChange(value, recordsToAssign, (v) =>
+      setCustomDistribution((prev) => ({ ...prev, [campaignValueKey]: v })),
+    );
+  };
+}
+
+function validateCampaignFormBeforeSave(
+  formData: {
+    name: string;
+    description: string;
+    start_date: string;
+    end_date: string;
+    status: string;
+    options: Record<string, any>;
+  },
+  showEditModal: boolean,
+  getTodayDate: () => string,
+): boolean {
+  const requiredFields: Array<{ field: keyof typeof formData; name: string; required: boolean }> = [
+    { field: "name", name: "Campaign Name", required: true },
+    { field: "start_date", name: "Start Date", required: true },
+    { field: "end_date", name: "End Date", required: true },
+  ];
+  if (!checkRequiredFields(formData, requiredFields)) return false;
+  const today = getTodayDate();
+  if (!showEditModal) {
+    if (formData.start_date && formData.start_date < today) {
+      toast.error("Start date must be today or a future date");
+      return false;
+    }
+    if (formData.end_date && formData.end_date < today) {
+      toast.error("End date must be today or a future date");
+      return false;
+    }
+  }
+  if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
+    toast.error("End date must be after start date");
+    return false;
+  }
+  return true;
+}
+
+function buildCampaignSavePayload(
+  formData: {
+    name: string;
+    description: string;
+    start_date: string;
+    end_date: string;
+    status: string;
+    options: Record<string, any>;
+  },
+  campaignFields: any[],
+  campaignUsers: readonly any[],
+  selectedIndustries: readonly any[],
+  selectedDealTemplate: any,
+): Record<string, unknown> {
+  const cleanedFields = campaignFields.map((field) => {
+    if (field.field_type === "dropdown" && field.field_options) {
+      return { ...field, field_options: field.field_options.filter((opt: string) => opt.trim() !== "") };
+    }
+    return field;
+  });
+  return {
+    ...formData,
+    name: formData.name.trim(),
+    description: formData.description.trim() || null,
+    start_date: formData.start_date || undefined,
+    end_date: formData.end_date || undefined,
+    status: formData.status as "active" | "inactive",
+    fields: cleanedFields,
+    campaign_users: campaignUsers.map((user) => user.value),
+    industry_ids: selectedIndustries.map((ind: any) => Number.parseInt(String(ind.value || ind.id), 10)),
+    deal_template_id: selectedDealTemplate
+      ? Number.parseInt(String(selectedDealTemplate.value || selectedDealTemplate.id), 10)
+      : undefined,
+  };
+}
+
+function getFieldTypeText(fieldType: string): string {
+  switch (fieldType.toLowerCase()) {
+    case "string":
+      return "Text";
+    case "integer":
+      return "Number";
+    case "date":
+      return "Date";
+    case "email":
+      return "Email";
+    case "dropdown":
+      return "Dropdown";
+    default:
+      return fieldType;
+  }
+}
+
+const CRM_CAMPAIGNS_SELECT_STYLES = {
+  control: (provided: any, state: any) => ({
+    ...provided,
+    minHeight: "38px",
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
+    boxShadow: state.isFocused ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)" : "none",
+    "&:hover": { borderColor: "#86b7fe" },
+  }),
+  multiValue: (provided: any) => ({
+    ...provided,
+    backgroundColor: "#0d6efd",
+    color: "white",
+    fontSize: "0.813rem",
+  }),
+  multiValueLabel: (provided: any) => ({ ...provided, color: "white", padding: "2px 6px" }),
+  multiValueRemove: (provided: any) => ({
+    ...provided,
+    color: "white",
+    "&:hover": { backgroundColor: "#0b5ed7", color: "white" },
+  }),
+  menu: (provided: any) => ({ ...provided, fontSize: "0.875rem" }),
+};
+
+type ToolbarFactoryArgs = {
+  campaignsSearch: string;
+  setCampaignsSearch: (v: string) => void;
+  handleFiltersChange: (filters: Record<string, any>) => void;
+  setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" }>>;
+  setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
+  filterCounts: { all: number; active: number; inactive: number };
+  activeFilter: string;
+  setActiveFilter: (v: string) => void;
+  setCampaignFilters: React.Dispatch<React.SetStateAction<{
+    status: string[];
+    dateFrom: string | null;
+    dateTo: string | null;
+    userExtensions: string[] | null;
+    hasUnassignedProspects: boolean | null;
+    tags: string[] | null;
+  }>>;
+  campaignFilters: {
+    status: string[];
+    dateFrom: string | null;
+    dateTo: string | null;
+    userExtensions: string[] | null;
+    hasUnassignedProspects: boolean | null;
+    tags: string[] | null;
+  };
+  extensions: any[];
+  showCampaignsAnalytics: boolean;
+  setShowCampaignsAnalytics: React.Dispatch<React.SetStateAction<boolean>>;
+  session: { user?: { permissions?: string[] } } | null;
+  handleDataAssignment: () => Promise<void>;
+  handleCreateCampaign: () => void;
+  onOpenUploadModal: () => void;
+};
+
+function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
+  return {
+    showSearch: true,
+    searchValue: a.campaignsSearch,
+    searchPlaceholder: "Search campaigns by name, description...",
+    onSearchChange: (value) => {
+      a.setCampaignsSearch(value);
+    },
+    onSearch: () => {
+      a.handleFiltersChange({ search: a.campaignsSearch });
+      a.setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      a.setRefreshKey((prev) => prev + 1);
+    },
+    showTabs: true,
+    tabs: [
+      { id: "all", label: "All Campaigns", count: a.filterCounts.all, removable: false },
+      { id: "active", label: "Active", count: a.filterCounts.active, removable: false },
+      { id: "inactive", label: "Inactive", count: a.filterCounts.inactive, removable: false },
+      { id: "assigned", label: "Assigned Records", removable: false },
+      { id: "unassigned", label: "Unassigned Records", removable: false },
+    ],
+    activeTab: a.activeFilter,
+    onTabChange: (tabId) => {
+      a.setActiveFilter(tabId);
+      if (tabId === "assigned") {
+        a.setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: false }));
+      } else if (tabId === "unassigned") {
+        a.setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: true }));
+      } else {
+        a.setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: null }));
+      }
+      a.setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      a.setRefreshKey((prev) => prev + 1);
+    },
+    showFiltersButton: true,
+    showFilterPills: false,
+    filterPills: [
+      {
+        id: "status",
+        label: "Status",
+        showDropdown: true,
+        active: a.campaignFilters.status.length > 0,
+        activeLabel: a.campaignFilters.status.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(", "),
+        onClear: () => {
+          a.setCampaignFilters((prev) => ({ ...prev, status: [] }));
+          a.setActiveFilter("all");
+          a.setRefreshKey((prev) => prev + 1);
+        },
+        dropdownOptions: [
+          {
+            label: "Active",
+            value: "active",
+            onClick: () => {
+              a.setCampaignFilters((prev) => ({ ...prev, status: ["active"] }));
+              a.setActiveFilter("all");
+              a.setRefreshKey((prev) => prev + 1);
+            },
+          },
+          {
+            label: "Inactive",
+            value: "inactive",
+            onClick: () => {
+              a.setCampaignFilters((prev) => ({ ...prev, status: ["inactive"] }));
+              a.setActiveFilter("all");
+              a.setRefreshKey((prev) => prev + 1);
+            },
+          },
+          {
+            label: "All",
+            value: "",
+            onClick: () => {
+              a.setCampaignFilters((prev) => ({ ...prev, status: [] }));
+              a.setActiveFilter("all");
+              a.setRefreshKey((prev) => prev + 1);
+            },
+          },
+        ],
+      },
+      {
+        id: "dateFrom",
+        label: "Date From",
+        showDropdown: true,
+        active: !!a.campaignFilters.dateFrom,
+        activeLabel: a.campaignFilters.dateFrom
+          ? new Date(a.campaignFilters.dateFrom).toLocaleDateString()
+          : undefined,
+        onClear: () => {
+          a.setCampaignFilters((prev) => ({ ...prev, dateFrom: null }));
+          a.handleFiltersChange({ date_from: null });
+        },
+        dropdownContent: (
+          <Form.Group style={{ minWidth: "200px" }}>
+            <Form.Label className="small fw-bold">Date From</Form.Label>
+            <Form.Control
+              type="date"
+              value={a.campaignFilters.dateFrom || ""}
+              onChange={(e) => {
+                const v = e.target.value || null;
+                a.setCampaignFilters((prev) => ({ ...prev, dateFrom: v }));
+                a.handleFiltersChange({ date_from: v || null });
+              }}
+            />
+          </Form.Group>
+        ),
+      },
+      {
+        id: "dateTo",
+        label: "Date To",
+        showDropdown: true,
+        active: !!a.campaignFilters.dateTo,
+        activeLabel: a.campaignFilters.dateTo
+          ? new Date(a.campaignFilters.dateTo).toLocaleDateString()
+          : undefined,
+        onClear: () => {
+          a.setCampaignFilters((prev) => ({ ...prev, dateTo: null }));
+          a.handleFiltersChange({ date_to: null });
+        },
+        dropdownContent: (
+          <Form.Group style={{ minWidth: "200px" }}>
+            <Form.Label className="small fw-bold">Date To</Form.Label>
+            <Form.Control
+              type="date"
+              value={a.campaignFilters.dateTo || ""}
+              onChange={(e) => {
+                const v = e.target.value || null;
+                a.setCampaignFilters((prev) => ({ ...prev, dateTo: v }));
+                a.handleFiltersChange({ date_to: v || null });
+              }}
+            />
+          </Form.Group>
+        ),
+      },
+      {
+        id: "users",
+        label: "Campaign Users",
+        showDropdown: true,
+        active: !!a.campaignFilters.userExtensions?.length,
+        activeLabel: a.campaignFilters.userExtensions?.length
+          ? `${a.campaignFilters.userExtensions.length} selected`
+          : undefined,
+        onClear: () => {
+          a.setCampaignFilters((prev) => ({ ...prev, userExtensions: null }));
+          a.handleFiltersChange({ user_extensions: null });
+        },
+        dropdownContent: (
+          <div style={{ minWidth: "260px" }}>
+            <Form.Label className="small fw-bold mb-2">Campaign Users</Form.Label>
+            <Select
+              isMulti
+              options={a.extensions.map((ext: any) => ({
+                value: ext.id,
+                label: ext.display_name || ext.name || ext.id,
+              }))}
+              value={
+                a.campaignFilters.userExtensions?.map((extId: string) => {
+                  const ext = a.extensions.find((e: { id?: unknown }) => sameExtensionId(e.id, extId));
+                  return { value: extId, label: ext?.display_name || ext?.name || `Extension ${extId}` };
+                }) || []
+              }
+              onChange={(selected) => {
+                const vals = selected ? selected.map((s) => s.value) : null;
+                a.setCampaignFilters((prev) => ({ ...prev, userExtensions: vals }));
+                a.handleFiltersChange({ user_extensions: vals || null });
+              }}
+              placeholder="Select users..."
+              styles={CRM_CAMPAIGNS_SELECT_STYLES}
+            />
+          </div>
+        ),
+      },
+    ],
+    showMoreFiltersButton: false,
+    rightActions: (
+      <div className="d-flex gap-2">
+        <Button
+          variant={a.showCampaignsAnalytics ? "primary" : "light"}
+          onClick={() => a.setShowCampaignsAnalytics((open) => !open)}
+          style={{
+            border: "1px solid #dee2e6",
+            borderRadius: "8px",
+            color: a.showCampaignsAnalytics ? undefined : "#212529",
+            height: "33px",
+            fontSize: "0.875rem",
+            padding: "0 12px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <BarChart3 size={15} />
+          Analytics
+        </Button>
+        {a.session?.user?.permissions?.includes("add-crm-data-management") &&
+          a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+            <Button
+              variant="light"
+              onClick={a.onOpenUploadModal}
+              style={{
+                border: "1px solid #dee2e6",
+                borderRadius: "8px",
+                color: "#212529",
+                height: "33px",
+                fontSize: "0.875rem",
+                padding: "0 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <Download size={15} />
+              Import
+            </Button>
+          )}
+        {a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+          <Button
+            variant="light"
+            onClick={a.handleDataAssignment}
+            style={{
+              border: "1px solid #dee2e6",
+              borderRadius: "8px",
+              color: "#212529",
+              height: "33px",
+              fontSize: "0.875rem",
+              padding: "0 12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <Target size={15} />
+            Data Assignment
+          </Button>
+        )}
+        {a.session?.user?.permissions?.includes("add-crm-campaigns") && (
+          <Button
+            onClick={a.handleCreateCampaign}
+            style={{
+              backgroundColor: "#4f46e5",
+              border: "none",
+              borderRadius: "8px",
+              color: "#ffffff",
+              height: "33px",
+              fontSize: "0.875rem",
+              padding: "0 12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <Plus size={15} />
+            New Campaign
+          </Button>
+        )}
+      </div>
+    ),
+  };
+}
 
 // KPI Card Component
 interface KPICardData {
@@ -121,7 +794,7 @@ interface KPICardData {
   onClick?: () => void;
 }
 
-const KPICard: React.FC<KPICardData> = ({
+const KPICard: React.FC<Readonly<KPICardData>> = ({
   title,
   value,
   change,
@@ -130,6 +803,13 @@ const KPICard: React.FC<KPICardData> = ({
   color,
   onClick,
 }) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onClick) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick();
+    }
+  };
   return (
     <Card
       className={onClick ? "h-100" : ""}
@@ -138,6 +818,9 @@ const KPICard: React.FC<KPICardData> = ({
         transition: "all 0.2s ease",
         border: "1px solid #e9ecef",
       }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={handleKeyDown}
       onClick={onClick}
       onMouseEnter={(e) => {
         if (onClick) {
@@ -174,6 +857,277 @@ const KPICard: React.FC<KPICardData> = ({
   );
 };
 
+function CrmProportionalDistributionRows(
+  props: Readonly<{
+    assignToCampaigns: string[];
+    availableCampaignsForUpload: Array<{ value: string; label: string; id: number }>;
+    recordsToAssign: number;
+    customDistribution: Record<string, number>;
+    handleNumberKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+    handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void;
+    setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  }>,
+) {
+  return (
+    <>
+      {props.assignToCampaigns.map((c) => {
+        const opt = props.availableCampaignsForUpload.find((ac) => ac.label === c);
+        if (!opt) return null;
+        return (
+          <CustomDistributionAmountRow
+            key={opt.value}
+            label={c}
+            recordsToAssign={props.recordsToAssign}
+            amount={props.customDistribution[opt.value] || 0}
+            onKeyDown={props.handleNumberKeyDown}
+            onAmountChange={createCustomDistributionAmountChangeHandler(
+              opt.value,
+              props.recordsToAssign,
+              props.handleNumberChange,
+              props.setCustomDistribution,
+            )}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function CustomDistributionAmountRow({
+  label,
+  recordsToAssign,
+  amount,
+  onKeyDown,
+  onAmountChange,
+}: Readonly<{
+  label: string;
+  recordsToAssign: number;
+  amount: number;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onAmountChange: (value: string) => void;
+}>) {
+  return (
+    <div className="mb-2">
+      <Row>
+        <Col md={6}>
+          <Form.Label className="small mb-0">{label}</Form.Label>
+        </Col>
+        <Col md={6}>
+          <Form.Control
+            type="number"
+            min={0}
+            max={recordsToAssign}
+            value={amount}
+            onKeyDown={onKeyDown}
+            onChange={(e) => onAmountChange(e.target.value)}
+            size="sm"
+          />
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+function CrmAssignmentStatsRow({
+  assignmentCounts,
+}: Readonly<{
+  assignmentCounts: { total: number; assigned: number; unassigned: number };
+}>) {
+  const items = [
+    { label: "Total Records", value: assignmentCounts.total, icon: <Users size={28} className="text-success" />, bg: "success" },
+    { label: "Assigned", value: assignmentCounts.assigned, icon: <UserPlus size={28} className="text-primary" />, bg: "primary" },
+    { label: "Unassigned", value: assignmentCounts.unassigned, icon: <AlertCircle size={28} className="text-warning" />, bg: "warning" },
+  ];
+  return (
+    <Row className="g-3 align-items-center">
+      {items.map((item) => (
+        <Col key={item.label} md={4}>
+          <div className="d-flex align-items-center gap-3">
+            <div className={`p-3 bg-${item.bg} bg-opacity-10 rounded-3`}>{item.icon}</div>
+            <div>
+              <small className="text-muted d-block mb-1">{item.label}</small>
+              <strong className="fs-3 text-dark">{item.value.toLocaleString()}</strong>
+            </div>
+          </div>
+        </Col>
+      ))}
+    </Row>
+  );
+}
+
+function useCrmCampaignBootstrapData(
+  refreshKey: number,
+  setExtensions: React.Dispatch<React.SetStateAction<any[]>>,
+  setDataManagementExtensions: React.Dispatch<React.SetStateAction<any[]>>,
+  setAvailableTags: React.Dispatch<
+    React.SetStateAction<Array<{ value: string; label: string; id: number }>>
+  >,
+  setAvailableCampaignsForUpload: React.Dispatch<
+    React.SetStateAction<Array<{ value: string; label: string; id: number }>>
+  >,
+  setIndustries: React.Dispatch<React.SetStateAction<IndustryData[]>>,
+  setDealTemplates: React.Dispatch<React.SetStateAction<DealTemplateData[]>>,
+) {
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS);
+        setExtensions(hierarchyData?.extensions || []);
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "CrmCampaigns.fetchCrmExtensions");
+      }
+    };
+    void fetchExtensions();
+  }, [setExtensions]);
+
+  useEffect(() => {
+    const fetchDataManagementExtensions = async () => {
+      try {
+        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
+        setDataManagementExtensions(hierarchyData?.extensions || []);
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "CrmCampaigns.fetchDataManagementExtensions");
+      }
+    };
+    void fetchDataManagementExtensions();
+  }, [setDataManagementExtensions]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tags = await getCrmDataTags();
+        setAvailableTags(tags.map((tag) => ({ value: tag.name, label: tag.name, id: tag.id })));
+      } catch {
+        setAvailableTags([]);
+      }
+    };
+    void loadTags();
+  }, [refreshKey, setAvailableTags]);
+
+  useEffect(() => {
+    const loadCampaignOptions = async () => {
+      try {
+        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        setAvailableCampaignsForUpload(
+          campaignsResponse.data.map((campaign) => ({
+            value: campaign.id.toString(),
+            label: campaign.name,
+            id: campaign.id,
+          })),
+        );
+      } catch {
+        setAvailableCampaignsForUpload([]);
+      }
+    };
+    void loadCampaignOptions();
+  }, [refreshKey, setAvailableCampaignsForUpload]);
+
+  useEffect(() => {
+    const loadIndustries = async () => {
+      try {
+        const response = await getIndustries({ per_page: 1000 });
+        setIndustries(response.data || []);
+      } catch {
+        setIndustries([]);
+      }
+    };
+    void loadIndustries();
+  }, [setIndustries]);
+
+  useEffect(() => {
+    const loadDealTemplates = async () => {
+      try {
+        const response = await getDealTemplates({ per_page: 1000 });
+        setDealTemplates(response.data || []);
+      } catch {
+        setDealTemplates([]);
+      }
+    };
+    void loadDealTemplates();
+  }, [setDealTemplates]);
+}
+
+function useCrmCampaignListQueryEffect(
+  listPermission: boolean,
+  refreshKey: number,
+  campaignsPagination: { currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" },
+  memoizedFilters: Record<string, any>,
+  campaignFilters: {
+    status: string[];
+    dateFrom: string | null;
+    dateTo: string | null;
+    userExtensions: string[] | null;
+    hasUnassignedProspects: boolean | null;
+    tags: string[] | null;
+  },
+  activeFilter: string,
+  campaignsSearch: string,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>,
+  setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>,
+  setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>,
+) {
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        setLoading(true);
+        const filters = buildCrmCampaignListFilters(activeFilter, campaignFilters, memoizedFilters);
+        const response = await getCampaigns({
+          page: campaignsPagination.currentPage,
+          per_page: campaignsPagination.rowsPerPage,
+          search: memoizedFilters.search || campaignsSearch || undefined,
+          filters,
+          module_slug: ModuleSlug.CRM_CAMPAIGNS,
+        });
+
+        if (response?.data) {
+          setCampaignsData(response.data);
+          setMetrics(response.metrics);
+          setTotalCampaigns(response.total || response.data.length);
+        }
+      } catch (error: unknown) {
+        consumeHandledApiError(error, "CrmCampaigns.loadCampaigns");
+        toast.error("Failed to load campaigns");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (listPermission) {
+      void loadCampaigns();
+    }
+  }, [
+    listPermission,
+    refreshKey,
+    campaignsPagination,
+    memoizedFilters,
+    campaignFilters,
+    activeFilter,
+    campaignsSearch,
+  ]);
+}
+
+function useCrmAssignmentCountsRefetch(
+  showDataAssignmentModal: boolean,
+  assignmentFilterCampaigns: string[],
+  assignmentFilterTags: readonly any[],
+  calculateEntryCounts: () => Promise<{ total: number; assigned: number; unassigned: number }>,
+  setAssignmentCounts: React.Dispatch<
+    React.SetStateAction<{ total: number; assigned: number; unassigned: number }>
+  >,
+  setRecordsToAssign: React.Dispatch<React.SetStateAction<number>>,
+) {
+  useEffect(() => {
+    const refetchCounts = async () => {
+      if (!showDataAssignmentModal) return;
+      const counts = await calculateEntryCounts();
+      setAssignmentCounts(counts);
+      setRecordsToAssign((prev) => (prev === 0 || prev > counts.unassigned ? counts.unassigned : prev));
+    };
+    void refetchCounts();
+  }, [assignmentFilterCampaigns, assignmentFilterTags, calculateEntryCounts, showDataAssignmentModal, setAssignmentCounts, setRecordsToAssign]);
+}
+
 const CrmCampaigns = () => {
   const { data: session } = useSession();
 
@@ -188,7 +1142,6 @@ const CrmCampaigns = () => {
 
   // UI State
   const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [campaignsSearch, setCampaignsSearch] = useState("");
   const [campaignsPagination, setCampaignsPagination] = useState({
@@ -248,7 +1201,6 @@ const CrmCampaigns = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [uploadSelectedCampaigns, setUploadSelectedCampaigns] = useState<readonly any[]>([]);
   const [availableTags, setAvailableTags] = useState<Array<{ value: string; label: string; id: number }>>([]);
@@ -259,7 +1211,6 @@ const CrmCampaigns = () => {
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [assignmentFilterCampaigns, setAssignmentFilterCampaigns] = useState<string[]>([]);
   const [assignmentFilterTags, setAssignmentFilterTags] = useState<readonly any[]>([]);
-  const [assignmentType, setAssignmentType] = useState<string>("");
   const [assignmentTargetType, setAssignmentTargetType] = useState<"campaigns" | "users">("campaigns");
   const [distributionMode, setDistributionMode] = useState<string>("equal");
   const [selectedUserExtensions, setSelectedUserExtensions] = useState<readonly any[]>([]);
@@ -274,119 +1225,28 @@ const CrmCampaigns = () => {
   const [successModalDescription, setSuccessModalDescription] = useState("");
   const [assigningData, setAssigningData] = useState(false);
 
-  // Fetch extensions data
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_CAMPAIGNS);
-        setExtensions(hierarchyData?.extensions || []);
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
+  useCrmCampaignBootstrapData(
+    refreshKey,
+    setExtensions,
+    setDataManagementExtensions,
+    setAvailableTags,
+    setAvailableCampaignsForUpload,
+    setIndustries,
+    setDealTemplates,
+  );
 
-  useEffect(() => {
-    const fetchDataManagementExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT);
-        setDataManagementExtensions(hierarchyData?.extensions || []);
-      } catch (error) {
-        console.error("Failed to fetch data management extensions:", error);
-      }
-    };
-    fetchDataManagementExtensions();
-  }, []);
-
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        setAvailableTags(tags.map((tag) => ({ value: tag.name, label: tag.name, id: tag.id })));
-      } catch {
-        setAvailableTags([]);
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        setAvailableCampaignsForUpload(
-          campaignsResponse.data.map((campaign) => ({
-            value: campaign.id.toString(),
-            label: campaign.name,
-            id: campaign.id,
-          }))
-        );
-      } catch {
-        setAvailableCampaignsForUpload([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
-
-  useEffect(() => {
-    const loadIndustries = async () => {
-      try {
-        const response = await getIndustries({ per_page: 1000 });
-        setIndustries(response.data || []);
-      } catch {
-        setIndustries([]);
-      }
-    };
-    loadIndustries();
-  }, []);
-
-  useEffect(() => {
-    const loadDealTemplates = async () => {
-      try {
-        const response = await getDealTemplates({ per_page: 1000 });
-        setDealTemplates(response.data || []);
-      } catch {
-        setDealTemplates([]);
-      }
-    };
-    loadDealTemplates();
-  }, []);
-
-  const getUserNames = (userExtensions: any[]) => {
+  const getUserNames = useCallback((userExtensions: { user_extension: unknown }[]) => {
     if (!userExtensions || userExtensions.length === 0) return "No users assigned";
     const maxDisplay = 2;
     const userNames = userExtensions
       .map((ue) => {
-        const extension = extensions.find((ext) => ext.id == ue.user_extension);
+        const extension = extensions.find((ext) => sameExtensionId(ext.id, ue.user_extension));
         return extension?.display_name || extension?.name || `Extension ${ue.user_extension}`;
       })
       .filter(Boolean);
     if (userNames.length <= maxDisplay) return userNames.join(", ");
     return `${userNames.slice(0, maxDisplay).join(", ")} +${userNames.length - maxDisplay} more`;
-  };
-
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "38px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)" : "none",
-      "&:hover": { borderColor: "#86b7fe" },
-    }),
-    multiValue: (provided: any) => ({ ...provided, backgroundColor: "#0d6efd", color: "white", fontSize: "0.813rem" }),
-    multiValueLabel: (provided: any) => ({ ...provided, color: "white", padding: "2px 6px" }),
-    multiValueRemove: (provided: any) => ({ ...provided, color: "white", "&:hover": { backgroundColor: "#0b5ed7", color: "white" } }),
-    menu: (provided: any) => ({ ...provided, fontSize: "0.875rem" }),
-  };
-
-  const getUserNameByExtension = (extension: string) => {
-    const ext = dataManagementExtensions.find(
-      (e: any) => e.id?.toString() === extension.trim() || e.extension?.toString() === extension.trim()
-    );
-    return ext?.display_name || ext?.name || `Extension ${extension.trim()}`;
-  };
+  }, [extensions]);
 
   const getMaxRecords = () => includeAssignedRecords ? assignmentCounts.total : assignmentCounts.unassigned;
 
@@ -395,10 +1255,10 @@ const CrmCampaigns = () => {
   };
 
   const handleNumberChange = (value: string, max: number, setter: (val: number) => void) => {
-    const cleaned = value.replace(/[^0-9]/g, "");
+    const cleaned = value.replaceAll(/\D/g, "");
     if (cleaned === "") { setter(0); return; }
-    const numValue = parseInt(cleaned, 10);
-    setter(numValue < 0 ? 0 : numValue > max ? max : numValue);
+    const numValue = Number.parseInt(cleaned, 10);
+    setter(Math.min(Math.max(0, numValue), max));
   };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -416,48 +1276,20 @@ const CrmCampaigns = () => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  // Fetch campaigns data
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        setLoading(true);
-        let statusFilter: string[] = [];
-        if (activeFilter === "active") statusFilter = ["active"];
-        else if (activeFilter === "inactive") statusFilter = ["inactive"];
-        const combinedStatus = campaignFilters.status.length > 0 ? campaignFilters.status : statusFilter;
-        const filters: Record<string, any> = { ...memoizedFilters };
-        if (combinedStatus.length > 0) filters.status = combinedStatus.length === 1 ? combinedStatus[0] : combinedStatus;
-        if (campaignFilters.dateFrom) filters.date_from = campaignFilters.dateFrom;
-        if (campaignFilters.dateTo) filters.date_to = campaignFilters.dateTo;
-        if (campaignFilters.userExtensions?.length) filters.user_extensions = campaignFilters.userExtensions;
-        if (campaignFilters.hasUnassignedProspects !== null) filters.has_unassigned_prospects = campaignFilters.hasUnassignedProspects;
-        if (campaignFilters.tags?.length) filters.tags = campaignFilters.tags;
-
-        const response = await getCampaigns({
-          page: campaignsPagination.currentPage,
-          per_page: campaignsPagination.rowsPerPage,
-          search: memoizedFilters.search || campaignsSearch || undefined,
-          filters,
-          module_slug: ModuleSlug.CRM_CAMPAIGNS,
-        });
-
-        if (response?.data) {
-          setCampaignsData(response.data);
-          setMetrics(response.metrics);
-          setTotalCampaigns(response.total || response.data.length);
-        }
-      } catch (error) {
-        console.error("Failed to fetch campaigns:", error);
-        toast.error("Failed to load campaigns");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (session?.user?.permissions?.includes("list-crm-campaigns")) {
-      loadCampaigns();
-    }
-  }, [refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch, session]);
+  const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
+  useCrmCampaignListQueryEffect(
+    listCampaignsPermission,
+    refreshKey,
+    campaignsPagination,
+    memoizedFilters,
+    campaignFilters,
+    activeFilter,
+    campaignsSearch,
+    setLoading,
+    setCampaignsData,
+    setMetrics,
+    setTotalCampaigns,
+  );
 
   // Modal handlers
   const handleCreateCampaign = useCallback(() => {
@@ -475,54 +1307,16 @@ const CrmCampaigns = () => {
       setLoading(true);
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
-      setFormData({
-        name: campaignData.name || "",
-        description: campaignData.description || "",
-        start_date: campaignData.start_date ? campaignData.start_date.split("T")[0] : "",
-        end_date: campaignData.end_date ? campaignData.end_date.split("T")[0] : "",
-        status: campaignData.status || "active",
-        options: campaignData.options || {},
-      });
-      setCampaignFields(campaignData.fields || []);
-
-      if (campaignData.user_extensions?.length) {
-        setCampaignUsers(
-          campaignData.user_extensions.map((ue: any) => {
-            const extension = extensions.find((ext) => ext.id == ue.user_extension);
-            return { value: ue.user_extension, label: extension?.display_name || extension?.name || ue?.user_extension };
-          })
-        );
-      } else {
-        setCampaignUsers([]);
-      }
-
-      const industriesData = (campaignData as any).industries;
-      const industryIds = (campaignData as any).industry_ids;
-      if (industriesData?.length) {
-        setSelectedIndustries(industriesData.map((ind: any) => ({ value: ind.id.toString(), label: ind.name || `Industry ${ind.id}`, id: ind.id })));
-      } else if (industryIds?.length) {
-        setSelectedIndustries(industryIds.map((id: number) => {
-          const industry = industries.find((ind) => ind.id === id);
-          return { value: id.toString(), label: industry?.name || `Industry ${id}`, id };
-        }));
-      } else {
-        setSelectedIndustries([]);
-      }
-
-      const dealTemplateData = (campaignData as any).deal_template;
-      const dealTemplateId = (campaignData as any).deal_template_id;
-      if (dealTemplateData?.id) {
-        setSelectedDealTemplate({ value: dealTemplateData.id.toString(), label: dealTemplateData.name || `Deal Template ${dealTemplateData.id}`, id: dealTemplateData.id });
-      } else if (dealTemplateId) {
-        const dt = dealTemplates.find((d) => d.id === parseInt(dealTemplateId.toString()));
-        setSelectedDealTemplate({ value: dealTemplateId.toString(), label: dt?.name || `Deal Template ${dealTemplateId}`, id: parseInt(dealTemplateId.toString()) });
-      } else {
-        setSelectedDealTemplate(null);
-      }
-
+      const draft = deriveEditorStateFromCampaignApi(campaignData, extensions, industries, dealTemplates);
+      setFormData(draft.formData);
+      setCampaignFields(draft.campaignFields);
+      setCampaignUsers(draft.campaignUsers);
+      setSelectedIndustries(draft.selectedIndustries);
+      setSelectedDealTemplate(draft.selectedDealTemplate);
       setNewField({ field_name: "", field_type: "string", field_options: [], sort_order: 0, is_required: false });
       setShowEditModal(true);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.handleEditCampaign");
       toast.error("Failed to fetch campaign details");
     } finally {
       setLoading(false);
@@ -535,7 +1329,8 @@ const CrmCampaigns = () => {
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
       setShowViewModal(true);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.handleViewCampaign");
       toast.error("Failed to fetch campaign details");
     } finally {
       setLoading(false);
@@ -556,7 +1351,8 @@ const CrmCampaigns = () => {
       setSelectedCampaign(null);
       toast.success("Campaign deleted successfully!");
       setRefreshKey((prev) => prev + 1);
-    } catch {
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.confirmDeleteCampaign");
       toast.error("Failed to delete campaign");
     } finally {
       setLoading(false);
@@ -577,13 +1373,13 @@ const CrmCampaigns = () => {
 
   const getMinEndDate = useCallback(() => {
     const today = getTodayDate();
-    if (formData.start_date) {
-      const startDate = new Date(formData.start_date);
-      startDate.setDate(startDate.getDate() + 1);
-      const nextDay = startDate.toISOString().split("T")[0];
-      return nextDay > today ? nextDay : today;
+    if (!formData.start_date) {
+      return today;
     }
-    return today;
+    const startDate = new Date(formData.start_date);
+    startDate.setDate(startDate.getDate() + 1);
+    const nextDay = startDate.toISOString().split("T")[0];
+    return laterCalendarIsoDate(nextDay, today);
   }, [formData.start_date, getTodayDate]);
 
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -614,43 +1410,17 @@ const CrmCampaigns = () => {
   }, [formData.start_date, getMinEndDate, showEditModal]);
 
   const handleFormSubmit = useCallback(async () => {
-    const requiredFields: Array<{ field: keyof typeof formData; name: string; required: boolean }> = [
-      { field: "name", name: "Campaign Name", required: true },
-      { field: "start_date", name: "Start Date", required: true },
-      { field: "end_date", name: "End Date", required: true },
-    ];
-    if (!checkRequiredFields(formData, requiredFields)) return;
-
-    const today = getTodayDate();
-    if (!showEditModal) {
-      if (formData.start_date && formData.start_date < today) { toast.error("Start date must be today or a future date"); return; }
-      if (formData.end_date && formData.end_date < today) { toast.error("End date must be today or a future date"); return; }
-    }
-    if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
-      toast.error("End date must be after start date"); return;
-    }
+    if (!validateCampaignFormBeforeSave(formData, showEditModal, getTodayDate)) return;
 
     try {
       setLoading(true);
-      const cleanedFields = campaignFields.map((field) => {
-        if (field.field_type === "dropdown" && field.field_options) {
-          return { ...field, field_options: field.field_options.filter((opt: string) => opt.trim() !== "") };
-        }
-        return field;
-      });
-
-      const campaignData = {
-        ...formData,
-        name: formData.name.trim(),
-        description: formData.description.trim() || null,
-        start_date: formData.start_date || undefined,
-        end_date: formData.end_date || undefined,
-        status: formData.status as "active" | "inactive",
-        fields: cleanedFields,
-        campaign_users: campaignUsers.map((user) => user.value),
-        industry_ids: selectedIndustries.map((ind: any) => parseInt(ind.value || ind.id)),
-        deal_template_id: selectedDealTemplate ? parseInt(selectedDealTemplate.value || selectedDealTemplate.id) : undefined,
-      };
+      const campaignData = buildCampaignSavePayload(
+        formData,
+        campaignFields,
+        campaignUsers,
+        selectedIndustries,
+        selectedDealTemplate,
+      );
 
       if (showEditModal && selectedCampaign) {
         await updateCampaign(selectedCampaign.id, campaignData);
@@ -663,8 +1433,8 @@ const CrmCampaigns = () => {
       }
       setSelectedCampaign(null);
       setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to save campaign");
+    } catch (error: unknown) {
+      toast.error(getErrorMessageFromUnknown(error, "Failed to save campaign"));
     } finally {
       setLoading(false);
     }
@@ -735,46 +1505,27 @@ const CrmCampaigns = () => {
     if (!selectedFile) { toast.error("Please select a file to upload"); return; }
 
     setUploading(true);
-    setUploadProgress(0);
     try {
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => { if (prev >= 90) { clearInterval(progressInterval); return prev; } return prev + 10; });
-      }, 200);
-
-      const response: any = await uploadCrmDataCsv(
+      const response = await uploadCrmDataCsv(
         selectedFile,
         Array.from(uploadSelectedCampaigns).map((c) => c.value),
         Array.from(fieldTags).map((tag) => tag.value),
         autoDistributeToUsers,
       );
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      const responseData = response?.data || {};
-      const processedCount = responseData.processed_count || 0;
-      const validationFailures = responseData.validation_failures || 0;
-
-      if (processedCount > 0) {
-        let msg = `Successfully processed ${processedCount} record${processedCount !== 1 ? "s" : ""}`;
-        if (validationFailures > 0) msg += ` with ${validationFailures} validation failure${validationFailures !== 1 ? "s" : ""}`;
-        validationFailures > 0 ? toast.warn(msg) : toast.success(msg);
-      } else if (validationFailures > 0) {
-        toast.error(`Upload failed: All ${validationFailures} record${validationFailures !== 1 ? "s" : ""} failed validation`);
-      } else {
-        toast.error("Upload completed but no records were processed");
-      }
+      const processedCount = response.processed_count ?? 0;
+      const validationFailureCount = Array.isArray(response.errors) ? response.errors.length : 0;
+      toastCrmCsvUploadOutcome(processedCount, validationFailureCount);
 
       setSelectedFile(null);
       setFieldTags([]);
       setUploadSelectedCampaigns([]);
       setAutoDistributeToUsers(false);
       setShowUploadModal(false);
-      setUploadProgress(0);
       setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to upload file. Please try again.");
-      setUploadProgress(0);
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.handleUpload");
+      toast.error(getErrorMessageFromUnknown(error, "Failed to upload file. Please try again."));
     } finally {
       setUploading(false);
     }
@@ -782,25 +1533,26 @@ const CrmCampaigns = () => {
 
   const calculateEntryCounts = useCallback(async () => {
     try {
-      const campaignIds = assignmentFilterCampaigns.map((c) => parseInt(c)).filter((id) => !isNaN(id) && id > 0);
+      const campaignIds = assignmentFilterCampaigns
+        .map((c) => Number.parseInt(c, 10))
+        .filter((id) => !Number.isNaN(id) && id > 0);
       const tags = assignmentFilterTags.map((tag: any) => tag.value || tag);
       const counts = await getCrmDataCounts(campaignIds, tags);
       return { total: counts.summary.total_records, assigned: counts.summary.assigned_records, unassigned: counts.summary.unassigned_records };
-    } catch {
-      return { total: 5000, assigned: 2000, unassigned: 3000 };
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.calculateEntryCounts");
+      return { total: 0, assigned: 0, unassigned: 0 };
     }
   }, [assignmentFilterCampaigns, assignmentFilterTags]);
 
-  useEffect(() => {
-    const refetchCounts = async () => {
-      if (showDataAssignmentModal) {
-        const counts = await calculateEntryCounts();
-        setAssignmentCounts(counts);
-        if (recordsToAssign === 0 || recordsToAssign > counts.unassigned) setRecordsToAssign(counts.unassigned);
-      }
-    };
-    refetchCounts();
-  }, [assignmentFilterCampaigns, assignmentFilterTags, calculateEntryCounts, showDataAssignmentModal]);
+  useCrmAssignmentCountsRefetch(
+    showDataAssignmentModal,
+    assignmentFilterCampaigns,
+    assignmentFilterTags,
+    calculateEntryCounts,
+    setAssignmentCounts,
+    setRecordsToAssign,
+  );
 
   const handleDataAssignment = useCallback(async () => {
     try {
@@ -808,9 +1560,10 @@ const CrmCampaigns = () => {
       setAssignmentCounts(counts);
       setRecordsToAssign(counts.unassigned);
       setShowDataAssignmentModal(true);
-    } catch {
-      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
-      setRecordsToAssign(3000);
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.handleDataAssignment");
+      setAssignmentCounts({ total: 0, assigned: 0, unassigned: 0 });
+      setRecordsToAssign(0);
       setShowDataAssignmentModal(true);
     }
   }, [calculateEntryCounts]);
@@ -819,7 +1572,6 @@ const CrmCampaigns = () => {
     setAssignmentFilterCampaigns([]);
     setAssignmentFilterTags([]);
     setAssignmentTargetType("campaigns");
-    setAssignmentType("");
     setDistributionMode("equal");
     setAssignToCampaigns([]);
     setSelectedUserExtensions([]);
@@ -846,44 +1598,26 @@ const CrmCampaigns = () => {
 
     setAssigningData(true);
     try {
-      const campaignFilterIds = assignmentFilterCampaigns.map((c) => parseInt(c)).filter((id) => !isNaN(id) && id > 0);
-      const tagIds = assignmentFilterTags.map((tag: any) => {
-        const t = availableTags.find((at) => at.value === (tag.value || tag));
-        return t ? t.id : 0;
-      }).filter((id) => id > 0);
+      const built = buildCrmDataAssignmentPayload({
+        assignmentTargetType,
+        recordsToAssign,
+        includeAssignedRecords,
+        assignmentFilterCampaigns,
+        assignmentFilterTags,
+        availableTags,
+        assignToCampaigns,
+        availableCampaignsForUpload,
+        distributionMode,
+        customDistribution,
+        selectedUserExtensions,
+      });
 
-      let payload: any = { count: recordsToAssign, include_assigned: includeAssignedRecords };
-      if (campaignFilterIds.length > 0) payload.campaign_filter_ids = campaignFilterIds;
-      if (tagIds.length > 0) payload.tag_ids = tagIds;
-
-      if (assignmentTargetType === "campaigns") {
-        const targetCampaignIds = assignToCampaigns.map((c) => {
-          const camp = availableCampaignsForUpload.find((ac) => ac.label === c);
-          return camp ? parseInt(camp.value) : 0;
-        }).filter((id) => id > 0);
-
-        if (targetCampaignIds.length === 0) { toast.error("Please select valid campaigns"); return; }
-
-        payload.campaign_ids = targetCampaignIds;
-        payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
-        if (distributionMode === "custom") {
-          const dist: Record<number, number> = {};
-          Object.entries(customDistribution).forEach(([v, count]) => {
-            const id = parseInt(v);
-            if (id > 0 && count > 0) dist[id] = count;
-          });
-          payload.campaign_distribution = dist;
-        }
-      } else {
-        const extensionArray = selectedUserExtensions.map((ext: any) =>
-          ext.value || ext.extension?.id?.toString() || ext.extension?.extension?.toString() || ""
-        ).filter((e) => e.length > 0);
-
-        if (extensionArray.length === 0) { toast.error("Please select valid users"); setAssigningData(false); return; }
-        payload.custom_extensions = extensionArray;
+      if (!built.ok) {
+        toast.error(built.message);
+        return;
       }
 
-      const response = await axiosInstance.post("/crm/crm_data/assign", payload);
+      const response = await axiosInstance.post("/crm/crm_data/assign", built.payload);
       if (response?.data?.data?.success) {
         toast.success(`Successfully assigned ${recordsToAssign} records!`);
         setShowDataAssignmentModal(false);
@@ -895,23 +1629,25 @@ const CrmCampaigns = () => {
       } else {
         toast.error(response.data.message || "Failed to assign data");
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to assign data");
+    } catch (error: unknown) {
+      consumeHandledApiError(error, "CrmCampaigns.handleDataAssignmentSubmit");
+      toast.error(getErrorMessageFromUnknown(error, "Failed to assign data"));
     } finally {
       setAssigningData(false);
     }
   }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, includeAssignedRecords, customDistribution]);
 
-  const getFieldTypeText = (_fieldType: string) => {
-    switch (_fieldType.toLowerCase()) {
-      case "string": return "Text";
-      case "integer": return "Number";
-      case "date": return "Date";
-      case "email": return "Email";
-      case "dropdown": return "Dropdown";
-      default: return _fieldType;
-    }
-  };
+  const handleAutoFillEqualDistribution = useCallback(() => {
+    if (assignToCampaigns.length === 0) return;
+    const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
+    const rem = recordsToAssign % assignToCampaigns.length;
+    const dist: Record<string, number> = {};
+    assignToCampaigns.forEach((c, i) => {
+      const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
+      if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
+    });
+    setCustomDistribution(dist);
+  }, [recordsToAssign, assignToCampaigns, availableCampaignsForUpload]);
 
   // --- GenericTable columns ---
   const campaignsTableColumns = useMemo<TableColumn<any>[]>(() => [
@@ -980,7 +1716,7 @@ const CrmCampaigns = () => {
         </small>
       ),
     },
-  ], [extensions]);
+  ], [extensions, getUserNames]);
 
   const campaignsTableActions = useMemo(() => {
     const actions: any[] = [];
@@ -1023,228 +1759,40 @@ const CrmCampaigns = () => {
     inactive: metrics.inactive_campaigns,
   }), [totalCampaigns, metrics]);
 
-  const toolbarConfig = useMemo<ToolbarConfig>(() => ({
-    showSearch: true,
-    searchValue: campaignsSearch,
-    searchPlaceholder: "Search campaigns by name, description...",
-    onSearchChange: (value) => {
-      setCampaignsSearch(value);
-    },
-    onSearch: () => {
-      handleFiltersChange({ search: campaignsSearch });
-      setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      setRefreshKey((prev) => prev + 1);
-    },
-    showTabs: true,
-    tabs: [
-      { id: "all", label: "All Campaigns", count: filterCounts.all, removable: false },
-      { id: "active", label: "Active", count: filterCounts.active, removable: false },
-      { id: "inactive", label: "Inactive", count: filterCounts.inactive, removable: false },
-      { id: "assigned", label: "Assigned Records", removable: false },
-      { id: "unassigned", label: "Unassigned Records", removable: false },
+  const toolbarConfig = useMemo<ToolbarConfig>(
+    () =>
+      createCrmCampaignsToolbarConfig({
+        campaignsSearch,
+        setCampaignsSearch,
+        handleFiltersChange,
+        setCampaignsPagination,
+        setRefreshKey,
+        filterCounts,
+        activeFilter,
+        setActiveFilter,
+        setCampaignFilters,
+        campaignFilters,
+        extensions,
+        showCampaignsAnalytics,
+        setShowCampaignsAnalytics,
+        session,
+        handleDataAssignment,
+        handleCreateCampaign,
+        onOpenUploadModal: () => setShowUploadModal(true),
+      }),
+    [
+      campaignsSearch,
+      activeFilter,
+      filterCounts,
+      showCampaignsAnalytics,
+      campaignFilters,
+      session?.user?.permissions,
+      extensions,
+      handleDataAssignment,
+      handleCreateCampaign,
+      handleFiltersChange,
     ],
-    activeTab: activeFilter,
-    onTabChange: (tabId) => {
-      setActiveFilter(tabId);
-      if (tabId === "assigned") {
-        setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: false }));
-      } else if (tabId === "unassigned") {
-        setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: true }));
-      } else {
-        setCampaignFilters((prev) => ({ ...prev, hasUnassignedProspects: null }));
-      }
-      setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      setRefreshKey((prev) => prev + 1);
-    },
-    showFiltersButton: true,
-    showFilterPills: showAdvancedFilters,
-    filterPills: [
-      {
-        id: "status",
-        label: "Status",
-        showDropdown: true,
-        active: campaignFilters.status.length > 0,
-        activeLabel: campaignFilters.status.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(", "),
-        onClear: () => {
-          setCampaignFilters((prev) => ({ ...prev, status: [] }));
-          setActiveFilter("all");
-          setRefreshKey((prev) => prev + 1);
-        },
-        dropdownOptions: [
-          { label: "Active", value: "active", onClick: () => { setCampaignFilters((prev) => ({ ...prev, status: ["active"] })); setActiveFilter("all"); setRefreshKey((prev) => prev + 1); } },
-          { label: "Inactive", value: "inactive", onClick: () => { setCampaignFilters((prev) => ({ ...prev, status: ["inactive"] })); setActiveFilter("all"); setRefreshKey((prev) => prev + 1); } },
-          { label: "All", value: "", onClick: () => { setCampaignFilters((prev) => ({ ...prev, status: [] })); setActiveFilter("all"); setRefreshKey((prev) => prev + 1); } },
-        ],
-      },
-      {
-        id: "dateFrom",
-        label: "Date From",
-        showDropdown: true,
-        active: !!campaignFilters.dateFrom,
-        activeLabel: campaignFilters.dateFrom ? new Date(campaignFilters.dateFrom).toLocaleDateString() : undefined,
-        onClear: () => { setCampaignFilters((prev) => ({ ...prev, dateFrom: null })); handleFiltersChange({ date_from: null }); },
-        dropdownContent: (
-          <Form.Group style={{ minWidth: "200px" }}>
-            <Form.Label className="small fw-bold">Date From</Form.Label>
-            <Form.Control
-              type="date"
-              value={campaignFilters.dateFrom || ""}
-              onChange={(e) => {
-                const v = e.target.value || null;
-                setCampaignFilters((prev) => ({ ...prev, dateFrom: v }));
-                handleFiltersChange({ date_from: v || null });
-              }}
-            />
-          </Form.Group>
-        ),
-      },
-      {
-        id: "dateTo",
-        label: "Date To",
-        showDropdown: true,
-        active: !!campaignFilters.dateTo,
-        activeLabel: campaignFilters.dateTo ? new Date(campaignFilters.dateTo).toLocaleDateString() : undefined,
-        onClear: () => { setCampaignFilters((prev) => ({ ...prev, dateTo: null })); handleFiltersChange({ date_to: null }); },
-        dropdownContent: (
-          <Form.Group style={{ minWidth: "200px" }}>
-            <Form.Label className="small fw-bold">Date To</Form.Label>
-            <Form.Control
-              type="date"
-              value={campaignFilters.dateTo || ""}
-              onChange={(e) => {
-                const v = e.target.value || null;
-                setCampaignFilters((prev) => ({ ...prev, dateTo: v }));
-                handleFiltersChange({ date_to: v || null });
-              }}
-            />
-          </Form.Group>
-        ),
-      },
-      {
-        id: "users",
-        label: "Campaign Users",
-        showDropdown: true,
-        active: !!(campaignFilters.userExtensions?.length),
-        activeLabel: campaignFilters.userExtensions?.length ? `${campaignFilters.userExtensions.length} selected` : undefined,
-        onClear: () => { setCampaignFilters((prev) => ({ ...prev, userExtensions: null })); handleFiltersChange({ user_extensions: null }); },
-        dropdownContent: (
-          <div style={{ minWidth: "260px" }}>
-            <Form.Label className="small fw-bold mb-2">Campaign Users</Form.Label>
-            <Select
-              isMulti
-              options={extensions.map((ext: any) => ({ value: ext.id, label: ext.display_name || ext.name || ext.id }))}
-              value={campaignFilters.userExtensions?.map((extId: string) => {
-                const ext = extensions.find((e: any) => e.id == extId);
-                return { value: extId, label: ext?.display_name || ext?.name || `Extension ${extId}` };
-              }) || []}
-              onChange={(selected) => {
-                const vals = selected ? selected.map((s) => s.value) : null;
-                setCampaignFilters((prev) => ({ ...prev, userExtensions: vals }));
-                handleFiltersChange({ user_extensions: vals || null });
-              }}
-              placeholder="Select users..."
-              styles={customSelectStyles}
-            />
-          </div>
-        ),
-      },
-    ],
-    showMoreFiltersButton: false,
-    rightActions: (
-      <div className="d-flex gap-2">
-        <Button
-          variant={showCampaignsAnalytics ? "primary" : "light"}
-          onClick={() => setShowCampaignsAnalytics((open) => !open)}
-          style={{
-            border: "1px solid #dee2e6",
-            borderRadius: "8px",
-            color: showCampaignsAnalytics ? undefined : "#212529",
-            height: "33px",
-            fontSize: "0.875rem",
-            padding: "0 12px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-        >
-          <BarChart3 size={15} />
-          Analytics
-        </Button>
-        {session?.user?.permissions?.includes("add-crm-data-management") &&
-          session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
-            <Button
-              variant="light"
-              onClick={() => setShowUploadModal(true)}
-              style={{
-                border: "1px solid #dee2e6",
-                borderRadius: "8px",
-                color: "#212529",
-                height: "33px",
-                fontSize: "0.875rem",
-                padding: "0 12px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Download size={15} />
-              Import
-            </Button>
-          )}
-        {session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
-          <Button
-            variant="light"
-            onClick={handleDataAssignment}
-            style={{
-              border: "1px solid #dee2e6",
-              borderRadius: "8px",
-              color: "#212529",
-              height: "33px",
-              fontSize: "0.875rem",
-              padding: "0 12px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <Target size={15} />
-            Data Assignment
-          </Button>
-        )}
-        {session?.user?.permissions?.includes("add-crm-campaigns") && (
-          <Button
-            onClick={handleCreateCampaign}
-            style={{
-              backgroundColor: "#4f46e5",
-              border: "none",
-              borderRadius: "8px",
-              color: "#ffffff",
-              height: "33px",
-              fontSize: "0.875rem",
-              padding: "0 12px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <Plus size={15} />
-            New Campaign
-          </Button>
-        )}
-      </div>
-    ),
-  }), [
-    campaignsSearch,
-    activeFilter,
-    filterCounts,
-    showCampaignsAnalytics,
-    showAdvancedFilters,
-    campaignFilters,
-    session?.user?.permissions,
-    extensions,
-    handleDataAssignment,
-    handleCreateCampaign,
-  ]);
+  );
 
   const handleCampaignsPaginationChange = useCallback((page: number, rowsPerPage: number) => {
     setCampaignsPagination((prev) => ({
@@ -1437,7 +1985,7 @@ const CrmCampaigns = () => {
                 </Card.Body>
               </Card>
               {campaignFields.map((field, index) => (
-                <Card key={index} className="mb-2">
+                <Card key={campaignFieldRowKey(field, index)} className="mb-2">
                   <Card.Body>
                     <Row className="align-items-center">
                       <Col md={4}>
@@ -1461,7 +2009,7 @@ const CrmCampaigns = () => {
                       {field.field_type === "dropdown" && (
                         <Col md={12} className="mt-3">
                           {field.field_options?.map((option: string, optionIndex: number) => (
-                            <div key={optionIndex} className="d-flex mb-3 row align-items-center justify-content-left">
+                            <div key={campaignFieldOptionKey(field.field_name, option, optionIndex)} className="d-flex mb-3 row align-items-center justify-content-left">
                               <Col md={5}>
                                 <Form.Control type="text" size="sm" value={option} onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)} placeholder="Option value" />
                               </Col>
@@ -1486,7 +2034,7 @@ const CrmCampaigns = () => {
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={closeCreateEditModal}>Cancel</Button>
           <Button variant="primary" onClick={handleFormSubmit} disabled={loading}>
-            {loading ? "Saving..." : showEditModal ? "Update Campaign" : "Create Campaign"}
+            {campaignFormSubmitButtonLabel(loading, showEditModal)}
           </Button>
         </Modal.Footer>
       </Modal>
@@ -1495,15 +2043,27 @@ const CrmCampaigns = () => {
       {selectedCampaign && (
         <Modal show={showViewModal} onHide={() => { setShowViewModal(false); setSelectedCampaign(null); }} size="xl" centered>
           <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
-            <button onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }} style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }} onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }} onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}>
-              <X size={20} />
+            <button
+              type="button"
+              aria-label="Close campaign details"
+              onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }}
+              style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+              onFocus={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+              onBlur={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+            >
+              <X size={20} aria-hidden />
             </button>
             <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>{selectedCampaign.name}</h3>
             <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>Campaign Details</p>
           </div>
           <Modal.Body style={{ padding: "30px" }}>
             {loading ? (
-              <div className="text-center py-4"><div className="spinner-border" role="status"><span className="visually-hidden">Loading...</span></div></div>
+              <output className="text-center py-4 d-block" aria-live="polite">
+                <span className="spinner-border d-inline-block" aria-hidden />
+                <span className="visually-hidden">Loading...</span>
+              </output>
             ) : (
               <>
                 <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1513,8 +2073,8 @@ const CrmCampaigns = () => {
                   {[
                     { label: "Campaign Name", value: selectedCampaign.name },
                     { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
-                  ].map((item, i) => (
-                    <div key={i} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                  ].map((item) => (
+                    <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
                       <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
                       <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
                     </div>
@@ -1535,9 +2095,7 @@ const CrmCampaigns = () => {
                   <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
                     <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
-                      {selectedCampaign.start_date && selectedCampaign.end_date
-                        ? `${new Date(selectedCampaign.start_date).toLocaleDateString()} - ${new Date(selectedCampaign.end_date).toLocaleDateString()}`
-                        : selectedCampaign.start_date ? `Starts: ${new Date(selectedCampaign.start_date).toLocaleDateString()}` : "Not set"}
+                      {viewModalDateRangeText(selectedCampaign)}
                     </div>
                   </div>
                   <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
@@ -1552,10 +2110,10 @@ const CrmCampaigns = () => {
                       <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
-                      {selectedCampaign.user_extensions.map((ue: any, index: number) => {
-                        const ext = extensions.find((e) => e.id == ue.user_extension);
+                      {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
+                        const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
                         return (
-                          <div key={index} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
+                          <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
                             {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
                           </div>
                         );
@@ -1575,13 +2133,15 @@ const CrmCampaigns = () => {
                       </thead>
                       <tbody>
                         {selectedCampaign.fields.map((field: any, index: number) => (
-                          <tr key={index}>
+                          <tr key={campaignFieldRowKey(field, index)}>
                             <td>{field.field_name}</td>
                             <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
                             <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
                             <td>
                               {field.field_type === "dropdown" && field.field_options
-                                ? field.field_options.map((opt: string, i: number) => <Badge key={i} bg="info" className="me-1">{opt}</Badge>)
+                                ? field.field_options.map((opt: string, i: number) => (
+                                  <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
+                                ))
                                 : <span className="text-muted">N/A</span>}
                             </td>
                           </tr>
@@ -1666,7 +2226,17 @@ const CrmCampaigns = () => {
           <Modal.Footer>
             <Button variant="secondary" onClick={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }}>Cancel</Button>
             <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
-              {uploading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Uploading...</> : <><Download size={16} className="me-2" />Upload & Import</>}
+              {uploading ? (
+                <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
+                  <span className="spinner-border spinner-border-sm" aria-hidden />
+                  <span>Uploading...</span>
+                </output>
+              ) : (
+                <span className="d-inline-flex align-items-center gap-1">
+                  <Download size={16} aria-hidden />
+                  <span>Upload & Import</span>
+                </span>
+              )}
             </Button>
           </Modal.Footer>
         </Modal>
@@ -1692,27 +2262,18 @@ const CrmCampaigns = () => {
                 <Col md={6}>
                   <Form.Group>
                     <Form.Label className="fw-semibold small text-muted mb-2"><span className="d-flex align-items-center gap-1"><Megaphone size={14} /> Campaign Filter</span></Form.Label>
-                    <Select isMulti options={availableCampaignsForUpload.map((c) => ({ value: c.value, label: c.label }))} value={assignmentFilterCampaigns.map((c) => { const opt = availableCampaignsForUpload.find((ac) => ac.value === c); return opt ? { value: opt.value, label: opt.label } : { value: c, label: c }; })} onChange={(s) => setAssignmentFilterCampaigns(s ? s.map((o) => o.value) : [])} placeholder="Select campaigns..." styles={customSelectStyles} />
+                    <Select isMulti options={availableCampaignsForUpload.map((c) => ({ value: c.value, label: c.label }))} value={assignmentFilterCampaigns.map((c) => { const opt = availableCampaignsForUpload.find((ac) => ac.value === c); return opt ? { value: opt.value, label: opt.label } : { value: c, label: c }; })} onChange={(s) => setAssignmentFilterCampaigns(s ? s.map((o) => o.value) : [])} placeholder="Select campaigns..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                   </Form.Group>
                 </Col>
                 <Col md={6}>
                   <Form.Group>
                     <Form.Label className="fw-semibold small text-muted mb-2"><span className="d-flex align-items-center gap-1"><Hash size={14} /> Tag Filter</span></Form.Label>
-                    <CreatableSelect isMulti options={availableTags} value={assignmentFilterTags} onChange={(s) => setAssignmentFilterTags(s || [])} placeholder="Select or create tags..." styles={customSelectStyles} />
+                    <CreatableSelect isMulti options={availableTags} value={assignmentFilterTags} onChange={(s) => setAssignmentFilterTags(s || [])} placeholder="Select or create tags..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                   </Form.Group>
                 </Col>
               </Row>
               <div className="mt-4 p-4 rounded-3" style={{ background: "linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(74, 222, 128, 0.08) 100%)", border: "1px solid rgba(34, 197, 94, 0.2)" }}>
-                <Row className="g-3 align-items-center">
-                  {[{ label: "Total Records", value: assignmentCounts.total, icon: <Users size={28} className="text-success" />, bg: "success" }, { label: "Assigned", value: assignmentCounts.assigned, icon: <UserPlus size={28} className="text-primary" />, bg: "primary" }, { label: "Unassigned", value: assignmentCounts.unassigned, icon: <AlertCircle size={28} className="text-warning" />, bg: "warning" }].map((item, i) => (
-                    <Col key={i} md={4}>
-                      <div className="d-flex align-items-center gap-3">
-                        <div className={`p-3 bg-${item.bg} bg-opacity-10 rounded-3`}>{item.icon}</div>
-                        <div><small className="text-muted d-block mb-1">{item.label}</small><strong className="fs-3 text-dark">{item.value.toLocaleString()}</strong></div>
-                      </div>
-                    </Col>
-                  ))}
-                </Row>
+                <CrmAssignmentStatsRow assignmentCounts={assignmentCounts} />
               </div>
             </div>
 
@@ -1720,8 +2281,8 @@ const CrmCampaigns = () => {
               <Form.Group className="mb-3">
                 <Form.Label className="fw-semibold small text-muted mb-2">Assign To <span className="text-danger">*</span></Form.Label>
                 <div>
-                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setAssignmentType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} className="mb-2" />
-                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setAssignmentType("custom"); setDistributionMode(""); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} />
+                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} className="mb-2" />
+                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setDistributionMode(""); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} />
                 </div>
               </Form.Group>
 
@@ -1731,13 +2292,13 @@ const CrmCampaigns = () => {
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Distribution Mode <span className="text-danger">*</span></Form.Label>
-                        <Select options={[{ value: "equal", label: "Equal Distribution" }, { value: "custom", label: "Proportional Distribution" }]} value={{ value: distributionMode, label: distributionMode === "equal" ? "Equal Distribution" : "Proportional Distribution" }} onChange={(s) => setDistributionMode(s?.value || "equal")} placeholder="Select distribution mode..." styles={customSelectStyles} />
+                        <Select options={[{ value: "equal", label: "Equal Distribution" }, { value: "custom", label: "Proportional Distribution" }]} value={{ value: distributionMode, label: distributionMode === "equal" ? "Equal Distribution" : "Proportional Distribution" }} onChange={(s) => setDistributionMode(s?.value || "equal")} placeholder="Select distribution mode..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Target Campaigns <span className="text-danger">*</span></Form.Label>
-                        <Select isMulti options={availableCampaignsForUpload.map((c) => ({ value: c.label, label: c.label }))} value={assignToCampaigns.map((c) => ({ value: c, label: c }))} onChange={(s) => setAssignToCampaigns(s ? s.map((o) => o.value) : [])} placeholder="Select campaigns..." styles={customSelectStyles} />
+                        <Select isMulti options={availableCampaignsForUpload.map((c) => ({ value: c.label, label: c.label }))} value={assignToCampaigns.map((c) => ({ value: c, label: c }))} onChange={(s) => setAssignToCampaigns(s ? s.map((o) => o.value) : [])} placeholder="Select campaigns..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                       </Form.Group>
                     </Col>
                   </Row>
@@ -1747,31 +2308,21 @@ const CrmCampaigns = () => {
                         <Form.Group>
                           <div className="d-flex justify-content-between align-items-center mb-2">
                             <Form.Label className="mb-0 fw-semibold small text-muted">Proportional Distribution</Form.Label>
-                            <Button variant="outline-secondary" size="sm" onClick={() => {
-                              const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
-                              const rem = recordsToAssign % assignToCampaigns.length;
-                              const dist: Record<string, number> = {};
-                              assignToCampaigns.forEach((c, i) => {
-                                const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
-                                if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
-                              });
-                              setCustomDistribution(dist);
-                            }}>Auto-fill Equal</Button>
+                            <Button variant="outline-secondary" size="sm" onClick={handleAutoFillEqualDistribution}>
+                              Auto-fill Equal
+                            </Button>
                           </div>
                           <div className="border rounded p-3 bg-light">
                             <p className="small text-muted mb-3">Total: <strong>{recordsToAssign}</strong> | Allocated: <strong>{Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong> | Remaining: <strong>{recordsToAssign - Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong></p>
-                            {assignToCampaigns.map((c) => {
-                              const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
-                              if (!opt) return null;
-                              return (
-                                <div key={opt.value} className="mb-2">
-                                  <Row>
-                                    <Col md={6}><Form.Label className="small mb-0">{c}</Form.Label></Col>
-                                    <Col md={6}><Form.Control type="number" min="0" max={recordsToAssign} value={customDistribution[opt.value] || 0} onKeyDown={handleNumberKeyDown} onChange={(e) => handleNumberChange(e.target.value, recordsToAssign, (v) => setCustomDistribution((prev) => ({ ...prev, [opt.value]: v })))} size="sm" /></Col>
-                                  </Row>
-                                </div>
-                              );
-                            })}
+                            <CrmProportionalDistributionRows
+                              assignToCampaigns={assignToCampaigns}
+                              availableCampaignsForUpload={availableCampaignsForUpload}
+                              recordsToAssign={recordsToAssign}
+                              customDistribution={customDistribution}
+                              handleNumberKeyDown={handleNumberKeyDown}
+                              handleNumberChange={handleNumberChange}
+                              setCustomDistribution={setCustomDistribution}
+                            />
                           </div>
                         </Form.Group>
                       </Col>
@@ -1786,13 +2337,13 @@ const CrmCampaigns = () => {
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Distribution Mode <span className="text-danger">*</span></Form.Label>
-                        <Select options={[{ value: "equal", label: "Equal Distribution" }, { value: "custom", label: "Proportional Distribution" }]} value={{ value: distributionMode, label: distributionMode === "equal" ? "Equal Distribution" : "Proportional Distribution" }} onChange={(s) => setDistributionMode(s?.value || "equal")} placeholder="Select distribution mode..." styles={customSelectStyles} />
+                        <Select options={[{ value: "equal", label: "Equal Distribution" }, { value: "custom", label: "Proportional Distribution" }]} value={{ value: distributionMode, label: distributionMode === "equal" ? "Equal Distribution" : "Proportional Distribution" }} onChange={(s) => setDistributionMode(s?.value || "equal")} placeholder="Select distribution mode..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Select Users <span className="text-danger">*</span></Form.Label>
-                        <Select isMulti options={dataManagementExtensions.map((ext: any) => ({ value: ext.id?.toString() || ext.extension?.toString() || "", label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`, extension: ext }))} value={selectedUserExtensions} onChange={(s) => setSelectedUserExtensions(s || [])} placeholder="Select users..." styles={customSelectStyles} />
+                        <Select isMulti options={dataManagementExtensions.map((ext: any) => ({ value: ext.id?.toString() || ext.extension?.toString() || "", label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`, extension: ext }))} value={selectedUserExtensions} onChange={(s) => setSelectedUserExtensions(s || [])} placeholder="Select users..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
                       </Form.Group>
                     </Col>
                   </Row>
@@ -1831,7 +2382,20 @@ const CrmCampaigns = () => {
         <Modal.Footer className="border-0 pt-0 px-4 pb-4">
           <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
           <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && selectedUserExtensions.length === 0)} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
-            {assigningData ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Assigning...</> : <><UserPlus size={18} />Assign {recordsToAssign > 0 ? `${recordsToAssign.toLocaleString()} Records` : "Records"}</>}
+            {assigningData ? (
+              <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
+                <span className="spinner-border spinner-border-sm" aria-hidden />
+                <span>Assigning...</span>
+              </output>
+            ) : (
+              <span className="d-inline-flex align-items-center gap-1">
+                <UserPlus size={18} aria-hidden />
+                <span>
+                  Assign
+                  {recordsToAssign > 0 ? ` ${recordsToAssign.toLocaleString()} Records` : " Records"}
+                </span>
+              </span>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>
