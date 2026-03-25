@@ -17,8 +17,6 @@ export default function CrmTicketListItemCard({
 }: Readonly<TicketCardProps>) {
   const leadRecordId = lead?.id;
 
-  const dealsCount = (lead?.deals as unknown[] | undefined)?.length ?? 0;
-
   return (
     <div
       key={String(leadRecordId)}
@@ -40,20 +38,6 @@ export default function CrmTicketListItemCard({
       >
         {toDisplayText(lead.name)}
       </span>
-
-      <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Company: {toDisplayText(lead.company_name)}
-      </p>
-
-      <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-        Status: {toDisplayText(lead.status)}
-      </p>
-
-      {dealsCount > 0 && (
-        <p style={{ fontSize: "13px", color: "#666666", margin: "4px 0" }}>
-          Deals: {dealsCount}
-        </p>
-      )}
     </div>
   );
 }

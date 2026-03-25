@@ -3396,12 +3396,14 @@ const CrmDeals = () => {
             email={
               selectedDeal?.email ||
               selectedDeal?.rawData?.email ||
-              relatedLead?.email
+              relatedLead?.email ||
+              selectedDeal?.main_decision_maker?.email
             }
             phone={
               selectedDeal?.phone ||
               selectedDeal?.rawData?.phone ||
-              relatedLead?.phone
+              relatedLead?.phone ||
+              selectedDeal?.decision_maker_phone
             }
             avatar={{
               initials: getInitials(selectedDeal?.name || "NA"),
