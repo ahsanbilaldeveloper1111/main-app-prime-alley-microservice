@@ -6,6 +6,14 @@ import { useAuth } from "./useAuth";
 import { useRouter } from "next/router";
 import { getGlobalExcludedPaths } from "@utils/Helper";
 import tokenService from "@utils/tokenService";
+import {
+  applyCallEventToCallStateMap,
+  mergeOngoingCallsIntoCallStateMap,
+  reduceLoadPersistedCallStates,
+  reduceSaveCallStates,
+  pickMostRecentCall,
+  mergeRemoteEventLogWithPrevious,
+} from "./ctiStompHelpers";
 
 interface CtiDevice {
   dn: string;
@@ -55,57 +63,23 @@ const MASTER_TAB_TIMEOUT = 5000; // 5 seconds
 // Helper for safe localStorage access
 const safeLocalStorage = {
   getItem: (key: string): string | null => {
-    if (typeof window === 'undefined') return null;
+    if (globalThis.window === undefined) return null;
     try {
       return localStorage.getItem(key);
-    } catch {
+    } catch (err) {
+      console.warn("[useCtiStomp] localStorage.getItem failed", key, err);
       return null;
     }
   },
   removeItem: (key: string): void => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     try {
       localStorage.removeItem(key);
-    } catch {
-      // Ignore errors
+    } catch (err) {
+      console.warn("[useCtiStomp] localStorage.removeItem failed", key, err);
     }
-  }
+  },
 };
-
-/** Non-empty party leg startTime from API (used for call timers; do not substitute eventTime). */
-function partyLegHasStartTime(startTime: unknown): boolean {
-  if (startTime == null) {
-    return false;
-  }
-  if (typeof startTime === "string" && startTime.trim() === "") {
-    return false;
-  }
-  return true;
-}
-
-/** Keep startTime on a leg when follow-up events omit it (common for state-only updates). */
-function preservePartyStartTimesFromBase(
-  parties: any[],
-  baseParties: any[] | undefined
-): any[] {
-  if (!baseParties?.length) {
-    return parties;
-  }
-  return parties.map((party) => {
-    if (partyLegHasStartTime(party?.startTime)) {
-      return party;
-    }
-    const prev = baseParties.find(
-      (b: any) =>
-        b?.callingAddress === party?.callingAddress &&
-        b?.calledAddress === party?.calledAddress
-    );
-    if (prev && partyLegHasStartTime(prev.startTime)) {
-      return { ...party, startTime: prev.startTime };
-    }
-    return party;
-  });
-}
 
 // Generate unique instance ID for each hook instance
 let instanceCounter = 0;
@@ -172,7 +146,7 @@ export default function useCtiStomp(
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   const [isMasterTab, setIsMasterTab] = useState(false);
-  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const [_eventSource, setEventSource] = useState<EventSource | null>(null);
 
   // Router for checking current page
   const router = useRouter();
@@ -281,81 +255,17 @@ export default function useCtiStomp(
 
       const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
       if (storedCallStates) {
-        const parsedCallStates = JSON.parse(storedCallStates);
-
-        // Filter only active calls (not terminated) and normalize currentState
-        const activeCallStates = Object.entries(parsedCallStates).reduce(
-          (acc, [callId, callEvent]) => {
-            const event = callEvent as CtiCallEvent;
-            if (
-              !event.isTerminating &&
-              event.parties &&
-              event.parties.length > 0
-            ) {
-              // Check if any party is still active (not DROPPED/DISCONNECTED)
-              const activeParties = event.parties.filter(
-                (p: any) =>
-                  p.callStatus &&
-                  p.callStatus !== "DROPPED" &&
-                  p.callStatus !== "DISCONNECTED" &&
-                  [
-                    "CONNECTED",
-                    "RETRIEVED",
-                    "ON_HOLD",
-                    "RINGING",
-                    "ANSWERED",
-                  ].includes(p.callStatus)
-              );
-
-              if (activeParties.length > 0) {
-                // Normalize currentState if it's DROPPED but there are active parties
-                let normalizedState = event.currentState;
-                if (
-                  event.currentState === "DROPPED" &&
-                  activeParties.length > 0
-                ) {
-                  // Determine state from active parties
-                  const connectedParty = activeParties.find(
-                    (p: any) => p.callStatus === "CONNECTED"
-                  );
-                  const heldParty = activeParties.find(
-                    (p: any) => p.callStatus === "ON_HOLD"
-                  );
-                  const retrievedParty = activeParties.find(
-                    (p: any) => p.callStatus === "RETRIEVED"
-                  );
-
-                  if (heldParty) {
-                    normalizedState = "HELD";
-                  } else if (retrievedParty) {
-                    normalizedState = "RETRIEVED";
-                  } else if (connectedParty) {
-                    normalizedState = "ANSWERED"; // Default for CONNECTED
-                  } else {
-                    normalizedState = "ANSWERED"; // Fallback
-                  }
-                }
-
-                // Create normalized event with only active parties (remove DROPPED/DISCONNECTED)
-                acc[callId] = {
-                  ...event,
-                  currentState: normalizedState,
-                  parties: activeParties, // Remove DROPPED/DISCONNECTED parties immediately
-                  hasActiveParticipants: activeParties.length > 0,
-                };
-              }
-            }
-            return acc;
-          },
-          {} as Record<string, CtiCallEvent>
-        );
+        const parsedCallStates = JSON.parse(storedCallStates) as Record<string, unknown>;
+        const activeCallStates = reduceLoadPersistedCallStates(
+          parsedCallStates,
+        ) as Record<string, CtiCallEvent>;
 
         if (Object.keys(activeCallStates).length > 0) {
           setCallStateMap(activeCallStates);
         }
       }
     } catch (error) {
-      // Clear corrupted data
+      console.warn("[useCtiStomp] loadPersistedCallStates failed, clearing storage", error);
       localStorage.removeItem(CALL_STATES_STORAGE_KEY);
       localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
     }
@@ -365,84 +275,17 @@ export default function useCtiStomp(
   const saveCallStatesToStorage = useCallback(
     (callStates: Record<string, CtiCallEvent>) => {
       try {
-        // Only save calls that are CONNECTED or RETRIEVED (not incoming/ringing)
-        const callsToPersist = Object.entries(callStates).reduce(
-          (acc, [callId, callEvent]) => {
-            if (
-              !callEvent.isTerminating &&
-              callEvent.parties &&
-              callEvent.parties.length > 0
-            ) {
-              // Check if there are active parties (not DROPPED/DISCONNECTED)
-              const activeParties = callEvent.parties.filter(
-                (p: any) =>
-                  p.callStatus &&
-                  p.callStatus !== "DROPPED" &&
-                  p.callStatus !== "DISCONNECTED" &&
-                  ["CONNECTED", "RETRIEVED", "ON_HOLD"].includes(p.callStatus)
-              );
+        const callsToPersist = reduceSaveCallStates(
+          callStates as unknown as Record<string, unknown>,
+        ) as Record<string, CtiCallEvent>;
 
-              // Check if this is a CONNECTED or RETRIEVED call (established calls only)
-              const isConnectedOrRetrieved = activeParties.some((p: any) => {
-                const status = p.callStatus;
-                return status && ["CONNECTED", "RETRIEVED"].includes(status);
-              });
-
-              if (isConnectedOrRetrieved && activeParties.length > 0) {
-                // Normalize currentState if it's DROPPED but there are active parties
-                let normalizedState = callEvent.currentState;
-                if (
-                  callEvent.currentState === "DROPPED" &&
-                  activeParties.length > 0
-                ) {
-                  const connectedParty = activeParties.find(
-                    (p: any) => p.callStatus === "CONNECTED"
-                  );
-                  const heldParty = activeParties.find(
-                    (p: any) => p.callStatus === "ON_HOLD"
-                  );
-                  const retrievedParty = activeParties.find(
-                    (p: any) => p.callStatus === "RETRIEVED"
-                  );
-
-                  if (heldParty) {
-                    normalizedState = "HELD";
-                  } else if (retrievedParty) {
-                    normalizedState = "RETRIEVED";
-                  } else if (connectedParty) {
-                    normalizedState = "ANSWERED";
-                  } else {
-                    normalizedState = "ANSWERED";
-                  }
-                }
-
-                acc[callId] = {
-                  ...callEvent,
-                  currentState: normalizedState,
-                  hasActiveParticipants: true,
-                };
-              }
-            }
-            return acc;
-          },
-          {} as Record<string, CtiCallEvent>
-        );
-
-        if (Object.keys(callsToPersist).length > 0) {
-          // localStorage.setItem(
-          //   CALL_STATES_STORAGE_KEY,
-          //   JSON.stringify(callsToPersist)
-          // );
-          // localStorage.setItem(
-          //   CALL_STATES_TIMESTAMP_KEY,
-          //   new Date().toISOString()
-          // );
-        } else {
-          // If no active calls, clear storage
+        if (Object.keys(callsToPersist).length === 0) {
           localStorage.removeItem(CALL_STATES_STORAGE_KEY);
           localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
         }
-      } catch (error) {}
+      } catch (error) {
+        console.warn("[useCtiStomp] saveCallStatesToStorage failed", error);
+      }
     },
     []
   );
@@ -483,349 +326,15 @@ export default function useCtiStomp(
         return log;
       });
 
-      // Parse eventTime to epoch milliseconds (source of truth for ordering)
-      const eventTimeMs = evt.eventTime ? new Date(evt.eventTime).getTime() : 0;
-      
-      // Get existing state for this callId
-      setCallStateMap((prev) => {
-        const updated = { ...prev };
-        const base = updated[callId] || {};
-        
-        // Parse existing eventTime to epoch milliseconds
-        const existingEventTimeMs = base.eventTime ? new Date(base.eventTime).getTime() : 0;
-        
-        // Handle terminating events - remove call immediately (always process, regardless of eventTime)
-        // This includes DISCONNECTED events with isTerminating: true or all parties DROPPED
-        if (evt.isTerminating) {
-          const { [callId]: _, ...rest } = updated;
-          saveCallStatesToStorage(rest);
-          return rest;
-        }
-
-        // Also handle DISCONNECTED events even if isTerminating is not explicitly set
-        // Check if all parties are DROPPED before processing
-        if (evt.eventType === "DISCONNECTED" && evt.parties) {
-          const allPartiesDroppedEarly =
-            evt.parties.length > 0 &&
-            evt.parties.every(
-              (p: any) =>
-                p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED"
-            );
-
-          if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
-            const { [callId]: _, ...rest } = updated;
-            saveCallStatesToStorage(rest);
-            return rest;
-          }
-        }
-        
-        // Compare eventTime: if incoming event is older, don't regress state
-        // Exception: RINGING events get special handling (see below)
-        if (eventTimeMs < existingEventTimeMs) {
-          // Event is older - don't update state, but we already added to eventLog
-          return updated;
-        }
-        
-        // If eventTime is the same, use sequence as tie-breaker (higher sequence wins)
-        if (eventTimeMs === existingEventTimeMs && existingEventTimeMs > 0) {
-          const incomingSequence = evt.sequence || 0;
-          const existingSequence = base.sequence || 0;
-          
-          // If incoming sequence is not higher, don't update
-          if (incomingSequence <= existingSequence) {
-            return updated;
-          }
-        }
-
-        // Defensive parties merge: use evt.parties if available, otherwise keep existing, otherwise empty array
-        const partiesToProcess = evt.parties || base.parties || [];
-
-        // Process parties to ensure callingDeviceType is included
-        const processedParties = partiesToProcess.map((party: any) => {
-          // First try to get device info from stored caller info
-          let storedCallerInfo = null;
-          try {
-            const stored = localStorage.getItem("cti_caller_info");
-            if (stored) {
-              storedCallerInfo = JSON.parse(stored);
-            }
-          } catch (error) {
-            // Ignore error
-          }
-
-          // If we have stored caller info and it matches this party, use it
-          if (
-            storedCallerInfo &&
-            storedCallerInfo.callingAddress === party.callingAddress &&
-            storedCallerInfo.callingDeviceName === party.callingDeviceName
-          ) {
-            party.callingDeviceType = storedCallerInfo.callingDeviceType;
-          }
-          // If callingDeviceType is still missing, try to get it from the dnsMap
-          else if (
-            !party.callingDeviceType &&
-            party.callingAddress &&
-            party.callingDeviceName
-          ) {
-            const userDevices = dnsMap[party.callingAddress]?.devices;
-            if (userDevices) {
-              const device = Object.values(userDevices).find(
-                (d: any) => d.deviceName === party.callingDeviceName
-              );
-              if (device) {
-                party.callingDeviceType = device.deviceType;
-              }
-            }
-          }
-          // Fallback: If still no device type, try to infer from device name
-          if (!party.callingDeviceType && party.callingDeviceName) {
-            let inferredType = "SOFT_HARD";
-            const deviceName = party.callingDeviceName.toLowerCase();
-
-            if (
-              deviceName.includes("android") ||
-              deviceName.includes("mobile")
-            ) {
-              inferredType = "MOBILE";
-            } else if (
-              deviceName.includes("soft") ||
-              deviceName.includes("csf") ||
-              deviceName.includes("web")
-            ) {
-              inferredType = "SOFT_HARD";
-            } else if (
-              deviceName.includes("phone") ||
-              deviceName.includes("ip")
-            ) {
-              inferredType = "SOFT_HARD";
-            } else if (
-              deviceName.includes("hard") ||
-              deviceName.includes("desk")
-            ) {
-              inferredType = "SOFT_HARD";
-            }
-
-            party.callingDeviceType = inferredType;
-          }
-
-          return party;
-        });
-
-        const partiesWithPreservedStart = preservePartyStartTimesFromBase(
-          processedParties,
-          base.parties
-        );
-
-        // IMPORTANT: Remove DROPPED and DISCONNECTED parties from the parties array immediately
-        // This ensures they are not stored in call state and won't appear in UI
-        const activePartiesOnly = partiesWithPreservedStart.filter(
-          (p: any) =>
-            p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED"
-        );
-
-        // Check if all parties are DROPPED - if so, mark call as terminating
-        const allPartiesDropped =
-          processedParties.length > 0 &&
-          processedParties.every(
-            (p: any) =>
-              p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED"
-          );
-
-        // Check if there are any active (non-DROPPED) parties
-        const hasActiveParties = activePartiesOnly.length > 0;
-
-        // Terminate if:
-        // 1. Explicitly marked as terminating (DISCONNECTED events with isTerminating: true)
-        // 2. All parties dropped/disconnected
-        // 3. No active participants flag and we have parties (EXCEPT for RINGING events - they should be shown)
-        // 4. Event type is DISCONNECTED and no active parties (aggressive cleanup)
-        // 5. No active parties remain after filtering
-        // IMPORTANT: RINGING events should NOT be terminated even if hasActiveParticipants is false,
-        // as RINGING is a valid call state that should appear in Live Calls section
-        const shouldTerminate =
-          evt.isTerminating ||
-          allPartiesDropped ||
-          (evt.hasActiveParticipants === false &&
-            processedParties.length > 0 &&
-            evt.eventType !== "RINGING") || // Don't terminate RINGING events
-          (!hasActiveParties && processedParties.length > 0 && evt.eventType !== "RINGING") || // Don't terminate RINGING events
-          (evt.eventType === "DISCONNECTED" && !hasActiveParties);
-
-        // RINGING precedence rule: when RINGING is received and it's the newest event by eventTime,
-        // it should overwrite the stored call state immediately (even if other events like CONNECTED/ANSWERED/RETRIEVED exist)
-        let effectiveCurrentState = evt.eventType;
-        
-        // Special handling for RINGING: if this is a RINGING event and it's the newest, use it immediately
-        if (evt.eventType === "RINGING") {
-          // RINGING takes precedence when it's the newest event
-          effectiveCurrentState = "RINGING";
-        } else if (evt.eventType === "DROPPED" && hasActiveParties) {
-          // If event is DROPPED but there are still active parties, use the state from active parties
-          const activeParty = activePartiesOnly[0];
-          if (activeParty) {
-            // Map call status to event type
-            if (activeParty.callStatus === "CONNECTED") {
-              effectiveCurrentState = base.currentState || "ANSWERED"; // Keep previous state or use ANSWERED
-            } else if (activeParty.callStatus === "ON_HOLD") {
-              effectiveCurrentState = "HELD";
-            } else if (activeParty.callStatus === "RETRIEVED") {
-              effectiveCurrentState = "RETRIEVED";
-            } else {
-              effectiveCurrentState = base.currentState || "ANSWERED"; // Keep previous state
-            }
-          } else {
-            effectiveCurrentState = base.currentState || evt.eventType; // Fallback to previous state
-          }
-        }
-
-        // On HELD: determine who put the call on hold for Resume button (only that party can resume).
-        // details "GlobalCalling:X" means the other party held -> heldBy = the address that is not X.
-        // No GlobalCalling -> caller put on hold -> heldBy = callingAddress.
-        let heldByAddress: string | undefined;
-        if (evt.eventType === "HELD" && activePartiesOnly.length >= 1) {
-          const p = activePartiesOnly[0];
-          const calling = p.callingAddress;
-          const called = p.calledAddress;
-          const details = (evt as any).details || "";
-          const globalCallingMatch = details.match(/GlobalCalling:(\S+)/);
-          if (globalCallingMatch) {
-            const globalCalling = globalCallingMatch[1].trim();
-            heldByAddress = calling === globalCalling ? called : calling;
-          } else {
-            heldByAddress = calling;
-          }
-        } else if (effectiveCurrentState !== "HELD") {
-          heldByAddress = undefined;
-        } else {
-          heldByAddress = base.heldByAddress;
-        }
-
-        // Store only active parties (DROPPED parties are removed immediately)
-        // Update state with new eventTime, sequence, and currentState
-        // eventTime: message ordering only; keep prior if this payload omits it
-        updated[callId] = {
-          ...base,
+      setCallStateMap((prev) =>
+        applyCallEventToCallStateMap(
+          prev as Record<string, any>,
           callId,
-          currentState: effectiveCurrentState,
-          sequence: evt.sequence,
-          eventTime: evt.eventTime ?? base.eventTime ?? "",
-          isConference: evt.isConference !== undefined ? evt.isConference : base.isConference,
-          isOneToOne: evt.isOneToOne !== undefined ? evt.isOneToOne : base.isOneToOne,
-          parties: activePartiesOnly, // Only store active parties - DROPPED parties are removed
-          isTerminating: shouldTerminate,
-          hasActiveParticipants:
-            // For RINGING events, always set to true if we have active parties (even if event says false)
-            // This ensures RINGING calls appear in Live Calls section
-            evt.eventType === "RINGING" && hasActiveParties
-              ? true
-              : evt.hasActiveParticipants !== undefined
-              ? evt.hasActiveParticipants
-              : hasActiveParties,
-          eventName: evt.eventName || base.eventName,
-          heldByAddress,
-        };
-
-        // If all parties are dropped or call is terminating, remove the call state
-        if (shouldTerminate) {
-          const { [callId]: _, ...rest } = updated;
-          const cleaned = rest;
-          // Save cleaned state to localStorage
-          saveCallStatesToStorage(cleaned);
-          return cleaned;
-        }
-
-        // Cleanup: After processing a DROPPED event for a specific party pair, check if the same party pair
-        // exists in other calls with older event times - if so, mark those as stale
-        if (evt.eventType === "DROPPED" && activePartiesOnly.length > 0) {
-          // Find all dropped party pairs from this event
-          const droppedPartyPairs = processedParties
-            .filter(
-              (p: any) =>
-                p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED"
-            )
-            .map((p: any) => ({
-              calling: p.callingAddress,
-              called: p.calledAddress,
-              callingDevice: p.callingDeviceName,
-              calledDevice: p.calledDeviceName,
-            }));
-
-          // For each dropped party pair, check if it exists in other calls with older event times
-          droppedPartyPairs.forEach((droppedPair: any) => {
-            Object.keys(updated).forEach((otherCallId) => {
-              if (otherCallId === callId) return; // Skip the current call
-
-              const otherCall = updated[otherCallId];
-              if (!otherCall || otherCall.isTerminating) return;
-
-              // Check if this call has the same party pair (matching by addresses)
-              // Match by addresses - if device names are available and match, that's a bonus but not required
-              const matchingParty = otherCall.parties?.find((p: any) => {
-                const matchesAddresses =
-                  (p.callingAddress === droppedPair.calling &&
-                    p.calledAddress === droppedPair.called) ||
-                  (p.callingAddress === droppedPair.called &&
-                    p.calledAddress === droppedPair.calling);
-
-                return matchesAddresses;
-              });
-
-              // If we found a matching party and this call's event time is older, mark it as DROPPED
-              if (
-                matchingParty &&
-                matchingParty.callStatus !== "DROPPED" &&
-                matchingParty.callStatus !== "DISCONNECTED"
-              ) {
-                const otherCallTime = new Date(
-                  otherCall.eventTime || 0
-                ).getTime();
-                const currentEventTime = new Date(evt.eventTime).getTime();
-
-                // If this call is older than the DROPPED event, mark the matching party as DROPPED
-                if (otherCallTime < currentEventTime) {
-                  const updatedParties = otherCall.parties.map((p: any) => {
-                    const isMatchingParty =
-                      (p.callingAddress === droppedPair.calling &&
-                        p.calledAddress === droppedPair.called) ||
-                      (p.callingAddress === droppedPair.called &&
-                        p.calledAddress === droppedPair.calling);
-
-                    if (isMatchingParty) {
-                      return { ...p, callStatus: "DROPPED" };
-                    }
-                    return p;
-                  });
-
-                  // Filter out DROPPED parties
-                  const activeParties = updatedParties.filter(
-                    (p: any) =>
-                      p.callStatus !== "DROPPED" &&
-                      p.callStatus !== "DISCONNECTED"
-                  );
-
-                  // If no active parties remain, mark call as terminating
-                  if (activeParties.length === 0) {
-                    updated[otherCallId] = {
-                      ...otherCall,
-                      isTerminating: true,
-                    };
-                  } else {
-                    // Update the call with filtered parties
-                    updated[otherCallId] = {
-                      ...otherCall,
-                      parties: activeParties,
-                    };
-                  }
-                }
-              }
-            });
-          });
-        }
-
-        // Save updated state to localStorage
-        saveCallStatesToStorage(updated);
-        return updated;
-      });
+          evt,
+          dnsMap,
+          saveCallStatesToStorage as (m: Record<string, any>) => void,
+        ) as Record<string, CtiCallEvent>,
+      );
     },
     [saveCallStatesToStorage, dnsMap] // Include dnsMap so non-master tabs have access to latest device info
   );
@@ -833,128 +342,22 @@ export default function useCtiStomp(
   // Handle ongoing calls response
   const handleOngoingCalls = useCallback(
     (data: { callsByDn?: Record<string, any> }) => {
-      if (!data || !data.callsByDn) {
-        console.log('[useCtiStomp] No callsByDn in ongoing calls response');
+      if (!data?.callsByDn) {
         return;
       }
 
-      const callsByDn = data.callsByDn || {};
-      console.log('[useCtiStomp] Processing ongoing calls:', Object.keys(callsByDn).length, 'DNs');
+      const callsByDn = data.callsByDn;
 
       setCallStateMap((prev) => {
-        const updated = { ...prev };
-
-        // Process each DN's call data
-        Object.entries(callsByDn).forEach(([dn, callData]: [string, any]) => {
-          // Only process if callId is not null
-          if (!callData.callId) {
-            return;
-          }
-
-          const callId = callData.callId;
-
-          // Check if call should be included (has active participants and not terminating)
-          const shouldInclude = 
-            callData.hasActiveParticipants !== false && 
-            callData.isTerminating !== true &&
-            callData.parties &&
-            callData.parties.length > 0;
-
-          if (!shouldInclude) {
-            // Remove from callStateMap if it exists
-            if (updated[callId]) {
-              delete updated[callId];
-            }
-            return;
-          }
-
-          const existingCall = updated[callId];
-
-          // Filter out DROPPED/DISCONNECTED parties FIRST; preserve leg startTime from prior map entry
-          const activeParties = preservePartyStartTimesFromBase(
-            (callData.parties || []).filter(
-              (p: any) =>
-                p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED"
-            ),
-            existingCall?.parties
-          );
-
-          if (activeParties.length === 0) {
-            // Remove from callStateMap if no active parties
-            if (updated[callId]) {
-              delete updated[callId];
-            }
-            return;
-          }
-
-          // Determine currentState from active parties (not from first party which might be DROPPED)
-          let currentState = callData.eventType || callData.currentState;
-          
-          // If currentState is DROPPED/DISCONNECTED but we have active parties, normalize it
-          if ((currentState === 'DROPPED' || currentState === 'DISCONNECTED') && activeParties.length > 0) {
-            // Find the status from active parties
-            const connectedParty = activeParties.find((p: any) => p.callStatus === 'CONNECTED');
-            const heldParty = activeParties.find((p: any) => p.callStatus === 'ON_HOLD');
-            const retrievedParty = activeParties.find((p: any) => p.callStatus === 'RETRIEVED');
-            const answeredParty = activeParties.find((p: any) => p.callStatus === 'ANSWERED');
-            const ringingParty = activeParties.find((p: any) => p.callStatus === 'RINGING');
-            
-            if (heldParty) {
-              currentState = 'HELD';
-            } else if (retrievedParty) {
-              currentState = 'RETRIEVED';
-            } else if (connectedParty) {
-              currentState = 'ANSWERED'; // Use ANSWERED for CONNECTED
-            } else if (answeredParty) {
-              currentState = 'ANSWERED';
-            } else if (ringingParty) {
-              currentState = 'RINGING';
-            } else {
-              // Fallback to first active party's status
-              currentState = activeParties[0]?.callStatus || 'ANSWERED';
-            }
-          } else if (!currentState && activeParties.length > 0) {
-            // If no currentState, determine from active parties
-            const connectedParty = activeParties.find((p: any) => p.callStatus === 'CONNECTED');
-            const heldParty = activeParties.find((p: any) => p.callStatus === 'ON_HOLD');
-            const retrievedParty = activeParties.find((p: any) => p.callStatus === 'RETRIEVED');
-            
-            if (heldParty) {
-              currentState = 'HELD';
-            } else if (retrievedParty) {
-              currentState = 'RETRIEVED';
-            } else if (connectedParty) {
-              currentState = 'ANSWERED';
-            } else {
-              currentState = activeParties[0]?.callStatus || 'UNKNOWN';
-            }
-          }
-
-          // Add or update call in callStateMap (preserve heldByAddress when state is HELD and we had it from a prior HELD event)
-          updated[callId] = {
-            ...callData,
-            callId,
-            currentState: currentState || "UNKNOWN",
-            parties: activeParties,
-            hasActiveParticipants: callData.hasActiveParticipants !== false,
-            isTerminating: callData.isTerminating === true,
-            // Do not use wall-clock time as eventTime (not call answer start; skews ordering vs STOMP events)
-            eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
-            ...(currentState === "HELD" &&
-              existingCall?.heldByAddress != null && {
-                heldByAddress: existingCall.heldByAddress,
-              }),
-          };
-
-          console.log(`[useCtiStomp] Added/updated ongoing call: ${callId} for DN: ${dn}, state: ${currentState}`);
-        });
-
-        // Save updated state to localStorage
+        const updated = mergeOngoingCallsIntoCallStateMap(
+          prev as Record<string, any>,
+          callsByDn,
+        ) as Record<string, CtiCallEvent>;
         saveCallStatesToStorage(updated);
         return updated;
       });
     },
-    [saveCallStatesToStorage]
+    [saveCallStatesToStorage],
   );
 
   // Group devices by DN and deviceName
@@ -1136,7 +539,13 @@ export default function useCtiStomp(
     isGettingTokenRef.current = true;
 
     try {
-      if(typeof window !== 'undefined' && globalExcludedPaths.some(path => window.location.pathname?.includes(path)) && !isAuthenticated) {
+      if (
+        globalThis.window !== undefined &&
+        globalExcludedPaths.some((path) =>
+          globalThis.window?.location.pathname?.includes(path),
+        ) &&
+        !isAuthenticated
+      ) {
         throw new Error("User not authenticated");
       }
       // Wait for token to be in sessionStorage so axios interceptor can send Authorization header.
@@ -1192,6 +601,7 @@ export default function useCtiStomp(
         return null;
       }
     } catch (error) {
+      console.warn("[useCtiStomp] getBearerToken failed", error);
       isGettingTokenRef.current = false;
       return null;
     }
@@ -1212,26 +622,22 @@ export default function useCtiStomp(
       );
       // Use fullyCloseConnection helper for consistent cleanup
       const fullyCloseConnection = async () => {
-        const currentInstanceId = instanceIdRef.current;
-        
-        // Close EventSource connection
         if (eventSourceRef.current) {
           try {
             eventSourceRef.current.close();
           } catch (err) {
-            // Ignore errors during close
+            console.warn("[useCtiStomp] EventSource.close failed during auth cleanup", err);
           }
           eventSourceRef.current = null;
         }
 
-        // Clear STOMP client reference if it exists
         if (clientRef.current) {
           try {
             if (clientRef.current.connected) {
-              clientRef.current.deactivate();
+              await clientRef.current.deactivate();
             }
           } catch (err) {
-            // Ignore errors during deactivation
+            console.warn("[useCtiStomp] STOMP deactivate failed during auth cleanup", err);
           }
           clientRef.current = null;
         }
@@ -1263,8 +669,8 @@ export default function useCtiStomp(
       };
       
       // Close connection asynchronously but don't wait for it
-      fullyCloseConnection().catch(() => {
-        // Ignore errors during cleanup
+      fullyCloseConnection().catch((err) => {
+        console.warn("[useCtiStomp] fullyCloseConnection failed during unauthenticated cleanup", err);
       });
       
       return;
@@ -1287,8 +693,7 @@ export default function useCtiStomp(
       // A closed connection should trigger re-initialization
       if (
         isInitializedRef.current &&
-        eventSourceRef.current &&
-        eventSourceRef.current.readyState === EventSource.OPEN
+        eventSourceRef.current?.readyState === EventSource.OPEN
       ) {
         console.log(
           `[${instanceIdRef.current}] useEffect triggered but already initialized with active connection, skipping...`
@@ -1306,7 +711,7 @@ export default function useCtiStomp(
         try {
           eventSourceRef.current.close();
         } catch (err) {
-          // Ignore errors
+          console.warn("[useCtiStomp] EventSource.close failed during stale reconnect", err);
         }
         eventSourceRef.current = null;
         isInitializedRef.current = false;
@@ -1325,24 +730,22 @@ export default function useCtiStomp(
       // Preserve reconnecting flag if needed
       const wasReconnecting = isReconnectingRef.current;
 
-      // Close EventSource connection
       if (eventSourceRef.current) {
         try {
           eventSourceRef.current.close();
         } catch (err) {
-          // Ignore errors during close
+          console.warn("[useCtiStomp] EventSource.close failed during full close", err);
         }
         eventSourceRef.current = null;
       }
 
-      // Clear STOMP client reference if it exists
       if (clientRef.current) {
         try {
           if (clientRef.current.connected) {
-            clientRef.current.deactivate();
+            await clientRef.current.deactivate();
           }
         } catch (err) {
-          // Ignore errors during deactivation
+          console.warn("[useCtiStomp] STOMP deactivate failed during full close", err);
         }
         clientRef.current = null;
       }
@@ -1366,14 +769,12 @@ export default function useCtiStomp(
       connectionStartTimeRef.current = null;
       hasRequestedInitialStateRef.current = false;
 
-      // Only reset reconnecting flag if not preserving it
-      if (!preserveReconnecting) {
-        isReconnectingRef.current = false;
-        setIsReconnecting(false);
-      } else {
-        // Restore the reconnecting flag if we're preserving it
+      if (preserveReconnecting) {
         isReconnectingRef.current = wasReconnecting;
         setIsReconnecting(!!wasReconnecting);
+      } else {
+        isReconnectingRef.current = false;
+        setIsReconnecting(false);
       }
 
       // Clear token, userAddress, userTeams, and userDataExtensions refs to force fresh token on next connection
@@ -1422,7 +823,6 @@ export default function useCtiStomp(
         isReconnectingRef.current = false;
         setIsReconnecting(false);
         reconnectionAttemptsRef.current = 0;
-       // setError(`Failed to reconnect after ${maxAttempts} attempts. Please refresh the page.`);
         return;
       }
 
@@ -1550,7 +950,7 @@ export default function useCtiStomp(
           try {
             eventSourceRef.current.close();
           } catch (err) {
-            // Ignore errors
+            console.warn("[useCtiStomp] EventSource.close failed before recreate", err);
           }
           eventSourceRef.current = null;
           // Wait a bit to ensure it's fully closed
@@ -1615,18 +1015,17 @@ export default function useCtiStomp(
             return;
           }
 
-          // Check if connection exists and is open
-          if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
+          if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
             console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
-            if (!isReconnectingRef.current && attemptReconnectionRef.current) {
-              // Stop health check immediately so only one reconnection runs; new connection will set its own interval
+            const reconnect = attemptReconnectionRef.current;
+            if (reconnect) {
               if (healthCheckIntervalRef.current) {
                 clearInterval(healthCheckIntervalRef.current);
                 healthCheckIntervalRef.current = null;
               }
               isReconnectingRef.current = true;
               setIsReconnecting(true);
-              attemptReconnectionRef.current();
+              reconnect();
             }
             return;
           }
@@ -1641,18 +1040,19 @@ export default function useCtiStomp(
           // If no CTI event received in 5 minutes AND connection is open, it might be stale
           // But if connection is OPEN, it's likely still alive (SSE keeps connection open with pings)
           // Only trigger reconnection if it's been a very long time (5 minutes) without any CTI events
-          if (timeSinceLastMessage > 300000) { // 5 minutes instead of 2 minutes
+          if (timeSinceLastMessage > 300000) {
             console.log(
               `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
             );
-            if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+            const reconnect = attemptReconnectionRef.current;
+            if (reconnect) {
               if (healthCheckIntervalRef.current) {
                 clearInterval(healthCheckIntervalRef.current);
                 healthCheckIntervalRef.current = null;
               }
               isReconnectingRef.current = true;
               setIsReconnecting(true);
-              attemptReconnectionRef.current();
+              reconnect();
             }
           }
         }, 30000); // Check every 30 seconds
@@ -1675,7 +1075,6 @@ export default function useCtiStomp(
             await connectViaSSE(freshToken.token, freshToken.userAddress, true);
           } else {
             console.error(`[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`);
-            //setError("Failed to get fresh token for reconnection");
           }
         }, 9000000); // 2.5hour
       };
@@ -1697,7 +1096,6 @@ export default function useCtiStomp(
                   groupDevicesByDnAndDeviceNameRef.current &&
                   updateSummaryDataRef.current
                 ) {
-                 // console.log("complete_state", data.data);
                   const grouped = groupDevicesByDnAndDeviceNameRef.current(
                     data.data
                   );
@@ -1722,12 +1120,11 @@ export default function useCtiStomp(
                   }
                 }
               } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process initial state`);
-                //setError("Failed to process initial state");
+                console.error(`[${currentInstanceId}] ❌ Failed to process initial state`, err);
               }
               break;
 
-            case "dns_states":
+            case "dns_states": {
               try {
                 const s = data.data;
                 setDnsMap((prev) => {
@@ -1744,10 +1141,10 @@ export default function useCtiStomp(
                   return updated;
                 });
               } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process update`);
-                //setError("Failed to process update");
+                console.error(`[${currentInstanceId}] ❌ Failed to process update`, err);
               }
               break;
+            }
 
             case "call_events":
               try {
@@ -1758,23 +1155,20 @@ export default function useCtiStomp(
                   scheduleRefreshAfterCallEndRef.current?.();
                 }
               } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process call event`);
-                //setError("Failed to process call event");
+                console.error(`[${currentInstanceId}] ❌ Failed to process call event`, err);
               }
               break;
 
-            case "stomp_connected":
+            case "stomp_connected": {
               setIsInitialized(true);
               setError(null);
-              // Request initial state only once per connection to avoid repeated demands
-              if (!hasRequestedInitialStateRef.current && publishStompMessageRef.current) {
+              const publishInitial = publishStompMessageRef.current;
+              if (!hasRequestedInitialStateRef.current && publishInitial) {
                 hasRequestedInitialStateRef.current = true;
-                publishStompMessageRef.current(
-                  "/app/request/initial-state",
-                  ""
-                );
+                publishInitial("/app/request/initial-state", "");
               }
               break;
+            }
 
             case "stomp_error":
               setError("STOMP error: " + (data.message || "unknown"));
@@ -1796,8 +1190,11 @@ export default function useCtiStomp(
                 console.log(
                   `[${instanceIdRef.current}] 🔄 Received reconnecting status from server`
                 );
-                // During reconnection, use retry logic with exponential backoff
-                if (!isReconnectingRef.current) {
+                if (isReconnectingRef.current) {
+                  console.log(
+                    `[${instanceIdRef.current}] ⚠️ Reconnection already in progress, ignoring duplicate message`
+                  );
+                } else {
                   const currentInstanceId = instanceIdRef.current;
                   isReconnectingRef.current = true;
                   setIsReconnecting(true);
@@ -1805,10 +1202,6 @@ export default function useCtiStomp(
                     `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`
                   );
                   attemptReconnection();
-                } else {
-                  console.log(
-                    `[${instanceIdRef.current}] ⚠️ Reconnection already in progress, ignoring duplicate message`
-                  );
                 }
               }
               break;
@@ -1830,7 +1223,7 @@ export default function useCtiStomp(
               break;
           }
         } catch (error) {
-          // Ignore parsing errors
+          console.warn("[useCtiStomp] SSE message parse/handle failed", error);
         }
       };
 
@@ -1851,7 +1244,7 @@ export default function useCtiStomp(
               try {
                 eventSourceRef.current.close();
               } catch (err) {
-                // Ignore errors
+                console.warn("[useCtiStomp] EventSource.close failed (primary onerror, not master)", err);
               }
               eventSourceRef.current = null;
             }
@@ -1865,17 +1258,16 @@ export default function useCtiStomp(
         if (readyState === EventSource.CLOSED) {
           console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
           setIsInitialized(false);
-          //setError("SSE connection closed");
 
-          // Reconnect with retry logic and exponential backoff
-          if (!isReconnectingRef.current) {
-            isReconnectingRef.current = true;
-            setIsReconnecting(true);
-            console.log(
-              `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
-            );
-            attemptReconnection();
+          if (isReconnectingRef.current) {
+            return;
           }
+          isReconnectingRef.current = true;
+          setIsReconnecting(true);
+          console.log(
+            `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
+          );
+          attemptReconnection();
         } else if (readyState === EventSource.CONNECTING) {
           // Don't set error yet, it's still trying to connect
           console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
@@ -1922,8 +1314,7 @@ export default function useCtiStomp(
       if (
         isGlobalInstance &&
         isInitializedRef.current &&
-        eventSourceRef.current &&
-        eventSourceRef.current.readyState === EventSource.OPEN
+        eventSourceRef.current?.readyState === EventSource.OPEN
       ) {
         console.log(
           `[${currentInstanceId}] Global instance already initialized with active connection, reusing...`
@@ -1965,7 +1356,7 @@ export default function useCtiStomp(
           const lastHeartbeat = safeLocalStorage.getItem(MASTER_TAB_HEARTBEAT_KEY);
           
           if (masterTabId && lastHeartbeat) {
-            const heartbeatTime = parseInt(lastHeartbeat, 10);
+            const heartbeatTime = Number.parseInt(lastHeartbeat, 10);
             const timeSinceHeartbeat = Date.now() - heartbeatTime;
             // If heartbeat is stale, clear it and retry master election
             if (timeSinceHeartbeat > MASTER_TAB_TIMEOUT) {
@@ -2126,7 +1517,7 @@ export default function useCtiStomp(
         const lastHeartbeat = safeLocalStorage.getItem(MASTER_TAB_HEARTBEAT_KEY);
         
         if (masterTabId && lastHeartbeat) {
-          const heartbeatTime = parseInt(lastHeartbeat, 10);
+          const heartbeatTime = Number.parseInt(lastHeartbeat, 10);
           const timeSinceHeartbeat = Date.now() - heartbeatTime;
           // If heartbeat is stale (>5 seconds), clear it and force master election
           if (timeSinceHeartbeat > MASTER_TAB_TIMEOUT) {
@@ -2145,9 +1536,8 @@ export default function useCtiStomp(
     // Only skip if there's actually an active connection (not just stale refs)
     // FIX: During client-side navigation, verify connection is actually OPEN
     // If connection is closed or doesn't exist, re-initialize
-    const hasActiveConnection = isGlobalInstance &&
-      eventSourceRef.current &&
-      eventSourceRef.current.readyState === EventSource.OPEN;
+    const hasActiveConnection =
+      isGlobalInstance && eventSourceRef.current?.readyState === EventSource.OPEN;
     
     if (hasActiveConnection) {
       console.log(
@@ -2211,7 +1601,6 @@ export default function useCtiStomp(
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
     (dn: string) => {
-      console.log("ZEZEZ getDevicesForDn", dn, dnsMap);
       const devices = dnsMap[dn] ? Object.values(dnsMap[dn].devices) : [];
       return devices;
     },
@@ -2296,9 +1685,7 @@ export default function useCtiStomp(
 
       if (!activeCalls.length) return null;
 
-      const mostRecent = activeCalls.reduce((a, b) =>
-        new Date(b.eventTime) > new Date(a.eventTime) ? b : a
-      );
+      const mostRecent = pickMostRecentCall(activeCalls);
 
       // Find the participant where this DN appears (all parties are already active, but check for safety)
       const matchedParty = mostRecent.parties.find(
@@ -2345,9 +1732,7 @@ export default function useCtiStomp(
       if (!filtered.length) return null;
 
       // Most recent call
-      const mostRecent = filtered.reduce((a, b) =>
-        new Date(b.eventTime) > new Date(a.eventTime) ? b : a
-      );
+      const mostRecent = pickMostRecentCall(filtered);
 
       // Matched party (prefer non-DROPPED)
       const matchedParty = mostRecent.parties.find(
@@ -2394,7 +1779,7 @@ export default function useCtiStomp(
         localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
       }
     } catch (error) {
-      // Ignore error
+      console.warn("[useCtiStomp] clearExpiredCallStates failed", error);
     }
   }, []);
 
@@ -2406,17 +1791,18 @@ export default function useCtiStomp(
 
       const parsedCallStates = JSON.parse(storedCallStates);
 
-      // Request call state updates for persisted calls
-      if (clientRef.current && clientRef.current.connected) {
-        Object.keys(parsedCallStates).forEach((callId) => {
-          clientRef.current?.publish({
-            destination: "/app/request/call-state",
-            body: JSON.stringify({ callId }),
-          });
-        });
+      if (!clientRef.current?.connected) {
+        return;
       }
+      const stompClient = clientRef.current;
+      Object.keys(parsedCallStates).forEach((callId) => {
+        stompClient.publish({
+          destination: "/app/request/call-state",
+          body: JSON.stringify({ callId }),
+        });
+      });
     } catch (error) {
-      // Ignore error
+      console.warn("[useCtiStomp] syncPersistedCallStates failed", error);
     }
   }, []);
 
@@ -2480,7 +1866,7 @@ export default function useCtiStomp(
         try {
           eventSourceRef.current.close();
         } catch (err) {
-          // Ignore errors
+          console.warn("[useCtiStomp] EventSource.close failed (not master cleanup)", err);
         }
         eventSourceRef.current = null;
       }
@@ -2602,7 +1988,6 @@ export default function useCtiStomp(
           eventSourceRef.current = eventSource;
           setEventSource(eventSource);
           eventSource.onopen = () => {
-           // console.log(`[${currentInstanceId}] ✅ Master tab connection opened`);
             isConnectingRef.current = false;
             isInitializedRef.current = true;
             setIsInitialized(true);
@@ -2636,22 +2021,21 @@ export default function useCtiStomp(
                 return;
               }
 
-              // Check if connection exists and is open
-              if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
+              if (eventSourceRef.current?.readyState !== EventSource.OPEN) {
                 console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
-                if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                const reconnect = attemptReconnectionRef.current;
+                if (reconnect) {
                   if (healthCheckIntervalRef.current) {
                     clearInterval(healthCheckIntervalRef.current);
                     healthCheckIntervalRef.current = null;
                   }
                   isReconnectingRef.current = true;
                   setIsReconnecting(true);
-                  attemptReconnectionRef.current();
+                  reconnect();
                 }
                 return;
               }
 
-              // Check if we've received a message recently (within last 5 minutes)
               const now = Date.now();
               const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
               const timeSinceLastMessage = now - lastMessageTime;
@@ -2660,14 +2044,15 @@ export default function useCtiStomp(
                 console.log(
                   `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
                 );
-                if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                const reconnectStale = attemptReconnectionRef.current;
+                if (reconnectStale) {
                   if (healthCheckIntervalRef.current) {
                     clearInterval(healthCheckIntervalRef.current);
                     healthCheckIntervalRef.current = null;
                   }
                   isReconnectingRef.current = true;
                   setIsReconnecting(true);
-                  attemptReconnectionRef.current();
+                  reconnectStale();
                 }
               }
             }, 30000); // Check every 30 seconds
@@ -2689,7 +2074,6 @@ export default function useCtiStomp(
                     groupDevicesByDnAndDeviceNameRef.current &&
                     updateSummaryDataRef.current
                   ) {
-                    //console.log("complete_state 2", data.data);
                     const grouped = groupDevicesByDnAndDeviceNameRef.current(
                       data.data
                     );
@@ -2714,7 +2098,7 @@ export default function useCtiStomp(
                   }
                   break;
 
-                case "dns_states":
+                case "dns_states": {
                   const s = data.data;
                   setDnsMap((prev) => {
                     const updated = { ...prev };
@@ -2729,16 +2113,15 @@ export default function useCtiStomp(
                     }
                     return updated;
                   });
-                  
-                  // CRITICAL: Broadcast dns_states to non-master tabs
-                  // This ensures non-master tabs receive device state updates
+
                   if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
                     manager.broadcastCtiEvent({
-                      type: 'dns_states',
-                      data: s
+                      type: "dns_states",
+                      data: s,
                     });
                   }
                   break;
+                }
 
                 case "call_events":
                   if (handleCallEventRef.current) {
@@ -2749,22 +2132,17 @@ export default function useCtiStomp(
                   }
                   break;
 
-                case "stomp_connected":
+                case "stomp_connected": {
                   setIsInitialized(true);
                   setError(null);
-                  if (!hasRequestedInitialStateRef.current && publishStompMessageRef.current) {
+                  const publishMaster = publishStompMessageRef.current;
+                  if (!hasRequestedInitialStateRef.current && publishMaster) {
                     hasRequestedInitialStateRef.current = true;
-                    publishStompMessageRef.current(
-                      "/app/request/initial-state",
-                      ""
-                    );
-                    // Request ongoing calls after initial state
-                    publishStompMessageRef.current(
-                      "/app/request/ongoing-calls",
-                      ""
-                    );
+                    publishMaster("/app/request/initial-state", "");
+                    publishMaster("/app/request/ongoing-calls", "");
                   }
                   break;
+                }
                 
                 case "ongoing_calls":
                   if (handleOngoingCallsRef.current) {
@@ -2773,7 +2151,7 @@ export default function useCtiStomp(
                   break;
               }
             } catch (error) {
-              // Ignore parsing errors
+              console.warn("[useCtiStomp] Master SSE message parse/handle failed", error);
             }
           };
 
@@ -2782,11 +2160,9 @@ export default function useCtiStomp(
             const readyState = eventSource.readyState;
             const manager = crossTabManagerRef.current;
 
-            // For global instance with cross-tab support, check if we're still master
             if (isGlobalInstance && manager.isCrossTabSupported()) {
               const isMaster = manager.isMasterTab();
               if (!isMaster) {
-                // We're no longer master, close connection and don't reconnect
                 console.log(
                   `[${currentInstanceId}] ⚠️ No longer master tab, closing connection...`
                 );
@@ -2794,31 +2170,29 @@ export default function useCtiStomp(
                   try {
                     eventSourceRef.current.close();
                   } catch (err) {
-                    // Ignore errors
+                    console.warn("[useCtiStomp] EventSource.close failed (master, not master)", err);
                   }
                   eventSourceRef.current = null;
                 }
-                setIsInitialized(true); // Keep UI enabled, actions will forward
+                setIsInitialized(true);
                 setError(null);
                 return;
               }
             }
 
-            // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
             if (readyState === EventSource.CLOSED) {
               console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
               setIsInitialized(false);
-              //setError("SSE connection closed");
 
-              // Reconnect with retry logic and exponential backoff
-              if (!isReconnectingRef.current && attemptReconnectionRef.current) {
-                isReconnectingRef.current = true;
-                setIsReconnecting(true);
-                console.log(
-                  `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
-                );
-                attemptReconnectionRef.current();
+              if (isReconnectingRef.current || !attemptReconnectionRef.current) {
+                return;
               }
+              isReconnectingRef.current = true;
+              setIsReconnecting(true);
+              console.log(
+                `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
+              );
+              attemptReconnectionRef.current();
             } else if (readyState === EventSource.CONNECTING) {
               // Don't set error yet, it's still trying to connect
               console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
@@ -2833,9 +2207,8 @@ export default function useCtiStomp(
         .catch((error) => {
           console.error(`[${currentInstanceId}] Error getting token:`, error);
           isConnectingRef.current = false;
-          isGettingTokenRef.current = false; // Reset token flag
+          isGettingTokenRef.current = false;
           console.error(`[${currentInstanceId}] ❌ Failed to get token`);
-          //setError("Failed to get token");
         });
     }
     // Re-run when auth state changes so we connect only when authenticated
@@ -2945,28 +2318,7 @@ export default function useCtiStomp(
       // CRITICAL: Sync eventLog from master tab so non-master tabs have full event history
       // This ensures components like GlobalFloatingCallBar can detect incoming calls
       if (state.eventLog && Array.isArray(state.eventLog)) {
-        // Merge with existing eventLog, avoiding duplicates
-        setEventLog((prev) => {
-          // If master's eventLog is longer or different, use it (master is source of truth)
-          // Otherwise, merge new events that aren't in prev
-          const prevEventIds = new Set(prev.map((e: any) => 
-            e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null
-          ).filter(Boolean));
-          
-          const newEvents = state.eventLog.filter((e: any) => {
-            const eventId = e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null;
-            return eventId && !prevEventIds.has(eventId);
-          });
-          
-          // If master has significantly more events, use master's version (it's the source of truth)
-          if (state.eventLog.length > prev.length + 10) {
-            return state.eventLog.slice(-200); // Keep last 200 events
-          }
-          
-          // Otherwise, merge new events
-          const merged = [...prev, ...newEvents];
-          return merged.slice(-200); // Keep last 200 events
-        });
+        setEventLog((prev) => mergeRemoteEventLogWithPrevious(prev, state.eventLog));
       }
       // Always set initialized to true when we receive state from master
       // This ensures non-master tabs appear as initialized
@@ -3031,7 +2383,7 @@ export default function useCtiStomp(
     // Broadcast latest call events to other tabs
     // This ensures non-master tabs receive events in real-time
     if (eventLog && eventLog.length > 0) {
-      const latestEvent = eventLog[eventLog.length - 1];
+      const latestEvent = eventLog.at(-1);
       // Broadcast all events, not just those with callId (some events like complete_state don't have callId)
       if (latestEvent) {
         manager.broadcastCtiEvent({
@@ -3070,6 +2422,7 @@ export default function useCtiStomp(
 
       return activeCallIds;
     } catch (error) {
+      console.warn("[useCtiStomp] getActiveCallIdsFromLocalStorage failed", error);
       return [];
     }
   }, []);
