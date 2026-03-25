@@ -165,7 +165,7 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as MutableConfig | undefined;
+    const originalRequest = error.config;
 
     if (!originalRequest) {
       if (error.response) {
