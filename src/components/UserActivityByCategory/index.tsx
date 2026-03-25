@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -11,24 +11,25 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
-import { Calendar, ExternalLink, ChevronDown } from "lucide-react";
+import { Calendar, ChevronDown } from "lucide-react";
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
-
+// Keep static demo data, but show absolute volume (count) + percentage.
+const BASE_TOTAL_ACTIVITY = 1000;
 const categories = [
-  { name: "Leads", value: 70.5, color: "#F4A57A" },
-  { name: "Deals", value: 60.5, color: "#90CAF9" },
-  { name: "Orders",            value: 50.5, color: "#A5D6A7" },
-  { name: "Companies",                value: 20.8, color: "#4ECDC4" },
-  { name: "Tasks",    value: 6.2,  color: "#B5A7E0" },
-  { name: "Meetings",         value: 3.8,  color: "#F4D47A" },
-  { name: "Calls",       value: 2.6,  color: "#F48FB1" },
-  { name: "Emails",                   value: 1.0,  color: "#EF6C00" },
-  { name: "Tickets", value: 0.8,  color: "#006D77" },
-  { name: "Attendance",      value: 0.5,    color: "#CE93D8" },
-  { name: "Projects",                  value: 0.2,    color: "#B0BEC5" },
+  { name: "Leads", percentage: 70.5, count: Math.round((70.5 / 100) * BASE_TOTAL_ACTIVITY), color: "#F4A57A" },
+  { name: "Deals", percentage: 60.5, count: Math.round((60.5 / 100) * BASE_TOTAL_ACTIVITY), color: "#90CAF9" },
+  { name: "Orders", percentage: 50.5, count: Math.round((50.5 / 100) * BASE_TOTAL_ACTIVITY), color: "#A5D6A7" },
+  { name: "Companies", percentage: 20.8, count: Math.round((20.8 / 100) * BASE_TOTAL_ACTIVITY), color: "#4ECDC4" },
+  { name: "Tasks", percentage: 6.2, count: Math.round((6.2 / 100) * BASE_TOTAL_ACTIVITY), color: "#B5A7E0" },
+  { name: "Meetings", percentage: 3.8, count: Math.round((3.8 / 100) * BASE_TOTAL_ACTIVITY), color: "#F4D47A" },
+  { name: "Calls", percentage: 2.6, count: Math.round((2.6 / 100) * BASE_TOTAL_ACTIVITY), color: "#F48FB1" },
+  { name: "Emails", percentage: 1, count: Math.round((1 / 100) * BASE_TOTAL_ACTIVITY), color: "#EF6C00" },
+  { name: "Tickets", percentage: 0.8, count: Math.round((0.8 / 100) * BASE_TOTAL_ACTIVITY), color: "#006D77" },
+  { name: "Attendance", percentage: 0.5, count: Math.round((0.5 / 100) * BASE_TOTAL_ACTIVITY), color: "#CE93D8" },
+  { name: "Projects", percentage: 0.2, count: Math.round((0.2 / 100) * BASE_TOTAL_ACTIVITY), color: "#B0BEC5" },
 ];
 
 // Legend items (top 10 shown in legend)
@@ -50,6 +51,9 @@ const legendItems = [
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
+    const first = payload[0];
+    const count = typeof first?.value === "number" ? first.value : Number(first?.value);
+    const percentage: number | undefined = first?.payload?.percentage;
     return (
       <div
         style={{
@@ -66,7 +70,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div style={{ fontWeight: 600, marginBottom: "4px" }}>{label}</div>
         <div style={{ color: "#444" }}>
           Activity Volume:{" "}
-          <strong>{payload[0].value.toFixed(1)}%</strong>
+          <strong>{Number.isFinite(count) ? count.toLocaleString() : "—"}</strong>
+          {typeof percentage === "number" ? (
+            <span style={{ marginLeft: 6, color: "#666" }}>({percentage.toFixed(1)}%)</span>
+          ) : null}
         </div>
       </div>
     );
@@ -76,11 +83,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 // ─── X-Axis tick formatter ─────────────────────────────────────────────────────
 
-const formatXTick = (value: number) => `${value}%`;
+const formatXTick = (value: number) => value.toLocaleString();
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function UserActivityByCategory() {
+export default function UserActivityByCategory({ scale = 1 }: { scale?: number }) {
   const [fromDate, setFromDate] = useState("27/01/2026");
   const [toDate, setToDate] = useState("27/02/2026");
   const fromInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +109,15 @@ export default function UserActivityByCategory() {
     const [day, month, year] = displayDate.split('/');
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   };
+
+  const effectiveCategories = useMemo(() => {
+    return categories.map((c) => ({
+      ...c,
+      count: Math.round(c.count * scale),
+    }));
+  }, [scale]);
+
+  const maxCount = Math.max(1, ...effectiveCategories.map((c) => c.count));
 
   return (
     <div
@@ -314,7 +330,7 @@ export default function UserActivityByCategory() {
       {/* ── Chart ── */}
       <ResponsiveContainer width="100%" height={360}>
         <BarChart
-          data={categories}
+          data={effectiveCategories}
           layout="vertical"
           margin={{ top: 0, right: 24, left: 0, bottom: 32 }}
           barCategoryGap="20%"
@@ -327,7 +343,7 @@ export default function UserActivityByCategory() {
           />
           <XAxis
             type="number"
-            domain={[0, 65]}
+            domain={[0, maxCount]}
             tickCount={14}
             tickFormatter={formatXTick}
             tick={{
@@ -366,8 +382,8 @@ export default function UserActivityByCategory() {
             content={<CustomTooltip />}
             cursor={{ fill: "rgba(0,0,0,0.04)" }}
           />
-          <Bar dataKey="value" radius={[0, 2, 2, 0]} maxBarSize={22}>
-            {categories.map((entry) => (
+          <Bar dataKey="count" radius={[0, 2, 2, 0]} maxBarSize={22}>
+            {effectiveCategories.map((entry) => (
               <Cell key={entry.name} fill={entry.color} />
             ))}
           </Bar>

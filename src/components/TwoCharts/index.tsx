@@ -11,12 +11,9 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  Legend,
-  ReferenceLine,
   LabelList,
 } from "recharts";
 import { Info } from "lucide-react";
-import CallsVsGoalChart from "@components/CallsVsGoals";
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 
 const TICK_STYLE = {
@@ -38,8 +35,7 @@ const leaderboardData = [
 ];
 
 // ─── Calls vs Goal Data ───────────────────────────────────────────────────────
-
-// Achieved = actual count; *Goal = target for "Achieve vs goal" comparison
+// Achieved = actual count; Target = goal/target for comparison
 const callsData = [
   { date: "1/1/2026",   calls: 12,  callsGoal: 25,  leads: 45,   leadsGoal: 50,   orders: 28,  ordersGoal: 35 },
   { date: "8/1/2026",   calls: 18,  callsGoal: 25,  leads: 62,   leadsGoal: 55,   orders: 41,  ordersGoal: 40 },
@@ -145,6 +141,10 @@ function getMonthlyData() {
 const weeklyData = getWeeklyData();
 const monthlyData = getMonthlyData();
 
+function scaleNumber(value: number, scale: number) {
+  return Math.round(value * scale);
+}
+
 // ─── Shared pill badge ────────────────────────────────────────────────────────
 
 function PillBadge({
@@ -245,7 +245,14 @@ const CallsTooltip = ({ active, payload, label }: any) => {
 
 // ─── Activity Leaderboard Chart ───────────────────────────────────────────────
 
-function ActivityLeaderboard() {
+function ActivityLeaderboard({ scale }: { scale: number }) {
+  const scaledLeaderboardData = leaderboardData.map((row) => ({
+    ...row,
+    propertyValue: scaleNumber(row.propertyValue, scale),
+    crmObject: scaleNumber(row.crmObject, scale),
+    crmObjectAssociation: scaleNumber(row.crmObjectAssociation, scale),
+  }));
+
   return (
     <div
       style={{
@@ -282,7 +289,7 @@ function ActivityLeaderboard() {
       {/* Chart */}
       <ResponsiveContainer width="100%" height={280}>
         <BarChart
-          data={leaderboardData}
+          data={scaledLeaderboardData}
           layout="vertical"
           margin={{ top: 8, right: 36, left: 0, bottom: 28 }}
           barCategoryGap="5%"
@@ -361,15 +368,22 @@ const renderLegendDot = (color: string, filled: boolean) => (
 
 type PillRange = "daily" | "weekly" | "monthly";
 
-function CallsVsGoal() {
+function CallsVsGoal({ scale }: { scale: number }) {
   const [activePill, setActivePill] = useState<PillRange>("daily");
   const [visible, setVisible] = useState({ calls: true, leads: true, orders: true });
 
   const chartData = useMemo(() => {
-    if (activePill === "weekly") return weeklyData;
-    if (activePill === "monthly") return monthlyData;
-    return callsData;
-  }, [activePill]);
+    const base = activePill === "weekly" ? weeklyData : activePill === "monthly" ? monthlyData : callsData;
+    return base.map((row) => ({
+      ...row,
+      calls: scaleNumber(row.calls, scale),
+      callsGoal: scaleNumber(row.callsGoal, scale),
+      leads: scaleNumber(row.leads, scale),
+      leadsGoal: scaleNumber(row.leadsGoal, scale),
+      orders: scaleNumber(row.orders, scale),
+      ordersGoal: scaleNumber(row.ordersGoal, scale),
+    }));
+  }, [activePill, scale]);
 
   const toggleSeries = (key: "calls" | "leads" | "orders") => {
     setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -409,7 +423,7 @@ function CallsVsGoal() {
             fontFamily: FONT,
           }}
         >
-          Achieve vs goal
+          Achieved vs Target
         </span>
         <Info size={14} color="#888" />
       </div>
@@ -435,10 +449,10 @@ function CallsVsGoal() {
           style={{ ...legendItemStyle(visible.calls), border: "none", background: "none", padding: 0 }}
         >
           {renderLegendDot("#F4A57A", visible.calls)}
-          <span>(Count) Calls</span>
+          <span>Calls</span>
           <span style={{ color: "#999", marginLeft: "4px" }}>—</span>
           <span style={{ display: "inline-block", borderTop: "2px dashed #F4A57A", width: 14, verticalAlign: "middle" }} />
-          <span>Calls goal</span>
+          <span>Calls target</span>
         </button>
         <button
           type="button"
@@ -446,10 +460,10 @@ function CallsVsGoal() {
           style={{ ...legendItemStyle(visible.leads), border: "none", background: "none", padding: 0 }}
         >
           {renderLegendDot("#90CAF9", visible.leads)}
-          <span>(Count) Leads</span>
+          <span>Leads</span>
           <span style={{ color: "#999", marginLeft: "4px" }}>—</span>
           <span style={{ display: "inline-block", borderTop: "2px dashed #90CAF9", width: 14, verticalAlign: "middle" }} />
-          <span>Leads goal</span>
+          <span>Leads target</span>
         </button>
         <button
           type="button"
@@ -457,10 +471,10 @@ function CallsVsGoal() {
           style={{ ...legendItemStyle(visible.orders), border: "none", background: "none", padding: 0 }}
         >
           {renderLegendDot("#A5D6A7", visible.orders)}
-          <span>(Count) Orders</span>
+          <span>Orders</span>
           <span style={{ color: "#999", marginLeft: "4px" }}>—</span>
           <span style={{ display: "inline-block", borderTop: "2px dashed #A5D6A7", width: 14, verticalAlign: "middle" }} />
-          <span>Orders goal</span>
+          <span>Orders target</span>
         </button>
       </div>
 
@@ -516,9 +530,9 @@ function CallsVsGoal() {
                 />
               );
             }}
-            name="(Count) Calls"
+            name="Calls"
           />
-          {/* Goal: Calls (dashed) */}
+          {/* Target: Calls (dashed) */}
           <Line
             type="monotone"
             dataKey="callsGoal"
@@ -526,7 +540,7 @@ function CallsVsGoal() {
             strokeWidth={1.5}
             strokeDasharray="6 4"
             dot={false}
-            name="Calls goal"
+            name="Calls target"
             hide={!visible.calls}
           />
           {/* Achieved: Leads (solid) */}
@@ -550,9 +564,9 @@ function CallsVsGoal() {
                 />
               );
             }}
-            name="(Count) Leads"
+            name="Leads"
           />
-          {/* Goal: Leads (dashed) */}
+          {/* Target: Leads (dashed) */}
           <Line
             type="monotone"
             dataKey="leadsGoal"
@@ -560,7 +574,7 @@ function CallsVsGoal() {
             strokeWidth={1.5}
             strokeDasharray="6 4"
             dot={false}
-            name="Leads goal"
+            name="Leads target"
             hide={!visible.leads}
           />
           {/* Achieved: Orders (solid) */}
@@ -584,9 +598,9 @@ function CallsVsGoal() {
                 />
               );
             }}
-            name="(Count) Orders"
+            name="Orders"
           />
-          {/* Goal: Orders (dashed) */}
+          {/* Target: Orders (dashed) */}
           <Line
             type="monotone"
             dataKey="ordersGoal"
@@ -594,7 +608,7 @@ function CallsVsGoal() {
             strokeWidth={1.5}
             strokeDasharray="6 4"
             dot={false}
-            name="Orders goal"
+            name="Orders target"
             hide={!visible.orders}
           />
         </LineChart>
@@ -605,7 +619,7 @@ function CallsVsGoal() {
 
 // ─── Combined Export ──────────────────────────────────────────────────────────
 
-export default function ChartsRow() {
+export default function ChartsRow({ scale = 1 }: { scale?: number }) {
   return (
     <div
       style={{
@@ -615,8 +629,8 @@ export default function ChartsRow() {
         fontFamily: FONT,
       }}
     >
-      <ActivityLeaderboard />
-      <CallsVsGoal />
+      <ActivityLeaderboard scale={scale} />
+      <CallsVsGoal scale={scale} />
     </div>
   );
 }

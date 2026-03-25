@@ -501,6 +501,23 @@ const SalesDashboard: NextPageWithLayout = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeTaskFilter, setActiveTaskFilter] = useState("All tasks");
+
+  type TaskStatKey = "allTasks" | "highPriority" | "toDos" | "calls" | "emails" | "linkedin";
+  const taskStatsByFilter: Record<string, Record<TaskStatKey, number>> = {
+    "All tasks": { allTasks: 7, highPriority: 3, toDos: 4, calls: 2, emails: 1, linkedin: 0 },
+    "Due today": { allTasks: 4, highPriority: 1, toDos: 2, calls: 1, emails: 1, linkedin: 0 },
+    Overdue: { allTasks: 3, highPriority: 2, toDos: 1, calls: 1, emails: 0, linkedin: 0 },
+    "Due tomorrow": { allTasks: 3, highPriority: 1, toDos: 2, calls: 0, emails: 1, linkedin: 0 },
+  };
+  const chartScaleByFilter: Record<string, number> = {
+    "All tasks": 1,
+    "Due today": 0.65,
+    Overdue: 0.85,
+    "Due tomorrow": 0.55,
+  };
+
+  const selectedTaskStats = taskStatsByFilter[activeTaskFilter] ?? taskStatsByFilter["All tasks"];
+  const selectedChartScale = chartScaleByFilter[activeTaskFilter] ?? 1;
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -603,13 +620,13 @@ const SalesDashboard: NextPageWithLayout = () => {
           {/* Stats Grid */}
           <div style={styles.statsGrid}>
             {[
-              { label: "All tasks", value: "7", icon: <CheckSquare size={16} color="#666" /> },
-              { label: "High priority", value: "3", icon: <AlertTriangle size={16} color="#666" /> },
-              { label: "To-dos", value: "4", icon: <List size={16} color="#666" /> },
-              { label: "Calls", value: "2", icon: <Phone size={16} color="#666" /> },
-              { label: "Emails", value: "1", icon: <Mail size={16} color="#666" /> },
-              { label: "LinkedIn", value: "0", icon: <Linkedin size={16} color="#22c55e" />, done: true },
-            ].map((stat, i) => (
+              { label: "All tasks", value: selectedTaskStats.allTasks, icon: <CheckSquare size={16} color="#666" /> },
+              { label: "High priority", value: selectedTaskStats.highPriority, icon: <AlertTriangle size={16} color="#666" /> },
+              { label: "To-dos", value: selectedTaskStats.toDos, icon: <List size={16} color="#666" /> },
+              { label: "Calls", value: selectedTaskStats.calls, icon: <Phone size={16} color="#666" /> },
+              { label: "Emails", value: selectedTaskStats.emails, icon: <Mail size={16} color="#666" /> },
+              { label: "LinkedIn", value: selectedTaskStats.linkedin, icon: <Linkedin size={16} color="#22c55e" />, done: true },
+            ].map((stat) => (
               <div
                 key={stat.label}
                 style={{
@@ -642,8 +659,8 @@ const SalesDashboard: NextPageWithLayout = () => {
                 <div
                   style={{
                     ...styles.statValue,
-                    color: stat.value === "0" ? "#141414" : "#006162",
-                    fontWeight: stat.value === "0" ? 400 : 700,
+                    color: stat.value === 0 ? "#141414" : "#006162",
+                    fontWeight: stat.value === 0 ? 400 : 700,
                   }}
                 >
                   {stat.value}
@@ -665,7 +682,7 @@ const SalesDashboard: NextPageWithLayout = () => {
           />
           {!collapsedSections.has("userActivity") && (
             <div style={{ padding: "12px 16px 16px" }}>
-              <UserActivityByCategory />
+              <UserActivityByCategory scale={selectedChartScale} />
             </div>
           )}
         </div>
@@ -679,7 +696,7 @@ const SalesDashboard: NextPageWithLayout = () => {
           />
           {!collapsedSections.has("twoCharts") && (
             <div style={{ padding: "12px 16px 16px" }}>
-              <TwoCharts />
+              <TwoCharts scale={selectedChartScale} />
             </div>
           )}
         </div>
