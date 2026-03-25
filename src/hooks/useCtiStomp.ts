@@ -72,6 +72,41 @@ const safeLocalStorage = {
   }
 };
 
+/** Non-empty party leg startTime from API (used for call timers; do not substitute eventTime). */
+function partyLegHasStartTime(startTime: unknown): boolean {
+  if (startTime == null) {
+    return false;
+  }
+  if (typeof startTime === "string" && startTime.trim() === "") {
+    return false;
+  }
+  return true;
+}
+
+/** Keep startTime on a leg when follow-up events omit it (common for state-only updates). */
+function preservePartyStartTimesFromBase(
+  parties: any[],
+  baseParties: any[] | undefined
+): any[] {
+  if (!baseParties?.length) {
+    return parties;
+  }
+  return parties.map((party) => {
+    if (partyLegHasStartTime(party?.startTime)) {
+      return party;
+    }
+    const prev = baseParties.find(
+      (b: any) =>
+        b?.callingAddress === party?.callingAddress &&
+        b?.calledAddress === party?.calledAddress
+    );
+    if (prev && partyLegHasStartTime(prev.startTime)) {
+      return { ...party, startTime: prev.startTime };
+    }
+    return party;
+  });
+}
+
 // Generate unique instance ID for each hook instance
 let instanceCounter = 0;
 const generateInstanceId = () => {
@@ -576,9 +611,14 @@ export default function useCtiStomp(
           return party;
         });
 
+        const partiesWithPreservedStart = preservePartyStartTimesFromBase(
+          processedParties,
+          base.parties
+        );
+
         // IMPORTANT: Remove DROPPED and DISCONNECTED parties from the parties array immediately
         // This ensures they are not stored in call state and won't appear in UI
-        const activePartiesOnly = processedParties.filter(
+        const activePartiesOnly = partiesWithPreservedStart.filter(
           (p: any) =>
             p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED"
         );
@@ -662,12 +702,13 @@ export default function useCtiStomp(
 
         // Store only active parties (DROPPED parties are removed immediately)
         // Update state with new eventTime, sequence, and currentState
+        // eventTime: message ordering only; keep prior if this payload omits it
         updated[callId] = {
           ...base,
           callId,
           currentState: effectiveCurrentState,
           sequence: evt.sequence,
-          eventTime: evt.eventTime, // Store the eventTime that won (newest)
+          eventTime: evt.eventTime ?? base.eventTime ?? "",
           isConference: evt.isConference !== undefined ? evt.isConference : base.isConference,
           isOneToOne: evt.isOneToOne !== undefined ? evt.isOneToOne : base.isOneToOne,
           parties: activePartiesOnly, // Only store active parties - DROPPED parties are removed
@@ -827,10 +868,15 @@ export default function useCtiStomp(
             return;
           }
 
-          // Filter out DROPPED/DISCONNECTED parties FIRST
-          const activeParties = (callData.parties || []).filter(
-            (p: any) =>
-              p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+          const existingCall = updated[callId];
+
+          // Filter out DROPPED/DISCONNECTED parties FIRST; preserve leg startTime from prior map entry
+          const activeParties = preservePartyStartTimesFromBase(
+            (callData.parties || []).filter(
+              (p: any) =>
+                p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED"
+            ),
+            existingCall?.parties
           );
 
           if (activeParties.length === 0) {
@@ -885,16 +931,19 @@ export default function useCtiStomp(
           }
 
           // Add or update call in callStateMap (preserve heldByAddress when state is HELD and we had it from a prior HELD event)
-          const existing = updated[callId];
           updated[callId] = {
             ...callData,
             callId,
-            currentState: currentState || 'UNKNOWN',
+            currentState: currentState || "UNKNOWN",
             parties: activeParties,
             hasActiveParticipants: callData.hasActiveParticipants !== false,
             isTerminating: callData.isTerminating === true,
-            eventTime: callData.eventTime || new Date().toISOString(),
-            ...(currentState === 'HELD' && existing?.heldByAddress != null && { heldByAddress: existing.heldByAddress }),
+            // Do not use wall-clock time as eventTime (not call answer start; skews ordering vs STOMP events)
+            eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
+            ...(currentState === "HELD" &&
+              existingCall?.heldByAddress != null && {
+                heldByAddress: existingCall.heldByAddress,
+              }),
           };
 
           console.log(`[useCtiStomp] Added/updated ongoing call: ${callId} for DN: ${dn}, state: ${currentState}`);

@@ -1,5 +1,7 @@
 import React from 'react'
-import useGlobalCallTimer from '../../../../hooks/useGlobalCallTimer'
+import useGlobalCallTimer, {
+  hasUsableCallTimerStart,
+} from '../../../../hooks/useGlobalCallTimer'
 
 interface CallTimerProps {
   dn: string
@@ -9,11 +11,15 @@ interface CallTimerProps {
 }
 
 const CallTimer: React.FC<CallTimerProps> = ({ dn, isActive, startTime, callId }) => {
-  // Use callId if available, otherwise fall back to dn for unique timer key
   const timerKey = callId ? `${dn}_${callId}` : dn
-  const { elapsedTime, isRunning } = useGlobalCallTimer(timerKey, isActive, startTime)
-  
+  const hasStart = hasUsableCallTimerStart(startTime)
+  const runElapsed = isActive && hasStart
+  const { elapsedTime, isRunning } = useGlobalCallTimer(timerKey, runElapsed, startTime)
+
   if (!isActive) {
+    return null
+  }
+  if (!hasStart) {
     return null
   }
 
