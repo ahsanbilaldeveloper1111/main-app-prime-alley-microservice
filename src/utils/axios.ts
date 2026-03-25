@@ -11,6 +11,7 @@ import { toast } from "react-toastify";
 import tokenService from "./tokenService";
 import { clearSessionCookiesClient } from "./cookieUtils";
 import { markAxiosUserFacingRejection } from "./axiosUserFacingRejection";
+import { isBenignNetworkFailure } from "./benignNetworkFailure";
 
 type MutableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -79,10 +80,12 @@ async function tryRefreshAndRetry(
   try {
     newToken = await tokenService.forceRefresh();
   } catch (refreshError: unknown) {
-    Sentry.captureException(refreshError, {
-      tags: { context: "axios_token_refresh" },
-      extra: { originalUrl: originalRequest.url },
-    });
+    if (!isBenignNetworkFailure(refreshError)) {
+      Sentry.captureException(refreshError, {
+        tags: { context: "axios_token_refresh" },
+        extra: { originalUrl: originalRequest.url },
+      });
+    }
     throw error;
   }
 
@@ -107,6 +110,10 @@ function captureApiErrorToSentry(error: AxiosError, originalRequest?: MutableCon
 }
 
 function captureNetworkErrorToSentry(error: AxiosError, originalRequest?: MutableConfig): void {
+  if (isBenignNetworkFailure(error)) {
+    markAxiosUserFacingRejection(error);
+    return;
+  }
   Sentry.captureException(error, {
     extra: {
       url: originalRequest?.url,
