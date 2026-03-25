@@ -1,3 +1,13 @@
+function stringFromErrorMessageField(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+}
+
 /**
  * Typical client-side connectivity issues (offline, CORS/ad-block, DNS, tab backgrounded).
  * Not useful as Sentry errors and should not surface as "unhandled".
@@ -12,7 +22,7 @@ export function isBenignNetworkFailure(reason: unknown): boolean {
     return false;
   }
 
-  const message = String(o.message ?? "");
+  const message = stringFromErrorMessageField(o.message);
   const code = typeof o.code === "string" ? o.code : undefined;
   const name = typeof o.name === "string" ? o.name : undefined;
   const lower = message.toLowerCase();
