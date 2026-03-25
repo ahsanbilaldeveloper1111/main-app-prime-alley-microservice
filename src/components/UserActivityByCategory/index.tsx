@@ -87,7 +87,7 @@ const formatXTick = (value: number) => value.toLocaleString();
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function UserActivityByCategory({ scale = 1 }: { scale?: number }) {
+export default function UserActivityByCategory({ scale = 1 }: { readonly scale?: number }) {
   const [fromDate, setFromDate] = useState("27/01/2026");
   const [toDate, setToDate] = useState("27/02/2026");
   const fromInputRef = useRef<HTMLInputElement>(null);

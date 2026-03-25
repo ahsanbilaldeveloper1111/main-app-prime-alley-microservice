@@ -432,9 +432,9 @@ const CELL_STYLE: React.CSSProperties = {
         if (res?.data) {
           const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
           setTasks(mapped);
-          setSelectedTasks((prev) =>
-            prev.filter((selected) => mapped.some((task) => task.id === selected.id))
-          );
+          // Precompute IDs to avoid nested callbacks in the selection filter.
+          const mappedTaskIds = new Set(mapped.map((task) => task.id));
+          setSelectedTasks((prev) => prev.filter((selected) => mappedTaskIds.has(selected.id)));
           setTotal(res.pagination?.total ?? 0);
         } else {
           setTasks([]);
@@ -981,14 +981,15 @@ const CELL_STYLE: React.CSSProperties = {
                           <button
                             key={option.value}
                             onClick={() => {
-                              setFForm((prev) => ({ ...prev, project: option.value }));
-                              setFilters((prev) => {
-                                const next = { ...prev };
-                                if (option.value === "All Projects") delete next.project;
-                                else next.project = option.value;
-                                return next;
-                              });
-                              setPager((prev) => ({ ...prev, page: 1 }));
+                              // Use current state values to avoid deeply nested callback functions.
+                              setFForm({ ...fForm, project: option.value });
+
+                              const nextFilters = { ...filters };
+                              if (option.value === "All Projects") delete nextFilters.project;
+                              else nextFilters.project = option.value;
+                              setFilters(nextFilters);
+
+                              setPager({ ...pager, page: 1 });
                               setOpenQuickFilter(null);
                             }}
                             style={{
@@ -1052,17 +1053,24 @@ const CELL_STYLE: React.CSSProperties = {
                             <button
                               key={option.value}
                               onClick={() => {
-                                const nextAssignees = selected
-                                  ? fForm.assignee.filter((v) => v !== option.value)
-                                  : [...fForm.assignee, option.value];
-                                setFForm((prev) => ({ ...prev, assignee: nextAssignees }));
-                                setFilters((prev) => {
-                                  const next = { ...prev };
-                                  if (nextAssignees.length > 0) next.assignee = nextAssignees;
-                                  else delete next.assignee;
-                                  return next;
-                                });
-                                setPager((prev) => ({ ...prev, page: 1 }));
+                                let nextAssignees: string[];
+                                if (selected) {
+                                  const index = fForm.assignee.indexOf(option.value);
+                                  nextAssignees =
+                                    index === -1
+                                      ? fForm.assignee
+                                      : [...fForm.assignee.slice(0, index), ...fForm.assignee.slice(index + 1)];
+                                } else {
+                                  nextAssignees = [...fForm.assignee, option.value];
+                                }
+                                setFForm({ ...fForm, assignee: nextAssignees });
+
+                                const nextFilters = { ...filters };
+                                if (nextAssignees.length > 0) nextFilters.assignee = nextAssignees;
+                                else delete nextFilters.assignee;
+                                setFilters(nextFilters);
+
+                                setPager({ ...pager, page: 1 });
                               }}
                               style={{
                                 width: "100%",
@@ -1111,7 +1119,7 @@ const CELL_STYLE: React.CSSProperties = {
                             width: "100%",
                             textAlign: "left",
                             border: "none",
-                            background: !fForm.task_type ? "#f3f4f6" : "transparent",
+                            background: fForm.task_type ? "transparent" : "#f3f4f6",
                             borderRadius: 6,
                             padding: "8px 10px",
                             fontSize: 12,
@@ -1127,9 +1135,9 @@ const CELL_STYLE: React.CSSProperties = {
                               key={option.value}
                               onClick={() => {
                                 const selectedType = { value: option.value, label: option.label };
-                                setFForm((prev) => ({ ...prev, task_type: selectedType }));
-                                setFilters((prev) => ({ ...prev, task_type: option.value }));
-                                setPager((prev) => ({ ...prev, page: 1 }));
+                                setFForm({ ...fForm, task_type: selectedType });
+                                setFilters({ ...filters, task_type: option.value });
+                                setPager({ ...pager, page: 1 });
                                 setOpenQuickFilter(null);
                               }}
                               style={{
@@ -1168,14 +1176,14 @@ const CELL_STYLE: React.CSSProperties = {
                           <button
                             key={option.value}
                             onClick={() => {
-                              setFForm((prev) => ({ ...prev, status: option.value }));
-                              setFilters((prev) => {
-                                const next = { ...prev };
-                                if (option.value === "All Status") delete next.status;
-                                else next.status = option.value;
-                                return next;
-                              });
-                              setPager((prev) => ({ ...prev, page: 1 }));
+                              setFForm({ ...fForm, status: option.value });
+
+                              const nextFilters = { ...filters };
+                              if (option.value === "All Status") delete nextFilters.status;
+                              else nextFilters.status = option.value;
+                              setFilters(nextFilters);
+
+                              setPager({ ...pager, page: 1 });
                               setOpenQuickFilter(null);
                             }}
                             style={{

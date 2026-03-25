@@ -251,10 +251,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
 
     const loadFormDropdowns = async () => {
       try {
-        const [usersResponse] = await Promise.all([
-          getAllUsers({ page: 1, perPage: 500 }),
-          
-        ]);
+        const usersResponse = await getAllUsers({ page: 1, perPage: 500 });
 
         const userList = Array.isArray(usersResponse?.dataList)
           ? usersResponse.dataList

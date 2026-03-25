@@ -151,11 +151,11 @@ function PillBadge({
   children,
   active,
   onClick,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
-}) {
+}>) {
   const isButton = typeof onClick === "function";
   const style = {
     display: "inline-block",
@@ -245,7 +245,7 @@ const CallsTooltip = ({ active, payload, label }: any) => {
 
 // ─── Activity Leaderboard Chart ───────────────────────────────────────────────
 
-function ActivityLeaderboard({ scale }: { scale: number }) {
+function ActivityLeaderboard({ scale }: Readonly<{ scale: number }>) {
   const scaledLeaderboardData = leaderboardData.map((row) => ({
     ...row,
     propertyValue: scaleNumber(row.propertyValue, scale),
@@ -368,12 +368,14 @@ const renderLegendDot = (color: string, filled: boolean) => (
 
 type PillRange = "daily" | "weekly" | "monthly";
 
-function CallsVsGoal({ scale }: { scale: number }) {
+function CallsVsGoal({ scale }: Readonly<{ scale: number }>) {
   const [activePill, setActivePill] = useState<PillRange>("daily");
   const [visible, setVisible] = useState({ calls: true, leads: true, orders: true });
 
   const chartData = useMemo(() => {
-    const base = activePill === "weekly" ? weeklyData : activePill === "monthly" ? monthlyData : callsData;
+    let base = callsData;
+    if (activePill === "weekly") base = weeklyData;
+    else if (activePill === "monthly") base = monthlyData;
     return base.map((row) => ({
       ...row,
       calls: scaleNumber(row.calls, scale),
@@ -619,7 +621,7 @@ function CallsVsGoal({ scale }: { scale: number }) {
 
 // ─── Combined Export ──────────────────────────────────────────────────────────
 
-export default function ChartsRow({ scale = 1 }: { scale?: number }) {
+export default function ChartsRow({ scale = 1 }: Readonly<{ scale?: number }>) {
   return (
     <div
       style={{

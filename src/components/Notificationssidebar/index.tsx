@@ -751,6 +751,232 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
     }
   };
 
+  // ── Notification row render helpers (reduce render callback complexity) ──
+
+  const renderNotificationText = (notif: Notification) => (
+    <>
+      <div
+        style={{
+          fontSize: '14px',
+          fontWeight: notif.read ? '400' : '700',
+          color: '#141414',
+          marginBottom: notif.description ? '4px' : 0,
+          lineHeight: '1.4',
+        }}
+      >
+        {notif.title}
+      </div>
+
+      {notif.actorName && (
+        <div
+          style={{
+            fontSize: '12px',
+            color: '#4a5568',
+            marginBottom: notif.description ? '2px' : 0,
+            lineHeight: '1.4',
+          }}
+        >
+          by {notif.actorName}
+        </div>
+      )}
+
+      {notif.description && (
+        <div
+          style={{
+            fontSize: '13px',
+            color: '#666666',
+            lineHeight: '1.5',
+          }}
+        >
+          {notif.description}
+        </div>
+      )}
+    </>
+  );
+
+  const renderNotificationCheckbox = (notif: Notification, isSelected: boolean) => (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleSelect(notif.id);
+      }}
+      style={{
+        width: '16px',
+        height: '16px',
+        border: `1.5px solid ${isSelected ? '#141414' : '#cccccc'}`,
+        borderRadius: '3px',
+        backgroundColor: isSelected ? '#141414' : '#ffffff',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        marginTop: '2px',
+        transition: 'all 0.15s',
+      }}
+    >
+      {isSelected && <Check size={11} color="#ffffff" strokeWidth={3} />}
+    </div>
+  );
+
+  const renderNotificationRowActions = (notif: Notification) => {
+    if (activeTab === 'trash') {
+      return <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} />;
+    }
+
+    const isBusy = Boolean(actionLoading);
+    const markBusy = isRowActionLoading('mark-read', notif.id);
+    const deleteBusy = isRowActionLoading('delete', notif.id);
+
+    const markHoverProps = !isBusy
+      ? {
+          onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = '#f0f0f0';
+            e.currentTarget.style.color = '#141414';
+          },
+          onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#718096';
+          },
+        }
+      : {};
+
+    const deleteHoverProps = !isBusy
+      ? {
+          onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = '#fff0f0';
+            e.currentTarget.style.color = '#e53e3e';
+          },
+          onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = '#718096';
+          },
+        }
+      : {};
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {notif.read ? (
+          <span title="Read" style={{ display: 'flex', padding: '3px', color: '#2563eb' }}>
+            <CheckCheck size={14} />
+          </span>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              markOneRead(notif.id);
+            }}
+            disabled={isBusy}
+            title="Mark as read"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              color: '#718096',
+              padding: '3px',
+              display: 'flex',
+              borderRadius: '3px',
+              opacity: isBusy ? 0.6 : 1,
+            }}
+            {...markHoverProps}
+          >
+            {markBusy ? <Loader size={14} style={LOADER_SPIN_STYLE} /> : <Check size={14} />}
+          </button>
+        )}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            trashOne(notif.id);
+          }}
+          disabled={isBusy}
+          title="Delete"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: isBusy ? 'not-allowed' : 'pointer',
+            color: '#718096',
+            padding: '3px',
+            display: 'flex',
+            borderRadius: '3px',
+            opacity: isBusy ? 0.6 : 1,
+          }}
+          {...deleteHoverProps}
+        >
+          {deleteBusy ? <Loader size={14} style={LOADER_SPIN_STYLE} /> : <Trash2 size={14} />}
+        </button>
+      </div>
+    );
+  };
+
+  const renderNotificationRow = (notif: Notification, isSelected: boolean) => (
+    <div
+      key={notif.id}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '14px',
+        padding: '14px 24px',
+        borderBottom: '1px solid #eaf0f6',
+        backgroundColor: isSelected ? '#f8fafc' : '#ffffff',
+        transition: 'background-color 0.1s',
+        cursor: 'default',
+        position: 'relative',
+      }}
+      onMouseEnter={
+        !isSelected
+          ? (e) => {
+              e.currentTarget.style.backgroundColor = '#fafafa';
+            }
+          : undefined
+      }
+      onMouseLeave={
+        !isSelected
+          ? (e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }
+          : undefined
+      }
+    >
+      {/* Checkbox */}
+      {renderNotificationCheckbox(notif, isSelected)}
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <button
+          onClick={() => handleNotificationClick(notif)}
+          style={{
+            width: '100%',
+            border: 'none',
+            background: 'transparent',
+            padding: 0,
+            textAlign: 'left',
+            cursor: 'pointer',
+          }}
+        >
+          {renderNotificationText(notif)}
+        </button>
+      </div>
+
+      {/* Time + actions */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: '6px',
+          flexShrink: 0,
+        }}
+      >
+        <span style={{ fontSize: '12px', color: '#718096', whiteSpace: 'nowrap' }}>
+          {notif.time}
+        </span>
+
+        {renderNotificationRowActions(notif)}
+      </div>
+    </div>
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -1145,163 +1371,7 @@ const NotificationsSidebar: React.FC<NotificationsSidebarProps> = ({ isOpen, onC
             <>
             {visibleWithActor.map((notif) => {
               const isSelected = selected.has(notif.id);
-              return (
-                <div
-                  key={notif.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '14px',
-                    padding: '14px 24px',
-                    borderBottom: '1px solid #eaf0f6',
-                    backgroundColor: isSelected ? '#f8fafc' : '#ffffff',
-                    transition: 'background-color 0.1s',
-                    cursor: 'default',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#fafafa';
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#ffffff';
-                  }}
-                >
-                  {/* Checkbox */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSelect(notif.id);
-                    }}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      border: `1.5px solid ${isSelected ? '#141414' : '#cccccc'}`,
-                      borderRadius: '3px',
-                      backgroundColor: isSelected ? '#141414' : '#ffffff',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginTop: '2px',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {isSelected && <Check size={11} color="#ffffff" strokeWidth={3} />}
-                  </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <button
-                      onClick={() => handleNotificationClick(notif)}
-                      style={{
-                        width: '100%',
-                        border: 'none',
-                        background: 'transparent',
-                        padding: 0,
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{
-                          fontSize: '14px',
-                          fontWeight: notif.read ? '400' : '700',
-                          color: '#141414',
-                          marginBottom: notif.description ? '4px' : 0,
-                          lineHeight: '1.4',
-                        }}>
-                        {notif.title}
-                      </div>
-                      {notif.actorName && (
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: '#4a5568',
-                            marginBottom: notif.description ? '2px' : 0,
-                            lineHeight: '1.4',
-                          }}
-                        >
-                          by {notif.actorName}
-                        </div>
-                      )}
-                      {notif.description && (
-                        <div
-                          style={{
-                            fontSize: '13px',
-                            color: '#666666',
-                            lineHeight: '1.5',
-                          }}
-                        >
-                          {notif.description}
-                        </div>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Time + actions */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'flex-end',
-                      gap: '6px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span style={{ fontSize: '12px', color: '#718096', whiteSpace: 'nowrap' }}>
-                      {notif.time}
-                    </span>
-
-                    {/* Row actions — visible on hover via group styling */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {activeTab !== 'trash' && (notif.read ? (
-                        <span title="Read" style={{ display: 'flex', padding: '3px', color: '#2563eb' }}>
-                          <CheckCheck size={14} />
-                        </span>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); markOneRead(notif.id); }}
-                          disabled={!!actionLoading}
-                          title="Mark as read"
-                          style={{
-                            background: 'transparent', border: 'none', cursor: actionLoading ? 'not-allowed' : 'pointer',
-                            color: '#718096', padding: '3px', display: 'flex', borderRadius: '3px',
-                            opacity: actionLoading ? 0.6 : 1,
-                          }}
-                          onMouseEnter={(e) => { if (!actionLoading) { e.currentTarget.style.backgroundColor = '#f0f0f0'; e.currentTarget.style.color = '#141414'; } }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#718096'; }}
-                        >
-                          {isRowActionLoading('mark-read', notif.id) ? (
-                            <Loader size={14} style={LOADER_SPIN_STYLE} />
-                          ) : (
-                            <Check size={14} />
-                          )}
-                        </button>
-                      ))}
-                      {activeTab !== 'trash' && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); trashOne(notif.id); }}
-                          disabled={!!actionLoading}
-                          title="Delete"
-                          style={{
-                            background: 'transparent', border: 'none', cursor: actionLoading ? 'not-allowed' : 'pointer',
-                            color: '#718096', padding: '3px', display: 'flex', borderRadius: '3px',
-                            opacity: actionLoading ? 0.6 : 1,
-                          }}
-                          onMouseEnter={(e) => { if (!actionLoading) { e.currentTarget.style.backgroundColor = '#fff0f0'; e.currentTarget.style.color = '#e53e3e'; } }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#718096'; }}
-                        >
-                          {isRowActionLoading('delete', notif.id) ? (
-                            <Loader size={14} style={LOADER_SPIN_STYLE} />
-                          ) : (
-                            <Trash2 size={14} />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
+              return renderNotificationRow(notif, isSelected);
             })}
             {((activeTab === 'all' && loadingMoreAll) ||
               (activeTab === 'unread' && loadingMoreUnread) ||

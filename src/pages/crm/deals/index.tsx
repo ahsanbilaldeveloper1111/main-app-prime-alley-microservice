@@ -511,6 +511,107 @@ const FilterBar: React.FC<FilterBarProps> = ({
   );
 };
 
+type AnyRecord = Record<string, any>;
+
+const addIfTruthyParam = (params: AnyRecord, key: string, value: unknown): void => {
+  if (value) {
+    params[key] = value;
+  }
+};
+
+const addIfDefinedParam = (params: AnyRecord, key: string, value: unknown): void => {
+  if (value !== undefined) {
+    params[key] = value;
+  }
+};
+
+const addIfNumberLikeParam = (
+  params: AnyRecord,
+  key: string,
+  value: unknown,
+): void => {
+  if (value != null && value !== "") {
+    params[key] = Number(value);
+  }
+};
+
+const addIfNotNullOrEmptyParam = (
+  params: AnyRecord,
+  key: string,
+  value: unknown,
+): void => {
+  if (value != null && value !== "") {
+    params[key] = value;
+  }
+};
+
+const resolveUserExtensions = (filters: AnyRecord): unknown[] | undefined => {
+  if (filters.user_extensions?.length) {
+    return filters.user_extensions;
+  }
+  if (filters.assigned_to) {
+    return [filters.assigned_to];
+  }
+  return undefined;
+};
+
+const applyDealsFilters = (params: AnyRecord, filters: AnyRecord): void => {
+  addIfTruthyParam(params, "search", filters.search);
+
+  addIfDefinedParam(params, "include_converted", filters.include_converted);
+  addIfDefinedParam(params, "include_lost", filters.include_lost);
+  addIfDefinedParam(params, "include_archived", filters.include_archived);
+
+  addIfTruthyParam(params, "user_extensions", resolveUserExtensions(filters));
+  addIfTruthyParam(params, "stage_id", filters.stage_id);
+
+  addIfNumberLikeParam(params, "probability_min", filters.probability_min);
+  addIfNumberLikeParam(params, "probability_max", filters.probability_max);
+
+  addIfTruthyParam(params, "deal_type", filters.deal_type);
+  addIfTruthyParam(params, "industry", filters.industry);
+
+  addIfTruthyParam(params, "expected_close_date_from", filters.expected_close_date_from);
+  addIfTruthyParam(params, "expected_close_date_to", filters.expected_close_date_to);
+
+  addIfTruthyParam(params, "follow_up_date_from", filters.follow_up_date_from);
+  addIfTruthyParam(params, "follow_up_date_to", filters.follow_up_date_to);
+
+  addIfTruthyParam(params, "created_at_from", filters.created_at_from);
+  addIfTruthyParam(params, "created_at_to", filters.created_at_to);
+  addIfTruthyParam(params, "created_at_month", filters.created_at_month);
+
+  addIfNotNullOrEmptyParam(params, "ticket_id", filters.ticket_id);
+
+  addIfDefinedParam(params, "has_meetings", filters.has_meetings);
+
+  addIfTruthyParam(params, "approval_status", filters.approval_status);
+
+  addIfTruthyParam(params, "sort_by", filters.sort_by);
+  addIfTruthyParam(params, "sort_order", filters.sort_order);
+};
+
+const applyTableSorting = (
+  params: AnyRecord,
+  includeTableSorting: boolean,
+  sortColumn: unknown,
+  sortDirection: unknown,
+): void => {
+  if (includeTableSorting && sortColumn) {
+    params.sort_column = sortColumn;
+    params.sort_direction = sortDirection;
+  }
+};
+
+const applyPagination = (
+  params: AnyRecord,
+  pagination?: { page: number; per_page: number },
+): void => {
+  if (!pagination) return;
+  params.page = pagination.page;
+  params.per_page = pagination.per_page;
+};
+
 const CrmDeals = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -774,36 +875,8 @@ const CrmDeals = () => {
   const buildDealsExportParams = useCallback(
     (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
-      if (filters.search) params.search = filters.search;
-      if (filters.include_converted !== undefined) params.include_converted = filters.include_converted;
-      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
-      if (filters.user_extensions?.length) {
-        params.user_extensions = filters.user_extensions;
-      } else if (filters.assigned_to) {
-        params.user_extensions = [filters.assigned_to];
-      }
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.probability_min != null && filters.probability_min !== "") params.probability_min = Number(filters.probability_min);
-      if (filters.probability_max != null && filters.probability_max !== "") params.probability_max = Number(filters.probability_max);
-      if (filters.deal_type) params.deal_type = filters.deal_type;
-      if (filters.industry) params.industry = filters.industry;
-      if (filters.expected_close_date_from) params.expected_close_date_from = filters.expected_close_date_from;
-      if (filters.expected_close_date_to) params.expected_close_date_to = filters.expected_close_date_to;
-      if (filters.follow_up_date_from) params.follow_up_date_from = filters.follow_up_date_from;
-      if (filters.follow_up_date_to) params.follow_up_date_to = filters.follow_up_date_to;
-      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
-      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
-      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
-      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
-      if (filters.has_meetings !== undefined) params.has_meetings = filters.has_meetings;
-      if (filters.approval_status) params.approval_status = filters.approval_status;
-      if (filters.sort_by) params.sort_by = filters.sort_by;
-      if (filters.sort_order) params.sort_order = filters.sort_order;
-      if (pagination) {
-        params.page = pagination.page;
-        params.per_page = pagination.per_page;
-      }
+      applyDealsFilters(params, filters);
+      applyPagination(params, pagination);
       return params;
     },
     [],
@@ -890,85 +963,14 @@ const CrmDeals = () => {
       perPage = 15,
       includeTableSorting = true,
     ) => {
-      const params: Record<string, any> = {
-        page,
-        per_page: perPage,
-      };
-
-      if (filters.search) {
-        params.search = filters.search;
-      }
-      if (filters.include_converted !== undefined) {
-        params.include_converted = filters.include_converted;
-      }
-      if (filters.include_lost !== undefined) {
-        params.include_lost = filters.include_lost;
-      }
-      if (filters.include_archived !== undefined) {
-        params.include_archived = filters.include_archived;
-      }
-      if (filters.user_extensions?.length) {
-        params.user_extensions = filters.user_extensions;
-      } else if (filters.assigned_to) {
-        params.user_extensions = [filters.assigned_to];
-      }
-      if (filters.stage_id) {
-        params.stage_id = filters.stage_id;
-      }
-      if (filters.probability_min != null && filters.probability_min !== "") {
-        params.probability_min = Number(filters.probability_min);
-      }
-      if (filters.probability_max != null && filters.probability_max !== "") {
-        params.probability_max = Number(filters.probability_max);
-      }
-      if (filters.deal_type) {
-        params.deal_type = filters.deal_type;
-      }
-      if (filters.industry) {
-        params.industry = filters.industry;
-      }
-      if (filters.expected_close_date_from) {
-        params.expected_close_date_from = filters.expected_close_date_from;
-      }
-      if (filters.expected_close_date_to) {
-        params.expected_close_date_to = filters.expected_close_date_to;
-      }
-      if (filters.follow_up_date_from) {
-        params.follow_up_date_from = filters.follow_up_date_from;
-      }
-      if (filters.follow_up_date_to) {
-        params.follow_up_date_to = filters.follow_up_date_to;
-      }
-      if (filters.created_at_from) {
-        params.created_at_from = filters.created_at_from;
-      }
-      if (filters.created_at_to) {
-        params.created_at_to = filters.created_at_to;
-      }
-      if (filters.created_at_month) {
-        params.created_at_month = filters.created_at_month;
-      }
-      if (filters.ticket_id != null && filters.ticket_id !== "") {
-        params.ticket_id = filters.ticket_id;
-      }
-      if (filters.has_meetings !== undefined) {
-        params.has_meetings = filters.has_meetings;
-      }
-      if (filters.approval_status) {
-        params.approval_status = filters.approval_status;
-      }
-      if (filters.sort_by) {
-        params.sort_by = filters.sort_by;
-      }
-      if (filters.sort_order) {
-        params.sort_order = filters.sort_order;
-      }
-
-      if (includeTableSorting && dealsPagination.sortColumn) {
-        params.sort_column = dealsPagination.sortColumn;
-        params.sort_direction = dealsPagination.sortDirection;
-      }
-
+      const params: Record<string, any> = { page, per_page: perPage };
+      applyDealsFilters(params, filters);
+      applyTableSorting(
+        params,
+        includeTableSorting,
+        dealsPagination.sortColumn,
+        dealsPagination.sortDirection,
+      );
       return params;
     },
     [dealsPagination.sortColumn, dealsPagination.sortDirection],
