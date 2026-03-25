@@ -1887,10 +1887,10 @@ const HelpCenterPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveT
 
 // ─── AI Chat (from settings: Tools Profiles, FAQ Profiles, Tenant Profile, Global FAQs) ───
 const aiChatTabs: Tab[] = [
-  { id: 'tools-profiles', label: 'Tools Profiles',permission: PERMISSIONS.VIEW_TOOLS_PROFILE_AI_CHAT },
-  { id: 'faq-profiles', label: 'FAQ Profiles',permission: PERMISSIONS.VIEW_FAQS_PROFILE_AI_CHAT },
-  { id: 'tenant-profile', label: 'Tenant Profile',permission: PERMISSIONS.MANAGE_TENANT_PROFILE_AI_CHAT },
-  { id: 'global-faqs', label: 'Global FAQs',permission: PERMISSIONS.MANAGE_GLOBAL_FAQS_AI_CHAT },
+  { id: 'tools-profiles', label: 'Tools Profiles',permission: PERMISSIONS.VIEW_AI_CHAT },
+  { id: 'faq-profiles', label: 'FAQ Profiles',permission: PERMISSIONS.VIEW_AI_CHAT },
+  { id: 'tenant-profile', label: 'Tenant Profile',permission: PERMISSIONS.VIEW_AI_CHAT },
+  { id: 'global-faqs', label: 'Global FAQs',permission: PERMISSIONS.VIEW_AI_CHAT },
 ]
 
 const AIChatPage: React.FC<ControlledTabsProps> = ({ activeTab: routeActiveTab, onTabChange }) => {

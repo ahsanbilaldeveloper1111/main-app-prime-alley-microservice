@@ -94,6 +94,7 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     padding: "10px 16px",
     cursor: "pointer",
+    border: "0px solid transparent",
     borderBottom: "2px solid transparent",
     textDecoration: "none",
     display: "block",
