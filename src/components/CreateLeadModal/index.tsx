@@ -2137,8 +2137,11 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               {/* Other Information Section */}
               <div className="contact-form-section" style={{ marginTop: "24px", paddingTop: "24px" }}>
                 <div className="contact-form-field" style={{ marginBottom: "20px" }}>
-                  <label className="contact-form-label" style={labelStyle}>Follow up date</label>
+                  <label className="contact-form-label" htmlFor="create-lead-follow-up-date" style={labelStyle}>
+                    Follow up date
+                  </label>
                   <input
+                    id="create-lead-follow-up-date"
                     type="date"
                     value={formData.follow_up_date}
                     onChange={(e) => handleInputChange("follow_up_date", e.target.value)}
