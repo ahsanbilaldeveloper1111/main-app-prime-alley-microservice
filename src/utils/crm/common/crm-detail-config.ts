@@ -6,7 +6,7 @@ type SupportedCrmDetailType = Extract<
 >;
 
 type CrmDetailStaticConfig = Pick<
-  CrmDetailPageLayoutConfig,
+  CrmDetailPageLayoutConfig,  
   | "breadcrumbLabel"
   | "listPath"
   | "loadingMessage"
