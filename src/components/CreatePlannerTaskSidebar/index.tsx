@@ -7,14 +7,10 @@ import {
   Tag,
   Users,
   Eye,
-  Flag,
   ListTodo,
   Plus,
-  Search,
-  Link as LinkIcon,
   FolderOpen,
   Check,
-  Info,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -31,9 +27,12 @@ import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
+type PlannerTaskType = "todo" | "regular" | "recurring";
+
 interface Extension {
   id: string;
   name: string;
+  extension_number?: string;
 }
 
 interface CreateTaskSidebarProps {
@@ -45,10 +44,37 @@ interface CreateTaskSidebarProps {
   labels?: Label[];
   project?: Project;
   statuses?: Status[];
-  task?: any;
+  task?: PlannerEditTask;
   isEdit?: boolean;
   selectedStatusForTask?: number | null;
-  taskType?: "regular" | "recurring" | "todo";
+  taskType?: PlannerTaskType;
+}
+
+/** Minimal task shape used when editing in the sidebar (API / normalized task). */
+interface PlannerEditTask {
+  id?: string | number;
+  rawData?: { id?: string | number };
+  project_id?: number;
+  project?: { id?: number };
+  status_id?: number;
+  status?: { id?: number; name?: string };
+  status_name?: string;
+  title?: string;
+  description?: string;
+  type?: string;
+  priority?: string;
+  assignees?: Array<{ extension_number?: string }>;
+  watchers?: Array<{ extension_number?: string }>;
+  extension_numbers?: string[];
+  watcher_numbers?: string[];
+  due_date?: string;
+  start_date?: string;
+  label_ids?: number[];
+  labels?: Array<{ id: number }>;
+  frequency?: string;
+  repeat_interval?: number;
+  repeat_on?: string | number | null;
+  due_time?: unknown;
 }
 
 interface UserType {
@@ -106,10 +132,16 @@ interface LinkedRecord {
   reference: string;
 }
 
+interface TaskListRow {
+  id: string | number;
+  title?: string;
+  reference?: string;
+}
+
 interface CreateTaskFormData {
   title: string;
   description: string;
-  taskType: "todo" | "regular" | "recurring";
+  taskType: PlannerTaskType;
   projectId: number | null;
   statusId: number | null;
   priorityId: number | null;
@@ -124,6 +156,321 @@ interface CreateTaskFormData {
   repeatInterval: number;
   repeatOn: string;
   dueTime: string;
+}
+
+function mapPriorityStringToId(priority: string | null | undefined): number {
+  const priorityMap: Record<string, number> = {
+    low: 1,
+    normal: 2,
+    medium: 2,
+    high: 3,
+    urgent: 4,
+  };
+  return priorityMap[priority?.toLowerCase() || "normal"] || 2;
+}
+
+function formatDateForInput(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  } catch {
+    return "";
+  }
+}
+
+function resolveExtensionUserId(extensions: Extension[], extRef: string | undefined): number {
+  if (extRef == null || extRef === "") return Number.NaN;
+  const extension = extensions.find(
+    (ext) => String(ext.id) === String(extRef) || ext.extension_number === extRef,
+  );
+  return extension ? Number(extension.id) : Number(extRef);
+}
+
+function mapAssigneeIdsFromEditTask(editTask: PlannerEditTask, extensions: Extension[]): number[] {
+  if (editTask.assignees?.length) {
+    return editTask.assignees.map((a) => resolveExtensionUserId(extensions, a.extension_number));
+  }
+  if (editTask.extension_numbers?.length) {
+    return editTask.extension_numbers.map((extNum) => resolveExtensionUserId(extensions, extNum));
+  }
+  return [];
+}
+
+function mapWatcherIdsFromEditTask(editTask: PlannerEditTask, extensions: Extension[]): number[] {
+  if (editTask.watchers?.length) {
+    return editTask.watchers.map((w) => resolveExtensionUserId(extensions, w.extension_number));
+  }
+  if (editTask.watcher_numbers?.length) {
+    return editTask.watcher_numbers.map((extNum) => resolveExtensionUserId(extensions, extNum));
+  }
+  return [];
+}
+
+function normalizeEditTaskType(editTask: PlannerEditTask): PlannerTaskType {
+  if (editTask.type === "todo" || editTask.type === "recurring") {
+    return editTask.type;
+  }
+  return "regular";
+}
+
+function buildInitialFormFromEdit(
+  editTask: PlannerEditTask,
+  extensions: Extension[],
+): CreateTaskFormData {
+  const projectIdRaw = editTask.project_id ?? editTask.project?.id;
+  const statusIdRaw = editTask.status_id ?? editTask.status?.id;
+  const assigneeIds = mapAssigneeIdsFromEditTask(editTask, extensions);
+  const watcherIds = mapWatcherIdsFromEditTask(editTask, extensions);
+  const taskTypeVal = normalizeEditTaskType(editTask);
+  const frequency = editTask.frequency || "weekly";
+  const repeatInterval = Math.max(1, Number(editTask.repeat_interval) || 1);
+  const repeatOn = editTask.repeat_on == null ? "" : String(editTask.repeat_on);
+  const dueTime = typeof editTask.due_time === "string" ? editTask.due_time : "";
+  return {
+    title: editTask.title || "",
+    description: editTask.description || "",
+    taskType: taskTypeVal,
+    projectId: projectIdRaw ? Number(projectIdRaw) : null,
+    statusId: statusIdRaw ? Number(statusIdRaw) : null,
+    priorityId: mapPriorityStringToId(editTask.priority),
+    assigneeIds,
+    watcherIds,
+    dueDate: formatDateForInput(editTask.due_date),
+    startDate: formatDateForInput(editTask.start_date),
+    labelIds: editTask.label_ids ?? editTask.labels?.map((l) => l.id) ?? [],
+    linkedRecordIds: [],
+    frequency,
+    repeatInterval,
+    repeatOn,
+    dueTime,
+  };
+}
+
+function buildInitialFormForCreate(
+  taskType: PlannerTaskType,
+  propProject: Project | undefined,
+  propStatuses: Status[],
+  selectedStatusForTask: number | null,
+): CreateTaskFormData {
+  return {
+    title: "",
+    description: "",
+    taskType,
+    projectId: propProject?.id ?? null,
+    statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
+    priorityId: 0,
+    assigneeIds: [],
+    watcherIds: [],
+    dueDate: "",
+    startDate: "",
+    labelIds: [],
+    linkedRecordIds: [],
+    frequency: "weekly",
+    repeatInterval: 1,
+    repeatOn: "",
+    dueTime: "",
+  };
+}
+
+function resolveSidebarProjects(fetchedProjects: Project[], propProject: Project | undefined): Project[] {
+  if (fetchedProjects.length > 0) {
+    return fetchedProjects;
+  }
+  if (propProject) {
+    return [propProject];
+  }
+  return [];
+}
+
+function getSidebarTitle(taskType: PlannerTaskType, isEdit: boolean): string {
+  if (taskType === "todo") {
+    return isEdit ? "Edit Todo" : "Create Todo";
+  }
+  if (taskType === "recurring") {
+    return isEdit ? "Edit Recurring" : "Create Recurring";
+  }
+  return isEdit ? "Edit Task" : "Create Task";
+}
+
+function linkedRecordsEmptyMessage(hasSearchQuery: boolean): string {
+  if (hasSearchQuery) {
+    return "No tasks found matching your search";
+  }
+  return "No tasks available";
+}
+
+function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean): string {
+  if (isSubmitting) return "Processing...";
+  if (isEdit) return "Update";
+  return "Create";
+}
+
+interface StatusSelectOptionsProps {
+  formDataProjectId: number | null;
+  loadingProjects: boolean;
+  loadingGenericStatuses: boolean;
+  statuses: Status[];
+  isEdit: boolean;
+  statusId: number | null;
+  editTask: PlannerEditTask | undefined;
+}
+
+function StatusSelectOptions({
+  formDataProjectId,
+  loadingProjects,
+  loadingGenericStatuses,
+  statuses,
+  isEdit,
+  statusId,
+  editTask,
+}: Readonly<StatusSelectOptionsProps>): React.ReactNode {
+  const isLoadingStatuses =
+    Boolean(formDataProjectId && loadingProjects) ||
+    Boolean(!formDataProjectId && loadingGenericStatuses);
+  if (isLoadingStatuses) {
+    return <option value="">Loading statuses...</option>;
+  }
+  if (statuses.length === 0) {
+    if (isEdit && statusId != null) {
+      const label =
+        editTask?.status?.name ||
+        editTask?.status_name ||
+        `Status #${statusId}`;
+      return <option value={statusId}>{label}</option>;
+    }
+    return <option value="">No statuses available</option>;
+  }
+  const missingFromList =
+    isEdit &&
+    statusId != null &&
+    !statuses.some((s) => String(s.id) === String(statusId));
+  return (
+    <>
+      <option value="">Select status</option>
+      {missingFromList && (
+        <option value={statusId}>
+          {editTask?.status?.name ||
+            editTask?.status_name ||
+            `Status #${statusId}`}
+        </option>
+      )}
+      {statuses.map((status) => (
+        <option key={status.id} value={status.id}>
+          {status.name}
+        </option>
+      ))}
+    </>
+  );
+}
+
+function renderProjectSelectChildren(loadingProjects: boolean, projects: Project[]): React.ReactNode {
+  if (loadingProjects) {
+    return <option value="">Loading projects...</option>;
+  }
+  if (projects.length === 0) {
+    return <option value="">No projects available</option>;
+  }
+  return (
+    <>
+      <option value="">Select project</option>
+      {projects.map((project) => (
+        <option key={project.id} value={project.id}>
+          {project.name}
+        </option>
+      ))}
+    </>
+  );
+}
+
+interface LinkedRecordListRowProps {
+  record: LinkedRecord;
+  selected: boolean;
+  onToggle: (recordId: number) => void;
+}
+
+function LinkedRecordListRow({
+  record,
+  selected,
+  onToggle,
+}: Readonly<LinkedRecordListRowProps>) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(record.id)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: 12,
+        cursor: "pointer",
+        backgroundColor: selected ? "#edf6ff" : "white",
+        border: "none",
+        borderBottom: "1px solid #f1f5f9",
+        width: "100%",
+        textAlign: "left",
+        font: "inherit",
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 4,
+          backgroundColor: record.type === "crm" ? "#4e6fa5" : "#6B7280",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginRight: 12,
+          flexShrink: 0,
+        }}
+      >
+        {record.type === "crm" ? (
+          <FolderOpen size={18} color="#fff" />
+        ) : (
+          <ListTodo size={18} color="#fff" />
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "0.9rem",
+            color: "#141414",
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {record.title}
+        </div>
+        <div
+          style={{
+            fontSize: "0.8rem",
+            color: "#718096",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {record.reference}
+        </div>
+      </div>
+      {selected && (
+        <Check
+          size={18}
+          style={{
+            color: "#3b82f6",
+            marginLeft: 8,
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </button>
+  );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -142,115 +489,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   selectedStatusForTask = null,
   taskType = "regular",
 }) => {
-  const mapPriorityStringToId = (priority: string | null | undefined): number => {
-    const priorityMap: Record<string, number> = {
-      low: 1,
-      normal: 2,
-      medium: 2,
-      high: 3,
-      urgent: 4,
-    };
-    return priorityMap[priority?.toLowerCase() || "normal"] || 2;
-  };
-
-  const formatDateForInput = (dateString: string | null | undefined): string => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return "";
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch {
-      return "";
-    }
-  };
-
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
-      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
-      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
-      const assigneeIds =
-        editTask.assignees?.map((assignee: any) => {
-          const extension = extensions.find(
-            (ext: any) =>
-              ext.id === assignee.extension_number ||
-              ext.extension_number === assignee.extension_number
-          );
-          return extension ? Number(extension.id) : Number(assignee.extension_number);
-        }) ||
-        editTask.extension_numbers?.map((extNum: string) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id === extNum || ext.extension_number === extNum
-          );
-          return extension ? Number(extension.id) : Number(extNum);
-        }) ||
-        [];
-      const watcherIds =
-        editTask.watchers?.map((watcher: any) => {
-          const extension = extensions.find(
-            (ext: any) =>
-              ext.id === watcher.extension_number ||
-              ext.extension_number === watcher.extension_number
-          );
-          return extension ? Number(extension.id) : Number(watcher.extension_number);
-        }) ||
-        editTask.watcher_numbers?.map((extNum: string) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id === extNum || ext.extension_number === extNum
-          );
-          return extension ? Number(extension.id) : Number(extNum);
-        }) ||
-        [];
-      const taskTypeVal =
-        editTask.type === "todo" || editTask.type === "recurring"
-          ? editTask.type
-          : "regular";
-      const frequency = (editTask.frequency || "weekly") as string;
-      const repeatInterval = Math.max(1, Number(editTask.repeat_interval) || 1);
-      const repeatOn = editTask.repeat_on != null ? String(editTask.repeat_on) : "";
-      const dueTime =
-        typeof editTask.due_time === "string" ? editTask.due_time : "";
-      return {
-        title: editTask.title || "",
-        description: editTask.description || "",
-        taskType: taskTypeVal,
-        projectId: projectIdRaw ? Number(projectIdRaw) : null,
-        statusId: statusIdRaw ? Number(statusIdRaw) : null,
-        priorityId: mapPriorityStringToId(editTask.priority),
-        assigneeIds,
-        watcherIds,
-        dueDate: formatDateForInput(editTask.due_date),
-        startDate: formatDateForInput(editTask.start_date),
-        labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
-        linkedRecordIds: [],
-        frequency,
-        repeatInterval,
-        repeatOn,
-        dueTime,
-      };
+      return buildInitialFormFromEdit(editTask, extensions);
     }
-    return {
-      title: "",
-      description: "",
+    return buildInitialFormForCreate(
       taskType,
-      projectId: propProject?.id || null,
-      statusId:
-        selectedStatusForTask ||
-        (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 0,
-      assigneeIds: [],
-      watcherIds: [],
-      dueDate: "",
-      startDate: "",
-      labelIds: [],
-      linkedRecordIds: [],
-      frequency: "weekly",
-      repeatInterval: 1,
-      repeatOn: "",
-      dueTime: "",
-    };
+      propProject,
+      propStatuses,
+      selectedStatusForTask,
+    );
   };
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
@@ -273,13 +521,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       try {
         setLoadingProjects(true);
         const response = await listProjects({ page: 1, limit: 100 });
-        if (
-          response &&
-          response.success === true &&
-          response.data &&
-          Array.isArray(response.data)
-        ) {
-          const projectsList = response.data.map((project: any) => ({
+        if (response?.success === true && Array.isArray(response.data)) {
+          const projectsList = response.data.map(
+            (project: {
+              id: number;
+              name: string;
+              color?: string;
+              statuses?: Project["statuses"];
+              labels?: Project["labels"];
+            }) => ({
             id: project.id,
             name: project.name,
             icon: "",
@@ -306,7 +556,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         setLoadingGenericStatuses(true);
         const response = await listStatuses();
         if (response && Array.isArray(response)) {
-          const statusesList = response.map((status: any) => ({
+          const statusesList = response.map((status: Status) => ({
             id: status.id,
             name: status.name,
             icon: "",
@@ -314,7 +564,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           }));
           setGenericStatuses(statusesList);
         } else if (response?.data && Array.isArray(response.data)) {
-          const statusesList = response.data.map((status: any) => ({
+          const statusesList = response.data.map((status: Status) => ({
             id: status.id,
             name: status.name,
             icon: "",
@@ -353,9 +603,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
           const records: LinkedRecord[] = response.data
             .filter(
-              (t: any) => currentTaskId == null || Number(t.id) !== currentTaskId
+              (t: TaskListRow) =>
+                currentTaskId == null || Number(t.id) !== currentTaskId,
             )
-            .map((t: any) => ({
+            .map((t: TaskListRow) => ({
               id: Number(t.id),
               type: "task" as const,
               title: t.title || "",
@@ -443,8 +694,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       .toUpperCase(),
   }));
 
-  const projects: Project[] =
-    fetchedProjects.length > 0 ? fetchedProjects : propProject ? [propProject] : [];
+  const projects: Project[] = resolveSidebarProjects(fetchedProjects, propProject);
 
   const getStatusesForSelectedProject = (): Status[] => {
     if (formData.projectId) {
@@ -455,7 +705,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         selectedProject?.statuses &&
         Array.isArray(selectedProject.statuses)
       ) {
-        return selectedProject.statuses.map((status: any) => ({
+        return selectedProject.statuses.map((status) => ({
           id: status.id,
           name: status.name,
           icon: "",
@@ -504,7 +754,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       (p) => p.id === formData.projectId
     );
     if (selectedProject?.labels && Array.isArray(selectedProject.labels)) {
-      return selectedProject.labels.map((label: any) => ({
+      return selectedProject.labels.map((label) => ({
         id: label.id,
         name: label.name,
         color: label.color || "#3b82f6",
@@ -536,12 +786,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       start_date: formData.startDate || "",
       extension_numbers:
         formData.assigneeIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          const extension = extensions.find((ext) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
       watchers:
         formData.watcherIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          const extension = extensions.find((ext) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
       type: formData.taskType,
@@ -567,146 +817,89 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     return payload;
   };
 
-  const handleCreate = async (e?: React.MouseEvent) => {
+  const validateBeforeSubmit = (): boolean => {
+    if (!formData.title.trim()) {
+      toast.error("Please enter a task title");
+      return false;
+    }
+    if (formData.taskType === "recurring") {
+      if (!formData.projectId) {
+        toast.error("Recurring tasks require a project");
+        return false;
+      }
+      if (!formData.statusId) {
+        toast.error("Recurring tasks require a status");
+        return false;
+      }
+      if (!formData.startDate) {
+        toast.error("Recurring tasks require a start date");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const persistTaskFromPayload = async (payload: ReturnType<typeof buildPayload>): Promise<boolean> => {
+    if (isEdit && editTask?.id != null) {
+      if (formData.taskType === "recurring") {
+        return Boolean(
+          await updateRecurringTask(
+            editTask.id,
+            payload as Parameters<typeof updateRecurringTask>[1],
+          ),
+        );
+      }
+      return Boolean(
+        await updateTask(editTask.id, payload as Parameters<typeof updateTask>[1]),
+      );
+    }
+    if (formData.taskType === "recurring") {
+      const recurringPayload = {
+        ...payload,
+        project_id: formData.projectId as number,
+        status_id: formData.statusId as number,
+        start_date: formData.startDate,
+        end_date: formData.dueDate || null,
+        type: "recurring" as const,
+      };
+      return Boolean(
+        await createRecurringTask(
+          recurringPayload as Parameters<typeof createRecurringTask>[0],
+        ),
+      );
+    }
+    const withTz = { ...payload, timezone: getAutoTimezone() };
+    return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+  };
+
+  const submitPlannerTask = async (
+    e: React.MouseEvent | undefined,
+    onSuccess: ((data: CreateTaskFormData) => void) | undefined,
+  ) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     if (isSubmitting) return;
-    if (!formData.title.trim()) {
-      toast.error("Please enter a task title");
-      return;
-    }
-    if (formData.taskType === "recurring") {
-      if (!formData.projectId) {
-        toast.error("Recurring tasks require a project");
-        return;
-      }
-      if (!formData.statusId) {
-        toast.error("Recurring tasks require a status");
-        return;
-      }
-      if (!formData.startDate) {
-        toast.error("Recurring tasks require a start date");
-        return;
-      }
-    }
+    if (!validateBeforeSubmit()) return;
+
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-      if (isEdit && editTask?.id) {
-        if (formData.taskType === "recurring") {
-          const result = await updateRecurringTask(editTask.id, payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        } else {
-          const result = await updateTask(editTask.id, payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        }
-      } else {
-        if (formData.taskType === "recurring") {
-          const recurringPayload = {
-            ...payload,
-            project_id: formData.projectId!,
-            status_id: formData.statusId!,
-            start_date: formData.startDate,
-            end_date: formData.dueDate || null,
-            type: "recurring" as const,
-          };
-          const result = await createRecurringTask(recurringPayload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        } else {
-          payload.timezone = getAutoTimezone();
-          const result = await createTask(payload);
-          if (result) {
-            onCreate?.(formData);
-            onClose?.();
-          }
-        }
+      const ok = await persistTaskFromPayload(payload);
+      if (ok) {
+        onSuccess?.(formData);
+        onClose?.();
       }
     } catch (error) {
-      console.error(
-        `Error ${isEdit ? "updating" : "creating"} task:`,
-        error
-      );
+      console.error(`Error ${isEdit ? "updating" : "creating"} task:`, error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCreateAndOpen = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (isSubmitting) return;
-    if (!formData.title.trim()) {
-      toast.error("Please enter a task title");
-      return;
-    }
-    if (formData.taskType === "recurring") {
-      if (!formData.projectId || !formData.statusId || !formData.startDate) {
-        toast.error("Recurring tasks require project, status, and start date");
-        return;
-      }
-    }
-    setIsSubmitting(true);
-    try {
-      const payload = buildPayload();
-      if (isEdit && editTask?.id) {
-        if (formData.taskType === "recurring") {
-          const result = await updateRecurringTask(editTask.id, payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        } else {
-          const result = await updateTask(editTask.id, payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        }
-      } else {
-        if (formData.taskType === "recurring") {
-          const recurringPayload = {
-            ...payload,
-            project_id: formData.projectId!,
-            status_id: formData.statusId!,
-            start_date: formData.startDate,
-            end_date: formData.dueDate || null,
-            type: "recurring" as const,
-          };
-          const result = await createRecurringTask(recurringPayload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        } else {
-          payload.timezone = getAutoTimezone();
-          const result = await createTask(payload);
-          if (result) {
-            onCreateAndOpen?.(formData);
-            onClose?.();
-          }
-        }
-      }
-    } catch (error) {
-      console.error(
-        `Error ${isEdit ? "updating" : "creating"} task:`,
-        error
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleCreate = async (e?: React.MouseEvent) => {
+    await submitPlannerTask(e, onCreate);
   };
 
   const toggleLabel = (labelId: number) => {
@@ -746,6 +939,43 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     formData.labelIds.includes(l.id)
   );
 
+  const renderLinkedRecordsList = (): React.ReactNode => {
+    if (loadingLinkedRecords) {
+      return (
+        <div
+          className="p-3 text-center text-muted"
+          style={{ fontSize: "0.9rem" }}
+        >
+          Loading tasks...
+        </div>
+      );
+    }
+    if (linkedRecordsFromApi.length === 0) {
+      return (
+        <div
+          className="p-3 text-center text-muted"
+          style={{ fontSize: "0.9rem" }}
+        >
+          {linkedRecordsEmptyMessage(Boolean(searchQuery))}
+        </div>
+      );
+    }
+    const toggleLinkedRecord = (recordId: number) => {
+      setFormData((prev) => ({
+        ...prev,
+        linkedRecordIds: prev.linkedRecordIds.includes(recordId) ? [] : [recordId],
+      }));
+    };
+    return linkedRecordsFromApi.map((record) => (
+      <LinkedRecordListRow
+        key={record.id}
+        record={record}
+        selected={formData.linkedRecordIds.includes(record.id)}
+        onToggle={toggleLinkedRecord}
+      />
+    ));
+  };
+
   if (!isOpen) return null;
 
   const labelStyle = {
@@ -776,13 +1006,18 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         }
       `}</style>
 
-      <div
+      <button
+        type="button"
+        aria-label="Close sidebar"
         onClick={onClose}
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 1000,
           backgroundColor: "rgba(0,0,0,0.2)",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
         }}
       />
       <div
@@ -824,17 +1059,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             }}
           >
             <ListTodo size={20} color="#4e6fa5" />
-            {formData.taskType === "todo"
-              ? isEdit
-                ? "Edit Todo"
-                : "Create Todo"
-              : formData.taskType === "recurring"
-              ? isEdit
-                ? "Edit Recurring"
-                : "Create Recurring"
-              : isEdit
-              ? "Edit Task"
-              : "Create Task"}
+            {getSidebarTitle(formData.taskType, isEdit)}
           </h2>
           <button
             type="button"
@@ -895,7 +1120,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    taskType: e.target.value as "todo" | "regular" | "recurring",
+                    taskType: e.target.value as PlannerTaskType,
                   })
                 }
                 className="py-2"
@@ -960,121 +1185,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       borderRadius: 4,
                     }}
                   >
-                    {loadingLinkedRecords ? (
-                      <div
-                        className="p-3 text-center text-muted"
-                        style={{ fontSize: "0.9rem" }}
-                      >
-                        Loading tasks...
-                      </div>
-                    ) : linkedRecordsFromApi.length === 0 ? (
-                      <div
-                        className="p-3 text-center text-muted"
-                        style={{ fontSize: "0.9rem" }}
-                      >
-                        {searchQuery
-                          ? "No tasks found matching your search"
-                          : "No tasks available"}
-                      </div>
-                    ) : (
-                      linkedRecordsFromApi.map((record) => (
-                        <div
-                          key={record.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              linkedRecordIds: prev.linkedRecordIds.includes(
-                                record.id
-                              )
-                                ? []
-                                : [record.id],
-                            }));
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              setFormData((prev) => ({
-                                ...prev,
-                                linkedRecordIds: prev.linkedRecordIds.includes(
-                                  record.id
-                                )
-                                  ? []
-                                  : [record.id],
-                              }));
-                            }
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            padding: 12,
-                            cursor: "pointer",
-                            backgroundColor: formData.linkedRecordIds.includes(
-                              record.id
-                            )
-                              ? "#edf6ff"
-                              : "white",
-                            borderBottom: "1px solid #f1f5f9",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 4,
-                              backgroundColor:
-                                record.type === "crm" ? "#4e6fa5" : "#6B7280",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginRight: 12,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {record.type === "crm" ? (
-                              <FolderOpen size={18} color="#fff" />
-                            ) : (
-                              <ListTodo size={18} color="#fff" />
-                            )}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "0.9rem",
-                                color: "#141414",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {record.title}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "0.8rem",
-                                color: "#718096",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {record.reference}
-                            </div>
-                          </div>
-                          {formData.linkedRecordIds.includes(record.id) && (
-                            <Check
-                              size={18}
-                              style={{
-                                color: "#3b82f6",
-                                marginLeft: 8,
-                                flexShrink: 0,
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))
-                    )}
+                    {renderLinkedRecordsList()}
                   </div>
                 </Form.Group>
               </Col>
@@ -1138,14 +1249,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   }}
                 >
                   {selectedAssignees.map((user) => (
-                    <div
+                    <button
                       key={user.id}
-                      role="button"
-                      tabIndex={0}
+                      type="button"
                       onClick={() => toggleAssignee(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleAssignee(user.id)
-                      }
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -1156,13 +1263,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         border: "1px solid #bfdbfe",
                         fontSize: "0.875rem",
                         cursor: "pointer",
+                        font: "inherit",
                       }}
                     >
                       <span style={{ color: "#141414", fontWeight: 500 }}>
                         {user.name}
                       </span>
                       <X size={14} style={{ color: "#64748b" }} />
-                    </div>
+                    </button>
                   ))}
                 </div>
                 {showAssigneeDropdown && (
@@ -1197,28 +1305,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           .includes(assigneeSearchQuery.toLowerCase())
                       )
                       .map((user) => (
-                        <div
+                        <button
                           key={user.id}
-                          role="button"
-                          tabIndex={0}
+                          type="button"
                           onClick={() => toggleAssignee(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleAssignee(user.id)
-                          }
                           style={{
                             padding: "7px 12px",
                             cursor: "pointer",
                             backgroundColor: formData.assigneeIds.includes(user.id)
                               ? "#edf6ff"
                               : "white",
-                              borderBottom: "1px solid #d5d5d5",
+                            border: "none",
+                            borderBottom: "1px solid #d5d5d5",
+                            width: "100%",
+                            textAlign: "left",
+                            font: "inherit",
                           }}
                         >
                           <span
                             style={{
                               fontSize: "13px",
                               color: "#141414",
-                              // fontWeight: 500,
                             }}
                           >
                             {user.name}
@@ -1230,7 +1337,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               style={{ flexShrink: 0, display: "inline", verticalAlign: "middle" }}
                             />
                           )}
-                        </div>
+                        </button>
                       ))}
                     
                   </div>
@@ -1298,14 +1405,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   }}
                 >
                   {selectedWatchers.map((user) => (
-                    <div
+                    <button
                       key={user.id}
-                      role="button"
-                      tabIndex={0}
+                      type="button"
                       onClick={() => toggleWatcher(user.id)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && toggleWatcher(user.id)
-                      }
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -1316,13 +1419,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         border: "1px solid #bbf7d0",
                         fontSize: "0.875rem",
                         cursor: "pointer",
+                        font: "inherit",
                       }}
                     >
                       <span style={{ color: "#141414", fontWeight: 500 }}>
                         {user.name}
                       </span>
                       <X size={14} style={{ color: "#64748b" }} />
-                    </div>
+                    </button>
                   ))}
                 </div>
                 {showWatcherDropdown && (
@@ -1357,28 +1461,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                           .includes(watcherSearchQuery.toLowerCase())
                       )
                       .map((user) => (
-                        <div
+                        <button
                           key={user.id}
-                          role="button"
-                          tabIndex={0}
+                          type="button"
                           onClick={() => toggleWatcher(user.id)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && toggleWatcher(user.id)
-                          }
                           style={{
                             padding: "7px 12px",
                             cursor: "pointer",
                             backgroundColor: formData.watcherIds.includes(user.id)
                               ? "#f0fdf4"
                               : "white",
+                            border: "none",
                             borderBottom: "1px solid #d5d5d5",
+                            width: "100%",
+                            textAlign: "left",
+                            font: "inherit",
                           }}
                         >
                           <span
                             style={{
                               fontSize: "13px",
                               color: "#141414",
-                              // fontWeight: 500,
                             }}
                           >
                             {user.name}
@@ -1394,7 +1497,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                               }}
                             />
                           )}
-                        </div>
+                        </button>
                       ))}
                     
                   </div>
@@ -1611,20 +1714,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       style={{ fontSize: "14px" }}
                       disabled={loadingProjects || projects.length === 0}
                     >
-                      {loadingProjects ? (
-                        <option value="">Loading projects...</option>
-                      ) : projects.length === 0 ? (
-                        <option value="">No projects available</option>
-                      ) : (
-                        <>
-                          <option value="">Select project</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
+                      {renderProjectSelectChildren(loadingProjects, projects)}
                     </Form.Select>
                   </Form.Group>
                 </Col>
@@ -1655,47 +1745,21 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         statuses.length === 0
                       }
                     >
-                      {(formData.projectId && loadingProjects) ||
-                      (!formData.projectId && loadingGenericStatuses) ? (
-                        <option value="">Loading statuses...</option>
-                      ) : statuses.length === 0 ? (
-                        isEdit && formData.statusId ? (
-                          <option value={formData.statusId}>
-                            {editTask?.status?.name ||
-                              editTask?.status_name ||
-                              `Status #${formData.statusId}`}
-                          </option>
-                        ) : (
-                          <option value="">No statuses available</option>
-                        )
-                      ) : (
-                        <>
-                          <option value="">Select status</option>
-                          {isEdit &&
-                            formData.statusId &&
-                            !statuses.some(
-                              (s) => String(s.id) === String(formData.statusId)
-                            ) && (
-                              <option value={formData.statusId}>
-                                {editTask?.status?.name ||
-                                  editTask?.status_name ||
-                                  `Status #${formData.statusId}`}
-                              </option>
-                            )}
-                          {statuses.map((status) => (
-                            <option key={status.id} value={status.id}>
-                              {status.name}
-                            </option>
-                          ))}
-                        </>
-                      )}
+                      <StatusSelectOptions
+                        formDataProjectId={formData.projectId}
+                        loadingProjects={loadingProjects}
+                        loadingGenericStatuses={loadingGenericStatuses}
+                        statuses={statuses}
+                        isEdit={isEdit}
+                        statusId={formData.statusId}
+                        editTask={editTask}
+                      />
                     </Form.Select>
                   </Form.Group>
                 </Col>
               )}
 
 {formData.taskType !== "todo" && (
-              <>
                 <Col xs={12} md={6}>
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
@@ -1712,10 +1776,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       }}
                     >
                       {selectedLabels.map((label) => (
-                        <div
+                        <button
                           key={label.id}
-                          role="button"
-                          tabIndex={0}
+                          type="button"
                           onClick={() => toggleLabel(label.id)}
                           style={{
                             display: "inline-flex",
@@ -1728,12 +1791,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                             fontWeight: 500,
                             cursor: "pointer",
                             borderRadius: 6,
+                            border: "none",
+                            font: "inherit",
                           }}
                         >
                           <Tag size={12} />
                           {label.name}
                           <X size={12} />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -1766,10 +1831,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                         }}
                       >
                         {labels.map((label) => (
-                          <div
+                          <button
                             key={label.id}
-                            role="button"
-                            tabIndex={0}
+                            type="button"
                             onClick={() => toggleLabel(label.id)}
                             style={{
                               backgroundColor: formData.labelIds.includes(
@@ -1786,19 +1850,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                                 ? "2px solid #3b82f6"
                                 : "1px solid #e2e8f0",
                               borderRadius: 6,
+                              font: "inherit",
                             }}
                           >
                             {label.name}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
                   </div>
                 </Form.Group>
                 </Col>
-
-               
-              </>
             )}
 
              
@@ -1838,6 +1900,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
             Cancel
           </button>
+          {onCreateAndOpen && !isEdit && (
+            <button
+              type="button"
+              onClick={(e) => void submitPlannerTask(e, onCreateAndOpen)}
+              disabled={isSubmitting}
+              style={{
+                padding: "8px 20px",
+                fontSize: 14,
+                fontWeight: 600,
+                backgroundColor: "#4f46e5",
+                border: "none",
+                borderRadius: 4,
+                color: "#fff",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {isSubmitting ? "Processing..." : "Create & open"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleCreate()}
@@ -1853,11 +1934,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               cursor: isSubmitting ? "not-allowed" : "pointer",
             }}
           >
-            {isSubmitting
-              ? "Processing..."
-              : isEdit
-              ? "Update"
-              : "Create"}
+            {primarySubmitButtonLabel(isSubmitting, isEdit)}
           </button>
         </div>
       </div>

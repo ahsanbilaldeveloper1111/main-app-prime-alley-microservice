@@ -2630,7 +2630,9 @@ const CrmCompanyManagement = () => {
     (company: any) => {
       const id = company?.id ?? company?.rawData?.id;
       if (id != null) {
-        router.push(`/crm/companies/company-detailpage?id=${id}`);
+        router.push(
+          `/crm/detailspage?type=companies&id=${encodeURIComponent(String(id))}`
+        );
       } else {
         setSelectedCompany(company);
         setShowCompanySidebar(true);
@@ -7529,7 +7531,9 @@ const CrmCompanyManagement = () => {
                   onClick: () => {
                     if (selectedCompany?.id != null) {
                       router.push(
-                        `/crm/companies/company-detailpage?id=${selectedCompany.id}`,
+                        `/crm/detailspage?type=companies&id=${encodeURIComponent(
+                          String(selectedCompany.id)
+                        )}`
                       );
                     }
                     setShowCompanySidebar(false);

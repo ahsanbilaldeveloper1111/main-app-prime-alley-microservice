@@ -269,6 +269,7 @@ export const AuditLogsWorkPlanner = async (params?: Record<string, unknown>) => 
 
 /**
  * GET tasks/calendar
+ * Query params may include `start`, `end` (YYYY-MM-DD) and `timezone` (IANA id, e.g. Asia/Almaty).
  * Returns { events, timezone } when successful
  */
 export const getTasksCalendar = async (

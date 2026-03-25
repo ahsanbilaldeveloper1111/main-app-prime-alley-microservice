@@ -3308,7 +3308,7 @@ const CrmQuotesManagement = () => {
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
       router.push(
-        `/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`,
+        `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
       );
     },
     [router],

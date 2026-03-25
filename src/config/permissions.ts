@@ -158,6 +158,8 @@ export const routePermissions: RoutePermission[] = [
             {path:'/inbox',permissions: [PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM]},
             {path:'/crm-tasks',permissions: [PERMISSIONS.VIEW_CRM_TASKS]},
             {path:'/main-dashboard',permissions: [PERMISSIONS.VIEW_CRM_DASHBOARD]},
+            // Unified CRM detail wrapper route
+            {path:'/detailspage',permissions: [PERMISSIONS.CRM_SERVICES]},
             
         ]
     },
