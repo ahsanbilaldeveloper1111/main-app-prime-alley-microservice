@@ -9,12 +9,21 @@ import { getTasksCalendar } from "@utils/work-planner";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
+/** Calendar week bounds use local midnight; ISO date strings must match that (not UTC via toISOString). */
+function toLocalDateParam(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const Calendar = () => {
   const fetchCalendarData = useCallback(
-    (start: Date, end: Date) =>
+    (start: Date, end: Date, timeZone: string) =>
       getTasksCalendar({
-        start_date: start.toISOString().slice(0, 10),
-        end_date: end.toISOString().slice(0, 10),
+        start: toLocalDateParam(start),
+        end: toLocalDateParam(end),
+        timezone: timeZone,
       }),
     [],
   );
