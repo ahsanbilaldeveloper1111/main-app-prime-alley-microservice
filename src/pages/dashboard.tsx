@@ -8,18 +8,12 @@ import {
   List,
   Phone,
   Mail,
-  Linkedin,
+  Share2,
   ExternalLink,
   Plus,
-  Play,
-  MoreHorizontal,
-  Calendar,
-  TrendingUp,
-  Zap,
   ChevronDown,
   GripVertical,
   Info,
-  HelpCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import CompanyData from "@pages/crm/companies";
@@ -101,6 +95,7 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     padding: "10px 16px",
     cursor: "pointer",
+    border: "0px solid transparent",
     borderBottom: "2px solid transparent",
     textDecoration: "none",
     display: "block",
@@ -373,37 +368,56 @@ const styles: Record<string, React.CSSProperties> = {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+type SectionHeaderProps = Readonly<{
+  title: string;
+  actionSlot?: React.ReactNode;
+  infoIcon?: boolean;
+  onToggle?: () => void;
+  isCollapsed?: boolean;
+}>;
+
 function SectionHeader({
   title,
   actionSlot,
   infoIcon = false,
   onToggle,
   isCollapsed = false,
-}: {
-  title: string;
-  actionSlot?: React.ReactNode;
-  infoIcon?: boolean;
-  onToggle?: () => void;
-  isCollapsed?: boolean;
-}) {
+}: SectionHeaderProps) {
+  const chevronStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    transition: "transform 0.2s ease",
+    transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
+  };
+
   return (
     <div style={styles.sectionHeader}>
       <div style={styles.sectionTitle}>
         <div style={styles.gripIcon}>
           <GripVertical size={14} />
         </div>
-        <div
-          onClick={onToggle}
-          style={{
-            cursor: onToggle ? "pointer" : "default",
-            display: "flex",
-            alignItems: "center",
-            transition: "transform 0.2s ease",
-            transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)",
-          }}
-        >
-          <ChevronDown size={14} color="#666" />
-        </div>
+        {onToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!isCollapsed}
+            aria-label={isCollapsed ? `Expand ${title} section` : `Collapse ${title} section`}
+            style={{
+              ...chevronStyle,
+              cursor: "pointer",
+              border: "none",
+              background: "none",
+              padding: 0,
+              font: "inherit",
+            }}
+          >
+            <ChevronDown size={14} color="#666" />
+          </button>
+        ) : (
+          <span style={{ ...chevronStyle, cursor: "default" }}>
+            <ChevronDown size={14} color="#666" />
+          </span>
+        )}
         {title}
         {infoIcon && <Info size={13} color="#999" />}
       </div>
@@ -479,8 +493,7 @@ type NextPageWithLayout = React.FC & {
 };
 
 const SalesDashboard: NextPageWithLayout = () => {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const { data: session } = useSession();
 
   const navTabs = React.useMemo(() => {
     const perms = session?.user?.permissions ?? [];
@@ -499,7 +512,7 @@ const SalesDashboard: NextPageWithLayout = () => {
   }, [navTabs, activeTab]);
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving] = useState(false);
   const [activeTaskFilter, setActiveTaskFilter] = useState("All tasks");
 
   type TaskStatKey = "allTasks" | "highPriority" | "toDos" | "calls" | "emails" | "linkedin";
@@ -544,22 +557,24 @@ const SalesDashboard: NextPageWithLayout = () => {
             <span style={styles.headerDivider}>|</span>
             <span style={styles.headerUser}>{session?.user?.name}</span>
           </div>
-          {/* <div style={styles.helpBtn}>
-            <HelpCircle size={15} color="#666" />
-          </div> */}
         </div>
-        <nav style={styles.nav}>
+        <nav style={styles.nav} aria-label="Dashboard sections">
           {navTabs.map((tab) => (
-            <a
+            <button
               key={tab.id}
+              type="button"
               style={{
                 ...styles.navTab,
                 ...(activeTab === tab.id ? styles.navTabActive : {}),
+                background: "none",
+                font: "inherit",
+                boxShadow: "none",
               }}
+              aria-current={activeTab === tab.id ? "page" : undefined}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
-            </a>
+            </button>
           ))}
         </nav>
       </div>
@@ -606,14 +621,6 @@ const SalesDashboard: NextPageWithLayout = () => {
                   <Plus size={12} /> Create task
                 </span>
               </button>
-              {/* <button
-  style={{ ...styles.btn, ...styles.btnPrimary }}
-  onClick={() => setIsModalOpen(true)}
->
-  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-    <Play size={12} /> Start tasks
-  </span>
-</button> */}
             </div>
           </div>
 
@@ -705,53 +712,13 @@ const SalesDashboard: NextPageWithLayout = () => {
         </>
         )}
 
-        {activeTab === "Companies" && (
-        //   <div style={styles.section}>
-        //     <SectionHeader title="Companies" />
-        //     <div style={styles.emptyState}>
-        //       <div style={styles.emptyTitle}>Companies View</div>
-        //       <p style={styles.emptyText}>
-        //         This is the Companies tab content. Company management features will be displayed here.
-        //       </p>
-        //     </div>
-        //   </div>
+        {activeTab === "Companies" && <CompanyData />}
 
-        <CompanyData />
-        )}
+        {activeTab === "Deals" && <DealsData />}
 
-        {activeTab === "Deals" && (
-        //   
-        <DealsData />
-        )}
+        {activeTab === "Tasks" && <TasksData />}
 
-        {activeTab === "Tasks" && (
-        <TasksData />
-        )}
-
-        {activeTab === "Calendar" && (
-          <SchedulePage />
-          // <div style={styles.section}>
-          //   <SectionHeader title="Schedule" />
-          //   <div style={styles.emptyState}>
-          //     <div style={styles.emptyTitle}>Schedule View</div>
-          //     <p style={styles.emptyText}>
-          //       This is the Schedule tab content. Calendar and scheduling features will be displayed here.
-          //     </p>
-          //   </div>
-          // </div>
-        )}
-
-        {/* {activeTab === "Dashboard" && (
-          <div style={styles.section}>
-            <SectionHeader title="Dashboard Analytics" />
-            <div style={styles.emptyState}>
-              <div style={styles.emptyTitle}>Dashboard View</div>
-              <p style={styles.emptyText}>
-                This is the Dashboard tab content. Analytics and insights will be displayed here.
-              </p>
-            </div>
-          </div>
-        )} */}
+        {activeTab === "Calendar" && <SchedulePage />}
       </div>
 
       {/* ── Got feedback button ── */}
@@ -791,11 +758,11 @@ const SalesDashboard: NextPageWithLayout = () => {
             onClose={() => { setShowCreate(false); setEditId(null); }}
             onSubmit={(formData, addAnother) => {
               console.log("Task form submitted:", formData, "Add another:", addAnother);
-              // TODO: Call API to create/update task here
-              // await createTask(formData) or await updateTask(editId, formData)
               toast.success(editId ? "Task updated" : "Task created");
-              // Optionally refresh task list here if needed
-              if (!addAnother) { setShowCreate(false); setEditId(null); }
+              if (!addAnother) {
+                setShowCreate(false);
+                setEditId(null);
+              }
             }}
             taskId={editId}
             loading={saving}
