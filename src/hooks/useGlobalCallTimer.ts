@@ -9,6 +9,22 @@ interface CallTimerData {
 
 type TimerProvidedStartTime = Date | string | null | undefined
 
+/** Parses API / hook start time (UTC-first, then local, then native Date). */
+function parseCallTimerStartTimeInput(value: Date | string): Date {
+  if (value instanceof Date) {
+    return value
+  }
+  let parsedMoment = moment.utc(value)
+  if (parsedMoment.isValid()) {
+    return parsedMoment.toDate()
+  }
+  parsedMoment = moment(value)
+  if (parsedMoment.isValid()) {
+    return parsedMoment.toDate()
+  }
+  return new Date(value)
+}
+
 class GlobalCallTimerManager {
   private static instance: GlobalCallTimerManager
   private readonly timers: Map<string, CallTimerData> = new Map()
@@ -25,39 +41,12 @@ class GlobalCallTimerManager {
   startTimer(dn: string, callback: (time: string) => void, providedStartTime?: TimerProvidedStartTime, forceNew?: boolean) {
     let startTime: Date
     const existingTimer = this.timers.get(dn)
-    
+
     if (providedStartTime) {
-      // If startTime is provided, parse it correctly handling timezone
-      if (providedStartTime instanceof Date) {
-        startTime = providedStartTime
-      } else {
-        // Parse the startTime string from API
-        // Format: "2026-01-09T19:55:29.336815488" (ISO-like, typically UTC from server)
-        // Parse as UTC first (most APIs send UTC), then we'll use it directly
-        // JavaScript Date objects store time as UTC internally, so we just need to parse correctly
-        let parsedMoment = moment.utc(providedStartTime)
-        
-        if (parsedMoment.isValid()) {
-          // Create Date from UTC timestamp - this preserves the actual time
-          // The Date object will represent this UTC time correctly
-          startTime = parsedMoment.toDate()
-        } else {
-          // If UTC parsing fails, try as local time
-          parsedMoment = moment(providedStartTime)
-          if (parsedMoment.isValid()) {
-            startTime = parsedMoment.toDate()
-          } else {
-            // Final fallback
-            startTime = new Date(providedStartTime)
-          }
-        }
-      }
+      startTime = parseCallTimerStartTimeInput(providedStartTime)
     } else if (existingTimer && !forceNew && existingTimer.isActive) {
-      // Only reuse existing startTime if timer is still active and we're not forcing new
-      // This handles re-renders of the same active call
       startTime = existingTimer.startTime
     } else {
-      // No API start time — do not run from wall clock (avoids fake ticking when startTime is null)
       return
     }
     
@@ -65,12 +54,9 @@ class GlobalCallTimerManager {
     this.timers.set(dn, { dn, startTime, isActive: true })
     this.callbacks.set(dn, callback)
 
-    // Start the global interval if not already running
-    if (!this.interval) {
-      this.interval = setInterval(() => {
-        this.updateAllTimers()
-      }, 1000)
-    }
+    this.interval ??= setInterval(() => {
+      this.updateAllTimers()
+    }, 1000)
 
     // Update immediately to show current elapsed time
     this.updateTimer(dn)
@@ -85,28 +71,7 @@ class GlobalCallTimerManager {
   updateStartTime(dn: string, newStartTime: Date | string) {
     const timer = this.timers.get(dn)
     if (timer) {
-      let startTime: Date
-      if (newStartTime instanceof Date) {
-        startTime = newStartTime
-      } else {
-        // Parse the startTime string from API
-        // Parse as UTC first (most APIs send UTC)
-        let parsedMoment = moment.utc(newStartTime)
-        
-        if (parsedMoment.isValid()) {
-          // Create Date from UTC timestamp
-          startTime = parsedMoment.toDate()
-        } else {
-          // If UTC parsing fails, try as local time
-          parsedMoment = moment(newStartTime)
-          if (parsedMoment.isValid()) {
-            startTime = parsedMoment.toDate()
-          } else {
-            // Final fallback
-            startTime = new Date(newStartTime)
-          }
-        }
-      }
+      const startTime = parseCallTimerStartTimeInput(newStartTime)
       this.timers.set(dn, { ...timer, startTime })
       // Update immediately with new startTime
       this.updateTimer(dn)
